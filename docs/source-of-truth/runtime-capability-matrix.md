@@ -1,0 +1,60 @@
+# owlmlx Runtime Capability Matrix
+
+> Status: authoritative
+> Updated: 2026-04-09
+
+Capability labels:
+
+- `supported`
+- `partial`
+- `experimental`
+- `not in scope`
+
+## 1. owlmlx Core Supported Capabilities
+
+| Capability | Label | Notes |
+|---|---|---|
+| Runtime identity as self-owned project | supported | This repository exists to freeze that boundary |
+| Runtime architecture truth | supported | Core documents define the architecture boundary |
+| Memory governance under multi-model switching | supported | Formal runtime principle |
+| Switch safety and active-request protection | supported | Formal runtime principle |
+| Runtime truth exposure as owned requirement | supported | Upper layers should consume runtime truth rather than invent it |
+| Background-heavy serving as a runtime class | supported | Formal runtime principle, even though path maturity differs |
+| Hazardous-operation governance | supported | Runtime-risking work belongs to runtime governance |
+| Safe-resume contract as runtime governance | supported | Controlled re-entry is part of runtime truth |
+| Fully self-owned implementation stack | partial | First Python module exists for schema validation only; serving and lifecycle implementation remain outside owlmlx |
+
+## 2. Large-Weight Path Supported Capabilities
+
+| Capability | Label | Notes |
+|---|---|---|
+| Large-weight runtime path exists | supported | First mature path inside `owlmlx` |
+| Background-heavy serving posture | supported | Honest current direction |
+| Honest specimen-specific capability labels | supported | Path should not overclaim from a single specimen |
+| Path naming independent of one model | supported | `Kimi` is not the permanent path name |
+
+## 3. Specialized-Only Capabilities
+
+| Capability | Label | Notes |
+|---|---|---|
+| `Kimi` as first validated specimen | supported | Historical and architectural milestone |
+| Specimen-specific runtime behavior | partial | Must not be confused with core runtime truth |
+| A specimen proving a path can exist | supported | Does not automatically generalize to other specimens |
+
+## 4. Future Or Not Yet Established
+
+| Capability | Label | Notes |
+|---|---|---|
+| Generalized foreground-interactive runtime | experimental | Not yet established as current truth |
+| Additional runtime paths beyond large-weight | experimental | Future only when real capability truth exists |
+| Fully internalized replacements for all external runtime mechanisms | partial | Directional goal, not current fact |
+| External runtime features observed but not adopted | not in scope | External reference is not `owlmlx` support |
+| `Kimi` as permanent name for the whole path | not in scope | Explicitly rejected |
+
+## 5. Product-Layer Relationship
+
+| Capability | Label | Notes |
+|---|---|---|
+| Desktop product shell above `owlmlx` | supported | Frozen boundary; repository naming may change |
+| Desktop shell defining runtime identity | not in scope | Runtime truth belongs here |
+| Shared runtime truth consumed by upper layers | supported | Required architecture direction |
