@@ -56,8 +56,9 @@ These are runtime-level goals, not temporary integration work.
 12. `runtime-contract-adoption-plan.md`
 13. `extraction-inventory.md`
 14. `autonomous-loop-discipline.md`
-15. `roadmap.md`
-16. `gemma-high-fidelity-role.md`
+15. `large-weight-path-truth.md`
+16. `roadmap.md`
+17. `gemma-high-fidelity-role.md`
 
 ## 6. Adoption Model
 
@@ -77,19 +78,16 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-The identity-freeze question is substantially answered. The current task is:
+Phase 2 is in progress. owlmlx now owns real serving code (generation gate,
+status builder) and the platform shell formally references it. The current
+question is:
 
-How do we advance from source-of-truth stability into the first concrete
-runtime-owned implementation beyond schema validation — specifically, moving
-from Phase 1 (truth freeze) into Phase 2 (large-weight path productization)
-with the extraction discipline, adoption model, and validated boundaries
-already established?
+What are the remaining gaps between "first owned module" and a self-sufficient
+large-weight runtime path that can evolve independently of the platform shell?
 
-The four immediate sub-questions are:
+Concrete sub-questions:
 
-1. Is Phase 1 complete enough to enter Phase 2?
-2. What is the minimum Phase 2 deliverable that proves owlmlx can own
-   implementation, not just documentation?
-3. Which "owned but shell-hosted" items should migrate first?
-4. How does the validated serving architecture (single-worker, queue-based)
-   become owlmlx-owned code rather than remaining in kimi-sharded-engine.py?
+1. Does owlmlx need its own serving entrypoint, or is the shell bridge sufficient?
+2. Which additional runtime responsibilities (lifecycle, readiness, memory
+   governance) should migrate next?
+3. When does Phase 2 have enough real code to declare productization complete?

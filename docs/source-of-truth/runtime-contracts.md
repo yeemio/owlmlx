@@ -67,7 +67,22 @@ to the first mature path, including:
 `Kimi` currently validates this path, but the contract is path-owned rather than
 specimen-owned.
 
-### 5.1 Validated Runtime Boundaries (From First Specimen)
+The formal path truth (serving posture, concurrency boundary, memory behavior,
+lifecycle, governance) is frozen in `large-weight-path-truth.md`.
+
+### 5.1 Owned Serving Modules
+
+The following owlmlx modules implement runtime contracts for this path:
+
+- `owlmlx/serving.py` — `GenerationGate` enforces the queue-based single-worker
+  generation discipline (concurrency boundary = 1)
+- `owlmlx/serving_status.py` — `build_large_weight_serving_status()` produces
+  the owlmlx-owned status shape; `merge_specimen_identity()` layers specimen
+  detail on top
+- `owlmlx/runtime_status.py` — schema validation for both core and large-weight
+  status payloads
+
+### 5.2 Validated Runtime Boundaries (From First Specimen)
 
 The following runtime boundaries were established through the Kimi K2.5
 experiment line (Phase 42, gates K-Q3a through K-Q4d) and have been absorbed
