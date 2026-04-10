@@ -35,6 +35,10 @@ Capability labels:
 | Background-heavy serving posture | supported | Honest current direction |
 | Honest specimen-specific capability labels | supported | Path should not overclaim from a single specimen |
 | Path naming independent of one model | supported | `Kimi` is not the permanent path name |
+| Single-worker queue-based serving | supported | Validated through K-Q4c; generation lock serializes safely |
+| Same-process parallel generation unsafe | supported | MLX/Metal substrate limitation; boundary = 1 |
+| Linear memory scaling for layer loading | supported | Validated 1→61 layers; no superlinear accumulation |
+| Heavy execution protocol field-validated | supported | K-Q3a→K-Q4d escalation proved the protocol |
 
 ## 3. Specialized-Only Capabilities
 

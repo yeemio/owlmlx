@@ -60,6 +60,25 @@ The `owlmlx` core runtime is organized around four non-optional principles:
 
 These principles define the core runtime more than any inherited codebase does.
 
+### 3.2a Principle Priority Under Conflict
+
+When runtime principles conflict, the following priority applies:
+
+1. **Host safety** (from runtime governance) — always first; a runtime that
+   threatens host stability has failed regardless of other goals
+2. **Memory governance** — memory truth constrains what is possible; decisions
+   made without memory truth are unsafe
+3. **Switch safety** — protecting active work is a correctness requirement
+4. **Runtime truth exposure** — honest state must not be sacrificed for
+   performance or convenience
+5. **Background-heavy serving** — serving posture classification follows from
+   the above; it does not override safety or truth
+
+This priority is not academic. The Kimi experiment line demonstrated it
+concretely: host safety forced the safe-resume gate, memory governance drove
+the escalation ladder, and serving posture (background-only) was a consequence
+of the other constraints.
+
 ### 3.3 Core Runtime Ownership
 
 The following belong to the `owlmlx core runtime` layer:
@@ -101,6 +120,13 @@ Characteristics:
 
 `Kimi` is the first validated specimen on this path. It is a milestone, not the
 name of the path.
+
+Validated serving architecture (from first specimen experiment line):
+
+- single-worker queue-based serving is the safe production pattern
+- same-process parallel generation is unsafe (MLX/Metal substrate limitation)
+- multi-process isolation bypasses the crash but is not cost-effective
+- engine warmup should complete before accepting requests
 
 ### 4.2 Future Paths
 

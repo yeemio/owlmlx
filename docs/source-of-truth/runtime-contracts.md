@@ -67,6 +67,48 @@ to the first mature path, including:
 `Kimi` currently validates this path, but the contract is path-owned rather than
 specimen-owned.
 
+### 5.1 Validated Runtime Boundaries (From First Specimen)
+
+The following runtime boundaries were established through the Kimi K2.5
+experiment line (Phase 42, gates K-Q3a through K-Q4d) and have been absorbed
+into large-weight path truth:
+
+**Serving concurrency:**
+
+- Same-process parallel generation is unsafe on MLX/Metal (substrate-level
+  thread-safety limitation, not specimen-specific)
+- Serialized queue-based serving (generation lock) is the safe production
+  pattern; validated to 4 queued connections
+- Multi-process isolation bypasses the thread-safety crash but is not
+  cost-effective (2× memory for ~1.1× throughput due to Metal GPU contention)
+
+**Memory behavior:**
+
+- BF16 attention layer loading scales linearly with layer count (no
+  superlinear accumulation observed across 1→61 layer escalation)
+- GC cleanup returns Metal active memory to pool floor; no persistent
+  accumulation detected
+- Memory pressure from concurrent engine instances is additive and predictable
+
+**Serving architecture:**
+
+- Single-worker, queue-based serving is the recommended production pattern
+  for large-weight path models
+- Engine warmup (prefill + initial generation) should happen before accepting
+  requests
+- Health and status endpoints must remain responsive even under generation load
+
+**Governance validation:**
+
+- The heavy execution protocol (dry-run → single-unit → serial → thresholded
+  → expansion) was field-validated through the full K-Q3/K-Q4 escalation
+- Safe-resume contracts were exercised after a real host incident
+- These governance rules are now runtime truth, not just documentation
+
+These boundaries are path-level truth. Specimen-specific details (layer count,
+per-layer memory size, generation speed) remain specimen-scoped and should not
+be generalized without evidence from additional specimens.
+
 ## 6. Relationship To Platform Protocols
 
 The current desktop product shell repository may continue to define:
