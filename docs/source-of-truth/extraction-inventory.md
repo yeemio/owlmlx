@@ -129,8 +129,10 @@ Wave A is considered complete when:
 4. Contract-test expectations from the platform shell repository point at
    owlmlx truth, not at local copies
 
-Current status: **substantially complete** — `runtime_status.py` and
-`serving.py` exist and validate; shell-side bridge test imports owlmlx;
+Current status: **substantially complete** — `runtime_status.py`, `serving.py`,
+and `serving_status.py` exist and validate; shell-side bridge test imports
+owlmlx; `kimi-sharded-engine.py` imports `GenerationGate` and
+`build_large_weight_serving_status` from owlmlx when available;
 contract-mapping exists. Gap: wider contract-test alignment beyond
 runtime-status and serving paths.
 

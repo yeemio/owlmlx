@@ -187,6 +187,21 @@ Round 1 outputs:
   safety, async execution, timing verification
 - extraction-inventory and capability-matrix updated
 
+Round 2 outputs:
+
+- `owlmlx/serving_status.py` — large-weight serving status builder
+- `tests/test_serving_status.py` — 10 tests for status composition
+- `build_large_weight_serving_status()` composes gate + memory + lifecycle
+- `merge_specimen_identity()` layers specimen detail on owlmlx base
+
+Round 3 outputs:
+
+- `kimi-sharded-engine.py` bridged to import owlmlx GenerationGate
+- `kimi-sharded-engine.py` bridged to import owlmlx serving status builders
+- Graceful fallback when owlmlx not on path (backward compatible)
+- Generate endpoint exposes gate timing metadata
+- Shell now formally references owlmlx as upstream runtime truth
+
 ## 4. Phase 3: Core Runtime Consolidation
 
 Goal:
