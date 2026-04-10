@@ -65,6 +65,7 @@ These are runtime-level goals, not temporary integration work.
 20. `training-to-serving-contract.md`
 21. `capability-absorption-inventory.md`
 22. `ownership-boundary.md`
+23. `model-line-placement.md`
 
 ## 6. Adoption Model
 

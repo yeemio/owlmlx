@@ -354,4 +354,19 @@ Delivered:
 - Ownership split rules frozen (runtime IS vs platform DOES WITH)
 - Provisional model-line placement for Gemma, Kimi 1T, gpt-oss-120b
 - Truth owner index for future questions
+
+### Round 3 — Freeze Model-Line Placement
+
+Status: **complete** (2026-04-10)
+
+Delivered:
+
+- `model-line-placement.md` — formal position for every model line
+- Gemma: owlmlx-native production mainline (only training-integrated line)
+- Kimi 1T: large-weight path specimen (lab, not production)
+- gpt-oss-120b: platform-managed stable heavy synthesis
+- Distilled-27B: platform default (standard + backup paths)
+- Qwen3.5, Mistral-Large: standard platform models
+- Two runtime path classes identified: standard MLX + large-weight
+- owlmlx does not own product roles — permanent split
   (small, hardware-verified, self-contained)
