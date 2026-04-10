@@ -339,4 +339,19 @@ Delivered:
 - 14 explicit non-candidates with reasoning
 - Next-round decision hooks for ownership boundary and first absorption target
 - Strongest first-absorption candidates: abort recovery + context concurrency
+
+### Round 2 — Freeze Ownership Boundary
+
+Status: **complete** (2026-04-10)
+
+Delivered:
+
+- `ownership-boundary.md` — formal ownership table for all platform capabilities
+- 5 ownership categories: runtime-owned (R), control-plane (C), routing (T),
+  shell-hosted (S), product-surface (P)
+- 19 runtime-owned capabilities (10 already owned, 9 to absorb)
+- 9 control-plane, 7 routing, 5 shell-hosted, 6 product-surface
+- Ownership split rules frozen (runtime IS vs platform DOES WITH)
+- Provisional model-line placement for Gemma, Kimi 1T, gpt-oss-120b
+- Truth owner index for future questions
   (small, hardware-verified, self-contained)
