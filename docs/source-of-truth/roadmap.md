@@ -108,7 +108,11 @@ Acceptance:
 - runtime contract adoption plan exists
 - shell-side runtime samples validate against `owlmlx` schema
 
-Status: **in progress** (2026-04-09)
+Status: **substantially complete** (2026-04-10)
+
+Waves 1–3 of the contract adoption plan are complete. Wave 4 (runtime-owned
+module expansion beyond schema validation) is deferred to Phase 2 because it
+requires new owlmlx implementation, which is the Phase 2 goal.
 
 Prompt: `docs/phase-prompts/owlmlx-phase-1d-contract-adoption.md`
 
@@ -119,10 +123,10 @@ Current achieved outputs:
 - shell protocol sections now reference `owlmlx` runtime contracts
 - router runtime-status builders normalize through `owlmlx` helper functions
 
-Remaining inside Phase 1D:
+Deferred to Phase 2:
 
 - wider contract-test alignment beyond runtime-status paths
-- additional runtime-owned helper expansion
+- additional runtime-owned helper expansion (requires new owlmlx modules)
 
 ## 2.11 Phase 1E: Adoption Model And Loop Discipline Freeze
 

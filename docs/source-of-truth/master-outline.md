@@ -1,7 +1,7 @@
 # owlmlx Master Outline
 
 > Status: authoritative outline
-> Updated: 2026-04-09
+> Updated: 2026-04-10
 
 ## 1. What `owlmlx` Is
 
@@ -77,10 +77,19 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-The present task is not "how much code has moved yet?"
+The identity-freeze question is substantially answered. The current task is:
 
-The present task is:
+How do we advance from source-of-truth stability into the first concrete
+runtime-owned implementation beyond schema validation — specifically, moving
+from Phase 1 (truth freeze) into Phase 2 (large-weight path productization)
+with the extraction discipline, adoption model, and validated boundaries
+already established?
 
-How do we freeze a correct runtime identity, architecture, and extraction
-boundary so future implementation work lands in the right repository and under
-the right truth model?
+The four immediate sub-questions are:
+
+1. Is Phase 1 complete enough to enter Phase 2?
+2. What is the minimum Phase 2 deliverable that proves owlmlx can own
+   implementation, not just documentation?
+3. Which "owned but shell-hosted" items should migrate first?
+4. How does the validated serving architecture (single-worker, queue-based)
+   become owlmlx-owned code rather than remaining in kimi-sharded-engine.py?

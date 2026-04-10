@@ -47,6 +47,10 @@ If a task does not specify a narrower entry point, read in this order:
 - Do not describe `owlmlx` as "just a fork" or "just a wrapper"
 - When borrowing ideas from external runtimes, rewrite them as `owlmlx`
   architecture, not as borrowed branding
+- Follow the autonomous loop discipline when iterating on source-of-truth
+  (see `autonomous-loop-discipline.md`)
+- Respect the adoption model: borrowed code enters as `partial` or
+  `experimental`, never automatically as `supported`
 
 ## Boundary Discipline
 
@@ -66,6 +70,8 @@ This repository does not own:
 
 ## Current Working Assumption
 
-The repository is in source-of-truth bootstrap mode. Prefer clarifying
-architecture, naming, capability boundaries, and extraction strategy before
-adding large code imports.
+The repository has completed source-of-truth bootstrap mode (Phase 0–1E) and
+is approaching Phase 2 (large-weight path productization). The immediate
+question is no longer "how to freeze the boundary" but "what is the first
+concrete implementation deliverable that proves owlmlx can own runtime code,
+not just documentation."

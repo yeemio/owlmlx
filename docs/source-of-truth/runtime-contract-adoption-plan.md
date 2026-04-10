@@ -1,7 +1,7 @@
 # owlmlx Runtime Contract Adoption Plan
 
 > Status: working plan
-> Updated: 2026-04-09
+> Updated: 2026-04-10
 
 ## 1. Purpose
 
@@ -78,4 +78,4 @@ Current status:
 - Wave 1 complete on 2026-04-09
 - Wave 2 complete on 2026-04-09
 - Wave 3 complete on 2026-04-09
-- Wave 4 not started
+- Wave 4 deferred to Phase 2 (requires new owlmlx implementation modules)
