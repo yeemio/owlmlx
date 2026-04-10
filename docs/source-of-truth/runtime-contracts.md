@@ -13,10 +13,11 @@ semantic ownership belongs here.
 
 ## 2. Contract Families
 
-`owlmlx` currently recognizes two first-class contract families:
+`owlmlx` currently recognizes three first-class contract families:
 
 1. `core runtime status`
 2. `large-weight runtime path status`
+3. `training substrate`
 
 These are runtime contracts, not dashboard-only response shapes.
 
@@ -124,7 +125,23 @@ These boundaries are path-level truth. Specimen-specific details (layer count,
 per-layer memory size, generation speed) remain specimen-scoped and should not
 be generalized without evidence from additional specimens.
 
-## 6. Relationship To Platform Protocols
+## 6. Training Substrate Contract
+
+The training substrate contract exists to define how model training relates to
+the owlmlx runtime. It covers:
+
+- training environment (hardware, venv, managed environment rules)
+- training stack selection (primary MLX native, fallback PyTorch + PEFT)
+- substrate boundary (owlmlx-owned vs shell-owned vs external tooling)
+- model architecture verification rules
+
+This contract is the authority for training environment truth. It is NOT a
+training orchestration system. Data engineering, evaluation criteria, and
+training job scheduling remain outside this contract.
+
+The full contract is in `training-substrate-contract.md`.
+
+## 7. Relationship To Platform Protocols
 
 The current desktop product shell repository may continue to define:
 

@@ -22,7 +22,9 @@ Capability labels:
 | Background-heavy serving as a runtime class | supported | Formal runtime principle, even though path maturity differs |
 | Hazardous-operation governance | supported | Runtime-risking work belongs to runtime governance |
 | Safe-resume contract as runtime governance | supported | Controlled re-entry is part of runtime truth |
-| Fully self-owned implementation stack | partial | Two Python modules exist (schema validation + generation gate); lifecycle implementation remains outside owlmlx |
+| Training substrate contract (environment, stack, boundary) | supported | Frozen in training-substrate-contract.md; MLX native primary, PyTorch fallback |
+| Training architecture verification rule | supported | Model must pass 5-step LoRA pilot before entering substrate |
+| Fully self-owned implementation stack | partial | Four Python modules exist (schema validation + generation gate + serving status); lifecycle implementation remains outside owlmlx |
 | Queue-based generation gate (owlmlx-owned) | supported | `owlmlx/serving.py` — GenerationGate class with 11 tests; enforces validated concurrency boundary |
 | Formal adoption model (reuse open-source, own truth layer) | supported | Adoption rule frozen in product-definition section 6 |
 | Extraction discipline with wave ordering | supported | Discipline rules frozen in extraction-inventory section 3 |
@@ -57,7 +59,7 @@ Capability labels:
 | Generalized foreground-interactive runtime | experimental | Not yet established as current truth |
 | Additional runtime paths beyond large-weight | experimental | Future only when real capability truth exists |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction, not yet frozen as supported path |
-| `gemma-4-31B-it` as first high-fidelity candidate | experimental | Useful planning candidate; not yet a frozen path class |
+| `gemma-4-31B-it` as first high-fidelity candidate | experimental | Production mainline candidate; training viability verified, substrate contract frozen |
 | Fully internalized replacements for all external runtime mechanisms | partial | Directional goal, not current fact |
 | Full-rewrite of every execution layer | not in scope | Adoption model explicitly rejects this as unnecessary |
 | External runtime features observed but not adopted | not in scope | External reference is not `owlmlx` support |

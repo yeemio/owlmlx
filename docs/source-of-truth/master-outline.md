@@ -59,6 +59,7 @@ These are runtime-level goals, not temporary integration work.
 15. `large-weight-path-truth.md`
 16. `roadmap.md`
 17. `gemma-high-fidelity-role.md`
+18. `training-substrate-contract.md`
 
 ## 6. Adoption Model
 
@@ -78,16 +79,17 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-Phase 2 is in progress. owlmlx now owns real serving code (generation gate,
-status builder) and the platform shell formally references it. The current
-question is:
+The training-and-production program is in progress. owlmlx now has a frozen
+training substrate contract defining environment, stack selection, and boundary
+rules. The current question is:
 
-What are the remaining gaps between "first owned module" and a self-sufficient
-large-weight runtime path that can evolve independently of the platform shell?
+**What artifact layout and naming contract does owlmlx need so that trained
+model artifacts (adapters, checkpoints, metadata) have a formal home instead
+of ad-hoc file paths?**
 
 Concrete sub-questions:
 
-1. Does owlmlx need its own serving entrypoint, or is the shell bridge sufficient?
-2. Which additional runtime responsibilities (lifecycle, readiness, memory
-   governance) should migrate next?
-3. When does Phase 2 have enough real code to declare productization complete?
+1. What is the canonical directory structure for base models, adapters,
+   checkpoints, and evaluation artifacts?
+2. How are trained artifacts named and versioned?
+3. Where is the artifact registration truth that the runtime consumes?

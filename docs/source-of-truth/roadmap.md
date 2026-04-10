@@ -241,3 +241,42 @@ Current live candidate:
 
 - `gemma-4-31B-it` as the first serious high-fidelity teacher/reference
   specimen candidate
+
+## 6. Training And Production Program
+
+Goal:
+
+- unify owlmlx training substrate with Gemma production mainline
+- owlmlx owns training environment, artifact, and training-to-serving contracts
+- Gemma validates the substrate as the first production mainline model
+
+Program contract: `owlmlx-gemma-training-and-production-mainline`
+
+### Round 1 — Training Substrate Contract
+
+Status: **complete** (2026-04-10)
+
+Delivered:
+
+- `training-substrate-contract.md` — authoritative training environment,
+  stack selection, and substrate boundary contract
+- `runtime-contracts.md` updated — training substrate added as third contract
+  family
+- `runtime-capability-matrix.md` updated — training substrate row added
+- `master-outline.md` updated — new document listed, dominant question updated
+
+### Round 2 — Artifact Layout Contract
+
+Status: **not started**
+
+### Round 3 — Training-To-Serving Contract
+
+Status: **not started**
+
+### Round 4 — Minimal Gemma Pilot
+
+Status: **not started**
+
+### Round 5 — Production Mainline Freeze
+
+Status: **not started**
