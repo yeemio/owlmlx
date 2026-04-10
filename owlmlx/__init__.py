@@ -19,6 +19,10 @@ from .serving import (
     GenerationResult,
     MAX_GENERATION_CONCURRENCY,
 )
+from .serving_status import (
+    build_large_weight_serving_status,
+    merge_specimen_identity,
+)
 
 __all__ = [
     "ALLOWED_CAPABILITY_LABELS",
@@ -33,6 +37,8 @@ __all__ = [
     "SUPPORTED",
     "UNSUPPORTED",
     "ValidationResult",
+    "build_large_weight_serving_status",
+    "merge_specimen_identity",
     "normalize_core_runtime_status",
     "normalize_large_weight_runtime_status",
     "validate_runtime_status",
