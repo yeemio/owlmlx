@@ -161,6 +161,7 @@ Actual outputs:
 Goal:
 
 - turn the first mature path into an explicitly owned `owlmlx` runtime path
+- produce real owlmlx-owned serving/lifecycle modules, not just documentation
 
 Focus areas:
 
@@ -172,6 +173,19 @@ Acceptance:
 
 - path has stable terminology
 - specimen-specific facts are separated from path-level facts
+- at least one real owlmlx-owned serving module with tests
+- platform shell references the new module
+
+Status: **in progress** (2026-04-10)
+
+Round 1 outputs:
+
+- path scope frozen (path-level vs specimen-only facts)
+- first owned module selected: queue-based generation gate
+- `owlmlx/serving.py` — GenerationGate class extracted and rebuilt
+- `tests/test_serving.py` — 11 tests including serialization, exception
+  safety, async execution, timing verification
+- extraction-inventory and capability-matrix updated
 
 ## 4. Phase 3: Core Runtime Consolidation
 

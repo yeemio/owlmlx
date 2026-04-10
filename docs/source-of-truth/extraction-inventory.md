@@ -75,7 +75,9 @@ checks:
 | `/Users/yeemio/AI/gitrep/owlmlx/files/verification-assets/phase-42-imported/kimi-crash-safe-resume-gate.md` | `owlmlx-owned judgment` | Imported first-instance safe-resume artifact preserved inside owlmlx |
 | `/Users/yeemio/AI/gitrep/owlmlx/files/verification-assets/phase-42-imported/kimi-nextgen-next-round-entry-safe-resume.md` | `owlmlx-owned judgment` | Imported first-instance hazardous-operation reclassification artifact preserved inside owlmlx |
 | `/Users/yeemio/AI/gitrep/owlmlx/owlmlx/runtime_status.py` | `owlmlx-owned judgment` | First extracted executable runtime-truth module |
+| `/Users/yeemio/AI/gitrep/owlmlx/owlmlx/serving.py` | `owlmlx-owned judgment` | Queue-based generation gate — first owlmlx-owned serving discipline module |
 | `/Users/yeemio/AI/gitrep/owlmlx/tests/test_runtime_status.py` | `owlmlx-owned judgment` | First test protection for extracted runtime-truth code |
+| `/Users/yeemio/AI/gitrep/owlmlx/tests/test_serving.py` | `owlmlx-owned judgment` | Tests for generation gate serialization, exception safety, async execution |
 
 ## 5. Platform-Shell Retained Areas
 
@@ -127,9 +129,10 @@ Wave A is considered complete when:
 4. Contract-test expectations from the platform shell repository point at
    owlmlx truth, not at local copies
 
-Current status: **substantially complete** — `runtime_status.py` exists and
-validates; shell-side bridge test imports owlmlx; contract-mapping exists. Gap:
-wider contract-test alignment beyond runtime-status path.
+Current status: **substantially complete** — `runtime_status.py` and
+`serving.py` exist and validate; shell-side bridge test imports owlmlx;
+contract-mapping exists. Gap: wider contract-test alignment beyond
+runtime-status and serving paths.
 
 ### Wave B: Runtime Entrypoints
 

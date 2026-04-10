@@ -22,7 +22,8 @@ Capability labels:
 | Background-heavy serving as a runtime class | supported | Formal runtime principle, even though path maturity differs |
 | Hazardous-operation governance | supported | Runtime-risking work belongs to runtime governance |
 | Safe-resume contract as runtime governance | supported | Controlled re-entry is part of runtime truth |
-| Fully self-owned implementation stack | partial | First Python module exists for schema validation only; serving and lifecycle implementation remain outside owlmlx |
+| Fully self-owned implementation stack | partial | Two Python modules exist (schema validation + generation gate); lifecycle implementation remains outside owlmlx |
+| Queue-based generation gate (owlmlx-owned) | supported | `owlmlx/serving.py` — GenerationGate class with 11 tests; enforces validated concurrency boundary |
 | Formal adoption model (reuse open-source, own truth layer) | supported | Adoption rule frozen in product-definition section 6 |
 | Extraction discipline with wave ordering | supported | Discipline rules frozen in extraction-inventory section 3 |
 | Autonomous loop discipline for self-iteration | supported | Loop discipline frozen in autonomous-loop-discipline.md |
