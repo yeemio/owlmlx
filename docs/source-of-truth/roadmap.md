@@ -279,7 +279,15 @@ Delivered:
 
 ### Round 3 — Training-To-Serving Contract
 
-Status: **not started**
+Status: **complete** (2026-04-10)
+
+Delivered:
+
+- `training-to-serving-contract.md` — load path, serving feasibility checklist,
+  runtime status extension for tuned artifacts, responsibility boundary
+- `runtime-contracts.md` updated — training-to-serving added as 5th family
+- `runtime-capability-matrix.md` updated — training-to-serving row added
+- `master-outline.md` updated — new document listed
 
 ### Round 4 — Minimal Gemma Pilot
 

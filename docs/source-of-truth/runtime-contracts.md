@@ -19,6 +19,7 @@ semantic ownership belongs here.
 2. `large-weight runtime path status`
 3. `training substrate`
 4. `artifact layout`
+5. `training-to-serving`
 
 These are runtime contracts, not dashboard-only response shapes.
 
@@ -155,7 +156,21 @@ they are named, versioned, and registered for runtime consumption. It covers:
 
 The full contract is in `artifact-layout-contract.md`.
 
-## 8. Relationship To Platform Protocols
+## 8. Training-To-Serving Contract
+
+The training-to-serving contract defines how trained artifacts re-enter the
+owlmlx runtime for inference. It covers:
+
+- load path for LoRA adapters and full fine-tune artifacts
+- serving feasibility checklist (registration, file integrity, load
+  verification, inference delta, memory budget, path compliance)
+- runtime status extension for tuned artifact identity
+- model switching safety integration with GenerationGate
+- responsibility boundary between runtime (HOW to switch) and product (WHEN)
+
+The full contract is in `training-to-serving-contract.md`.
+
+## 9. Relationship To Platform Protocols
 
 The current desktop product shell repository may continue to define:
 

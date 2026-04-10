@@ -61,6 +61,7 @@ These are runtime-level goals, not temporary integration work.
 17. `gemma-high-fidelity-role.md`
 18. `training-substrate-contract.md`
 19. `artifact-layout-contract.md`
+20. `training-to-serving-contract.md`
 
 ## 6. Adoption Model
 
