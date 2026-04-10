@@ -18,6 +18,7 @@ semantic ownership belongs here.
 1. `core runtime status`
 2. `large-weight runtime path status`
 3. `training substrate`
+4. `artifact layout`
 
 These are runtime contracts, not dashboard-only response shapes.
 
@@ -141,7 +142,20 @@ training job scheduling remain outside this contract.
 
 The full contract is in `training-substrate-contract.md`.
 
-## 7. Relationship To Platform Protocols
+## 7. Artifact Layout Contract
+
+The artifact layout contract defines where trained model artifacts live, how
+they are named, versioned, and registered for runtime consumption. It covers:
+
+- base model path rules (read-only after download)
+- tuned artifact layout (`$MODELS_ROOT/{model-id}/tuned/{run-id}/`)
+- naming convention (`{task}-{method}-{date}-{seq}`)
+- metadata.json as the artifact registration record
+- checkpoint and evaluation subtree structure
+
+The full contract is in `artifact-layout-contract.md`.
+
+## 8. Relationship To Platform Protocols
 
 The current desktop product shell repository may continue to define:
 

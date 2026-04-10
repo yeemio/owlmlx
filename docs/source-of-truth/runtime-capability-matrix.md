@@ -22,6 +22,7 @@ Capability labels:
 | Background-heavy serving as a runtime class | supported | Formal runtime principle, even though path maturity differs |
 | Hazardous-operation governance | supported | Runtime-risking work belongs to runtime governance |
 | Safe-resume contract as runtime governance | supported | Controlled re-entry is part of runtime truth |
+| Artifact layout contract (tuned artifact paths, naming, registration) | supported | Frozen in artifact-layout-contract.md; run-id naming, metadata.json registration |
 | Training substrate contract (environment, stack, boundary) | supported | Frozen in training-substrate-contract.md; MLX native primary, PyTorch fallback |
 | Training architecture verification rule | supported | Model must pass 5-step LoRA pilot before entering substrate |
 | Fully self-owned implementation stack | partial | Four Python modules exist (schema validation + generation gate + serving status); lifecycle implementation remains outside owlmlx |

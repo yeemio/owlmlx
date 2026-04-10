@@ -267,7 +267,15 @@ Delivered:
 
 ### Round 2 — Artifact Layout Contract
 
-Status: **not started**
+Status: **complete** (2026-04-10)
+
+Delivered:
+
+- `artifact-layout-contract.md` — base model paths, tuned artifact layout,
+  run-id naming, metadata.json registration, checkpoint structure
+- `runtime-contracts.md` updated — artifact layout added as 4th contract family
+- `runtime-capability-matrix.md` updated — artifact layout row added
+- `master-outline.md` updated — new document listed
 
 ### Round 3 — Training-To-Serving Contract
 
