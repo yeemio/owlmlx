@@ -23,6 +23,9 @@ Capability labels:
 | Hazardous-operation governance | supported | Runtime-risking work belongs to runtime governance |
 | Safe-resume contract as runtime governance | supported | Controlled re-entry is part of runtime truth |
 | Fully self-owned implementation stack | partial | First Python module exists for schema validation only; serving and lifecycle implementation remain outside owlmlx |
+| Formal adoption model (reuse open-source, own truth layer) | supported | Adoption rule frozen in product-definition section 6 |
+| Extraction discipline with wave ordering | supported | Discipline rules frozen in extraction-inventory section 3 |
+| Autonomous loop discipline for self-iteration | supported | Loop discipline frozen in autonomous-loop-discipline.md |
 
 ## 2. Large-Weight Path Supported Capabilities
 
@@ -39,6 +42,7 @@ Capability labels:
 |---|---|---|
 | `Kimi` as first validated specimen | supported | Historical and architectural milestone |
 | Specimen-specific runtime behavior | partial | Must not be confused with core runtime truth |
+| Borrowed implementation auto-promoted to supported | not in scope | Adoption model explicitly rejects silent promotion |
 | A specimen proving a path can exist | supported | Does not automatically generalize to other specimens |
 
 ## 4. Future Or Not Yet Established
@@ -47,6 +51,8 @@ Capability labels:
 |---|---|---|
 | Generalized foreground-interactive runtime | experimental | Not yet established as current truth |
 | Additional runtime paths beyond large-weight | experimental | Future only when real capability truth exists |
+| High-fidelity teacher/reference runtime path | experimental | Candidate direction, not yet frozen as supported path |
+| `gemma-4-31B-it` as first high-fidelity candidate | experimental | Useful planning candidate; not yet a frozen path class |
 | Fully internalized replacements for all external runtime mechanisms | partial | Directional goal, not current fact |
 | External runtime features observed but not adopted | not in scope | External reference is not `owlmlx` support |
 | `Kimi` as permanent name for the whole path | not in scope | Explicitly rejected |

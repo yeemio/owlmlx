@@ -24,16 +24,37 @@ Each item must be classified as one of:
 
 Only items in categories 1 and 2 are extraction candidates for `owlmlx`.
 
-## 3. Immediate Extraction Candidates
+## 3. Extraction Discipline Rules
 
-### 3.1 Large-Weight Path Runtime
+Before any extraction candidate moves or is reclassified, it must pass these
+checks:
+
+1. **Boundary test** — does this code primarily answer a runtime question?
+   (See `repository-boundaries.md` section 7 for test questions.)
+2. **Adoption label** — is this `owlmlx-owned judgment` or `borrow and
+   internalize`? If the latter, has it been evaluated against owlmlx runtime
+   principles?
+3. **Capability label assignment** — what honest label does this get in the
+   capability matrix? Borrowed code that has not been validated under owlmlx
+   governance enters as `partial` or `experimental`, never `supported`.
+4. **Split rule** — if a file mixes runtime truth with shell logic, split
+   first, then extract the runtime portion. Do not move the whole file.
+5. **Wave ordering** — respect the wave sequence (A → B → C). Do not skip
+   ahead to Wave C internals if Wave A contracts are still unstable.
+6. **No silent promotion** — moving code into the owlmlx repo does not
+   automatically upgrade its capability label. Label promotion requires
+   explicit evaluation and evidence.
+
+## 4. Immediate Extraction Candidates
+
+### 4.1 Large-Weight Path Runtime
 
 | Current location | Classification | Why |
 |---|---|---|
 | `/Users/yeemio/AI/Agent/scripts/kimi-sharded-engine.py` | `owlmlx-owned judgment` | This is the clearest current implementation of the large-weight runtime path |
 | `/Users/yeemio/AI/Agent/scripts/start-kimi.sh` | `borrow and internalize` | Startup wrapper for the large-weight path should eventually become an `owlmlx` runtime entrypoint |
 
-### 3.2 Runtime Memory Governance And Switch Safety
+### 4.2 Runtime Memory Governance And Switch Safety
 
 | Current location | Classification | Why |
 |---|---|---|
@@ -42,7 +63,7 @@ Only items in categories 1 and 2 are extraction candidates for `owlmlx`.
 | `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/validate-swap-safe-patch.py` | `borrow and internalize` | Validation logic reflects runtime invariants we will want in owned form |
 | `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/patch-guard.sh` | `external reference only` | Upgrade guard for patched oMLX remains transitional until `owlmlx` no longer depends on patched upstream files |
 
-### 3.3 Runtime Truth Contracts
+### 4.3 Runtime Truth Contracts
 
 | Current location | Classification | Why |
 |---|---|---|
@@ -56,7 +77,7 @@ Only items in categories 1 and 2 are extraction candidates for `owlmlx`.
 | `/Users/yeemio/AI/gitrep/owlmlx/owlmlx/runtime_status.py` | `owlmlx-owned judgment` | First extracted executable runtime-truth module |
 | `/Users/yeemio/AI/gitrep/owlmlx/tests/test_runtime_status.py` | `owlmlx-owned judgment` | First test protection for extracted runtime-truth code |
 
-## 4. Platform-Shell Retained Areas
+## 5. Platform-Shell Retained Areas
 
 The following remain with the current desktop product shell repository even if
 they consume `owlmlx` truth:
@@ -67,7 +88,7 @@ they consume `owlmlx` truth:
 | `/Users/yeemio/AI/Agent/ops_dashboard/` | `platform-shell retained` | Dashboard and operator presentation remain outside runtime ownership |
 | `/Users/yeemio/AI/Agent/local-llm-desktop/` | `platform-shell retained` | Desktop shell, onboarding, and user-facing workflows are not runtime source of truth |
 
-## 5. Boundary-Split Items
+## 6. Boundary-Split Items
 
 Some current platform files mix runtime truth with shell logic. These should be
 split rather than moved whole.
@@ -78,7 +99,7 @@ split rather than moved whole.
 | `/Users/yeemio/AI/Agent/ops_dashboard/metrics.py` | `borrow and internalize` | Extract runtime-owned truth shape and semantics into `owlmlx`; retain dashboard aggregation here |
 | `/Users/yeemio/AI/Agent/ops_dashboard/app.py` | `platform-shell retained` | Keep UI/API composition; reference runtime-owned contracts from `owlmlx` |
 
-## 6. Near-Term Extraction Sequence
+## 7. Near-Term Extraction Sequence
 
 ### Wave A: Runtime Truth Contracts
 
@@ -111,7 +132,7 @@ Then internalize:
 - active-request protection semantics
 - migration away from patching upstream files in place
 
-## 7. Explicit Non-Extraction
+## 8. Explicit Non-Extraction
 
 The following should not be described as `owlmlx` support just because they
 exist nearby:

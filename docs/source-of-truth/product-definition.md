@@ -123,13 +123,68 @@ repository.
 Current repository history may still use legacy names for this shell layer, but
 those names should not be treated as permanent runtime-truth terminology.
 
-## 6. Extraction Map
+## 6. Adoption Model
+
+`owlmlx` is a self-owned runtime, but self-owned does not mean full rewrite.
+
+### 6.1 Formal Adoption Rule
+
+`owlmlx` reuses open-source runtime mechanisms wherever they are proven and
+useful. It does not require — and does not intend — a ground-up rewrite of
+every execution layer beneath it.
+
+What `owlmlx` owns is:
+
+- runtime identity
+- runtime principles
+- runtime governance
+- runtime truth contracts
+- runtime path semantics
+- extraction direction
+
+What `owlmlx` borrows freely:
+
+- MLX tensor execution substrate
+- loader and model-format machinery from the MLX ecosystem
+- cache scheduling ideas from `oMLX`
+- serving and packaging patterns from `vMLX`
+- any proven open-source mechanism that fits `owlmlx`'s own principles
+
+### 6.2 Adoption Boundary
+
+When a borrowed mechanism enters `owlmlx`, it accepts `owlmlx`'s capability
+labels and governance semantics. The origin system does not automatically
+define it as `supported` in `owlmlx`.
+
+Borrowed implementation that has not been evaluated against `owlmlx` runtime
+principles must be labeled `partial` or `experimental`, never `supported`.
+
+### 6.3 What Adoption Is Not
+
+- Adoption is not re-branding another project's code as `owlmlx`.
+- Adoption is not pretending `owlmlx` invented something it borrowed.
+- Adoption is not avoiding credit where implementation came from.
+- Adoption is not declaring independence for the sake of optics.
+
+### 6.4 Why This Rule Matters
+
+Without a formal adoption model, `owlmlx` risks two failure modes:
+
+1. **Full-rewrite theater** — wasting effort reimplementing things that already
+   work, in order to "look independent"
+2. **Identity collapse** — borrowing so heavily that `owlmlx` becomes a thin
+   wrapper with no owned truth, defeating the purpose of the project
+
+The adoption model exists to occupy the correct middle ground: own the truth
+layer, reuse the execution layer, and be honest about which is which.
+
+## 7. Extraction Map
 
 `owlmlx` needs a disciplined separation between runtime judgments we already own,
 ideas we plan to internalize, and external references that are not yet `owlmlx`
 capabilities.
 
-### 6.1 Already Ours In Runtime Judgment
+### 7.1 Already Ours In Runtime Judgment
 
 These are already part of `owlmlx`'s runtime direction, regardless of where all
 implementation currently lives:
@@ -140,7 +195,7 @@ implementation currently lives:
 - background-heavy serving as an explicit runtime class
 - runtime governance for hazardous operations and safe-resume
 
-### 6.2 Borrow And Internalize
+### 7.2 Borrow And Internalize
 
 These may be borrowed from external systems, but only by being rewritten as
 `owlmlx` architecture:
@@ -150,7 +205,7 @@ These may be borrowed from external systems, but only by being rewritten as
 - any future runtime mechanism that fits `owlmlx`'s own principles and
   capability model
 
-### 6.3 External Reference Only
+### 7.3 External Reference Only
 
 The following do not count as `owlmlx` supported capability merely because they
 exist elsewhere:
@@ -160,7 +215,7 @@ exist elsewhere:
 - a specimen-specific behavior that has not been elevated into path-level or
   core-runtime truth
 
-## 7. First Mature Path
+## 8. First Mature Path
 
 The first mature path in `owlmlx` is the `large-weight runtime path`.
 
@@ -175,7 +230,7 @@ Current truth:
 - It should not be named after a single specimen forever
 - `Kimi` is the first validated specimen on this path
 
-## 8. Current Non-Claims
+## 9. Current Non-Claims
 
 `owlmlx` does not currently claim:
 
@@ -184,7 +239,7 @@ Current truth:
 - that external runtime ideas can be copied without reinterpretation
 - that the first mature path is the only future path
 
-## 9. Product Success Criteria
+## 10. Product Success Criteria
 
 `owlmlx` starts succeeding when it can do three things clearly:
 

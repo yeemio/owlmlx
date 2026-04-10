@@ -124,6 +124,34 @@ Remaining inside Phase 1D:
 - wider contract-test alignment beyond runtime-status paths
 - additional runtime-owned helper expansion
 
+## 2.11 Phase 1E: Adoption Model And Loop Discipline Freeze
+
+Goal:
+
+- formally freeze the open-source adoption model into core source-of-truth
+- establish autonomous loop discipline as a self-iteration protocol
+- tighten extraction inventory with discipline rules and wave ordering
+
+Acceptance:
+
+- adoption model exists in product-definition.md as a formal section
+- autonomous-loop-discipline.md exists as authoritative document
+- extraction-inventory.md includes discipline rules before candidates list
+- capability matrix reflects adoption model and loop discipline as supported
+- AGENTS.md, README.md, and master-outline.md reference adoption model
+
+Status: **complete** (2026-04-10)
+
+Round: `owlmlx-round-1.md`
+
+Actual outputs:
+
+- adoption model section (product-definition.md section 6)
+- extraction discipline rules (extraction-inventory.md section 3)
+- autonomous-loop-discipline.md (new authoritative document)
+- capability matrix updated with adoption + extraction + loop rows
+- README, master-outline, AGENTS.md updated with adoption model truth
+
 ## 3. Phase 2: Large-Weight Path Productization
 
 Goal:
@@ -168,9 +196,15 @@ Candidate areas:
 
 - generalized interactive path
 - second large-weight specimen family
+- high-fidelity teacher/reference path
 - alternate specialization paths
 
 Acceptance:
 
 - each new path has its own honest capability matrix
 - no path is named after one temporary specimen
+
+Current live candidate:
+
+- `gemma-4-31B-it` as the first serious high-fidelity teacher/reference
+  specimen candidate

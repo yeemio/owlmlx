@@ -20,7 +20,8 @@ If a task does not specify a narrower entry point, read in this order:
 12. `docs/source-of-truth/rename-strategy.md`
 13. `docs/source-of-truth/contract-mapping.md`
 14. `docs/source-of-truth/extraction-inventory.md`
-15. `docs/source-of-truth/roadmap.md`
+15. `docs/source-of-truth/autonomous-loop-discipline.md`
+16. `docs/source-of-truth/roadmap.md`
 
 ## Non-Negotiable Project Truth
 
@@ -33,6 +34,9 @@ If a task does not specify a narrower entry point, read in this order:
   `local-llm-platform`, sits above `owlmlx`.
 - `Kimi` is a first validated specimen on the `large-weight runtime path`, not
   the permanent name of that path.
+- `owlmlx` reuses open-source runtime mechanisms freely. Self-owned does not
+  mean full rewrite. What is owned is identity, principles, governance, truth
+  contracts, and path semantics.
 
 ## Writing Rules
 

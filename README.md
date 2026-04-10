@@ -45,6 +45,10 @@ Current honest state:
 - `Kimi` is the first validated specimen on that path
 - the current desktop product shell repository remains the operator surface and
   product integration layer above this runtime
+- `owlmlx` reuses open-source runtime mechanisms freely; it does not require a
+  full rewrite of every execution layer beneath it
+- what `owlmlx` owns is identity, principles, governance, truth contracts, and
+  path semantics — not necessarily every line of execution code
 
 ## What `owlmlx` Is Not
 
@@ -68,6 +72,7 @@ Current honest state:
 - `docs/source-of-truth/rename-strategy.md`
 - `docs/source-of-truth/contract-mapping.md`
 - `docs/source-of-truth/extraction-inventory.md`
+- `docs/source-of-truth/autonomous-loop-discipline.md`
 - `docs/source-of-truth/roadmap.md`
 
 ## Immediate Priority

@@ -55,9 +55,27 @@ These are runtime-level goals, not temporary integration work.
 11. `contract-mapping.md`
 12. `runtime-contract-adoption-plan.md`
 13. `extraction-inventory.md`
-14. `roadmap.md`
+14. `autonomous-loop-discipline.md`
+15. `roadmap.md`
+16. `gemma-high-fidelity-role.md`
 
-## 6. Current Dominant Question
+## 6. Adoption Model
+
+`owlmlx` reuses open-source runtime mechanisms wherever they are proven. It does
+not require full rewrite of every execution layer. What `owlmlx` owns is
+identity, principles, governance, truth contracts, and path semantics. What it
+borrows freely is MLX substrate, loader machinery, and proven serving patterns.
+
+The formal adoption rule is frozen in `product-definition.md` section 6.
+
+## 7. Autonomous Loop Discipline
+
+`owlmlx` progresses through self-directed iteration rounds. Each round
+identifies a dominant gap, executes against it, verifies delivery, and decides
+whether to continue. The discipline is frozen in
+`autonomous-loop-discipline.md`.
+
+## 8. Current Dominant Question
 
 The present task is not "how much code has moved yet?"
 
