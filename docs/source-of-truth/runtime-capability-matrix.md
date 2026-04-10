@@ -1,7 +1,7 @@
 # owlmlx Runtime Capability Matrix
 
 > Status: authoritative
-> Updated: 2026-04-09
+> Updated: 2026-04-10
 
 Capability labels:
 
@@ -54,6 +54,7 @@ Capability labels:
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction, not yet frozen as supported path |
 | `gemma-4-31B-it` as first high-fidelity candidate | experimental | Useful planning candidate; not yet a frozen path class |
 | Fully internalized replacements for all external runtime mechanisms | partial | Directional goal, not current fact |
+| Full-rewrite of every execution layer | not in scope | Adoption model explicitly rejects this as unnecessary |
 | External runtime features observed but not adopted | not in scope | External reference is not `owlmlx` support |
 | `Kimi` as permanent name for the whole path | not in scope | Explicitly rejected |
 
@@ -64,3 +65,13 @@ Capability labels:
 | Desktop product shell above `owlmlx` | supported | Frozen boundary; repository naming may change |
 | Desktop shell defining runtime identity | not in scope | Runtime truth belongs here |
 | Shared runtime truth consumed by upper layers | supported | Required architecture direction |
+
+## 6. Label Promotion Rules
+
+A capability may only move from `partial` or `experimental` to `supported`
+when the promotion criteria in `extraction-inventory.md` section 8 are
+satisfied: implementation evidence, test coverage, no false dependency,
+governance compliance, and adoption label resolved.
+
+No capability may be promoted based solely on documentation existing or a
+feature working in an external runtime.

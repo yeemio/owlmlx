@@ -1,7 +1,7 @@
 # owlmlx Extraction Inventory
 
 > Status: working inventory
-> Updated: 2026-04-09
+> Updated: 2026-04-10
 
 ## 1. Purpose
 
@@ -115,6 +115,22 @@ The first owned truth targets for this wave are:
 - `runtime-contracts.md`
 - `runtime-status-schema.md`
 
+**Wave A completion gate:**
+
+Wave A is considered complete when:
+
+1. `runtime-contracts.md` and `runtime-status-schema.md` are authoritative and
+   stable (no open truth drift issues)
+2. At least one executable module (`runtime_status.py`) validates against the
+   schema
+3. At least one shell-side consumer references owlmlx contract definitions
+4. Contract-test expectations from the platform shell repository point at
+   owlmlx truth, not at local copies
+
+Current status: **substantially complete** — `runtime_status.py` exists and
+validates; shell-side bridge test imports owlmlx; contract-mapping exists. Gap:
+wider contract-test alignment beyond runtime-status path.
+
 ### Wave B: Runtime Entrypoints
 
 Then pull out:
@@ -122,6 +138,22 @@ Then pull out:
 - large-weight runtime startup path
 - owned serve entrypoints
 - runtime-specific health and status surfaces
+
+**Wave B entry prerequisite:** Wave A completion gate must be satisfied.
+
+**Wave B completion gate:**
+
+Wave B is considered complete when:
+
+1. owlmlx has at least one owned serve entrypoint (not a wrapper around an
+   external runtime's server)
+2. Large-weight path startup can be invoked through an owlmlx-owned command
+3. Health and status surfaces return owlmlx-schema-compliant responses
+4. The startup path has been validated against the heavy execution protocol
+   (dry-run, single-unit, serial, thresholded)
+
+Current status: **not started** — all entrypoints remain in platform shell or
+kimi-sharded-engine.py.
 
 ### Wave C: Memory Governance Internals
 
@@ -132,7 +164,46 @@ Then internalize:
 - active-request protection semantics
 - migration away from patching upstream files in place
 
-## 8. Explicit Non-Extraction
+**Wave C entry prerequisite:** Wave B completion gate must be satisfied.
+
+**Wave C completion gate:**
+
+Wave C is considered complete when:
+
+1. Memory governance decisions are made by owlmlx-owned code, not by patches
+   applied to an upstream runtime
+2. Active-request protection logic lives inside owlmlx, not as patch-guard
+   scripts
+3. The patched-upstream dependency can be removed or reduced to substrate-only
+4. Runtime governance (hazardous operations, safe-resume) is enforced by owlmlx
+   code, not just documented
+
+Current status: **not started** — governance principles are documented but
+implementation remains in patch form.
+
+## 8. Capability Label Promotion Criteria
+
+A capability currently labeled `partial` or `experimental` in the runtime
+capability matrix may only be promoted to `supported` when:
+
+1. **Implementation evidence** — owlmlx-owned code exists that implements the
+   capability (not just documents describing it)
+2. **Test coverage** — at least one test validates the capability's core
+   behavior
+3. **No false dependency** — the capability works through owlmlx's own code
+   path, not solely through an external runtime being patched
+4. **Governance compliance** — if the capability touches hazardous territory,
+   it must have entered through the heavy execution protocol
+5. **Adoption label resolved** — if borrowed, it has been explicitly evaluated
+   against owlmlx runtime principles and relabeled as owlmlx-owned
+
+A capability may NOT be promoted based solely on:
+
+- documentation existing
+- the feature working in an external runtime we reference
+- a single specimen demonstrating it once
+
+## 9. Explicit Non-Extraction
 
 The following should not be described as `owlmlx` support just because they
 exist nearby:

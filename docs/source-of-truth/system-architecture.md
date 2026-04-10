@@ -37,7 +37,19 @@ This layer is responsible for:
 This is the layer that must become self-owned over time, even where early
 implementation work still borrows ideas or code structure from other runtimes.
 
-### 3.1 Core Runtime Principles
+### 3.1 Adoption Model At The Core Layer
+
+The core runtime layer follows the owlmlx adoption model: it owns identity,
+principles, governance, truth contracts, and path semantics. It borrows freely
+from MLX substrate, loader machinery, and proven open-source mechanisms.
+
+Borrowed code entering the core runtime layer must be evaluated against owlmlx
+runtime principles before it can be labeled `supported`. Until evaluated, it
+enters as `partial` or `experimental`.
+
+See `product-definition.md` section 6 for the formal adoption rule.
+
+### 3.2 Core Runtime Principles
 
 The `owlmlx` core runtime is organized around four non-optional principles:
 
@@ -48,7 +60,7 @@ The `owlmlx` core runtime is organized around four non-optional principles:
 
 These principles define the core runtime more than any inherited codebase does.
 
-### 3.2 Core Runtime Ownership
+### 3.3 Core Runtime Ownership
 
 The following belong to the `owlmlx core runtime` layer:
 
