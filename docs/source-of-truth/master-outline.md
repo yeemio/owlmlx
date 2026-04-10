@@ -67,6 +67,7 @@ These are runtime-level goals, not temporary integration work.
 22. `ownership-boundary.md`
 23. `model-line-placement.md`
 24. `first-absorption-target.md`
+25. `convergence-posture.md`
 
 ## 6. Adoption Model
 
