@@ -63,6 +63,7 @@ These are runtime-level goals, not temporary integration work.
 18. `training-substrate-contract.md`
 19. `artifact-layout-contract.md`
 20. `training-to-serving-contract.md`
+21. `capability-absorption-inventory.md`
 
 ## 6. Adoption Model
 
@@ -82,17 +83,17 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-The training-and-production program is in progress. owlmlx now has a frozen
-training substrate contract defining environment, stack selection, and boundary
-rules. The current question is:
+The training-and-production program is complete. The platform capability
+absorption and convergence program is now in progress. The current question is:
 
-**What artifact layout and naming contract does owlmlx need so that trained
-model artifacts (adapters, checkpoints, metadata) have a formal home instead
-of ad-hoc file paths?**
+**Which mature capabilities from the original local LLM platform should owlmlx
+absorb as runtime-owned truth, which must stay in the platform control-plane or
+shell layers, and how do we prevent owlmlx from becoming a parallel system?**
 
 Concrete sub-questions:
 
-1. What is the canonical directory structure for base models, adapters,
-   checkpoints, and evaluation artifacts?
-2. How are trained artifacts named and versioned?
-3. Where is the artifact registration truth that the runtime consumes?
+1. Where is the ownership boundary between owlmlx (runtime truth) and the
+   platform (control-plane, routing, product entry)?
+2. How do Gemma, Kimi 1T, gpt-oss-120b, and other model lines sit in the
+   unified architecture?
+3. Which absorption target should be first?

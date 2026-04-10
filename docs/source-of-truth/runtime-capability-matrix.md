@@ -62,6 +62,7 @@ Capability labels:
 | Additional runtime paths beyond large-weight | experimental | Future only when real capability truth exists |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction; Gemma has moved to production mainline instead |
 | `gemma-4-31B-it` as production mainline | supported | Production mainline frozen; pilot LoRA PASS; substrate contracts exercised end-to-end |
+| Platform capability absorption inventory | supported | Gap-driven inventory frozen; 8 gaps identified, 14 non-candidates excluded |
 | Fully internalized replacements for all external runtime mechanisms | partial | Directional goal, not current fact |
 | Full-rewrite of every execution layer | not in scope | Adoption model explicitly rejects this as unnecessary |
 | External runtime features observed but not adopted | not in scope | External reference is not `owlmlx` support |

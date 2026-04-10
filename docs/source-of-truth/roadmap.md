@@ -315,3 +315,28 @@ Delivered:
 - Current capabilities (6 items) and limitations (8 items) explicitly listed
 - owlcoda boundary defined: consumes, does not define substrate
 - What comes next listed (data engineering → evaluation → production training)
+
+## 7. Platform Capability Absorption And Convergence Program
+
+Goal:
+
+- absorb mature capabilities from the original local LLM platform into owlmlx
+- freeze ownership boundary between runtime (owlmlx) and control-plane/shell
+- prevent owlmlx from becoming a parallel system that duplicates the platform
+- place model lines (Gemma, Kimi 1T, gpt-oss-120b) in unified architecture
+
+Program contract: `owlmlx-platform-capability-absorption-and-convergence`
+
+### Round 1 — Freeze Capability Absorption Inventory
+
+Status: **complete** (2026-04-10)
+
+Delivered:
+
+- `capability-absorption-inventory.md` — gap-driven inventory organized around
+  what owlmlx lacks, not platform archaeology
+- 8 gaps identified with maturity classification and absorption recommendation
+- 14 explicit non-candidates with reasoning
+- Next-round decision hooks for ownership boundary and first absorption target
+- Strongest first-absorption candidates: abort recovery + context concurrency
+  (small, hardware-verified, self-contained)
