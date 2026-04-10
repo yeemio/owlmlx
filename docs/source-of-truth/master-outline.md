@@ -38,6 +38,7 @@ These are runtime-level goals, not temporary integration work.
 - `oMLX` and `vMLX` are borrowable reference systems, not identity sources
 - The first mature runtime path is `large-weight runtime path`
 - `Kimi` is the first validated specimen on that path
+- `Gemma` is the production mainline model (training substrate verified, pilot PASS)
 - the current desktop product shell repository sits above `owlmlx`
 
 ## 5. Core Documents
