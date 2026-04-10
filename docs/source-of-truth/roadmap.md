@@ -291,7 +291,18 @@ Delivered:
 
 ### Round 4 — Minimal Gemma Pilot
 
-Status: **not started**
+Status: **complete** (2026-04-10)
+
+Delivered:
+
+- `owlmlx/training.py` — artifact registration module (build, write, read,
+  discover, validate_for_serving)
+- `tests/test_training.py` — 17 tests for artifact registration
+- Minimal LoRA pilot: 5-step training on gemma-4-31B-it (loss 10.5→6.5)
+- Adapter saved to contract-compliant path with metadata.json
+- Load verification: adapter loads via mlx_lm.load(adapter_path=...)
+- Inference delta: confirmed (tuned output differs from base)
+- Feasibility note: `files/pilot-results/gemma-pilot-lora-20260410-feasibility-note.md`
 
 ### Round 5 — Production Mainline Freeze
 
