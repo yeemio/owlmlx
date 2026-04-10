@@ -37,8 +37,9 @@ Before listing gaps, this is what owlmlx already owns:
 | 10 | Memory governance principles | `runtime-governance.md` | doc-only |
 | 11 | Hazardous-operation governance | `hazardous-operations.md` | doc-only |
 | 12 | Safe-resume contract | `runtime-governance.md` | doc-only |
+| 13 | Serving-path memory budget truth | `memory_budget.py` (32 tests) | supported |
 
-Total: 4 Python modules, 44 tests, 20 truth documents.
+Total: 5 Python modules, 76 tests, 20 truth documents.
 
 ## 3. Gap-Driven Inventory
 

@@ -1,5 +1,13 @@
 """owlmlx runtime helpers."""
 
+from .memory_budget import (
+    BudgetEvaluation,
+    BudgetVerdict,
+    MachineMemoryProfile,
+    budget_snapshot,
+    default_machine_profile,
+    evaluate_model_fit,
+)
 from .runtime_status import (
     ALLOWED_CAPABILITY_LABELS,
     BEST_EFFORT,
@@ -41,9 +49,15 @@ __all__ = [
     "ARTIFACT_STATUSES",
     "BEST_EFFORT",
     "BLOCKED",
+    "BudgetEvaluation",
+    "BudgetVerdict",
+    "default_machine_profile",
     "default_owlmlx_repo",
+    "evaluate_model_fit",
+    "budget_snapshot",
     "GenerationGate",
     "GenerationResult",
+    "MachineMemoryProfile",
     "MANUAL_ONLY",
     "MAX_GENERATION_CONCURRENCY",
     "PARTIAL",

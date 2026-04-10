@@ -40,7 +40,7 @@ and what should happen next.
 
 | Area | owlmlx Side | Platform Side | Why Still Separate |
 |---|---|---|---|
-| Substrate boundaries | Documented as owlmlx-owned (R11-R13) | Code still lives in router/dashboard | Code absorption not yet executed |
+| Substrate boundaries | Abort recovery + context concurrency documented as owlmlx-owned (R11-R12); memory budget absorbed (R13) | Abort recovery + context concurrency code still in router/dashboard | Memory budget absorbed; two capabilities remain |
 | Runtime health semantics | Schema validation only | 5-tier load_state, 4-level inference health in metrics.py | Larger scope; second-wave |
 | Model lifecycle states | Ownership assigned (R15) | State machine lives in lifecycle.py + docs | Split absorption needed |
 | Per-model runtime truth | Status schema exists | Endpoint logic in router app.py | Schema extracted; transport stays |
@@ -52,9 +52,9 @@ and what should happen next.
 | Metric | Score |
 |---|---|
 | Capabilities with assigned truth owner | **46/46** (100%) |
-| owlmlx-owned capabilities with code | **4/19** (21%) — runtime_status, serving, serving_status, training |
+| owlmlx-owned capabilities with code | **5/19** (26%) — runtime_status, serving, serving_status, training, memory_budget |
 | owlmlx-owned capabilities as doc-only | **6/19** (32%) — governance, hazardous-ops, safe-resume, training contracts |
-| owlmlx-owned capabilities to absorb | **9/19** (47%) — Gaps 1-8 from inventory |
+| owlmlx-owned capabilities to absorb | **8/19** (42%) — Gaps 1-3, 5-8 from inventory (Gap 4 memory budget absorbed) |
 | Model lines with formal placement | **6/6** (100%) |
 | Platform capabilities with clear non-absorption reasoning | **14/14** (100%) |
 
