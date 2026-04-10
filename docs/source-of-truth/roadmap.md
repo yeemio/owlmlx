@@ -369,4 +369,17 @@ Delivered:
 - Qwen3.5, Mistral-Large: standard platform models
 - Two runtime path classes identified: standard MLX + large-weight
 - owlmlx does not own product roles — permanent split
+
+### Round 4 — First High-Value Absorption Target
+
+Status: **complete** (2026-04-10)
+
+Delivered:
+
+- `first-absorption-target.md` — selected first absorption group
+- Group: abort recovery + context concurrency + memory budget (~460 LOC)
+- All three are hardware-verified MLX/Metal substrate boundaries
+- Why more urgent than training: prevents dual-system drift on physical truths
+- Expected deliverables: new owlmlx module(s), tests, router imports owlmlx
+- Second-wave candidates ranked: health semantics, lifecycle states, lineage
   (small, hardware-verified, self-contained)

@@ -66,6 +66,7 @@ These are runtime-level goals, not temporary integration work.
 21. `capability-absorption-inventory.md`
 22. `ownership-boundary.md`
 23. `model-line-placement.md`
+24. `first-absorption-target.md`
 
 ## 6. Adoption Model
 
