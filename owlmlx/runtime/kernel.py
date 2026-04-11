@@ -26,6 +26,7 @@ from .backends import RuntimeBackend
 from .types import (
     GenerateResult,
     LoadResult,
+    RestartResult,
     RuntimeErrorCode,
     RuntimeStatus,
     UnloadResult,
@@ -172,6 +173,58 @@ class RuntimeKernel:
             remaining = self.backend.status().loaded_models
             self._active_model_id = remaining[-1].model_id if remaining else None
         return result
+
+    def restart_model(self, model_id: str) -> RestartResult:
+        """Restart a loaded model using the existing runtime registration."""
+
+        loaded = {
+            model.model_id: model
+            for model in self.backend.status().loaded_models
+        }
+        current = loaded.get(model_id)
+        if current is None:
+            return RestartResult(
+                ok=False,
+                message=f"model not loaded: {model_id}",
+                error_code=RuntimeErrorCode.model_not_loaded,
+                model_id=model_id,
+            )
+
+        was_active = self._active_model_id == model_id
+        unloaded = self.backend.unload(model_id)
+        if not unloaded.ok:
+            return RestartResult(
+                ok=False,
+                message=f"restart unload failed: {unloaded.message}",
+                error_code=unloaded.error_code or RuntimeErrorCode.backend_error,
+                model_id=model_id,
+                detail={"unload": asdict(unloaded)},
+            )
+
+        reloaded = self.backend.load(model_id, memory_gb=current.memory_gb)
+        if not reloaded.ok:
+            return RestartResult(
+                ok=False,
+                message=f"restart load failed: {reloaded.message}",
+                error_code=reloaded.error_code or RuntimeErrorCode.backend_error,
+                model_id=model_id,
+                detail={
+                    "unload": asdict(unloaded),
+                    "load": asdict(reloaded),
+                },
+            )
+        if was_active:
+            self._active_model_id = model_id
+        return RestartResult(
+            ok=True,
+            message=f"restarted {model_id}",
+            model_id=model_id,
+            restarted_model=reloaded.model,
+            detail={
+                "unload": asdict(unloaded),
+                "load": asdict(reloaded),
+            },
+        )
 
     def status(self) -> RuntimeStatus:
         """Return a self-derived runtime status snapshot."""

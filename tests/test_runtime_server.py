@@ -129,3 +129,29 @@ def test_runtime_status_returns_full_kernel_snapshot() -> None:
     assert payload["backend"]["backend_name"] == "fake"
     assert payload["inventory"]["model_count"] == 1
     assert payload["health"]["readiness"] == "ready"
+
+
+def test_runtime_restart_endpoint_restarts_loaded_model() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.post("/v1/runtime/restart", json={"model_id": "fake-a"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["model_id"] == "fake-a"
+    models = client.get("/v1/models").json()
+    assert models["active_model_id"] == "fake-a"
+    assert models["inventory"]["model_count"] == 1
+
+
+def test_runtime_restart_endpoint_requires_loaded_model() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+
+    response = client.post("/v1/runtime/restart", json={"model_id": "missing"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["error_code"] == "model_not_loaded"

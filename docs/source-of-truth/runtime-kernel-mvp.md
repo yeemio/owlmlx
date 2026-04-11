@@ -204,5 +204,12 @@ and fair comparison benchmarks against the old platform.
 The benchmark truth is frozen separately in
 `runtime2-benchmark-baseline.md`.
 
+Runtime-3 has now started above that backend baseline:
+
+- explicit restart is exposed at `POST /v1/runtime/restart`
+- full runtime snapshot is exposed at `GET /v1/runtime/status`
+- serialized concurrent serving truth is frozen in
+  `runtime3-serving-surface.md`
+
 The current environment truth is frozen separately in
 `runtime1-environment-diagnostics.md`.

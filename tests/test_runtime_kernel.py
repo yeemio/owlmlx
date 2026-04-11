@@ -107,6 +107,29 @@ def test_unload_missing_model_fails() -> None:
     assert result.error_code is RuntimeErrorCode.model_not_loaded
 
 
+def test_restart_model_roundtrip_keeps_model_loaded() -> None:
+    kernel = RuntimeKernel(FakeBackend(), profile=_small_profile())
+    kernel.load_model("fake-a")
+
+    result = kernel.restart_model("fake-a")
+
+    assert result.ok is True
+    assert result.model_id == "fake-a"
+    assert result.restarted_model is not None
+    status = kernel.status_dict()
+    assert status["active_model_id"] == "fake-a"
+    assert status["inventory"]["model_count"] == 1
+
+
+def test_restart_missing_model_fails() -> None:
+    kernel = RuntimeKernel(FakeBackend(), profile=_small_profile())
+
+    result = kernel.restart_model("missing")
+
+    assert result.ok is False
+    assert result.error_code is RuntimeErrorCode.model_not_loaded
+
+
 def test_backend_unhealthy_status_blocks_readiness() -> None:
     kernel = RuntimeKernel(FakeBackend(healthy=False), profile=_small_profile())
 

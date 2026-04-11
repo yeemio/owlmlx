@@ -77,6 +77,14 @@ class UnloadResult(RuntimeOperationResult):
 
 
 @dataclass(frozen=True, slots=True)
+class RestartResult(RuntimeOperationResult):
+    """Result of restarting a loaded model."""
+
+    model_id: str | None = None
+    restarted_model: LoadedModelInfo | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class BackendStatus:
     """Backend status snapshot used by RuntimeKernel."""
 

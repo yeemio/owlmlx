@@ -33,6 +33,12 @@ class UnloadRequest(BaseModel):
     model_id: str = Field(min_length=1)
 
 
+class RestartRequest(BaseModel):
+    """HTTP request body for runtime restart of a loaded model."""
+
+    model_id: str = Field(min_length=1)
+
+
 def _result_to_dict(result: Any) -> dict[str, Any]:
     data = asdict(result)
     error = data.get("error_code")
@@ -94,6 +100,11 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
     @app.get("/v1/runtime/status")
     def runtime_status() -> dict[str, Any]:
         return runtime.status_dict()
+
+    @app.post("/v1/runtime/restart")
+    def restart_model(payload: RestartRequest) -> dict[str, Any]:
+        result = runtime.restart_model(payload.model_id)
+        return _result_to_dict(result)
 
     @app.post("/v1/unload")
     def unload_model(payload: UnloadRequest) -> dict[str, Any]:

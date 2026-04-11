@@ -19,7 +19,7 @@ owlmlx 是我们在 Apple Silicon 上的**自有 MLX runtime**。
 
 ### 2.1 owlmlx 今天实际是什么
 
-一个进入 **Runtime-2 persistent child kernel** 阶段的早期 runtime。
+一个进入 **Runtime-3 serving surface** 阶段的早期 runtime。
 
 它不再只是 truth derivation library：现在有自有 `RuntimeKernel`、
 backend adapter 边界、FakeBackend、最小 HTTP entry，并且 kernel 自己消费
@@ -30,7 +30,7 @@ memory budget / model inventory / runtime health / GenerationGate。
 
 | 维度 | 现状 | 目标状态 |
 |---|---|---|
-| 能启动 server 吗 | **能，Runtime-0 最小 HTTP app** | 能：生产级 HTTP serving |
+| 能启动 server 吗 | **能，Runtime-3 已有 runtime status / restart surface** | 能：生产级 HTTP serving |
 | 能 load model 吗 | **能，persistent child 真实 MLX load 已验证** | 能：真实 MLX 权重加载 |
 | 能 generate token 吗 | **能，persistent child 真实 completion 已验证** | 能：真实模型 completion |
 | 能管理内存吗 | **能做 load 前预算检查和 inventory 状态跟踪** | 能：主动 load/unload/evict/reclaim |
@@ -39,7 +39,7 @@ memory budget / model inventory / runtime health / GenerationGate。
 
 ### 2.2 代码盘点
 
-Runtime-2 hardening 后，owlmlx 有 19 个 Python 模块，331 tests。
+Runtime-3 首批交付后，owlmlx 有 19 个 Python 模块，332 tests。
 
 | 模块 | LOC | 性质 | 做什么 |
 |---|---|---|---|
@@ -63,7 +63,7 @@ Runtime-2 hardening 后，owlmlx 有 19 个 Python 模块，331 tests。
 | runtime/mlx_lm_subprocess_backend.py | ~220 | **subprocess backend** | 父进程安全的 mlx-lm 持久 child lifecycle：`load once -> generate many -> unload` |
 | runtime/mlx_environment.py | ~150 | **environment probe** | 安全环境选择 + 结构化诊断，default vs known 分离 |
 
-**关键事实：Runtime-2 已验证真实本地模型通过持久 child 完成 `load once -> generate many -> unload`。父进程永不 import mlx_lm。**
+**关键事实：Runtime-3 已把 Runtime-2 的 child health / restart 语义和 serialized serving truth 上推到 runtime surface。父进程仍永不 import mlx_lm。**
 
 ### 2.3 文档盘点
 
@@ -92,12 +92,12 @@ Runtime-2 hardening 后，owlmlx 有 19 个 Python 模块，331 tests。
 
 ## 3. 四层架构（诚实版）
 
-system-architecture.md 定义了四层。Runtime-2 后，Layer 2 已有最小可执行 kernel 和真实 MLX child session：
+system-architecture.md 定义了四层。Runtime-3 后，Layer 2 已有最小可执行 kernel、真实 MLX child session、以及第一批 runtime control surface：
 
 ```
 Layer 4: Product integration (平台 ops_dashboard、dashboard、API)     ← 存在，在平台
-Layer 3: Runtime paths (large-weight path, standard path)             ← GenerationGate + Runtime-2 path
-Layer 2: Core runtime (load, serve, memory, switch, introspect)       ← Runtime-2 minimal kernel 存在
+Layer 3: Runtime paths (large-weight path, standard path)             ← GenerationGate + Runtime-3 path
+Layer 2: Core runtime (load, serve, memory, switch, introspect)       ← Runtime-3 minimal kernel 存在
 Layer 1: MLX substrate (tensor execution)                             ← 存在，是 Apple 的
 
 owlmlx 实际占据的位置：Layer 2 最小 kernel + truth substrate。还不是 production runtime。
@@ -111,12 +111,12 @@ owlmlx 实际占据的位置：Layer 2 最小 kernel + truth substrate。还不�
 |---|---|---|---|
 | 1 | **Safe real MLX model loader** | 持久 child 已完成真实 `load`；clean `.runtime1-mlx` 已通过 import probe；`gpt-oss-20b` 和 `Qwen3.5-27B` 已完成 Runtime-2 真实复用 smoke | 下一步是 child health probe / restart，不再是“能不能真 load” |
 | 2 | **Safe real inference engine** | persistent child 已完成真实 `generate many` | 下一步是 steady-state metrics、restart policy、streaming |
-| 3 | **Production HTTP server** | Runtime-0 最小 FastAPI app | 需要错误码、流式输出、配置、部署入口 |
+| 3 | **Production HTTP server** | Runtime-3 已有 runtime status / restart surface | 下一步是 streaming、配置、部署入口、控制面完整化 |
 | 4 | **Memory controller** | load 前预算检查 + inventory | 要能主动 load/unload/evict/reclaim |
 | 5 | **Self-introspection** | kernel status 可自推导；persistent child `ping` health probe 已接入 backend status | 下一步是把 probe 结果上推到更明确的 runtime/API 语义 |
 | 6 | **Process lifecycle** | persistent child `load / unload / next-request restart` 已存在 | 下一步是 restart policy 的更高层治理和 SLO |
 
-Runtime-2 当前的运行纪律已经明确：
+Runtime-3 当前的运行纪律已经明确：
 
 - 父进程不直接 import `mlx_lm`
 - 默认环境探测只检查当前解释器
@@ -125,6 +125,7 @@ Runtime-2 当前的运行纪律已经明确：
 - 真实模型会话必须通过 persistent child lifecycle，不回退到 one-shot 默认路径
 - child health 以 `ping` 为准，不允许只看进程是否还活着
 - dead child restart 只在保留 registration 的前提下发生，不在当前失败请求里偷偷重试
+- serialized concurrent serving 仍然是 runtime truth，不允许因为 persistent child 而默认放开并发
 
 ### 4.2 已经完成的（truth library 价值）
 
@@ -192,7 +193,7 @@ Runtime-2 当前的运行纪律已经明确：
 
 第一版不追求性能，不强制真实模型加载。目标是架构闭环，不是跑 31B。
 
-### 7.2 实际内部结构（Runtime-2）
+### 7.2 实际内部结构（Runtime-3）
 
 ```
 owlmlx/
@@ -226,12 +227,14 @@ R11-R18 的价值：给 RuntimeKernel 准备了判断层。
 诚实的 scorecard 拆成两张：
 
 ```
-Truth substrate readiness:  11 truth modules, 331 tests, 7 platform consumers ✓
+Truth substrate readiness:  11 truth modules, 332 tests, 7 platform consumers ✓
 Runtime executability:      Runtime-0 MVP ✓ → Runtime-1 真实模型验证 ✓ → Runtime-2 persistent child ✓
+Runtime serving surface:    Runtime-3 restart/status surface ✓
 Subprocess isolation:       父进程永不 import mlx_lm，子进程 abort → 结构化错误 ✓
 Real local smoke baseline:  gpt-oss-20b + Qwen3.5-27B + Qwen3.5-35B-A3B 通过 ✓
 Persistent child proof:     gpt-oss-20b / Qwen3.5-27B 同一 pid 连续 generate 通过 ✓
 Steady-state benchmark:     gpt-oss-20b load≈1.49s, warm median≈0.157s ✓
+Serialized serving proof:   gpt-oss-20b 并发2请求保持 serial gate ✓
 Production readiness:       not yet
 ```
 

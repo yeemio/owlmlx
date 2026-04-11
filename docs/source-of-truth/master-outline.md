@@ -101,13 +101,13 @@ whether to continue. The discipline is frozen in
 The schema-extraction mainline is no longer the dominant path. The current
 question is:
 
-**How does owlmlx complete Runtime-2 from a working persistent child kernel into
-a reliable runtime surface with explicit health, restart, and benchmark truth?**
+**How does owlmlx move from a working Runtime-2 persistent child kernel into a
+Runtime-3 serving surface with explicit restart control, honest serialized
+concurrent serving, and fair benchmark truth?**
 
 Concrete sub-questions:
 
-1. How should child health and restart semantics appear at the runtime/API
-   surface, not just inside backend internals?
-2. What is the honest steady-state performance baseline for persistent child
-   serving on this machine?
-3. Which Runtime-2 reliability gaps remain before Runtime-3 should begin?
+1. Which runtime/control surfaces must exist above backend internals?
+2. How do we prove serialized concurrent serving remains runtime truth under
+   persistent child execution?
+3. What is the first fair comparison shape against the old platform?
