@@ -1,0 +1,217 @@
+# owlmlx 架构真源
+
+> Status: **唯一权威** — 与本文件冲突的其他文档，以本文件为准
+> Updated: 2026-04-11
+
+## 1. owlmlx 是什么
+
+owlmlx 是我们在 Apple Silicon 上的**自有 MLX runtime**。
+
+它的终局是**替代 oMLX**，成为一个能独立 load model、serve inference、manage memory、handle lifecycle 的完整 runtime system。
+
+它**不是**：
+- oMLX 的 fork 或 wrapper
+- 平台的 type library / schema 包
+- 一堆 enum 和 dataclass 的集合
+- 文档项目
+
+## 2. 诚实现状
+
+### 2.1 owlmlx 今天实际是什么
+
+一个进入 **Runtime-0 executable kernel MVP** 的早期 runtime。
+
+它不再只是 truth derivation library：现在有自有 `RuntimeKernel`、
+backend adapter 边界、FakeBackend、最小 HTTP entry，并且 kernel 自己消费
+memory budget / model inventory / runtime health / GenerationGate。
+
+但它仍不是 production runtime：真实 MLX 模型加载、生产 serving hardening、
+进程生命周期和平台迁移还未完成。
+
+| 维度 | 现状 | 目标状态 |
+|---|---|---|
+| 能启动 server 吗 | **能，Runtime-0 最小 HTTP app** | 能：生产级 HTTP serving |
+| 能 load model 吗 | **能，FakeBackend；mlx-lm adapter 调用路径已存在** | 能：真实 MLX 权重加载 |
+| 能 generate token 吗 | **能，FakeBackend completion；mlx-lm adapter 调用路径已存在** | 能：真实模型 completion |
+| 能管理内存吗 | **能做 load 前预算检查和 inventory 状态跟踪** | 能：主动 load/unload/evict/reclaim |
+| 能感知自身状态吗 | **能，从 kernel 自身 backend status 推导 health** | 能：真实 runtime probe 自己 |
+| 能恢复故障吗 | 只能判断"是否 contaminated" | 能：自己执行 restart/recovery |
+
+### 2.2 代码盘点
+
+Runtime-0 后，owlmlx 有 16 个 Python 模块，308 tests。
+
+| 模块 | LOC | 性质 | 做什么 |
+|---|---|---|---|
+| memory_budget.py | 234 | schema + derivation | 判断模型能不能装进 116GB budget |
+| context_concurrency.py | 166 | schema + lookup | 按 context length 查 gate table |
+| abort_recovery.py | 338 | state machine | clean/probing/contaminated 状态跟踪 |
+| runtime_health.py | 466 | schema + derivation | 6 enum + 7 derivation → readiness |
+| model_inventory.py | ~280 | schema + composition | inventory snapshot → budget/health 组合调用 |
+| model_lineage.py | 322 | schema + validation | lineage 校验 + truth inheritance |
+| cache_truth.py | ~250 | schema + derivation | cache profile / flag / restart 推导 |
+| runtime_status.py | ~200 | schema validation | runtime status payload 校验 |
+| serving_status.py | ~100 | status builder | large-weight path status dict 构建 |
+| serving.py | ~200 | gate (asyncio) | GenerationGate semaphore — **唯一接近 runtime 行为的代码** |
+| training.py | ~480 | artifact management | 训练产物 metadata 注册/发现/校验 |
+| runtime/types.py | ~100 | executable runtime contract | load/generate/unload/status 结果类型 |
+| runtime/backends.py | ~130 | backend adapter + FakeBackend | RuntimeBackend 边界和可测试 fake runtime |
+| runtime/kernel.py | ~230 | **runtime behavior** | RuntimeKernel: load/generate/unload/status |
+| runtime/server.py | ~80 | **HTTP runtime entry** | `/healthz`, `/v1/load`, `/v1/generate`, `/v1/models`, `/v1/unload` |
+| runtime/mlx_lm_backend.py | ~120 | MLX adapter | lazy mlx-lm load/generate 调用路径 |
+
+**关键事实：Runtime-0 已经补上可执行 runtime kernel，但真实 MLX 模型加载仍未验证。**
+
+### 2.3 文档盘点
+
+29 个 source-of-truth 文档。
+
+其中多数文档描述的是**目标架构**（owlmlx 应该成为什么），不是**当前实现**（owlmlx 现在能做什么）。这不是错——方向文档有存在价值——但不能把方向文档等同于已交付能力。
+
+### 2.4 平台消费关系
+
+平台（AI/Agent）import owlmlx 的 7 个模块做推导：
+
+| 平台文件 | 消费的 owlmlx 模块 | 做什么 |
+|---|---|---|
+| metrics.py | model_inventory, runtime_health | 构建 inventory snapshot → 推导 load_state/wait_tier |
+| control_service.py | model_inventory, memory_budget | budget 检查：能不能 load 这个模型 |
+| context_concurrency_policy.py | context_concurrency | 按 context length 限并发 |
+| abort_recovery.py (platform) | abort_recovery | 委托状态跟踪给 AbortRecoveryTracker |
+| primary_line_status.py | model_lineage | normalize/validate catalog lineage |
+| distilled_cache_substrate.py | cache_truth | cache flag/profile/restart 推导 |
+| kimi-sharded-engine.py | serving | GenerationGate 并发控制 |
+
+**这 7 个消费关系证明 owlmlx 作为 truth substrate 是有价值的。Runtime-0 之前，
+真正的 runtime 行为（probe、load、serve、restart）全在平台侧。Runtime-0
+补上了 owlmlx 自己的最小 load/generate/unload/status kernel，但平台消费关系仍然只代表
+schema/truth 复用，不代表生产 runtime 迁移完成。**
+
+## 3. 四层架构（诚实版）
+
+system-architecture.md 定义了四层。Runtime-0 后，Layer 2 有了最小可执行 kernel：
+
+```
+Layer 4: Product integration (平台 ops_dashboard、dashboard、API)     ← 存在，在平台
+Layer 3: Runtime paths (large-weight path, standard path)             ← GenerationGate + Runtime-0 path
+Layer 2: Core runtime (load, serve, memory, switch, introspect)       ← Runtime-0 MVP 存在
+Layer 1: MLX substrate (tensor execution)                             ← 存在，是 Apple 的
+
+owlmlx 实际占据的位置：Layer 2 最小 kernel + truth substrate。还不是 production runtime。
+```
+
+## 4. 从 truth library 到 runtime 的差距
+
+### 4.1 缺失的 runtime 能力（按优先级）
+
+| # | 能力 | 现状 | 为什么需要 |
+|---|---|---|---|
+| 1 | **Real MLX model loader** | mlx-lm adapter 调用路径存在，真实模型加载未验证 | Runtime-1 必须证明真实权重加载 |
+| 2 | **Real inference engine** | Fake completion + mlx-lm generate 调用路径 | Runtime-1 必须证明真实 completion |
+| 3 | **Production HTTP server** | Runtime-0 最小 FastAPI app | 需要错误码、流式输出、配置、部署入口 |
+| 4 | **Memory controller** | load 前预算检查 + inventory | 要能主动 load/unload/evict/reclaim |
+| 5 | **Self-introspection** | kernel status 可自推导，真实 backend probe 未完成 | runtime 要能 probe 自己的真实 backend |
+| 6 | **Process lifecycle** | 不存在 | 要能启动、停止、restart |
+
+### 4.2 已经完成的（truth library 价值）
+
+| # | 能力 | 模块 | 价值 |
+|---|---|---|---|
+| 1 | Memory budget truth | memory_budget.py | 未来 memory controller 用它判断 |
+| 2 | Concurrency boundary | context_concurrency.py | 未来 serving 用它限流 |
+| 3 | Abort recovery state | abort_recovery.py | 未来 lifecycle 用它判断恢复 |
+| 4 | Health derivation chain | runtime_health.py | 未来 introspection 用它推导状态 |
+| 5 | Model inventory schema | model_inventory.py | 未来 loader 用它跟踪已加载模型 |
+| 6 | Lineage validation | model_lineage.py | 未来 loader 用它校验权重来源 |
+| 7 | Cache truth contract | cache_truth.py | 未来 cache manager 用它决定策略 |
+| 8 | Generation gate | serving.py | 已经是真正的 runtime 组件 |
+
+**这些不是废物。它们是未来 runtime 的判断层基础。但判断层不等于 runtime 本身。**
+
+## 5. 文档权威性排序
+
+从本文件生效起，owlmlx 文档权威性：
+
+```
+1. ARCHITECTURE-TRUTH.md (本文件) — 唯一顶层真源
+2. runtime code (owlmlx/*.py) — 代码即实现事实
+3. tests/ — 验证事实
+4. product-definition.md — 冻结的方向声明
+5. system-architecture.md — 架构目标（标注哪些已实现、哪些未实现）
+6. 其他 source-of-truth docs — 参考，与本文件冲突时以本文件为准
+```
+
+## 6. 术语矫正
+
+| 之前用的词 | 问题 | 改为 |
+|---|---|---|
+| "absorbed" | 暗示 owlmlx 吸收了 runtime 能力 | "schema extracted" — 提取了 schema/derivation |
+| "consumed" | 暗示平台依赖 owlmlx runtime | "platform imports" — 平台 import 了 owlmlx 的 schema |
+| "convergence" | 暗示两个 runtime 在靠拢 | "schema unification" — schema 层统一了 |
+| "runtime truth" | 暗示 owlmlx 拥有 runtime 事实 | "derivation truth" — owlmlx 拥有推导规则 |
+| "owlmlx-owned" | 对于 enum/derivation 没问题 | 保留，但不用于描述 runtime 执行能力 |
+
+## 7. 下一步方向
+
+### Chosen Direction: Executable Runtime Kernel First
+
+**Option D (stay as truth library) rejected** — owlmlx 要成为 runtime，不是 schema 包。
+
+**Option C (wrap oMLX as subprocess) rejected** — wrapper 不是 runtime。
+
+**Option A/B merged into A': Executable Runtime Kernel** — owlmlx 先成为可执行 runtime kernel，借用 MLX ecosystem 的 loader/generation 机制（mlx-lm），不从零重写底层 transformer。自有 = 拥有 runtime 入口、状态、治理、内存决策、服务语义。不等于重写每一行执行代码。
+
+"替代 oMLX" 的精确含义：**owlmlx 替代 oMLX 作为我们的 runtime control boundary**。不是第一天替代 oMLX 的每一行代码。
+
+**从本决策生效起，owlmlx 不再以 schema extraction 为主线。** 未来 schema 工作只允许在直接支撑 RuntimeKernel 实现时进行。
+
+### 7.1 Runtime Kernel MVP — 最低交付定义
+
+第一版已证明一件事：**owlmlx 自己能作为 runtime kernel 活起来**。
+
+| # | 交付物 | 说明 |
+|---|---|---|
+| 1 | 自有 kernel | `RuntimeKernel` 管理 load/generate/unload/status |
+| 2 | Backend adapter | `RuntimeBackend`, `FakeBackend`, `MlxLmBackend` |
+| 3 | Generation endpoint | FakeBackend 可 completion；mlx-lm generate 调用路径可 mock 验证 |
+| 4 | 最小 HTTP API | `GET /healthz`, `POST /v1/load`, `POST /v1/generate`, `GET /v1/models`, `POST /v1/unload` |
+| 5 | Truth substrate 集成 | load 前走 memory_budget 预算检查，serve 走 GenerationGate，health 走 runtime_health snapshot |
+
+第一版不追求性能，不强制真实模型加载。目标是架构闭环，不是跑 31B。
+
+### 7.2 预期内部结构
+
+```
+owlmlx/
+  runtime/
+    kernel.py          # RuntimeKernel: load/generate/unload/status 核心
+    loader.py          # MLXModelLoader interface + mlx-lm adapter
+    engine.py          # generation adapter
+    server.py          # HTTP entry (FastAPI or lightweight)
+    memory.py          # 消费 memory_budget / model_inventory
+    lifecycle.py       # 消费 runtime_health / abort_recovery
+```
+
+### 7.3 之前工作的重新定性
+
+R11-R18 的价值：给 RuntimeKernel 准备了判断层。
+
+| 之前叫 | 改为 |
+|---|---|
+| Runtime absorption 进度 58% | Truth substrate readiness: 11 modules / 286 tests / platform consumed |
+| 下一个吸收 gap | **不再有。主线切到 RuntimeKernel。** |
+
+诚实的 scorecard 拆成两张：
+
+```
+Truth substrate readiness:  11 truth modules, 286+ tests, 7 platform consumers ✓
+Runtime executability:      Runtime-0 MVP ✓
+Production readiness:       not yet
+```
+
+## 8. 本文件的维护规则
+
+- 每次 owlmlx 有重大变更（新模块、新 runtime 能力、架构方向变化），更新本文件
+- §2.2 代码盘点必须反映实际模块列表
+- §4.1 缺失能力随实现进展移除
+- 不允许其他文档声称 owlmlx 拥有本文件 §4.1 中标注为"不存在"的能力

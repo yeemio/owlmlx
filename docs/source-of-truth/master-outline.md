@@ -71,6 +71,7 @@ These are runtime-level goals, not temporary integration work.
 26. `hypura-overflow-path-reference.md`
 27. `model-lineage-schema.md`
 28. `cache-truth-contract.md`
+29. `runtime-kernel-mvp.md`
 
 ## 6. Adoption Model
 

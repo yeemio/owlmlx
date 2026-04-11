@@ -16,6 +16,7 @@ Capability labels:
 |---|---|---|
 | Runtime identity as self-owned project | supported | This repository exists to freeze that boundary |
 | Runtime architecture truth | supported | Core documents define the architecture boundary |
+| Executable runtime kernel MVP | supported | Runtime-0: `RuntimeKernel`, `RuntimeBackend`, `FakeBackend`, `MlxLmBackend`, minimal HTTP app, 22 runtime tests |
 | Memory governance under multi-model switching | supported | Formal runtime principle |
 | Switch safety and active-request protection | supported | Formal runtime principle |
 | Runtime truth exposure as owned requirement | supported | Upper layers should consume runtime truth rather than invent it |
@@ -33,7 +34,7 @@ Capability labels:
 | Serving-path model inventory registry | supported | `owlmlx/model_inventory.py` — LoadedModelEntry, ModelInventorySnapshot, loaded-memory aggregation, budget integration, runtime-health integration with 18 tests; **platform consumes** via `metrics.py` and `control_service.py` building inventory snapshots |
 | Served-model lineage schema | supported | `owlmlx/model_lineage.py` — ModelLineage, validation, truth inheritance derivation, training-artifact bridge with 20 tests; **platform consumes** via `primary_line_status.py` normalizing and validating catalog lineage |
 | Cache truth contract | supported | `owlmlx/cache_truth.py` — cache profile labels, flag schema, restart-required derivation, and TurboQuant cache-safety rules with 22 tests; **platform consumes** via `distilled_cache_substrate.py` and `primary_line_status.py` |
-| Fully self-owned implementation stack | partial | Eleven Python modules exist (schema validation + generation gate + serving status + memory budget + context concurrency + abort recovery + runtime health + model inventory + model lineage + cache truth); lifecycle state definitions deferred (product classification, not runtime truth); remaining per-model mutation/transport schema still separate |
+| Fully self-owned implementation stack | partial | Eleven truth modules plus Runtime-0 executable kernel exist; real MLX model load/generate, production serving, process lifecycle, eviction/reclaim, and platform migration remain open |
 | Queue-based generation gate (owlmlx-owned) | supported | `owlmlx/serving.py` — GenerationGate class with 11 tests; enforces validated concurrency boundary |
 | Formal adoption model (reuse open-source, own truth layer) | supported | Adoption rule frozen in product-definition section 6 |
 | Extraction discipline with wave ordering | supported | Discipline rules frozen in extraction-inventory section 3 |
@@ -67,6 +68,7 @@ Capability labels:
 |---|---|---|
 | Generalized foreground-interactive runtime | experimental | Not yet established as current truth |
 | Additional runtime paths beyond large-weight | experimental | Future only when real capability truth exists |
+| Real MLX model load/generate through owlmlx | experimental | `MlxLmBackend` exists and is mock-tested; real local model smoke is Runtime-1 |
 | Overflow / NVMe-tier execution path | experimental | Future candidate only; Hypura recorded as external reference in `hypura-overflow-path-reference.md`, not adopted |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction; Gemma has moved to production mainline instead |
 | `gemma-4-31B-it` as production mainline | supported | Production mainline frozen; pilot LoRA PASS; substrate contracts exercised end-to-end |
