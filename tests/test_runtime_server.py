@@ -105,6 +105,18 @@ def test_generate_stream_returns_ndjson_events() -> None:
     assert payloads[0]["model_id"] == "fake-a"
 
 
+def test_fake_backend_stream_tokens_are_deltas_not_cumulative() -> None:
+    backend = FakeBackend()
+    backend.load("fake-a", memory_gb=1.0)
+
+    events = backend.stream_generate("fake-a", "hello world")
+    token_texts = [event.text for event in events if event.event == "token"]
+
+    assert token_texts[0] == "hello "
+    assert token_texts[1] == "world "
+    assert all("hello world" not in token for token in token_texts[:-1])
+
+
 def test_chat_completions_non_stream_provides_openai_shape() -> None:
     client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
     client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
@@ -235,6 +247,33 @@ def test_anthropic_messages_non_stream_provides_message_shape() -> None:
     assert payload["content"][0]["type"] == "text"
     assert "user: hello" in payload["content"][0]["text"]
     assert payload["usage"]["input_tokens"] >= 0
+
+
+def test_anthropic_messages_accept_structured_system_blocks() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-a",
+            "system": [
+                {
+                    "type": "text",
+                    "text": "You are OwlCoda runtime test system.",
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    text = payload["content"][0]["text"]
+    assert "system: You are OwlCoda runtime test system." in text
+    assert "cache_control" not in text
 
 
 def test_anthropic_messages_stream_provides_sse_events() -> None:
@@ -369,7 +408,7 @@ def test_anthropic_messages_non_stream_can_return_tool_use_blocks() -> None:
         "/v1/messages",
         json={
             "model": "fake-a",
-            "messages": [{"role": "user", "content": "inspect files"}],
+            "messages": [{"role": "user", "content": "[force_tool_use] inspect files"}],
             "max_tokens": 4,
             "tools": [
                 {
@@ -398,7 +437,7 @@ def test_anthropic_messages_stream_can_return_tool_use_events() -> None:
         "/v1/messages",
         json={
             "model": "fake-a",
-            "messages": [{"role": "user", "content": "inspect files"}],
+            "messages": [{"role": "user", "content": "[force_tool_use] inspect files"}],
             "max_tokens": 4,
             "stream": True,
             "tools": [
@@ -416,7 +455,34 @@ def test_anthropic_messages_stream_can_return_tool_use_events() -> None:
     assert "event: message_start" in chunks
     assert "event: content_block_start" in chunks
     assert any('"type": "tool_use"' in line or '"type":"tool_use"' in line for line in chunks)
+    assert any('"type": "input_json_delta"' in line or '"type":"input_json_delta"' in line for line in chunks)
     assert any('"stop_reason": "tool_use"' in line or '"stop_reason":"tool_use"' in line for line in chunks)
+
+
+def test_anthropic_messages_with_tools_do_not_force_tool_use_by_default() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-a",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+            "tools": [
+                {
+                    "name": "Sleep",
+                    "description": "Sleep briefly",
+                    "input_schema": {"type": "object"},
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["stop_reason"] == "end_turn"
+    assert payload["content"][0]["type"] == "text"
 
 
 def test_anthropic_messages_with_tool_result_then_returns_final_text() -> None:

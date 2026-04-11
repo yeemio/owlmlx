@@ -137,30 +137,18 @@ class FakeBackend:
                 completion_tokens=len(self.completion_suffix.split()),
             )
         tools = kwargs.get("tools")
-        tool_choice = kwargs.get("tool_choice")
-        if isinstance(tools, list) and tools and tool_choice != "none":
-            first = tools[0]
-            if isinstance(first, dict):
-                name = str(first.get("name") or "tool")
-                tool_use_id = "toolu_fake_001"
-                return GenerateResult(
-                    ok=True,
-                    message="generated tool_use",
-                    model_id=model_id,
-                    text="",
-                    finish_reason="tool_use",
-                    prompt_tokens=len(prompt.split()),
-                    completion_tokens=0,
-                    detail={
-                        "tool_uses": [
-                            {
-                                "id": tool_use_id,
-                                "name": name,
-                                "input": {"prompt": prompt},
-                            }
-                        ]
-                    },
-                )
+        if isinstance(tools, list) and tools and self._should_emit_tool_use(prompt, kwargs):
+            tool_use = self._build_tool_use(tools, prompt)
+            return GenerateResult(
+                ok=True,
+                message="generated tool_use",
+                model_id=model_id,
+                text="",
+                finish_reason="tool_use",
+                prompt_tokens=len(prompt.split()),
+                completion_tokens=0,
+                detail={"tool_uses": [tool_use]},
+            )
         max_tokens = kwargs.get("max_tokens")
         token_note = f" max_tokens={max_tokens}" if max_tokens is not None else ""
         return GenerateResult(
@@ -172,6 +160,33 @@ class FakeBackend:
             prompt_tokens=len(prompt.split()),
             completion_tokens=len(self.completion_suffix.split()),
         )
+
+    def _should_emit_tool_use(self, prompt: str, kwargs: dict[str, object]) -> bool:
+        tool_choice = kwargs.get("tool_choice")
+        if tool_choice == "none":
+            return False
+        return "[force_tool_use]" in prompt
+
+    def _build_tool_use(self, tools: list[object], prompt: str) -> dict[str, object]:
+        for tool in tools:
+            if isinstance(tool, dict) and str(tool.get("name") or "") == "Sleep":
+                return {
+                    "id": "toolu_fake_001",
+                    "name": "Sleep",
+                    "input": {"durationSeconds": 1},
+                }
+        first = tools[0]
+        if isinstance(first, dict):
+            return {
+                "id": "toolu_fake_001",
+                "name": str(first.get("name") or "tool"),
+                "input": {"prompt": prompt},
+            }
+        return {
+            "id": "toolu_fake_001",
+            "name": "tool",
+            "input": {"prompt": prompt},
+        }
 
     def generate_messages(
         self,
@@ -226,14 +241,13 @@ class FakeBackend:
                 )
             ]
         events: list[StreamEvent] = []
-        assembled: list[str] = []
         for idx, word in enumerate(words, start=1):
-            assembled.append(word)
+            token_text = word + (" " if idx < len(words) else "")
             events.append(
                 StreamEvent(
                     event="token",
                     model_id=model_id,
-                    text=(" ".join(assembled) + (" " if idx < len(words) else "")),
+                    text=token_text,
                     sequence=idx,
                     prompt_tokens=result.prompt_tokens,
                     completion_tokens=idx,

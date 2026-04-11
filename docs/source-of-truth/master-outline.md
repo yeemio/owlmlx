@@ -80,6 +80,7 @@ These are runtime-level goals, not temporary integration work.
 35. `cache-truth-contract.md`
 36. `runtime6-anthropic-entrypoint.md`
 37. `runtime7-owlcc-cutover-verification.md`
+38. `runtime8-owlcoda-cutover-verification.md`
 
 ## 6. Adoption Model
 
@@ -105,5 +106,5 @@ whether to continue. The discipline is frozen in
 
 Runtime-7 is now complete. The next question is:
 
-**How does owlmlx move from first real owlcc cutover proof into deeper
-owlcoda cutover, control-plane integration, and real platform replacement?**
+**How does owlmlx move from first OwlCoda native/headless cutover proof into
+full OwlCoda REPL cutover, control-plane integration, and real platform replacement?**

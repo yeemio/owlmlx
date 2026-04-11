@@ -41,6 +41,7 @@ class ChatMessage(BaseModel):
 class AnthropicTextBlock(BaseModel):
     type: str
     text: str | None = None
+    cache_control: dict[str, Any] | None = None
 
 
 class AnthropicToolUseInputBlock(BaseModel):
@@ -89,7 +90,7 @@ class AnthropicMessagesRequest(BaseModel):
     messages: list[AnthropicInputMessage]
     max_tokens: int | None = Field(default=None, ge=1)
     temperature: float | None = None
-    system: str | None = None
+    system: str | list[AnthropicTextBlock] | None = None
     stream: bool = False
     tools: list[AnthropicToolDef] = Field(default_factory=list)
     tool_choice: str | dict[str, Any] | None = None
@@ -122,11 +123,12 @@ def _messages_to_turns(messages: list[ChatMessage]) -> list[ChatTurn]:
 def _anthropic_messages_to_turns(
     messages: list[AnthropicInputMessage],
     *,
-    system: str | None = None,
+    system: str | list[AnthropicTextBlock] | None = None,
 ) -> list[ChatTurn]:
     turns: list[ChatTurn] = []
-    if system:
-        turns.append(ChatTurn(role="system", content=system))
+    system_text = _anthropic_system_to_text(system)
+    if system_text:
+        turns.append(ChatTurn(role="system", content=system_text))
     for message in messages:
         if isinstance(message.content, str):
             content = message.content
@@ -164,6 +166,20 @@ def _anthropic_messages_to_turns(
         if content:
             turns.append(ChatTurn(role=message.role, content=content))
     return turns
+
+
+def _anthropic_system_to_text(system: str | list[AnthropicTextBlock] | None) -> str:
+    if isinstance(system, str):
+        return system
+    if not system:
+        return ""
+    text_parts: list[str] = []
+    for block in system:
+        if getattr(block, "type", None) == "text":
+            text = str(getattr(block, "text", "") or "")
+            if text:
+                text_parts.append(text)
+    return "\n".join(text_parts)
 
 
 def _openai_response_dict(
@@ -528,6 +544,7 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
                     continue
                 if event.event == "tool_use":
                     tool = dict(event.detail.get("tool_use") or {})
+                    tool_input = tool.get("input") or {}
                     start = {
                         "type": "content_block_start",
                         "index": 0,
@@ -535,10 +552,20 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
                             "type": "tool_use",
                             "id": tool.get("id"),
                             "name": tool.get("name"),
-                            "input": tool.get("input") or {},
+                            "input": {},
                         },
                     }
                     yield f"event: content_block_start\ndata: {json.dumps(start)}\n\n"
+                    if tool_input:
+                        delta = {
+                            "type": "content_block_delta",
+                            "index": 0,
+                            "delta": {
+                                "type": "input_json_delta",
+                                "partial_json": json.dumps(tool_input, ensure_ascii=False),
+                            },
+                        }
+                        yield f"event: content_block_delta\ndata: {json.dumps(delta)}\n\n"
                     yield "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
                     continue
                 if event.event == "done":
