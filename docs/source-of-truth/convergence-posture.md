@@ -158,7 +158,7 @@ All 5 success criteria satisfied.
 
 | Rule | Compliance |
 |---|---|
-| Not written as replacement complete state | ✓ 9/19 capabilities still to absorb |
+| Not written as replacement complete state | ✓ 4/19 capabilities still to absorb |
 | Not mechanical copy of all platform capabilities | ✓ 14 explicit non-candidates |
 | Not training expansion | ✓ Training explicitly deferred |
 | Not unverified experimental promoted | ✓ All candidates are verified |
