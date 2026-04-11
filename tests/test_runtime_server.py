@@ -213,6 +213,91 @@ def test_chat_completions_missing_model_returns_compat_error_status() -> None:
     assert payload["error"]["code"] == "model_not_loaded"
 
 
+def test_anthropic_messages_non_stream_provides_message_shape() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-a",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "x-request-id" in response.headers
+    payload = response.json()
+    assert payload["type"] == "message"
+    assert payload["role"] == "assistant"
+    assert payload["model"] == "fake-a"
+    assert payload["content"][0]["type"] == "text"
+    assert "user: hello" in payload["content"][0]["text"]
+    assert payload["usage"]["input_tokens"] >= 0
+
+
+def test_anthropic_messages_stream_provides_sse_events() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    with client.stream(
+        "POST",
+        "/v1/messages",
+        json={
+            "model": "fake-a",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+            "stream": True,
+        },
+    ) as response:
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+        chunks = [line for line in response.iter_lines() if line]
+
+    assert "event: message_start" in chunks
+    assert "event: content_block_start" in chunks
+    assert "event: content_block_delta" in chunks
+    assert "event: message_stop" in chunks
+
+
+def test_anthropic_messages_missing_model_returns_error_shape() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "missing",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+        },
+    )
+
+    assert response.status_code == 404
+    payload = response.json()
+    assert payload["type"] == "error"
+    assert payload["error"]["type"] == "model_not_loaded"
+
+
+def test_anthropic_count_tokens_returns_estimate() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+
+    response = client.post(
+        "/v1/messages/count_tokens",
+        json={
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": [{"type": "text", "text": "world"}]},
+            ],
+            "system": "be terse",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["input_tokens"] >= 1
+
+
 def test_openai_models_lists_loaded_models() -> None:
     client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
     client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})

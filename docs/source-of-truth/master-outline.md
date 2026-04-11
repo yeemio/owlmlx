@@ -101,8 +101,8 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-Runtime-5 is now complete. The next question is:
+Runtime-6 is now in progress. The next question is:
 
-**How does owlmlx move from a completed Runtime-5 compat entrypoint layer into
-a Runtime-6 serving runtime with deeper control-plane integration, transport
-completion, and real platform cutover?**
+**How does owlmlx move from the first Runtime-6 Anthropic-compatible entrypoint
+into deeper owlcoda/owlcc cutover, fuller Anthropic semantics, and real
+platform replacement?**

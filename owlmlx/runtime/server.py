@@ -38,6 +38,16 @@ class ChatMessage(BaseModel):
     content: str
 
 
+class AnthropicTextBlock(BaseModel):
+    type: str
+    text: str | None = None
+
+
+class AnthropicInputMessage(BaseModel):
+    role: str
+    content: str | list[AnthropicTextBlock]
+
+
 class CompletionRequest(BaseModel):
     model: str | None = Field(default=None, min_length=1)
     prompt: str = Field(min_length=1)
@@ -51,6 +61,15 @@ class ChatCompletionRequest(BaseModel):
     messages: list[ChatMessage]
     max_tokens: int | None = Field(default=None, ge=1)
     temperature: float | None = None
+    stream: bool = False
+
+
+class AnthropicMessagesRequest(BaseModel):
+    model: str | None = Field(default=None, min_length=1)
+    messages: list[AnthropicInputMessage]
+    max_tokens: int | None = Field(default=None, ge=1)
+    temperature: float | None = None
+    system: str | None = None
     stream: bool = False
 
 
@@ -76,6 +95,29 @@ def _result_to_dict(result: Any) -> dict[str, Any]:
 
 def _messages_to_turns(messages: list[ChatMessage]) -> list[ChatTurn]:
     return [ChatTurn(role=message.role, content=message.content) for message in messages]
+
+
+def _anthropic_messages_to_turns(
+    messages: list[AnthropicInputMessage],
+    *,
+    system: str | None = None,
+) -> list[ChatTurn]:
+    turns: list[ChatTurn] = []
+    if system:
+        turns.append(ChatTurn(role="system", content=system))
+    for message in messages:
+        if isinstance(message.content, str):
+            content = message.content
+        else:
+            text_parts = [
+                str(block.text or "")
+                for block in message.content
+                if block.type == "text"
+            ]
+            content = "".join(text_parts)
+        if content:
+            turns.append(ChatTurn(role=message.role, content=content))
+    return turns
 
 
 def _openai_response_dict(
@@ -135,6 +177,26 @@ def _compat_error_response(
     )
 
 
+def _anthropic_error_response(
+    *,
+    request_id: str,
+    message: str,
+    code: str,
+    status_code: int,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        headers={"x-request-id": request_id},
+        content={
+            "type": "error",
+            "error": {
+                "type": code,
+                "message": message,
+            },
+        },
+    )
+
+
 def _openai_completion_dict(
     *,
     completion_id: str,
@@ -155,6 +217,43 @@ def _openai_completion_dict(
             }
         ],
     }
+
+
+def _anthropic_usage_dict(*, input_tokens: int | None, output_tokens: int | None) -> dict[str, int]:
+    return {
+        "input_tokens": int(input_tokens or 0),
+        "output_tokens": int(output_tokens or 0),
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+    }
+
+
+def _anthropic_message_dict(
+    *,
+    message_id: str,
+    model: str,
+    text: str,
+    stop_reason: str = "end_turn",
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
+) -> dict[str, Any]:
+    return {
+        "id": message_id,
+        "type": "message",
+        "role": "assistant",
+        "model": model,
+        "content": [{"type": "text", "text": text}],
+        "stop_reason": stop_reason,
+        "stop_sequence": None,
+        "usage": _anthropic_usage_dict(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        ),
+    }
+
+
+def _estimate_input_tokens_from_turns(turns: list[ChatTurn]) -> int:
+    return max(1, sum(len(turn.content) for turn in turns) // 4) if turns else 0
 
 
 def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
@@ -301,6 +400,96 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
             media_type="text/event-stream",
             headers={"x-request-id": request_id},
         )
+
+    @app.post("/v1/messages")
+    async def anthropic_messages(payload: AnthropicMessagesRequest):
+        target_model = payload.model or runtime.active_model_id
+        message_id = f"msg_{uuid.uuid4().hex[:24]}"
+        request_id = f"req_{uuid.uuid4().hex}"
+        turns = _anthropic_messages_to_turns(payload.messages, system=payload.system)
+        params: dict[str, Any] = {}
+        if payload.max_tokens is not None:
+            params["max_tokens"] = payload.max_tokens
+        if payload.temperature is not None:
+            params["temperature"] = payload.temperature
+        input_tokens = _estimate_input_tokens_from_turns(turns)
+
+        if not payload.stream:
+            result = await runtime.generate_messages(turns, model_id=target_model, **params)
+            if not result.ok:
+                status_code = 404 if result.error_code and result.error_code.value == "model_not_loaded" else 503
+                return _anthropic_error_response(
+                    request_id=request_id,
+                    message=result.message,
+                    code=result.error_code.value if result.error_code is not None else "backend_error",
+                    status_code=status_code,
+                )
+            return JSONResponse(
+                headers={"x-request-id": request_id},
+                content=_anthropic_message_dict(
+                    message_id=message_id,
+                    model=target_model or "unknown",
+                    text=result.text,
+                    stop_reason="end_turn",
+                    input_tokens=result.prompt_tokens or input_tokens,
+                    output_tokens=result.completion_tokens,
+                ),
+            )
+
+        async def anthropic_sse_source():
+            yield (
+                "event: message_start\n"
+                f"data: {json.dumps({'type': 'message_start', 'message': _anthropic_message_dict(message_id=message_id, model=target_model or 'unknown', text='', stop_reason=None, input_tokens=input_tokens, output_tokens=0)})}\n\n"
+            )
+            yield (
+                "event: content_block_start\n"
+                "data: {\"type\":\"content_block_start\",\"index\":0,"
+                "\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+            )
+            async for event in runtime.generate_stream_messages(
+                turns,
+                model_id=target_model,
+                **params,
+            ):
+                if event.event == "token":
+                    chunk = {
+                        "type": "content_block_delta",
+                        "index": 0,
+                        "delta": {"type": "text_delta", "text": event.text},
+                    }
+                    yield f"event: content_block_delta\ndata: {json.dumps(chunk)}\n\n"
+                    continue
+                if event.event == "done":
+                    yield "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+                    message_delta = {
+                        "type": "message_delta",
+                        "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                        "usage": {"output_tokens": int(event.completion_tokens or 0)},
+                    }
+                    yield f"event: message_delta\ndata: {json.dumps(message_delta)}\n\n"
+                    yield "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+                    return
+                if event.event == "error":
+                    error_obj = {
+                        "type": "error",
+                        "error": {
+                            "type": event.error_code.value if event.error_code is not None else "api_error",
+                            "message": event.detail.get("message", "stream generation failed"),
+                        },
+                    }
+                    yield f"event: error\ndata: {json.dumps(error_obj)}\n\n"
+                    return
+
+        return StreamingResponse(
+            anthropic_sse_source(),
+            media_type="text/event-stream",
+            headers={"x-request-id": request_id},
+        )
+
+    @app.post("/v1/messages/count_tokens")
+    def anthropic_count_tokens(payload: AnthropicMessagesRequest) -> dict[str, Any]:
+        turns = _anthropic_messages_to_turns(payload.messages, system=payload.system)
+        return {"input_tokens": _estimate_input_tokens_from_turns(turns)}
 
     @app.post("/v1/completions")
     async def completions(payload: CompletionRequest):
