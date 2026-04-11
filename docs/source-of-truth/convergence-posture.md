@@ -3,7 +3,7 @@
 > Status: authoritative
 > Updated: 2026-04-11
 > Program: owlmlx-platform-capability-absorption-and-convergence
-> Round: consumption-wiring
+> Round: model-inventory-registry
 
 ## 1. Purpose
 
@@ -41,9 +41,9 @@ and what should happen next.
 | Area | owlmlx Side | Platform Side | Why Still Separate |
 |---|---|---|---|
 | Substrate boundaries | All three substrate boundaries absorbed: memory budget (R13), context concurrency (R12), abort recovery (R11) | **Platform consumes owlmlx truth** — `control_service.py` imports `owlmlx.memory_budget`, `context_concurrency_policy.py` imports `owlmlx.context_concurrency`, `abort_recovery.py` delegates state tracking to `owlmlx.abort_recovery.AbortRecoveryTracker` | **Consumption wired**; local duplicate definitions removed |
-| Runtime health semantics | **Absorbed + consumed** (R14): 6 enums, 7 derivation functions in `owlmlx/runtime_health.py`; platform imports `derive_wait_tier()` and `derive_platform_status()` | Platform owns all probing (HTTP, socket, tmux), backend-specific introspection, preflight check execution, recovery actions | **Consumption wired** — inline derivation chains replaced |
+| Runtime health semantics | **Absorbed + consumed** (R14): 6 enums, 7 derivation functions in `owlmlx/runtime_health.py`; platform consumes via `model_inventory.inventory_health_snapshot()` and imports `derive_platform_status()` | Platform owns all probing (HTTP, socket, tmux), backend-specific introspection, preflight check execution, recovery actions | **Consumption wired** — inline derivation chains replaced |
 | Model lifecycle states | Ownership assigned (R15) | State machine lives in lifecycle.py + docs | Split absorption needed |
-| Per-model runtime truth | Status schema exists | Endpoint logic in router app.py | Schema extracted; transport stays |
+| Per-model runtime truth | Model inventory registry absorbed | `owlmlx/model_inventory.py`; platform consumes in metrics/control_service | Endpoint transport and mutations stay platform-owned |
 | Cache truth | Not yet started | distilled_cache_substrate.py | Specialized; needs generalization |
 | Model lineage | Training artifacts have metadata.json | Served model lineage in platform docs | Schema not yet extracted |
 
@@ -52,10 +52,10 @@ and what should happen next.
 | Metric | Score |
 |---|---|
 | Capabilities with assigned truth owner | **46/46** (100%) |
-| owlmlx-owned capabilities with code | **8/19** (42%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency, abort_recovery, runtime_health |
-| owlmlx-owned capabilities consumed by platform | **4/8** (50%) — memory_budget, context_concurrency, abort_recovery, runtime_health (platform imports owlmlx truth, no local duplicates) |
+| owlmlx-owned capabilities with code | **9/19** (47%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory |
+| owlmlx-owned capabilities consumed by platform | **5/9** (56%) — memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory (platform imports owlmlx truth, no local duplicates) |
 | owlmlx-owned capabilities as doc-only | **6/19** (32%) — governance, hazardous-ops, safe-resume, training contracts |
-| owlmlx-owned capabilities to absorb | **5/19** (26%) — Gaps 5-8 from inventory (Gaps 1+2+3+4 fully absorbed) |
+| owlmlx-owned capabilities to absorb | **4/19** (21%) — Gaps 5, 6, 8 plus remaining per-model mutation/transport schema work (Gaps 1+2+3+4 absorbed; Gap 7 inventory layer absorbed) |
 | Model lines with formal placement | **6/6** (100%) |
 | Platform capabilities with clear non-absorption reasoning | **14/14** (100%) |
 
@@ -72,9 +72,20 @@ placement. The ownership boundary is explicit and documented.
 absorbed into owlmlx modules AND the platform now consumes them via direct
 imports. Local duplicate truth definitions have been removed from the platform.
 
-**Remaining convergence work:** 6 of 19 runtime-owned capabilities still
-need code absorption (Gaps 1, 5–8 from inventory). The 3 absorbed+consumed
-capabilities prove the pattern for future rounds.
+**Runtime health semantics absorbed and consumed.** R14 added 6 enums
+and 7 pure derivation functions to `owlmlx/runtime_health.py`. Platform
+consumes runtime health through `model_inventory.inventory_health_snapshot()`
+and imports `derive_platform_status()`.
+
+**Model inventory registry absorbed and consumed.** R17 now has an owlmlx
+input truth layer: `LoadedModelEntry`, `ModelInventorySnapshot`,
+loaded-memory aggregation, and pure budget/health integration. Platform
+`metrics.py` and `control_service.py` fill inventory snapshots; owlmlx
+derives downstream truth.
+
+**Remaining convergence work:** 4 of 19 runtime-owned capabilities still
+need code absorption. The 5 absorbed+consumed capabilities prove the
+pattern for future rounds.
 
 ### 4.2 What This Means Operationally
 
@@ -100,18 +111,25 @@ The substrate boundary trio (Gap 2+3+4) is fully absorbed and consumed.
 The pattern is proven: owlmlx defines truth → platform imports and consumes
 → local duplicates removed → tests pass through owlmlx truth.
 
-The next dominant gap is **Gap 1: Runtime Health Semantics** (R14).
+~~Gap 1: Runtime Health Semantics (R14) — completed 2026-04-11.~~
+~~Model Inventory Registry (R17 input truth layer) — completed 2026-04-11.~~
+
+The next dominant gap is **Model Lifecycle State Definitions** (R15):
+absorb state names and transition truth only. Lifecycle daemon polling,
+auto-heal, TTL policy, endpoint transport, and operator actions remain
+platform-owned.
 
 | Step | Action | Expected Output |
 |---|---|---|
-| 1 | Extract 5-tier load_state and 4-level inference health from `metrics.py` | New `owlmlx/runtime_health.py` with health tier definitions |
-| 2 | Write owlmlx-side tests | Cover tier transitions, semantic boundaries |
-| 3 | Wire platform to consume | `metrics.py` and `health.py` import from owlmlx |
-| 4 | Update ownership-boundary.md | R14 → "absorbed + consumed" |
+| 1 | Map lifecycle state sources (`lifecycle.py` + lifecycle docs) | State/transition mapping |
+| 2 | Add owlmlx lifecycle state definitions | Pure enums + transition helpers |
+| 3 | Write owlmlx-side tests | Valid transitions, terminal states, no platform imports |
+| 4 | Wire platform to consume if narrow seam exists | Lifecycle code imports owlmlx definitions |
+| 5 | Update source-of-truth docs | Mark absorbed / consumed accurately |
 
-Secondary candidates (can proceed in parallel if independent):
-- Gap 6: Model lifecycle state definitions (R15)
+Secondary candidates (after inventory closes):
 - Gap 8: Model lineage schema (R16)
+- Gap 5: Cache truth contract (R18)
 
 ### What Has Changed Since Round 5
 

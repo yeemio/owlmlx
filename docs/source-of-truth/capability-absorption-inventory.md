@@ -40,8 +40,10 @@ Before listing gaps, this is what owlmlx already owns:
 | 13 | Serving-path memory budget truth | `memory_budget.py` (32 tests) | supported |
 | 14 | Serving-path context concurrency truth | `context_concurrency.py` (34 tests) | supported |
 | 15 | Serving-path abort recovery state machine | `abort_recovery.py` (31 tests) | supported |
+| 16 | Serving-path runtime health semantics | `runtime_health.py` (85 tests) | supported |
+| 17 | Serving-path model inventory registry | `model_inventory.py` (18 tests) | supported |
 
-Total: 7 Python modules, 141 tests, 20 truth documents.
+Total: 9 Python modules, 244 tests, 20 truth documents.
 
 ## 3. Gap-Driven Inventory
 
@@ -51,7 +53,8 @@ Total: 7 Python modules, 141 tests, 20 truth documents.
 `owlmlx/runtime_health.py` — 6 enum types (LoadState, InferenceHealth,
 WaitTier, TruthLevel, RuntimeReadiness, PlatformStatus), 7 derivation
 functions, 3 normalization functions. 85 tests. Platform `metrics.py`
-imports `derive_wait_tier()` and `derive_platform_status()`.
+consumes runtime health via `model_inventory.inventory_health_snapshot()`
+and imports `derive_platform_status()`.
 
 **What the platform retains:**
 All HTTP/socket/tmux probing, backend-specific introspection (oMLX
@@ -207,14 +210,15 @@ model promotions and demotions.
 
 ---
 
-### Gap 7: Per-Model Runtime Truth Exposure
+### Gap 7: Per-Model Runtime Truth Exposure — **PARTIALLY ABSORBED + CONSUMED**
 
-**What owlmlx lacks:**
-owlmlx has `runtime_status.py` schema validation and
-`build_large_weight_serving_status()` for one specific path. It does not
-own a generalized per-model runtime truth surface covering load state,
-memory fitness, pin state, quantization metadata, or engine identity across
-all model types.
+**What owlmlx now owns:**
+`owlmlx/model_inventory.py` defines the serving-path model inventory input
+schema and pure helpers: `LoadedModelEntry`, `ModelInventorySnapshot`,
+loaded-memory aggregation, per-model load/truth lookup, memory-budget
+integration, and runtime-health integration. 18 tests. Platform
+`metrics.py` and `control_service.py` build inventory snapshots and consume
+owlmlx derivation helpers.
 
 **What the platform has:**
 
@@ -227,10 +231,10 @@ all model types.
 **Platform maturity:** Verified — Router endpoints exercised, Dashboard
 consumes these.
 
-**Absorption candidate:** PARTIAL — owlmlx should own the schema and
-semantic definition of per-model runtime truth. The HTTP transport
-(endpoint routing, proxy logic) stays in the router/platform. owlmlx
-defines what fields exist and what they mean; platform transports them.
+**Remaining boundary:** HTTP transport, endpoint routing, backend probes,
+backend-specific ID normalization, and dashboard rendering remain in the
+router/platform. Model mutation semantics (`unload`, pinning, TTL) remain
+future work.
 
 **Current platform source files:**
 - `llm_router/app.py` (runtime status endpoints)
@@ -303,7 +307,7 @@ because they belong to other architectural layers.
 | Gap 6 | Model lifecycle states | Verified (40+ phases) | Split: state definitions only |
 | Gap 8 | Model lineage schema | Defined (mandatory for stable) | Full schema ownership |
 | Gap 5 | Cache profile management | Verified but specialized | Partial: generalized contract only |
-| Gap 7 | Per-model runtime truth | Verified (endpoints live) | Partial: schema + semantics only |
+| Gap 7 | Per-model runtime truth | **Partially absorbed + consumed** | `owlmlx/model_inventory.py` — inventory input schema + budget/health derivation; transport remains platform |
 
 ### Non-Candidates — By Reason
 

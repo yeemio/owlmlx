@@ -40,11 +40,11 @@ runtime truth must have exactly one truth owner.
 | R10 | Safe-resume contract | R | owlmlx docs | Already owned (doc-only) |
 | R11 | Abort recovery state machine | R | `owlmlx/abort_recovery.py` | **Absorbed + consumed** — platform `abort_recovery.py` delegates to `AbortRecoveryTracker` |
 | R12 | Context concurrency boundary definitions | R | `owlmlx/context_concurrency.py` | **Absorbed + consumed** — platform `context_concurrency_policy.py` imports gate, threshold, version |
-| R13 | Memory budget definition and calculation | R | `owlmlx/memory_budget.py` | **Absorbed + consumed** — platform `control_service.py` imports budget constants + `evaluate_model_fit` |
-| R14 | Runtime health semantic tiers | R | `owlmlx/runtime_health.py` | **Absorbed + consumed** — 6 enum types, 7 derivation functions; platform `metrics.py` imports `derive_wait_tier()` and `derive_platform_status()` |
+| R13 | Memory budget definition and calculation | R | `owlmlx/memory_budget.py` | **Absorbed + consumed** — platform `control_service.py` consumes via `model_inventory.inventory_budget_check()` plus budget constants |
+| R14 | Runtime health semantic tiers | R | `owlmlx/runtime_health.py` | **Absorbed + consumed** — 6 enum types, 7 derivation functions; platform `metrics.py` consumes via `model_inventory.inventory_health_snapshot()` and `derive_platform_status()` |
 | R15 | Model lifecycle state definitions | R | `model-lifecycle-and-upgrade-gate.md` | **To absorb** (states + transition rules only) |
 | R16 | Model lineage schema | R | `model-lifecycle-and-upgrade-gate.md` | **To absorb** |
-| R17 | Per-model runtime truth schema | R | `llm_router/app.py` (endpoint shapes) | **To absorb** (schema only) |
+| R17 | Per-model runtime truth schema | R | `owlmlx/model_inventory.py` | **Absorbed + consumed** — model inventory schema + pure budget/health derivation; platform fills snapshots and keeps transport/probes |
 | R18 | Cache truth contract | R | `llm_router/distilled_cache_substrate.py` | **To absorb** (generalized contract shell) |
 | R19 | Gemma production mainline identity | R | owlmlx docs | Already owned |
 
