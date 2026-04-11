@@ -1,9 +1,9 @@
 # owlmlx Platform Convergence Posture
 
 > Status: authoritative
-> Updated: 2026-04-10
+> Updated: 2026-04-11
 > Program: owlmlx-platform-capability-absorption-and-convergence
-> Round: 6
+> Round: consumption-wiring
 
 ## 1. Purpose
 
@@ -40,7 +40,7 @@ and what should happen next.
 
 | Area | owlmlx Side | Platform Side | Why Still Separate |
 |---|---|---|---|
-| Substrate boundaries | All three substrate boundaries absorbed: memory budget (R13), context concurrency (R12), abort recovery (R11) | Platform still has original code | **Substrate trio complete**; platform modules can now delegate to owlmlx |
+| Substrate boundaries | All three substrate boundaries absorbed: memory budget (R13), context concurrency (R12), abort recovery (R11) | **Platform consumes owlmlx truth** — `control_service.py` imports `owlmlx.memory_budget`, `context_concurrency_policy.py` imports `owlmlx.context_concurrency`, `abort_recovery.py` delegates state tracking to `owlmlx.abort_recovery.AbortRecoveryTracker` | **Consumption wired**; local duplicate definitions removed |
 | Runtime health semantics | Schema validation only | 5-tier load_state, 4-level inference health in metrics.py | Larger scope; second-wave |
 | Model lifecycle states | Ownership assigned (R15) | State machine lives in lifecycle.py + docs | Split absorption needed |
 | Per-model runtime truth | Status schema exists | Endpoint logic in router app.py | Schema extracted; transport stays |
@@ -53,6 +53,7 @@ and what should happen next.
 |---|---|
 | Capabilities with assigned truth owner | **46/46** (100%) |
 | owlmlx-owned capabilities with code | **7/19** (37%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency, abort_recovery |
+| owlmlx-owned capabilities consumed by platform | **3/7** (43%) — memory_budget, context_concurrency, abort_recovery (platform imports owlmlx truth, no local duplicates) |
 | owlmlx-owned capabilities as doc-only | **6/19** (32%) — governance, hazardous-ops, safe-resume, training contracts |
 | owlmlx-owned capabilities to absorb | **6/19** (32%) — Gaps 1, 5-8 from inventory (Gaps 2+3+4 substrate trio fully absorbed) |
 | Model lines with formal placement | **6/6** (100%) |
@@ -66,9 +67,14 @@ and what should happen next.
 bifurcation.** Every capability has a truth owner. Every model line has a
 placement. The ownership boundary is explicit and documented.
 
-**However, convergence is not yet complete.** 9 of 19 runtime-owned
-capabilities still have their implementation in the original platform. The
-boundary is frozen, but code has not yet followed the boundary.
+**The first code absorption is complete.** The substrate boundary trio
+(R11 abort recovery, R12 context concurrency, R13 memory budget) has been
+absorbed into owlmlx modules AND the platform now consumes them via direct
+imports. Local duplicate truth definitions have been removed from the platform.
+
+**Remaining convergence work:** 6 of 19 runtime-owned capabilities still
+need code absorption (Gaps 1, 5–8 from inventory). The 3 absorbed+consumed
+capabilities prove the pattern for future rounds.
 
 ### 4.2 What This Means Operationally
 
@@ -88,37 +94,33 @@ boundary is frozen, but code has not yet followed the boundary.
 
 ## 5. Next Phase Recommendation
 
-### Recommendation: Enter Code Absorption Phase
+### Recommendation: Continue Code Absorption — Second Wave
 
-The convergence program has completed its boundary and planning work.
-The next phase should be **code absorption** — actually moving the first
-absorption group (Gap 2 + 3 + 4) from platform code into owlmlx modules.
+The substrate boundary trio (Gap 2+3+4) is fully absorbed and consumed.
+The pattern is proven: owlmlx defines truth → platform imports and consumes
+→ local duplicates removed → tests pass through owlmlx truth.
 
-Specifically:
+The next dominant gap is **Gap 1: Runtime Health Semantics** (R14).
 
 | Step | Action | Expected Output |
 |---|---|---|
-| 1 | Create `owlmlx/substrate_boundaries.py` | Context concurrency constants + memory budget calculation |
-| 2 | Create `owlmlx/substrate_health.py` | Abort recovery state machine |
-| 3 | Write owlmlx-side tests | Cover all boundary conditions |
-| 4 | Update router to import from owlmlx | Router consumes, does not define |
-| 5 | Update dashboard to import from owlmlx | Dashboard consumes budget truth |
-| 6 | Update ownership-boundary.md | R11, R12, R13 → "absorbed" |
+| 1 | Extract 5-tier load_state and 4-level inference health from `metrics.py` | New `owlmlx/runtime_health.py` with health tier definitions |
+| 2 | Write owlmlx-side tests | Cover tier transitions, semantic boundaries |
+| 3 | Wire platform to consume | `metrics.py` and `health.py` import from owlmlx |
+| 4 | Update ownership-boundary.md | R14 → "absorbed + consumed" |
 
-This is **not** a documentation phase. It produces new Python modules in
-owlmlx with tests, and modifies the platform to consume them.
+Secondary candidates (can proceed in parallel if independent):
+- Gap 6: Model lifecycle state definitions (R15)
+- Gap 8: Model lineage schema (R16)
 
-### Why Not Continue Training Instead
+### What Has Changed Since Round 5
 
-Training can proceed in parallel — the substrate contracts are frozen and
-the pilot is complete. But if training proceeds without code absorption:
+The original recommendation was "Enter Code Absorption Phase." That phase
+has been entered and partially completed:
 
-- Training will make memory budget assumptions that are not owlmlx-owned code
-- Concurrent training + serving scenarios will not have a single concurrency
-  truth source
-- Abort recovery during training will be handled ad-hoc
-
-Code absorption first closes this gap. Training can happen alongside or after.
+- **Substrate trio absorbed** (Rounds 4–6): 3 modules, 97 tests, ~736 LOC
+- **Platform consumption wired** (Rounds A–C): 3 platform files rewired, local truth removed
+- **Pattern proven**: owlmlx truth → platform import → backward-compatible re-export → tests pass
 
 ## 6. Program Success Evaluation
 

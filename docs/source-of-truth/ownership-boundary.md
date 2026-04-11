@@ -1,9 +1,9 @@
 # owlmlx Ownership Boundary
 
 > Status: authoritative
-> Updated: 2026-04-10
+> Updated: 2026-04-11
 > Program: owlmlx-platform-capability-absorption-and-convergence
-> Round: 6
+> Round: consumption-wiring
 
 ## 1. Purpose
 
@@ -38,9 +38,9 @@ runtime truth must have exactly one truth owner.
 | R8 | Memory governance principles | R | owlmlx docs | Already owned (doc-only) |
 | R9 | Hazardous-operation governance | R | owlmlx docs | Already owned (doc-only) |
 | R10 | Safe-resume contract | R | owlmlx docs | Already owned (doc-only) |
-| R11 | Abort recovery state machine | R | `owlmlx/abort_recovery.py` | **Absorbed** (serving-path) |
-| R12 | Context concurrency boundary definitions | R | `owlmlx/context_concurrency.py` | **Absorbed** (serving-path) |
-| R13 | Memory budget definition and calculation | R | `owlmlx/memory_budget.py` | **Absorbed** (serving-path) |
+| R11 | Abort recovery state machine | R | `owlmlx/abort_recovery.py` | **Absorbed + consumed** — platform `abort_recovery.py` delegates to `AbortRecoveryTracker` |
+| R12 | Context concurrency boundary definitions | R | `owlmlx/context_concurrency.py` | **Absorbed + consumed** — platform `context_concurrency_policy.py` imports gate, threshold, version |
+| R13 | Memory budget definition and calculation | R | `owlmlx/memory_budget.py` | **Absorbed + consumed** — platform `control_service.py` imports budget constants + `evaluate_model_fit` |
 | R14 | Runtime health semantic tiers | R | `ops_dashboard/metrics.py` + `health.py` | **To absorb** |
 | R15 | Model lifecycle state definitions | R | `model-lifecycle-and-upgrade-gate.md` | **To absorb** (states + transition rules only) |
 | R16 | Model lineage schema | R | `model-lifecycle-and-upgrade-gate.md` | **To absorb** |

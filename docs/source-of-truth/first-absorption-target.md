@@ -1,7 +1,7 @@
 # owlmlx First Absorption Target Selection
 
 > Status: authoritative
-> Updated: 2026-04-10
+> Updated: 2026-04-11
 > Program: owlmlx-platform-capability-absorption-and-convergence
 > Round: 4
 
@@ -111,15 +111,23 @@ constants in an existing module.
 | Contract documents | Platform integration wiring |
 | owlmlx-side tests | Router/dashboard test migration |
 
-### 3.4 Expected Deliverables
+### 3.4 Deliverables (Completed)
 
-When this absorption executes (in a future code-absorption round):
+This absorption has been executed across two programs:
 
-1. New owlmlx module(s) with boundary definitions, state machine, budget logic
-2. owlmlx-owned tests for each absorbed capability
-3. Router/dashboard imports owlmlx definitions instead of defining their own
-4. Updated ownership-boundary.md (R11, R12, R13 → "absorbed")
-5. Updated capability-matrix.md with new `supported` rows
+**Code absorption (Rounds 4–6):**
+
+1. ✅ `owlmlx/memory_budget.py` — 234 LOC, 32 tests
+2. ✅ `owlmlx/context_concurrency.py` — 165 LOC, 34 tests
+3. ✅ `owlmlx/abort_recovery.py` — 337 LOC, 31 tests
+
+**Platform consumption wiring (Rounds A–C):**
+
+4. ✅ `control_service.py` imports `owlmlx.memory_budget` (budget constants + `evaluate_model_fit`)
+5. ✅ `context_concurrency_policy.py` imports `owlmlx.context_concurrency` (gate, threshold, version)
+6. ✅ `abort_recovery.py` delegates state tracking to `owlmlx.abort_recovery.AbortRecoveryTracker`
+7. ✅ `ownership-boundary.md` updated: R11, R12, R13 → "absorbed + consumed"
+8. ✅ `convergence-posture.md` updated: substrate boundaries → "consumption wired"
 
 ## 4. Second-Wave Candidates (Not Selected For First)
 
