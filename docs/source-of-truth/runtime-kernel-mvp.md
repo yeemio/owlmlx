@@ -141,9 +141,10 @@ Current Runtime-1 state:
 
 - parent-safe subprocess runner exists
 - clean-room environment `.runtime1-mlx` can import `mlx_lm 0.31.2`
-- first real local smoke has passed on
-  `/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4`
-- real subprocess generate completed successfully in about `12.07s`
+- real local smoke has passed on:
+  - `gpt-oss-20b-MXFP4-Q4` in about `12.07s`
+  - `Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit` in about `12.66s`
+  - `Qwen3.5-35B-A3B-4bit` in about `13.41s`
 
 Runtime-1 now also has explicit environment selection discipline:
 
@@ -153,8 +154,10 @@ Runtime-1 now also has explicit environment selection discipline:
   environments already known to crash during `import mlx_lm`
 
 Runtime-1 should not jump straight to Kimi 1T, 120B, or Gemma 31B. The next gap
-is widening real-model coverage and turning subprocess success from one proven
-path into a stable baseline.
+is deciding when to move from one-shot subprocess execution to persistent child
+process lifecycle. Runtime-1 now has a real three-model baseline; Runtime-2 is
+the place to make `load once -> generate many -> explicit unload/restart`
+real.
 
 The current environment truth is frozen separately in
 `runtime1-environment-diagnostics.md`.

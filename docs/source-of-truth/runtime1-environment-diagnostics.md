@@ -55,11 +55,13 @@ Verified successful clean-room environment:
 |---|---|---|---|
 | runtime1-mlx | `/Users/yeemio/AI/gitrep/owlmlx/.runtime1-mlx/bin/python` | import probe passed | clean environment can safely import `mlx_lm 0.31.2` |
 
-Verified first real local smoke:
+Verified real local smoke coverage:
 
 | Model | Path | Result | Detail |
 |---|---|---|---|
 | gpt-oss-20b-MXFP4-Q4 | `/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4` | PASS | real subprocess `generate` succeeded in about 12.07s |
+| Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit | `/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit` | PASS | real subprocess `generate` succeeded in about 12.66s |
+| Qwen3.5-35B-A3B-4bit | `/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit` | PASS | real subprocess `generate` succeeded in about 13.41s |
 
 ## 4. Operational Discipline
 
@@ -103,3 +105,11 @@ The remaining Runtime-1 question is no longer "can anything import mlx_lm on
 this machine?" The remaining question is how broadly this clean environment can
 cover real local models, and whether `unload` should evolve from registration
 only into an explicit child-process lifecycle.
+
+Current answer on `unload`:
+
+- in Runtime-1 one-shot mode, `unload` is a registration boundary, not a child
+  process teardown boundary
+- each `generate` starts a fresh child process and that child exits when the
+  request completes
+- explicit persistent child lifecycle belongs to Runtime-2, not Runtime-1

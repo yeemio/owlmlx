@@ -39,7 +39,7 @@ memory budget / model inventory / runtime health / GenerationGate。
 
 ### 2.2 代码盘点
 
-Runtime-0 后，owlmlx 有 16 个 Python 模块，308 tests。
+Runtime-1 后，owlmlx 有 19 个 Python 模块，328 tests。
 
 | 模块 | LOC | 性质 | 做什么 |
 |---|---|---|---|
@@ -58,9 +58,12 @@ Runtime-0 后，owlmlx 有 16 个 Python 模块，308 tests。
 | runtime/backends.py | ~130 | backend adapter + FakeBackend | RuntimeBackend 边界和可测试 fake runtime |
 | runtime/kernel.py | ~230 | **runtime behavior** | RuntimeKernel: load/generate/unload/status |
 | runtime/server.py | ~80 | **HTTP runtime entry** | `/healthz`, `/v1/load`, `/v1/generate`, `/v1/models`, `/v1/unload` |
-| runtime/mlx_lm_backend.py | ~120 | MLX adapter | lazy mlx-lm load/generate 调用路径 |
+| runtime/mlx_lm_backend.py | ~120 | MLX adapter | lazy mlx-lm load/generate 调用路径（in-process，仅 probe 用途） |
+| runtime/mlx_lm_runner.py | ~65 | **child process runner** | 子进程内执行 mlx_lm.load + generate，stdin/stdout JSON 协议 |
+| runtime/mlx_lm_subprocess_backend.py | ~220 | **subprocess backend** | 父进程安全的 mlx-lm 执行隔离，one-shot 子进程 |
+| runtime/mlx_environment.py | ~150 | **environment probe** | 安全环境选择 + 结构化诊断，default vs known 分离 |
 
-**关键事实：Runtime-0 已经补上可执行 runtime kernel，但真实 MLX 模型加载仍未验证。**
+**关键事实：Runtime-1 已验证真实本地模型（gpt-oss-20b-MXFP4-Q4）通过子进程隔离完成 load → generate。父进程永不 import mlx_lm。**
 
 ### 2.3 文档盘点
 
@@ -106,8 +109,8 @@ owlmlx 实际占据的位置：Layer 2 最小 kernel + truth substrate。还不�
 
 | # | 能力 | 现状 | 为什么需要 |
 |---|---|---|---|
-| 1 | **Safe real MLX model loader** | mlx-lm adapter 调用路径存在；真实 load/generate 已移入子进程 runner；clean `.runtime1-mlx` 已通过 import probe，`gpt-oss-20b` 首次真实 smoke 已通过 | 下一步要验证更多本地模型，而不是停留在单个成功样本 |
-| 2 | **Safe real inference engine** | Fake completion + 子进程 mlx-lm runner；`gpt-oss-20b` 已完成真实 completion | 下一步要扩大真实 completion 覆盖面并稳定 child lifecycle |
+| 1 | **Safe real MLX model loader** | mlx-lm adapter 调用路径存在；真实 load/generate 已移入子进程 runner；clean `.runtime1-mlx` 已通过 import probe，`gpt-oss-20b`、`Qwen3.5-27B`、`Qwen3.5-35B-A3B` 真实 smoke 已通过 | 下一步不再是“有没有真实样本”，而是是否转入 persistent child lifecycle |
+| 2 | **Safe real inference engine** | Fake completion + 子进程 mlx-lm runner；三个本地模型已完成真实 completion | 下一步要把 one-shot 成功扩展成 `load once -> generate many` |
 | 3 | **Production HTTP server** | Runtime-0 最小 FastAPI app | 需要错误码、流式输出、配置、部署入口 |
 | 4 | **Memory controller** | load 前预算检查 + inventory | 要能主动 load/unload/evict/reclaim |
 | 5 | **Self-introspection** | kernel status 可自推导，真实 backend probe 未完成 | runtime 要能 probe 自己的真实 backend |
@@ -186,17 +189,26 @@ Runtime-1 当前的运行纪律已经明确：
 
 第一版不追求性能，不强制真实模型加载。目标是架构闭环，不是跑 31B。
 
-### 7.2 预期内部结构
+### 7.2 实际内部结构（Runtime-1）
 
 ```
 owlmlx/
   runtime/
-    kernel.py          # RuntimeKernel: load/generate/unload/status 核心
-    loader.py          # MLXModelLoader interface + mlx-lm adapter
-    engine.py          # generation adapter
-    server.py          # HTTP entry (FastAPI or lightweight)
-    memory.py          # 消费 memory_budget / model_inventory
-    lifecycle.py       # 消费 runtime_health / abort_recovery
+    types.py                      # 结果类型 + RuntimeErrorCode
+    backends.py                   # RuntimeBackend Protocol + FakeBackend
+    kernel.py                     # RuntimeKernel: load/generate/unload/status 核心
+    server.py                     # 最小 HTTP entry (FastAPI)
+    mlx_lm_backend.py             # in-process mlx-lm adapter（仅 probe 用途）
+    mlx_lm_runner.py              # 子进程 runner：import mlx_lm + load + generate
+    mlx_lm_subprocess_backend.py  # 父进程安全 backend，stdin/stdout JSON 协议
+    mlx_environment.py            # 环境探测 + 安全选择
+```
+
+未来可能新增但 Runtime-1 还不需要的：
+
+```
+    memory.py          # 消费 memory_budget / model_inventory → 主动 evict
+    lifecycle.py       # 消费 runtime_health / abort_recovery → process restart
 ```
 
 ### 7.3 之前工作的重新定性
@@ -211,8 +223,10 @@ R11-R18 的价值：给 RuntimeKernel 准备了判断层。
 诚实的 scorecard 拆成两张：
 
 ```
-Truth substrate readiness:  11 truth modules, 286+ tests, 7 platform consumers ✓
-Runtime executability:      Runtime-0 MVP ✓
+Truth substrate readiness:  11 truth modules, 328 tests, 7 platform consumers ✓
+Runtime executability:      Runtime-0 MVP ✓ → Runtime-1 真实模型验证 ✓
+Subprocess isolation:       父进程永不 import mlx_lm，子进程 abort → 结构化错误 ✓
+Real local smoke baseline:  gpt-oss-20b + Qwen3.5-27B + Qwen3.5-35B-A3B 通过 ✓
 Production readiness:       not yet
 ```
 
