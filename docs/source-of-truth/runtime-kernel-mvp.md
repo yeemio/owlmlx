@@ -21,6 +21,7 @@ and self-derived runtime status.
 | Backend adapter boundary | `owlmlx/runtime/backends.py` — `RuntimeBackend` protocol |
 | Stable test backend | `FakeBackend` |
 | MLX-family adapter | `owlmlx/runtime/mlx_lm_backend.py` — lazy `mlx_lm` adapter |
+| MLX subprocess adapter | `owlmlx/runtime/mlx_lm_subprocess_backend.py` — parent-safe child-process runner |
 | HTTP entry | `owlmlx/runtime/server.py` |
 | Runtime result contracts | `owlmlx/runtime/types.py` |
 
@@ -84,9 +85,10 @@ The adapter:
 - supports kernel load/generate/unload/status in mock tests
 
 Direct `mlx_lm` import in the local venv currently initializes MLX/Metal and
-can crash in non-runtime test contexts. This is why the adapter is lazy,
-mock-tested in Runtime-0, and protected by an isolated subprocess import
-probe before parent-process import.
+can crash in non-runtime test contexts. This is why the in-process adapter is
+lazy and mock-tested only. Runtime-1 adds `MlxLmSubprocessBackend`, which keeps
+the parent runtime safe by executing `mlx_lm.load + mlx_lm.generate` inside a
+child process.
 
 Runtime-1 adds an explicit operator smoke script:
 
@@ -112,6 +114,7 @@ Runtime-0 tests prove:
 - HTTP load/generate/models/unload roundtrip works
 - HTTP load respects memory budget
 - `MlxLmBackend` calls mlx-lm load/generate paths under mock
+- `MlxLmSubprocessBackend` runs child-process generation through a JSON runner
 - `RuntimeKernel` can use `MlxLmBackend` under mock
 - `MlxLmBackend` import preflight returns structured failure instead of
   importing `mlx_lm` in the parent process
@@ -134,11 +137,10 @@ Runtime-0 does not claim:
 Runtime-1 should verify a real MLX model load/generate path through
 `MlxLmBackend` using a local model small enough for safe smoke testing.
 
-Current Runtime-1 blocker: `mlx_lm` import can crash the child process during
-MLX/Metal initialization before any model load. The next step is to stabilize
-the MLX import environment or move real load/generate into a dedicated
-subprocess runner so the owlmlx parent runtime never imports crash-prone Metal
-code directly.
+Current Runtime-1 state: parent-safe subprocess runner exists. Real local model
+smoke is still blocked by MLX/Metal import failure in child processes on the
+current environment. The parent runtime now receives structured subprocess
+failure instead of crashing.
 
 Runtime-1 should not start with Kimi 1T, 120B, or Gemma 31B. The next gap is
 safe real adapter execution, not large-model productization.

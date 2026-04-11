@@ -19,7 +19,7 @@ import json
 from pathlib import Path
 import sys
 
-from owlmlx.runtime import MlxLmBackend, RuntimeKernel
+from owlmlx.runtime import MlxLmSubprocessBackend, RuntimeKernel
 from owlmlx.runtime.mlx_lm_backend import probe_mlx_lm_import
 
 
@@ -45,7 +45,7 @@ def main() -> int:
         print(json.dumps({"error": f"model path does not exist: {model}"}, indent=2))
         return 2
 
-    kernel = RuntimeKernel(MlxLmBackend(python_executable=args.python))
+    kernel = RuntimeKernel(MlxLmSubprocessBackend(python_executable=args.python))
     loaded = kernel.load_model(str(model), memory_gb=args.memory_gb)
     print(json.dumps({"load": asdict(loaded)}, indent=2, default=str))
     if not loaded.ok:

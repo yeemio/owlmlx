@@ -106,8 +106,8 @@ owlmlx 实际占据的位置：Layer 2 最小 kernel + truth substrate。还不�
 
 | # | 能力 | 现状 | 为什么需要 |
 |---|---|---|---|
-| 1 | **Safe real MLX model loader** | mlx-lm adapter 调用路径存在；import preflight 已隔离；真实模型加载未验证 | Runtime-1 必须证明真实权重加载且不崩父进程 |
-| 2 | **Safe real inference engine** | Fake completion + mlx-lm generate 调用路径；真实 generate 未验证 | Runtime-1 必须证明真实 completion 且不崩父进程 |
+| 1 | **Safe real MLX model loader** | mlx-lm adapter 调用路径存在；真实 load/generate 已移入子进程 runner；真实模型加载未通过 | Runtime-1 必须证明真实权重加载且不崩父进程 |
+| 2 | **Safe real inference engine** | Fake completion + 子进程 mlx-lm runner；真实 generate 未通过 | Runtime-1 必须证明真实 completion 且不崩父进程 |
 | 3 | **Production HTTP server** | Runtime-0 最小 FastAPI app | 需要错误码、流式输出、配置、部署入口 |
 | 4 | **Memory controller** | load 前预算检查 + inventory | 要能主动 load/unload/evict/reclaim |
 | 5 | **Self-introspection** | kernel status 可自推导，真实 backend probe 未完成 | runtime 要能 probe 自己的真实 backend |

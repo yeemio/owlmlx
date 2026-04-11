@@ -3,6 +3,7 @@
 from .backends import FakeBackend, RuntimeBackend
 from .kernel import RuntimeKernel
 from .mlx_lm_backend import MlxLmBackend
+from .mlx_lm_subprocess_backend import MlxLmSubprocessBackend
 from .types import (
     BackendStatus,
     GenerateResult,
@@ -21,6 +22,7 @@ __all__ = [
     "LoadResult",
     "LoadedModelInfo",
     "MlxLmBackend",
+    "MlxLmSubprocessBackend",
     "RuntimeBackend",
     "RuntimeErrorCode",
     "RuntimeKernel",
