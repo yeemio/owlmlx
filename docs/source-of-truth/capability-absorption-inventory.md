@@ -171,36 +171,30 @@ current implementation is a specimen-specific reference.
 
 ---
 
-### Gap 6: Model Lifecycle State Definitions
+### Gap 6: Model Lifecycle State Definitions — **DEFERRED (not runtime truth)**
 
-**What owlmlx lacks:**
-No lifecycle states, no promotion gates, no eviction policies, no state
-transition rules. owlmlx knows about training artifacts and serving
-feasibility but has no concept of "is this model stable, candidate,
-blocked, or parked?"
+**Adjudication (2026-04-11):** Code-level inspection of `lifecycle.py`
+(693 LOC) confirmed no state enum, no transition function, no runtime
+substrate truth exists in code. The 6 lifecycle states
+(stable/backup/candidate/experimental/blocked/parked) are product
+lifecycle classification managed through documentation and catalog
+`channel` fields. The LifecycleDaemon uses channel strings for TTL and
+auto-heal decisions — control-plane orchestration, not runtime truth.
 
-**What the platform has:**
+**Why not absorb:**
 
-- `model-lifecycle-and-upgrade-gate.md` — 6 states with entry/exit rules
-- Full upgrade gate (G1–G7), backup gate (B1–B4), runtime gate (R1–R3),
-  quant gate (Q1–Q3)
-- Truth inheritance rules (what carries over vs must re-verify)
-- `ops_dashboard/lifecycle.py` — LifecycleDaemon (693 LOC)
-- TTL eviction: preview=30m, lab=15m, stable=never
-- Auto-heal on consecutive health failures
+- States are human product decisions (upgrade gate G1–G7), not runtime-
+  derivable truth like LoadState or SubstrateState.
+- `lifecycle.py` has no state enum to extract — absorbing would mean
+  inventing an enum with no existing code consumer.
+- No derivation chain connects lifecycle states to memory budget,
+  runtime health, or any owlmlx module.
+- Upgrade gates, TTL policy, auto-heal are control-plane policy.
 
-**Platform maturity:** Verified — exercised across 40+ phases with real
-model promotions and demotions.
-
-**Absorption candidate:** SPLIT —
-
-- **State definitions** (stable/backup/candidate/experimental/blocked/parked)
-  and **truth inheritance rules** are runtime truth → absorb into owlmlx.
-- **Upgrade gate tests** (G1–G7) are product-level quality validation →
-  stays in platform.
-- **LifecycleDaemon** (polling, eviction, auto-heal) is control-plane
-  orchestration → stays in platform.
-- **TTL policy** is operational policy → stays in platform.
+**Disposition:** All lifecycle state definitions remain platform-owned.
+Truth inheritance rules (§4 of model-lifecycle-and-upgrade-gate.md) may
+be partially absorbed under Gap 8 (lineage schema) where they inform
+"what verification carries over" derivation.
 
 **Current platform source files:**
 - `docs/source-of-truth/local-llm-platform/model-lifecycle-and-upgrade-gate.md`
@@ -304,7 +298,7 @@ because they belong to other architectural layers.
 | Gap 2 | Abort recovery state machine | Verified (field-tested) | Full module absorption |
 | Gap 3 | Context concurrency policy | Verified (hardware-proven) | Full boundary ownership |
 | Gap 4 | Memory budget enforcement | Verified (production use) | Full budget logic ownership |
-| Gap 6 | Model lifecycle states | Verified (40+ phases) | Split: state definitions only |
+| Gap 6 | Model lifecycle states | Verified (40+ phases) | **Deferred** — product classification, not runtime truth; no code to absorb |
 | Gap 8 | Model lineage schema | Defined (mandatory for stable) | Full schema ownership |
 | Gap 5 | Cache profile management | Verified but specialized | Partial: generalized contract only |
 | Gap 7 | Per-model runtime truth | **Partially absorbed + consumed** | `owlmlx/model_inventory.py` — inventory input schema + budget/health derivation; transport remains platform |
@@ -320,15 +314,17 @@ because they belong to other architectural layers.
 | Separate capability line | N9 |
 | Specialized research surface | N14 |
 
-## 6. Next-Round Decision Hooks
+## 6. Resolved Decision Hooks
 
-### For Round 2 (Ownership Boundary Freeze)
+### Historical Round 2 Hooks
 
-The following questions must be resolved:
+The following questions were raised during ownership-boundary freeze and
+have since been resolved or superseded:
 
-1. **Gap 6 split line:** Which lifecycle state definitions move to owlmlx
-   vs stay in platform? Proposal: state enum + transition rules → owlmlx;
-   gate tests + TTL policy + daemon → platform.
+1. **Gap 6 split line:** Resolved 2026-04-11. Lifecycle state definitions
+   stay platform-owned. They are product classification and promotion
+   policy, not runtime substrate truth; `lifecycle.py` has no state enum or
+   transition function to absorb.
 
 2. **Gap 5 generalization:** Does owlmlx own a cache truth contract, or
    only note that cache truth is a future gap? Proposal: own a minimal

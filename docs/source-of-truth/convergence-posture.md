@@ -42,7 +42,7 @@ and what should happen next.
 |---|---|---|---|
 | Substrate boundaries | All three substrate boundaries absorbed: memory budget (R13), context concurrency (R12), abort recovery (R11) | **Platform consumes owlmlx truth** — `control_service.py` imports `owlmlx.memory_budget`, `context_concurrency_policy.py` imports `owlmlx.context_concurrency`, `abort_recovery.py` delegates state tracking to `owlmlx.abort_recovery.AbortRecoveryTracker` | **Consumption wired**; local duplicate definitions removed |
 | Runtime health semantics | **Absorbed + consumed** (R14): 6 enums, 7 derivation functions in `owlmlx/runtime_health.py`; platform consumes via `model_inventory.inventory_health_snapshot()` and imports `derive_platform_status()` | Platform owns all probing (HTTP, socket, tmux), backend-specific introspection, preflight check execution, recovery actions | **Consumption wired** — inline derivation chains replaced |
-| Model lifecycle states | Ownership assigned (R15) | State machine lives in lifecycle.py + docs | Split absorption needed |
+| Model lifecycle states | **Deferred** (R15): 6 states are product lifecycle classification (stable/backup/candidate/experimental/blocked/parked), not runtime substrate truth; `lifecycle.py` has no state enum or transition function to absorb; absorbing would produce orphan enum with no derivation consumer | Platform owns state definitions in `model-lifecycle-and-upgrade-gate.md`, upgrade gates (G1–G7), and LifecycleDaemon execution | **Not a code absorption target** — product policy, not runtime truth |
 | Per-model runtime truth | Model inventory registry absorbed | `owlmlx/model_inventory.py`; platform consumes in metrics/control_service | Endpoint transport and mutations stay platform-owned |
 | Cache truth | Not yet started | distilled_cache_substrate.py | Specialized; needs generalization |
 | Model lineage | Training artifacts have metadata.json | Served model lineage in platform docs | Schema not yet extracted |
@@ -55,7 +55,8 @@ and what should happen next.
 | owlmlx-owned capabilities with code | **9/19** (47%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory |
 | owlmlx-owned capabilities consumed by platform | **5/9** (56%) — memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory (platform imports owlmlx truth, no local duplicates) |
 | owlmlx-owned capabilities as doc-only | **6/19** (32%) — governance, hazardous-ops, safe-resume, training contracts |
-| owlmlx-owned capabilities to absorb | **4/19** (21%) — Gaps 5, 6, 8 plus remaining per-model mutation/transport schema work (Gaps 1+2+3+4 absorbed; Gap 7 inventory layer absorbed) |
+| owlmlx-owned capabilities deferred (not runtime truth) | **1/19** (5%) — Gap 6 model lifecycle states (product classification, not substrate truth) |
+| owlmlx-owned capabilities to absorb | **3/19** (16%) — Gaps 5, 8 plus remaining per-model mutation/transport schema (Gaps 1+2+3+4 absorbed; Gap 7 inventory layer absorbed; Gap 6 deferred) |
 | Model lines with formal placement | **6/6** (100%) |
 | Platform capabilities with clear non-absorption reasoning | **14/14** (100%) |
 
@@ -114,18 +115,31 @@ The pattern is proven: owlmlx defines truth → platform imports and consumes
 ~~Gap 1: Runtime Health Semantics (R14) — completed 2026-04-11.~~
 ~~Model Inventory Registry (R17 input truth layer) — completed 2026-04-11.~~
 
-The next dominant gap is **Model Lifecycle State Definitions** (R15):
-absorb state names and transition truth only. Lifecycle daemon polling,
-auto-heal, TTL policy, endpoint transport, and operator actions remain
-platform-owned.
+**Gap 6: Model Lifecycle State Definitions (R15) — deferred 2026-04-11.**
+Code-level inspection of `lifecycle.py` (693 LOC) confirmed: no state
+enum, no transition function, no runtime substrate truth to absorb. The
+6 lifecycle states (stable/backup/candidate/experimental/blocked/parked)
+are product classification managed through `model-lifecycle-and-upgrade-gate.md`
+and catalog `channel` fields. The LifecycleDaemon uses channel for TTL
+and auto-heal policy — these are control-plane orchestration, not runtime
+truth. Absorbing would produce an orphan enum with no derivation chain
+and no platform consumer. R15 remains platform-owned.
+
+The next dominant gap is **Model Lineage Schema** (R16 / Gap 8):
+absorb lineage schema definitions and truth inheritance rules. This
+connects to `training.py`'s existing artifact metadata on the production
+side: training produces artifacts → lineage records how weights reached
+serving state → truth inheritance rules determine what verification
+carries over vs must re-verify.
 
 | Step | Action | Expected Output |
 |---|---|---|
-| 1 | Map lifecycle state sources (`lifecycle.py` + lifecycle docs) | State/transition mapping |
-| 2 | Add owlmlx lifecycle state definitions | Pure enums + transition helpers |
-| 3 | Write owlmlx-side tests | Valid transitions, terminal states, no platform imports |
-| 4 | Wire platform to consume if narrow seam exists | Lifecycle code imports owlmlx definitions |
-| 5 | Update source-of-truth docs | Mark absorbed / consumed accurately |
+| 1 | Map lineage sources (`model-lifecycle-and-upgrade-gate.md` §2 + catalog.json) | Field-level mapping to owlmlx schema |
+| 2 | Add owlmlx lineage schema definitions | Immutable dataclasses + validation |
+| 3 | Add truth inheritance derivation | Pure functions: change type → what re-verifies |
+| 4 | Write owlmlx-side tests | Schema validation, inheritance rules, composition with training.py |
+| 5 | Wire platform to consume if seam exists | Catalog lineage validated through owlmlx |
+| 6 | Update source-of-truth docs | Mark absorbed / consumed accurately |
 
 Secondary candidates (after inventory closes):
 - Gap 8: Model lineage schema (R16)
@@ -158,7 +172,7 @@ All 5 success criteria satisfied.
 
 | Rule | Compliance |
 |---|---|
-| Not written as replacement complete state | ✓ 4/19 capabilities still to absorb |
+| Not written as replacement complete state | ✓ 3/19 capabilities still to absorb, 1/19 explicitly deferred |
 | Not mechanical copy of all platform capabilities | ✓ 14 explicit non-candidates |
 | Not training expansion | ✓ Training explicitly deferred |
 | Not unverified experimental promoted | ✓ All candidates are verified |

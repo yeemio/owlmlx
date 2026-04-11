@@ -42,7 +42,7 @@ runtime truth must have exactly one truth owner.
 | R12 | Context concurrency boundary definitions | R | `owlmlx/context_concurrency.py` | **Absorbed + consumed** — platform `context_concurrency_policy.py` imports gate, threshold, version |
 | R13 | Memory budget definition and calculation | R | `owlmlx/memory_budget.py` | **Absorbed + consumed** — platform `control_service.py` consumes via `model_inventory.inventory_budget_check()` plus budget constants |
 | R14 | Runtime health semantic tiers | R | `owlmlx/runtime_health.py` | **Absorbed + consumed** — 6 enum types, 7 derivation functions; platform `metrics.py` consumes via `model_inventory.inventory_health_snapshot()` and `derive_platform_status()` |
-| R15 | Model lifecycle state definitions | R | `model-lifecycle-and-upgrade-gate.md` | **To absorb** (states + transition rules only) |
+| R15 | Model lifecycle state definitions | R | `model-lifecycle-and-upgrade-gate.md` | **Deferred** — 6 states (stable/backup/candidate/experimental/blocked/parked) are product lifecycle classification, not runtime substrate truth; `lifecycle.py` has no state enum or transition function; absorbing would produce an orphan enum with no derivation chain or platform consumer |
 | R16 | Model lineage schema | R | `model-lifecycle-and-upgrade-gate.md` | **To absorb** |
 | R17 | Per-model runtime truth schema | R | `owlmlx/model_inventory.py` | **Absorbed + consumed** — model inventory schema + pure budget/health derivation; platform fills snapshots and keeps transport/probes |
 | R18 | Cache truth contract | R | `llm_router/distilled_cache_substrate.py` | **To absorb** (generalized contract shell) |
@@ -52,7 +52,7 @@ runtime truth must have exactly one truth owner.
 
 | # | Capability | Owner | Location | Notes |
 |---|---|---|---|---|
-| C1 | Lifecycle daemon (polling + auto-heal) | C | `ops_dashboard/lifecycle.py` | Consumes R14, R15; executes policy |
+| C1 | Lifecycle daemon (polling + auto-heal) | C | `ops_dashboard/lifecycle.py` | Consumes R14; owns lifecycle state definitions (R15 deferred — product classification); executes TTL/auto-heal policy |
 | C2 | Recovery orchestration | C | `ops_dashboard/recovery_service.py` | Policy-driven restart decisions |
 | C3 | Bootstrap supervisor | C | `ops_dashboard/supervisor.py` | Layer-0 cold-start; not runtime |
 | C4 | Action persistence + state machine | C | `ops_dashboard/control_jobs.py` | Operational audit trail |
@@ -136,7 +136,7 @@ These placements feed Round 3 finalization.
 | Training substrate | owlmlx (R5, R6, R7) | Runtime-owned |
 | Serving on platform | Shell-hosted (S2 via oMLX) | Shell-hosted |
 | Product routing | Router (T1, T6) | Routing-owned |
-| Lifecycle state (future stable promotion) | owlmlx defines state (R15); platform executes gate (C7) | Split |
+| Lifecycle state (stable promotion) | Platform-owned (R15 deferred); platform defines states and executes gate (C7) | Platform-owned |
 
 Gemma is the first model line that is owlmlx-native from training through
 serving. Its runtime contracts are already frozen. It currently serves via
@@ -150,7 +150,7 @@ oMLX on the standard platform path. No special shell treatment needed.
 | Sharded engine | Shell-hosted (S1) | Shell-hosted (imports owlmlx) |
 | Background-heavy serving posture | owlmlx docs | Runtime-owned |
 | Product routing | Router (T1) via dedicated port :8014 | Routing-owned |
-| Lifecycle state | Experimental / lab | owlmlx defines; platform enforces |
+| Lifecycle state | Experimental / lab | Platform-owned (R15 deferred); product classification, not runtime truth |
 
 Kimi is the first validated specimen on the large-weight path. It already
 bridges into owlmlx (GenerationGate, serving status). It is NOT a production
@@ -182,8 +182,10 @@ managed.
 | MiroThinker-1.7 Q8 | Kimi engine | Stable (search scout) | Lab engine |
 
 These models are platform-managed. owlmlx provides: (a) runtime truth schema
-they conform to, (b) lifecycle state definitions, (c) lineage schema. The
-platform manages their catalog placement, routing, and product surface.
+they conform to, (b) lineage schema (R16, to absorb). Lifecycle state
+definitions (R15) remain platform-owned — product classification, not
+runtime truth. The platform manages their catalog placement, routing,
+lifecycle gates, and product surface.
 
 ## 6. Truth Owner Index
 
@@ -197,7 +199,7 @@ For any future question "who owns the truth about X?", use this index:
 | What is the memory budget? | owlmlx (R13) |
 | Does this request fit concurrency limits? | owlmlx (R12) defines; router (T7) enforces |
 | Is the engine contaminated after abort? | owlmlx (R11) |
-| What lifecycle state is this model? | owlmlx (R15) defines; platform catalogs |
+| What lifecycle state is this model? | Platform-owned (R15 deferred — product classification) |
 | Where did these weights come from? | owlmlx (R16) lineage schema |
 | Which model should the user see by default? | Product surface (P3) catalog |
 | How do we recover from a cold start? | Control-plane (C3) |
