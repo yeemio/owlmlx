@@ -2,18 +2,20 @@
 
 > Status: authoritative
 > Updated: 2026-04-11
-> Milestone: Runtime-0
+> Milestone: Runtime-2
 
 ## 1. Purpose
 
-Runtime-0 moves `owlmlx` from a truth derivation library into an executable
-runtime kernel MVP.
+Runtime-0 moved `owlmlx` from a truth derivation library into an executable
+runtime kernel MVP. Runtime-2 extends that kernel into a persistent child
+runtime for real MLX model sessions.
 
 This milestone does not make `owlmlx` production-ready. It proves that owlmlx
 now has its own runtime control object, backend adapter boundary, HTTP entry,
-and self-derived runtime status.
+self-derived runtime status, and a persistent child session path for real MLX
+models.
 
-## 2. Runtime-0 Deliverables
+## 2. Runtime Deliverables
 
 | Deliverable | Implementation |
 |---|---|
@@ -21,7 +23,7 @@ and self-derived runtime status.
 | Backend adapter boundary | `owlmlx/runtime/backends.py` — `RuntimeBackend` protocol |
 | Stable test backend | `FakeBackend` |
 | MLX-family adapter | `owlmlx/runtime/mlx_lm_backend.py` — lazy `mlx_lm` adapter |
-| MLX subprocess adapter | `owlmlx/runtime/mlx_lm_subprocess_backend.py` — parent-safe child-process runner |
+| MLX subprocess adapter | `owlmlx/runtime/mlx_lm_subprocess_backend.py` — parent-safe persistent child backend |
 | HTTP entry | `owlmlx/runtime/server.py` |
 | Runtime result contracts | `owlmlx/runtime/types.py` |
 
@@ -84,11 +86,10 @@ The adapter:
 - reports loaded models through `BackendStatus.loaded_models`
 - supports kernel load/generate/unload/status in mock tests
 
-Direct `mlx_lm` import in the local venv currently initializes MLX/Metal and
+Direct `mlx_lm` import in the local venv can initialize MLX/Metal and
 can crash in non-runtime test contexts. This is why the in-process adapter is
 lazy and mock-tested only. Runtime-1 adds `MlxLmSubprocessBackend`, which keeps
-the parent runtime safe by executing `mlx_lm.load + mlx_lm.generate` inside a
-child process.
+the parent runtime safe by executing `mlx_lm` inside a child process.
 
 Runtime-1 adds an explicit operator smoke script:
 
@@ -98,6 +99,14 @@ python scripts/runtime1_mlx_lm_smoke.py --model /path/to/small-mlx-model
 
 This script is not part of pytest. It may initialize MLX/Metal and must remain
 an explicit smoke until the local Metal import crash is resolved.
+
+Runtime-2 changes the child behavior from one-shot execution to persistent
+session lifecycle:
+
+- `load` starts one child per loaded model
+- `generate` reuses that child
+- `unload` explicitly shuts that child down
+- parent process still never imports `mlx_lm`
 
 ## 7. Verified Behavior
 
@@ -115,6 +124,8 @@ Runtime-0 tests prove:
 - HTTP load respects memory budget
 - `MlxLmBackend` calls mlx-lm load/generate paths under mock
 - `MlxLmSubprocessBackend` runs child-process generation through a JSON runner
+- `MlxLmSubprocessBackend` can keep one persistent child alive across multiple
+  generation requests
 - `RuntimeKernel` can use `MlxLmBackend` under mock
 - `MlxLmBackend` import preflight returns structured failure instead of
   importing `mlx_lm` in the parent process
@@ -132,32 +143,43 @@ Runtime-0 does not claim:
 - oMLX is fully replaced
 - Kimi/Gemma/120B serving is migrated
 
-## 9. Next Dominant Gap
+## 9. Runtime-1 Baseline
 
-Runtime-1 should verify a real MLX model load/generate path through
-`MlxLmBackend` using a local model small enough for safe smoke testing.
-
-Current Runtime-1 state:
-
-- parent-safe subprocess runner exists
 - clean-room environment `.runtime1-mlx` can import `mlx_lm 0.31.2`
-- real local smoke has passed on:
+- one-shot real local smoke passed on:
   - `gpt-oss-20b-MXFP4-Q4` in about `12.07s`
   - `Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit` in about `12.66s`
   - `Qwen3.5-35B-A3B-4bit` in about `13.41s`
 
-Runtime-1 now also has explicit environment selection discipline:
+Runtime-1 also established explicit environment selection discipline:
 
 - default smoke probing only checks the current Python executable
 - known MLX-oriented virtualenvs require explicit opt-in
 - this avoids default diagnostics triggering repeated child-process aborts on
   environments already known to crash during `import mlx_lm`
 
-Runtime-1 should not jump straight to Kimi 1T, 120B, or Gemma 31B. The next gap
-is deciding when to move from one-shot subprocess execution to persistent child
-process lifecycle. Runtime-1 now has a real three-model baseline; Runtime-2 is
-the place to make `load once -> generate many -> explicit unload/restart`
-real.
+## 10. Runtime-2 Verified State
+
+Runtime-2 is now the active kernel milestone. It has verified:
+
+- persistent child lifecycle through `MlxLmSubprocessBackend`
+- `load once -> generate many -> explicit unload`
+- real local model reuse in the clean `.runtime1-mlx` environment
+
+Runtime-2 real local smoke results:
+
+- `gpt-oss-20b-MXFP4-Q4`
+  - `load` started one persistent child
+  - `generate #1` reused that child in about `0.2438s`
+  - `generate #2` reused the same child in about `0.1479s`
+- `Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit`
+  - `load` started one persistent child
+  - `generate #1` reused that child in about `0.5539s`
+  - `generate #2` reused the same child in about `0.4322s`
+
+This closes the Runtime-1 one-shot performance bottleneck. The dominant gap is
+no longer cold-start-per-request. It is now Runtime-2 hardening: persistent
+child health probe, restart policy, and steady-state serving metrics.
 
 The current environment truth is frozen separately in
 `runtime1-environment-diagnostics.md`.

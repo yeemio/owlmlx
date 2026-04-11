@@ -7,15 +7,51 @@ from pathlib import Path
 from owlmlx.runtime import MlxLmSubprocessBackend, RuntimeErrorCode, RuntimeKernel
 
 
-def _write_runner(tmp_path: Path, *, ok: bool = True) -> str:
+def _write_runner(
+    tmp_path: Path,
+    *,
+    ok: bool = True,
+    crash_on_generate: bool = False,
+    error_on_generate: bool = False,
+) -> str:
     module = tmp_path / "fake_runner.py"
     if ok:
+        generate_body = (
+            "        raise SystemExit(7)"
+            if crash_on_generate
+            else (
+                "        print(json.dumps({'ok': False, 'error': 'child boom'}), flush=True)"
+                if error_on_generate
+                else (
+                "        count += 1\n"
+                "        print(json.dumps({'ok': True, 'action': 'generate', "
+                "'text': req['prompt'] + ' :: child', 'pid': os.getpid(), "
+                "'generation_count': count}), flush=True)"
+                )
+            )
+        )
         module.write_text(
             "\n".join(
                 [
-                    "import json, sys",
-                    "req=json.loads(sys.stdin.read())",
-                    "print(json.dumps({'ok': True, 'text': req['prompt'] + ' :: child'}))",
+                    "import json, os, sys",
+                    "loaded = None",
+                    "count = 0",
+                    "for line in sys.stdin:",
+                    "    req = json.loads(line)",
+                    "    action = req.get('action')",
+                    "    if action == 'load':",
+                    "        loaded = req['model_id']",
+                    "        count = 0",
+                    "        print(json.dumps({'ok': True, 'action': 'load', 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                    "    elif action == 'generate':",
+                    *generate_body.splitlines(),
+                    "    elif action == 'ping':",
+                    "        print(json.dumps({'ok': True, 'action': 'ping', 'model_id': loaded, 'pid': os.getpid(), 'generation_count': count}), flush=True)",
+                    "    elif action in ('shutdown', 'unload'):",
+                    "        print(json.dumps({'ok': True, 'action': action, 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                    "        break",
+                    "    else:",
+                    "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
                 ]
             ),
             encoding="utf-8",
@@ -24,9 +60,10 @@ def _write_runner(tmp_path: Path, *, ok: bool = True) -> str:
         module.write_text(
             "\n".join(
                 [
-                    "import json",
-                    "print(json.dumps({'ok': False, 'error': 'child boom'}))",
-                    "raise SystemExit(2)",
+                    "import json, sys",
+                    "for _line in sys.stdin:",
+                    "    print(json.dumps({'ok': False, 'error': 'child boom'}), flush=True)",
+                    "    continue",
                 ]
             ),
             encoding="utf-8",
@@ -34,7 +71,7 @@ def _write_runner(tmp_path: Path, *, ok: bool = True) -> str:
     return module.stem
 
 
-def test_subprocess_backend_registers_loaded_model(tmp_path: Path, monkeypatch) -> None:
+def test_subprocess_backend_load_starts_persistent_child(tmp_path: Path) -> None:
     runner = _write_runner(tmp_path)
     backend = MlxLmSubprocessBackend(
         runner_module=runner,
@@ -45,11 +82,15 @@ def test_subprocess_backend_registers_loaded_model(tmp_path: Path, monkeypatch) 
 
     assert result.ok is True
     assert result.model is not None
-    assert result.model.backend == "mlx-lm-subprocess"
-    assert backend.status().loaded_models[0].model_id == "model-a"
+    status = backend.status()
+    assert status.loaded_models[0].model_id == "model-a"
+    assert status.detail["persistent_child"] is True
+    assert status.detail["children"]["model-a"]["alive"] is True
+    assert status.detail["children"]["model-a"]["pid"] is not None
+    backend.unload("model-a")
 
 
-def test_subprocess_backend_generate_runs_child(tmp_path: Path, monkeypatch) -> None:
+def test_subprocess_backend_generate_reuses_same_child(tmp_path: Path) -> None:
     runner = _write_runner(tmp_path)
     backend = MlxLmSubprocessBackend(
         runner_module=runner,
@@ -57,14 +98,21 @@ def test_subprocess_backend_generate_runs_child(tmp_path: Path, monkeypatch) -> 
     )
     backend.load("model-a", memory_gb=2.0)
 
-    result = backend.generate("model-a", "hello", max_tokens=4)
+    first = backend.generate("model-a", "hello", max_tokens=4)
+    second = backend.generate("model-a", "again", max_tokens=4)
 
-    assert result.ok is True
-    assert result.text == "hello :: child"
-    assert backend.status().healthy is True
+    assert first.ok is True
+    assert second.ok is True
+    assert first.text == "hello :: child"
+    assert second.text == "again :: child"
+    assert first.detail["pid"] == second.detail["pid"]
+    assert first.detail["generation_count"] == 1
+    assert second.detail["generation_count"] == 2
+    assert backend.status().detail["children"]["model-a"]["generation_count"] == 2
+    backend.unload("model-a")
 
 
-def test_subprocess_backend_generate_requires_loaded_model(tmp_path: Path, monkeypatch) -> None:
+def test_subprocess_backend_generate_requires_loaded_model(tmp_path: Path) -> None:
     runner = _write_runner(tmp_path)
     backend = MlxLmSubprocessBackend(
         runner_module=runner,
@@ -77,13 +125,14 @@ def test_subprocess_backend_generate_requires_loaded_model(tmp_path: Path, monke
     assert result.error_code is RuntimeErrorCode.model_not_loaded
 
 
-def test_subprocess_backend_reports_child_failure(tmp_path: Path, monkeypatch) -> None:
-    runner = _write_runner(tmp_path, ok=False)
+def test_subprocess_backend_reports_child_failure(tmp_path: Path) -> None:
+    runner = _write_runner(tmp_path, error_on_generate=True)
     backend = MlxLmSubprocessBackend(
         runner_module=runner,
         extra_pythonpath=(str(tmp_path),),
     )
-    backend.load("model-a", memory_gb=2.0)
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
 
     result = backend.generate("model-a", "hello")
 
@@ -91,25 +140,28 @@ def test_subprocess_backend_reports_child_failure(tmp_path: Path, monkeypatch) -
     assert result.error_code is RuntimeErrorCode.backend_error
     assert "child boom" in result.message
     assert backend.status().healthy is False
-    assert backend.status().detail["last_subprocess"]["returncode"] == 2
+    backend.unload("model-a")
 
 
-def test_subprocess_backend_unload_unregisters_model(tmp_path: Path, monkeypatch) -> None:
+def test_subprocess_backend_unload_stops_persistent_child(tmp_path: Path) -> None:
     runner = _write_runner(tmp_path)
     backend = MlxLmSubprocessBackend(
         runner_module=runner,
         extra_pythonpath=(str(tmp_path),),
     )
     backend.load("model-a", memory_gb=2.0)
+    child_pid = backend.status().detail["children"]["model-a"]["pid"]
 
     result = backend.unload("model-a")
 
     assert result.ok is True
     assert result.freed_gb == 2.0
+    assert child_pid is not None
     assert backend.status().loaded_models == ()
+    assert backend.status().detail["children"] == {}
 
 
-def test_runtime_kernel_can_use_subprocess_backend(tmp_path: Path, monkeypatch) -> None:
+def test_runtime_kernel_can_use_subprocess_backend(tmp_path: Path) -> None:
     runner = _write_runner(tmp_path)
     backend = MlxLmSubprocessBackend(
         runner_module=runner,
@@ -118,29 +170,29 @@ def test_runtime_kernel_can_use_subprocess_backend(tmp_path: Path, monkeypatch) 
     kernel = RuntimeKernel(backend)
 
     loaded = kernel.load_model("model-a", memory_gb=2.0)
-    generated = asyncio.run(kernel.generate("hello", max_tokens=4))
+    first = asyncio.run(kernel.generate("hello", max_tokens=4))
+    second = asyncio.run(kernel.generate("again", max_tokens=4))
 
     assert loaded.ok is True
-    assert generated.ok is True
-    assert generated.text == "hello :: child"
+    assert first.ok is True
+    assert second.ok is True
+    assert first.detail["pid"] == second.detail["pid"]
     assert kernel.status_dict()["backend"]["backend_name"] == "mlx-lm-subprocess"
+    kernel.unload_model("model-a")
 
 
-def test_real_runner_missing_mlx_lm_returns_structured_failure() -> None:
+def test_real_runner_missing_mlx_lm_returns_structured_load_failure() -> None:
     backend = MlxLmSubprocessBackend(
         python_executable=sys.executable,
         runner_module="owlmlx.runtime.mlx_lm_runner",
         timeout_s=20.0,
     )
-    backend.load("model-a", memory_gb=1.0)
 
-    result = backend.generate("model-a", "hello")
+    loaded = backend.load("model-a", memory_gb=1.0)
 
-    # In dev/test environments without mlx_lm, this must be a structured
-    # backend error, not a parent-process crash.
-    assert result.ok is False
-    assert result.error_code is RuntimeErrorCode.backend_error
-    assert "subprocess generate failed" in result.message
+    assert loaded.ok is False
+    assert loaded.error_code is RuntimeErrorCode.backend_error
+    assert "subprocess load failed" in loaded.message
 
 
 def test_subprocess_backend_reports_empty_child_output(tmp_path: Path) -> None:
@@ -153,10 +205,26 @@ def test_subprocess_backend_reports_empty_child_output(tmp_path: Path) -> None:
         runner_module=runner.stem,
         extra_pythonpath=(str(tmp_path),),
     )
-    backend.load("model-a", memory_gb=1.0)
+
+    loaded = backend.load("model-a", memory_gb=1.0)
+
+    assert loaded.ok is False
+    assert loaded.error_code is RuntimeErrorCode.backend_error
+    assert "child process produced no output" in loaded.message
+
+
+def test_subprocess_backend_drops_dead_child_after_generate_crash(tmp_path: Path) -> None:
+    runner = _write_runner(tmp_path, crash_on_generate=True)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=1.0)
+    assert loaded.ok is True
 
     result = backend.generate("model-a", "hello")
 
     assert result.ok is False
     assert result.error_code is RuntimeErrorCode.backend_error
-    assert "child process produced no output" in result.message
+    assert backend.status().detail["children"] == {}
+    assert backend.status().healthy is False

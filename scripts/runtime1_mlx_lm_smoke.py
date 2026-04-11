@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime-1 mlx-lm smoke probe.
+"""Runtime-1/2 mlx-lm smoke probe.
 
 This script is intentionally not part of pytest. It may initialize MLX/Metal
 and can crash the child Python process on misconfigured hosts. Use it only as
@@ -35,6 +35,7 @@ def main() -> int:
     parser.add_argument("--memory-gb", type=float, default=1.0)
     parser.add_argument("--prompt", default="Hello")
     parser.add_argument("--max-tokens", type=int, default=8)
+    parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--python", default=None)
     parser.add_argument(
         "--python-candidate",
@@ -82,11 +83,23 @@ def main() -> int:
     if not loaded.ok:
         return 2
 
-    generated = asyncio.run(
-        kernel.generate(args.prompt, max_tokens=args.max_tokens)
-    )
-    print(json.dumps({"generate": asdict(generated)}, indent=2, default=str))
-    return 0 if generated.ok else 2
+    ok = True
+    for index in range(args.repeat):
+        generated = asyncio.run(
+            kernel.generate(args.prompt, max_tokens=args.max_tokens)
+        )
+        print(
+            json.dumps(
+                {"generate": index + 1, "result": asdict(generated)},
+                indent=2,
+                default=str,
+            )
+        )
+        ok = ok and generated.ok
+
+    unloaded = kernel.unload_model(str(model))
+    print(json.dumps({"unload": asdict(unloaded)}, indent=2, default=str))
+    return 0 if ok and unloaded.ok else 2
 
 
 if __name__ == "__main__":

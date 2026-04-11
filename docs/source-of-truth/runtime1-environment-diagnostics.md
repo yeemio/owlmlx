@@ -1,12 +1,12 @@
-# Runtime-1 Environment Diagnostics
+# Runtime-1/2 Environment Diagnostics
 
 > Status: authoritative
 > Updated: 2026-04-11
-> Scope: local Runtime-1 MLX environment truth
+> Scope: local Runtime-1/2 MLX environment truth
 
 ## 1. Purpose
 
-This document freezes the current Runtime-1 environment situation, including
+This document freezes the current Runtime-1/2 environment situation, including
 the clean-room environment result that unblocked the first real local smoke.
 
 The question is not whether `owlmlx` has a safe subprocess boundary anymore.
@@ -59,9 +59,9 @@ Verified real local smoke coverage:
 
 | Model | Path | Result | Detail |
 |---|---|---|---|
-| gpt-oss-20b-MXFP4-Q4 | `/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4` | PASS | real subprocess `generate` succeeded in about 12.07s |
-| Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit | `/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit` | PASS | real subprocess `generate` succeeded in about 12.66s |
-| Qwen3.5-35B-A3B-4bit | `/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit` | PASS | real subprocess `generate` succeeded in about 13.41s |
+| gpt-oss-20b-MXFP4-Q4 | `/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4` | PASS | Runtime-1 one-shot `generate` succeeded in about 12.07s |
+| Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit | `/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit` | PASS | Runtime-1 one-shot `generate` succeeded in about 12.66s |
+| Qwen3.5-35B-A3B-4bit | `/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit` | PASS | Runtime-1 one-shot `generate` succeeded in about 13.41s |
 
 ## 4. Operational Discipline
 
@@ -101,15 +101,22 @@ env PYTHONPATH=/Users/yeemio/AI/gitrep/owlmlx \
   --max-tokens 8
 ```
 
-The remaining Runtime-1 question is no longer "can anything import mlx_lm on
-this machine?" The remaining question is how broadly this clean environment can
-cover real local models, and whether `unload` should evolve from registration
-only into an explicit child-process lifecycle.
+## 7. Runtime-2 Persistent Child Validation
+
+Runtime-2 has now validated persistent child reuse in the clean
+`.runtime1-mlx` environment:
+
+| Model | Load result | Generate #1 | Generate #2 | Proof |
+|---|---|---|---|---|
+| gpt-oss-20b-MXFP4-Q4 | PASS, one persistent child | PASS, `0.2438s` | PASS, `0.1479s` | same `pid`, `generation_count=1 -> 2` |
+| Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit | PASS, one persistent child | PASS, `0.5539s` | PASS, `0.4322s` | same `pid`, `generation_count=1 -> 2` |
+
+This proves Runtime-2 is no longer doing one-shot `load + generate + exit` on
+every request. The model stays resident inside one child process until explicit
+`unload`.
 
 Current answer on `unload`:
 
-- in Runtime-1 one-shot mode, `unload` is a registration boundary, not a child
-  process teardown boundary
-- each `generate` starts a fresh child process and that child exits when the
-  request completes
-- explicit persistent child lifecycle belongs to Runtime-2, not Runtime-1
+- in Runtime-1 one-shot mode, `unload` was only a registration boundary
+- in Runtime-2 persistent mode, `unload` is a real child teardown boundary
+- Runtime-2 `generate` reuses the already-loaded child process
