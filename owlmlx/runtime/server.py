@@ -43,9 +43,23 @@ class AnthropicTextBlock(BaseModel):
     text: str | None = None
 
 
+class AnthropicToolUseInputBlock(BaseModel):
+    type: str
+    id: str | None = None
+    name: str | None = None
+    input: dict[str, Any] | None = None
+
+
+class AnthropicToolResultInputBlock(BaseModel):
+    type: str
+    tool_use_id: str | None = None
+    content: str | list[AnthropicTextBlock] | None = None
+    is_error: bool = False
+
+
 class AnthropicInputMessage(BaseModel):
     role: str
-    content: str | list[AnthropicTextBlock]
+    content: str | list[AnthropicTextBlock | AnthropicToolUseInputBlock | AnthropicToolResultInputBlock]
 
 
 class CompletionRequest(BaseModel):
@@ -109,12 +123,36 @@ def _anthropic_messages_to_turns(
         if isinstance(message.content, str):
             content = message.content
         else:
-            text_parts = [
-                str(block.text or "")
-                for block in message.content
-                if block.type == "text"
-            ]
-            content = "".join(text_parts)
+            text_parts: list[str] = []
+            for block in message.content:
+                if block.type == "text":
+                    text_parts.append(str(getattr(block, "text", "") or ""))
+                    continue
+                if block.type == "tool_result":
+                    result_content = getattr(block, "content", None)
+                    if isinstance(result_content, str):
+                        result_text = result_content
+                    elif isinstance(result_content, list):
+                        result_text = "".join(
+                            str(text_block.text or "")
+                            for text_block in result_content
+                            if text_block.type == "text"
+                        )
+                    else:
+                        result_text = ""
+                    prefix = "[ERROR] " if getattr(block, "is_error", False) else ""
+                    tool_use_id = str(getattr(block, "tool_use_id", "") or "")
+                    text_parts.append(f"[tool_result:{tool_use_id}] {prefix}{result_text}".strip())
+                    continue
+                if block.type == "tool_use":
+                    name = str(getattr(block, "name", "") or "")
+                    tool_id = str(getattr(block, "id", "") or "")
+                    tool_input = getattr(block, "input", None) or {}
+                    text_parts.append(
+                        f"[tool_use:{tool_id}] {name} {json.dumps(tool_input, ensure_ascii=False)}".strip()
+                    )
+                    continue
+            content = "\n".join(part for part in text_parts if part)
         if content:
             turns.append(ChatTurn(role=message.role, content=content))
     return turns

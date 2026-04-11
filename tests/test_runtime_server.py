@@ -298,6 +298,69 @@ def test_anthropic_count_tokens_returns_estimate() -> None:
     assert payload["input_tokens"] >= 1
 
 
+def test_anthropic_messages_accept_tool_result_blocks() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-a",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "run ls"},
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "toolu_123",
+                            "content": [{"type": "text", "text": "file-a\\nfile-b"}],
+                        },
+                    ],
+                }
+            ],
+            "max_tokens": 4,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    text = payload["content"][0]["text"]
+    assert "run ls" in text
+    assert "[tool_result:toolu_123] file-a" in text
+
+
+def test_anthropic_messages_accept_assistant_tool_use_blocks() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-a",
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "toolu_abc",
+                            "name": "read_file",
+                            "input": {"path": "README.md"},
+                        }
+                    ],
+                }
+            ],
+            "max_tokens": 4,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    text = payload["content"][0]["text"]
+    assert "[tool_use:toolu_abc] read_file" in text
+
+
 def test_openai_models_lists_loaded_models() -> None:
     client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
     client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})

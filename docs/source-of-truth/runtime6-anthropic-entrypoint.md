@@ -41,6 +41,17 @@ The streaming event sequence now includes:
 This is the first `owlmlx` entrypoint directly shaped for `owlcoda` /
 `owlcc`-style consumers.
 
+Runtime-6 now also accepts additional Anthropic input block shapes on
+`POST /v1/messages`:
+
+- text blocks
+- `tool_result` blocks
+- assistant-side historical `tool_use` blocks
+
+These are currently flattened into runtime-native message text before backend
+execution. This is an input-side cutover seam, not a claim of full tool
+protocol parity.
+
 ## 3. Architecture Truth
 
 Runtime-6 does not reintroduce the old server-layer prompt hack.
@@ -61,7 +72,7 @@ path, not bolted on as a separate translation-only path.
 Runtime-6 does not yet claim:
 
 - tool_use output parity
-- tool_result input parity
+- true tool_result semantic execution parity
 - thinking block parity
 - full Claude / Anthropic beta surface
 - direct owlcoda production cutover
