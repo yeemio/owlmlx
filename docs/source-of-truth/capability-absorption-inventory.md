@@ -43,8 +43,9 @@ Before listing gaps, this is what owlmlx already owns:
 | 16 | Serving-path runtime health semantics | `runtime_health.py` (85 tests) | supported |
 | 17 | Serving-path model inventory registry | `model_inventory.py` (18 tests) | supported |
 | 18 | Served-model lineage schema | `model_lineage.py` (20 tests) | supported |
+| 19 | Cache truth contract | `cache_truth.py` (22 tests) | supported |
 
-Total: 10 Python modules, 264 tests, 21 truth documents.
+Total: 11 Python modules, 286 tests, 22 truth documents.
 
 ## 3. Gap-Driven Inventory
 
@@ -145,30 +146,30 @@ the budget definition belongs to owlmlx.
 
 ---
 
-### Gap 5: Cache Profile Management
+### Gap 5: Cache Profile Management — **ABSORBED + CONSUMED**
 
-**What owlmlx lacks:**
-No concept of cache profiles, cache switching, or cache state management.
-owlmlx roadmap mentions "cache tier truth" as future work but owns nothing.
+**What owlmlx now owns:**
+`owlmlx/cache_truth.py` defines generic cache profile truth: profile labels
+(`baseline`, `cache-enabled`, `not_running`, `unknown`), oMLX cache env/CLI
+flag schema, cache flag normalization, configured profile derivation,
+restart-required derivation, and TurboQuant cache-safety rules. 22 tests.
 
-**What the platform has:**
+**What the platform retains:**
+`llm_router/distilled_cache_substrate.py` still owns env file parsing and
+mutation, backup/rollback, `lsof`/`ps` runtime detection, Phase 39 ladder
+asset loading, Distilled-27B model identity, endpoint transport, and cache
+switch commands.
 
-- `llm_router/distilled_cache_substrate.py` (20.9 KB)
-- Cache profiling and profile switching
-- Auto-backup before switch, rollback capability
-- Runtime detection via lsof-based port probing
-- Honest status reporting for cache state
+**Platform consumption:**
+`distilled_cache_substrate.py` imports owlmlx cache env keys, CLI flag
+extraction, profile derivation, active flag shape, and restart-required
+derivation. `primary_line_status.py` imports owlmlx TurboQuant cache-safety
+derivation.
 
-**Platform maturity:** Verified but specialized — tightly coupled to
-`Distilled-27B` model line and current oMLX cache implementation.
-
-**Absorption candidate:** PARTIAL — the concept of cache profile management
-as runtime truth belongs to owlmlx. The specific Distilled-27B coupling
-does not. owlmlx should own a generalized cache truth contract; the
-current implementation is a specimen-specific reference.
-
-**Current platform source files:**
-- `llm_router/distilled_cache_substrate.py`
+**Remaining boundary:**
+Profile mutation, cache clearing, runtime probing, and dashboard/API
+transport are platform-owned. owlmlx owns what cache state means; the
+platform discovers and applies it.
 
 ---
 
@@ -300,7 +301,7 @@ because they belong to other architectural layers.
 | Gap 4 | Memory budget enforcement | Verified (production use) | Full budget logic ownership |
 | Gap 6 | Model lifecycle states | Verified (40+ phases) | **Deferred** — product classification, not runtime truth; no code to absorb |
 | Gap 8 | Model lineage schema | **Absorbed + consumed** | `owlmlx/model_lineage.py` — schema, validation, truth inheritance; platform primary-line status consumes |
-| Gap 5 | Cache profile management | Verified but specialized | Partial: generalized contract only |
+| Gap 5 | Cache profile management | **Absorbed + consumed** | `owlmlx/cache_truth.py` — profile labels, flag schema, restart-required derivation, TurboQuant cache safety; platform consumes |
 | Gap 7 | Per-model runtime truth | **Partially absorbed + consumed** | `owlmlx/model_inventory.py` — inventory input schema + budget/health derivation; transport remains platform |
 
 ### Non-Candidates — By Reason
@@ -326,9 +327,10 @@ have since been resolved or superseded:
    policy, not runtime substrate truth; `lifecycle.py` has no state enum or
    transition function to absorb.
 
-2. **Gap 5 generalization:** Does owlmlx own a cache truth contract, or
-   only note that cache truth is a future gap? Proposal: own a minimal
-   contract shell; current implementation stays in platform.
+2. **Gap 5 generalization:** Resolved 2026-04-11. owlmlx owns the
+   generalized cache truth contract in `cache_truth.py`; platform retains
+   env mutation, runtime probing, Distilled assets, endpoints, and cache
+   clearing implementation.
 
 3. **Gap 7 transport boundary:** owlmlx defines the schema, platform
    provides HTTP transport. But who owns the "unload" mutation semantics?

@@ -44,7 +44,7 @@ and what should happen next.
 | Runtime health semantics | **Absorbed + consumed** (R14): 6 enums, 7 derivation functions in `owlmlx/runtime_health.py`; platform consumes via `model_inventory.inventory_health_snapshot()` and imports `derive_platform_status()` | Platform owns all probing (HTTP, socket, tmux), backend-specific introspection, preflight check execution, recovery actions | **Consumption wired** — inline derivation chains replaced |
 | Model lifecycle states | **Deferred** (R15): 6 states are product lifecycle classification (stable/backup/candidate/experimental/blocked/parked), not runtime substrate truth; `lifecycle.py` has no state enum or transition function to absorb; absorbing would produce orphan enum with no derivation consumer | Platform owns state definitions in `model-lifecycle-and-upgrade-gate.md`, upgrade gates (G1–G7), and LifecycleDaemon execution | **Not a code absorption target** — product policy, not runtime truth |
 | Per-model runtime truth | Model inventory registry absorbed | `owlmlx/model_inventory.py`; platform consumes in metrics/control_service | Endpoint transport and mutations stay platform-owned |
-| Cache truth | Not yet started | distilled_cache_substrate.py | Specialized; needs generalization |
+| Cache truth | **Absorbed + consumed** (R18): `owlmlx/cache_truth.py` owns cache profile labels, flag schema, restart-required derivation, and TurboQuant cache-safety rules | Platform owns env mutation, runtime probing, Distilled ladder assets, profile switch endpoints, and cache clearing | **Consumption wired** — `distilled_cache_substrate.py` and `primary_line_status.py` import owlmlx cache truth |
 | Model lineage | **Absorbed + consumed** (R16): `owlmlx/model_lineage.py` owns schema, validation, truth inheritance, and training-artifact bridge | Platform owns catalog population, file hash calculation, upgrade-gate execution, and API transport; `primary_line_status.py` consumes owlmlx validation | **Consumption wired** — catalog lineage is normalized and validated through owlmlx |
 
 ### 3.3 Convergence Scorecard
@@ -52,11 +52,11 @@ and what should happen next.
 | Metric | Score |
 |---|---|
 | Capabilities with assigned truth owner | **46/46** (100%) |
-| owlmlx-owned capabilities with code | **10/19** (53%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory, model_lineage |
-| owlmlx-owned capabilities consumed by platform | **6/10** (60%) — memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory, model_lineage (platform imports owlmlx truth, no local duplicates) |
+| owlmlx-owned capabilities with code | **11/19** (58%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory, model_lineage, cache_truth |
+| owlmlx-owned capabilities consumed by platform | **7/11** (64%) — memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory, model_lineage, cache_truth (platform imports owlmlx truth, no local duplicates) |
 | owlmlx-owned capabilities as doc-only | **6/19** (32%) — governance, hazardous-ops, safe-resume, training contracts |
 | owlmlx-owned capabilities deferred (not runtime truth) | **1/19** (5%) — Gap 6 model lifecycle states (product classification, not substrate truth) |
-| owlmlx-owned capabilities to absorb | **2/19** (11%) — Gap 5 cache truth contract plus remaining per-model mutation/transport schema (Gaps 1+2+3+4+8 absorbed; Gap 7 inventory layer absorbed; Gap 6 deferred) |
+| owlmlx-owned capabilities to absorb | **1/19** (5%) — remaining per-model mutation/transport schema follow-up (Gaps 1+2+3+4+5+8 absorbed; Gap 7 inventory layer absorbed; Gap 6 deferred) |
 | Model lines with formal placement | **6/6** (100%) |
 | Platform capabilities with clear non-absorption reasoning | **14/14** (100%) |
 
@@ -89,8 +89,15 @@ served-model lineage schema, validation rules, and truth inheritance
 derivation. Platform `primary_line_status.py` normalizes and validates
 catalog lineage through owlmlx.
 
-**Remaining convergence work:** 2 of 19 runtime-owned capabilities still
-need code absorption. The 6 absorbed+consumed capabilities prove the
+**Cache truth contract absorbed and consumed.** R18 now has cache profile
+labels, oMLX cache flag schema, restart-required derivation, and TurboQuant
+cache-safety rules in `owlmlx/cache_truth.py`. Platform
+`distilled_cache_substrate.py` and `primary_line_status.py` consume this truth
+while retaining env mutation, runtime probing, endpoint transport, and
+Distilled-specific assets.
+
+**Remaining convergence work:** 1 of 19 runtime-owned capabilities still
+need code absorption. The 7 absorbed+consumed capabilities prove the
 pattern for future rounds.
 
 ### 4.2 What This Means Operationally
@@ -131,19 +138,21 @@ truth. Absorbing would produce an orphan enum with no derivation chain
 and no platform consumer. R15 remains platform-owned.
 
 ~~Model Lineage Schema (R16 / Gap 8) — completed 2026-04-11.~~
+~~Cache Truth Contract (R18 / Gap 5) — completed 2026-04-11.~~
 
-The next dominant gap is **Cache Truth Contract** (R18 / Gap 5):
-generalize the Distilled-27B cache substrate contract without absorbing
-specimen-specific cache implementation, dashboard transport, or mutation
+The next dominant gap is the remaining **per-model mutation/transport schema
+follow-up**:
+separate any reusable mutation/result schema from router endpoint transport
+without absorbing backend-specific probes, HTTP handlers, or cache mutation
 policy.
 
 | Step | Action | Expected Output |
 |---|---|---|
-| 1 | Map cache substrate sources (`distilled_cache_substrate.py`) | Separate generic cache truth from Distilled-specific values |
-| 2 | Add owlmlx cache truth contract | Pure schema + safety rules only |
-| 3 | Write owlmlx-side tests | Cache key safety, profile identity, invalidation rules |
-| 4 | Wire platform to consume if narrow seam exists | Cache substrate summary imports owlmlx schema/rules |
-| 6 | Update source-of-truth docs | Mark absorbed / consumed accurately |
+| 1 | Map router model mutation/status endpoints | Separate reusable schema from HTTP/backend implementation |
+| 2 | Decide whether a runtime-owned schema exists | Absorb only if there is durable truth, not transport shape |
+| 3 | Add owlmlx-side tests if absorbed | Mutation result/readiness/error semantics |
+| 4 | Wire platform consumption if narrow seam exists | Router imports owlmlx schema helpers |
+| 5 | Update source-of-truth docs | Mark absorbed, deferred, or platform-owned accurately |
 
 Secondary candidate:
 - Remaining per-model mutation/transport schema work (R17 follow-up)
@@ -175,7 +184,7 @@ All 5 success criteria satisfied.
 
 | Rule | Compliance |
 |---|---|
-| Not written as replacement complete state | ✓ 2/19 capabilities still to absorb, 1/19 explicitly deferred |
+| Not written as replacement complete state | ✓ 1/19 capability still to absorb, 1/19 explicitly deferred |
 | Not mechanical copy of all platform capabilities | ✓ 14 explicit non-candidates |
 | Not training expansion | ✓ Training explicitly deferred |
 | Not unverified experimental promoted | ✓ All candidates are verified |

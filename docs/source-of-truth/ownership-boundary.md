@@ -45,7 +45,7 @@ runtime truth must have exactly one truth owner.
 | R15 | Model lifecycle state definitions | R | `model-lifecycle-and-upgrade-gate.md` | **Deferred** — 6 states (stable/backup/candidate/experimental/blocked/parked) are product lifecycle classification, not runtime substrate truth; `lifecycle.py` has no state enum or transition function; absorbing would produce an orphan enum with no derivation chain or platform consumer |
 | R16 | Model lineage schema | R | `owlmlx/model_lineage.py` | **Absorbed + consumed** — canonical lineage schema, validation, and truth inheritance rules; platform `primary_line_status.py` normalizes/validates catalog lineage |
 | R17 | Per-model runtime truth schema | R | `owlmlx/model_inventory.py` | **Absorbed + consumed** — model inventory schema + pure budget/health derivation; platform fills snapshots and keeps transport/probes |
-| R18 | Cache truth contract | R | `llm_router/distilled_cache_substrate.py` | **To absorb** (generalized contract shell) |
+| R18 | Cache truth contract | R | `owlmlx/cache_truth.py` | **Absorbed + consumed** — cache profile labels, flag schema, restart-required derivation, and TurboQuant cache-safety rules; platform keeps env mutation, process probing, Distilled assets, and endpoints |
 | R19 | Gemma production mainline identity | R | owlmlx docs | Already owned |
 
 ### 3.2 Control-Plane (platform-owned)

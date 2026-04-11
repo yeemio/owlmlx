@@ -70,6 +70,7 @@ These are runtime-level goals, not temporary integration work.
 25. `convergence-posture.md`
 26. `hypura-overflow-path-reference.md`
 27. `model-lineage-schema.md`
+28. `cache-truth-contract.md`
 
 ## 6. Adoption Model
 
@@ -106,4 +107,4 @@ Concrete sub-questions:
    platform (control-plane, routing, product entry)?
 2. How do Gemma, Kimi 1T, gpt-oss-120b, and other model lines sit in the
    unified architecture?
-3. Which remaining absorption target should follow R16 lineage schema?
+3. Which remaining absorption target should follow R18 cache truth?
