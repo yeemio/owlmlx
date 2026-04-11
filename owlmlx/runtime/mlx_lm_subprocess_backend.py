@@ -124,7 +124,10 @@ class MlxLmSubprocessBackend:
 
         payload: dict[str, Any]
         try:
-            payload = json.loads(proc.stdout.strip().splitlines()[-1])
+            stdout = proc.stdout.strip()
+            if not stdout:
+                raise ValueError("child process produced no output")
+            payload = json.loads(stdout.splitlines()[-1])
         except Exception as exc:
             payload = {
                 "ok": False,

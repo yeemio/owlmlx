@@ -14,13 +14,18 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from dataclasses import asdict
 import json
 from pathlib import Path
-import sys
 
-from owlmlx.runtime import MlxLmSubprocessBackend, RuntimeKernel
-from owlmlx.runtime.mlx_lm_backend import probe_mlx_lm_import
+from owlmlx.runtime import (
+    MlxEnvironmentCandidate,
+    MlxLmSubprocessBackend,
+    RuntimeKernel,
+    default_environment_candidates,
+    known_environment_candidates,
+    select_mlx_environment,
+    selection_to_dict,
+)
 
 
 def main() -> int:
@@ -29,13 +34,38 @@ def main() -> int:
     parser.add_argument("--memory-gb", type=float, default=1.0)
     parser.add_argument("--prompt", default="Hello")
     parser.add_argument("--max-tokens", type=int, default=8)
-    parser.add_argument("--python", default=sys.executable)
+    parser.add_argument("--python", default=None)
+    parser.add_argument(
+        "--python-candidate",
+        action="append",
+        default=[],
+        help="Additional python executable candidates to probe in order",
+    )
+    parser.add_argument(
+        "--include-known-venvs",
+        action="store_true",
+        help="Also probe known local MLX virtualenvs; may trigger child-process aborts",
+    )
     args = parser.parse_args()
 
-    probe = probe_mlx_lm_import(python_executable=args.python)
-    print(json.dumps({"import_probe": asdict(probe)}, indent=2))
-    if not probe.ok:
+    candidates: list[MlxEnvironmentCandidate] = []
+    if args.python:
+        candidates.append(MlxEnvironmentCandidate(args.python, "explicit"))
+    for index, executable in enumerate(args.python_candidate):
+        candidates.append(MlxEnvironmentCandidate(executable, f"candidate-{index + 1}"))
+    if not candidates:
+        candidates.extend(default_environment_candidates())
+        if args.include_known_venvs:
+            current = {candidate.python_executable for candidate in candidates}
+            for candidate in known_environment_candidates():
+                if candidate.python_executable not in current:
+                    candidates.append(candidate)
+
+    selection = select_mlx_environment(tuple(candidates))
+    print(json.dumps({"environment_selection": selection_to_dict(selection)}, indent=2))
+    if not selection.ok or selection.selected is None:
         return 2
+    selected_python = selection.selected.candidate.python_executable
 
     if not args.model:
         return 0
@@ -45,7 +75,7 @@ def main() -> int:
         print(json.dumps({"error": f"model path does not exist: {model}"}, indent=2))
         return 2
 
-    kernel = RuntimeKernel(MlxLmSubprocessBackend(python_executable=args.python))
+    kernel = RuntimeKernel(MlxLmSubprocessBackend(python_executable=selected_python))
     loaded = kernel.load_model(str(model), memory_gb=args.memory_gb)
     print(json.dumps({"load": asdict(loaded)}, indent=2, default=str))
     if not loaded.ok:

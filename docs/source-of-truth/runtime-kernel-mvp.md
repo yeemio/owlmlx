@@ -142,5 +142,12 @@ smoke is still blocked by MLX/Metal import failure in child processes on the
 current environment. The parent runtime now receives structured subprocess
 failure instead of crashing.
 
+Runtime-1 now also has explicit environment selection discipline:
+
+- default smoke probing only checks the current Python executable
+- known MLX-oriented virtualenvs require explicit opt-in
+- this avoids default diagnostics triggering repeated child-process aborts on
+  environments already known to crash during `import mlx_lm`
+
 Runtime-1 should not start with Kimi 1T, 120B, or Gemma 31B. The next gap is
 safe real adapter execution, not large-model productization.

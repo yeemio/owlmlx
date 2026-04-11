@@ -141,3 +141,22 @@ def test_real_runner_missing_mlx_lm_returns_structured_failure() -> None:
     assert result.ok is False
     assert result.error_code is RuntimeErrorCode.backend_error
     assert "subprocess generate failed" in result.message
+
+
+def test_subprocess_backend_reports_empty_child_output(tmp_path: Path) -> None:
+    runner = tmp_path / "empty_runner.py"
+    runner.write_text(
+        "raise SystemExit(9)\n",
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=1.0)
+
+    result = backend.generate("model-a", "hello")
+
+    assert result.ok is False
+    assert result.error_code is RuntimeErrorCode.backend_error
+    assert "child process produced no output" in result.message
