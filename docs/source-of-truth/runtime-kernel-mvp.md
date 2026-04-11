@@ -2,13 +2,14 @@
 
 > Status: authoritative
 > Updated: 2026-04-11
-> Milestone: Runtime-2
+> Milestone: Runtime-3
 
 ## 1. Purpose
 
 Runtime-0 moved `owlmlx` from a truth derivation library into an executable
-runtime kernel MVP. Runtime-2 extends that kernel into a persistent child
-runtime for real MLX model sessions.
+runtime kernel MVP. Runtime-3 extends that kernel into a persistent-child
+runtime with explicit control surface, real streaming, and same-model benchmark
+comparison against the old platform.
 
 This milestone does not make `owlmlx` production-ready. It proves that owlmlx
 now has its own runtime control object, backend adapter boundary, HTTP entry,
@@ -68,7 +69,10 @@ Runtime-0 exposes a minimal FastAPI app:
 | `GET /healthz` | Kernel-derived health snapshot |
 | `POST /v1/load` | Load a model through RuntimeKernel |
 | `POST /v1/generate` | Generate through RuntimeKernel and GenerationGate |
+| `POST /v1/generate/stream` | Stream NDJSON events through RuntimeKernel |
 | `GET /v1/models` | Inventory, budget, backend state |
+| `GET /v1/runtime/status` | Full kernel-derived runtime snapshot |
+| `POST /v1/runtime/restart` | Explicit restart of one loaded model |
 | `POST /v1/unload` | Unload a model through RuntimeKernel |
 
 The HTTP app does not own model state. It delegates to `RuntimeKernel`.
@@ -136,7 +140,6 @@ Runtime-0 does not claim:
 
 - real local model load is verified
 - real token generation is verified
-- streaming output exists
 - production HTTP serving is ready
 - process lifecycle is implemented
 - eviction/reclaim is implemented
@@ -204,12 +207,16 @@ and fair comparison benchmarks against the old platform.
 The benchmark truth is frozen separately in
 `runtime2-benchmark-baseline.md`.
 
-Runtime-3 has now started above that backend baseline:
+Runtime-3 is now complete above that backend baseline:
 
 - explicit restart is exposed at `POST /v1/runtime/restart`
 - full runtime snapshot is exposed at `GET /v1/runtime/status`
 - serialized concurrent serving truth is frozen in
   `runtime3-serving-surface.md`
+- streamed generation is exposed at `POST /v1/generate/stream`
+- real streamed token delivery is frozen in `runtime3-benchmark-and-streaming.md`
+- same-model benchmark comparison against the old platform is frozen in
+  `runtime3-benchmark-and-streaming.md`
 
 The current environment truth is frozen separately in
 `runtime1-environment-diagnostics.md`.

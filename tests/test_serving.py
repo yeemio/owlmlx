@@ -162,6 +162,21 @@ def test_async_execution() -> None:
     assert gate.status["total_served"] == 1
 
 
+def test_stream_session_updates_gate_counters() -> None:
+    gate = GenerationGate()
+
+    async def run() -> tuple[bool, float]:
+        async with gate.stream_session() as start:
+            return start.was_queued, start.wait_time_s
+
+    was_queued, wait_time_s = asyncio.run(run())
+
+    assert was_queued is False
+    assert wait_time_s >= 0
+    assert gate.status["total_served"] == 1
+    assert gate.status["total_queued"] == 1
+
+
 def test_timing_metadata_is_reasonable() -> None:
     """Execution and wait times are plausible."""
     gate = GenerationGate()

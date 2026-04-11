@@ -45,6 +45,10 @@ def _write_runner(
                     "        print(json.dumps({'ok': True, 'action': 'load', 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
                     "    elif action == 'generate':",
                     *generate_body.splitlines(),
+                    "    elif action == 'stream_generate':",
+                    "        count += 1",
+                    "        print(json.dumps({'ok': True, 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                    "        print(json.dumps({'ok': True, 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
                     "    elif action == 'ping':",
                     "        print(json.dumps({'ok': True, 'action': 'ping', 'model_id': loaded, 'pid': os.getpid(), 'generation_count': count}), flush=True)",
                     "    elif action in ('shutdown', 'unload'):",
@@ -109,6 +113,23 @@ def test_subprocess_backend_generate_reuses_same_child(tmp_path: Path) -> None:
     assert first.detail["generation_count"] == 1
     assert second.detail["generation_count"] == 2
     assert backend.status().detail["children"]["model-a"]["generation_count"] == 2
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_stream_generate_reuses_same_child(tmp_path: Path) -> None:
+    runner = _write_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    events = list(backend.stream_generate("model-a", "hello", max_tokens=4))
+
+    assert [event.event for event in events] == ["token", "done"]
+    assert events[0].text == "hello"
+    assert events[0].detail["pid"] == events[1].detail["pid"]
+    assert backend.status().detail["children"]["model-a"]["generation_count"] == 1
     backend.unload("model-a")
 
 

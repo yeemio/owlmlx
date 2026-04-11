@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from collections.abc import Iterator
 from typing import Any
 
 from .types import (
@@ -20,6 +21,7 @@ from .types import (
     LoadResult,
     LoadedModelInfo,
     RuntimeErrorCode,
+    StreamEvent,
     UnloadResult,
 )
 
@@ -181,6 +183,47 @@ class MlxLmBackend:
             model_id=model_id,
             text=str(text),
         )
+
+    def stream_generate(
+        self,
+        model_id: str,
+        prompt: str,
+        **kwargs: object,
+    ) -> Iterator[StreamEvent]:
+        loaded = self._loaded.get(model_id)
+        if loaded is None:
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=RuntimeErrorCode.model_not_loaded,
+                detail={"message": f"model not loaded: {model_id}"},
+            )
+            return
+
+        model, tokenizer, _info = loaded
+        try:
+            module = self._mlx_lm()
+            sequence = 0
+            for response in module.stream_generate(model, tokenizer, prompt=prompt, **kwargs):
+                sequence += 1
+                yield StreamEvent(
+                    event="token",
+                    model_id=model_id,
+                    text=str(getattr(response, "text", "") or ""),
+                    sequence=sequence,
+                    prompt_tokens=getattr(response, "prompt_tokens", None),
+                    completion_tokens=getattr(response, "generation_tokens", None),
+                    finish_reason=getattr(response, "finish_reason", None),
+                )
+            yield StreamEvent(event="done", model_id=model_id, sequence=sequence, finish_reason="stop")
+        except Exception as exc:
+            self._last_error = str(exc)
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=RuntimeErrorCode.backend_error,
+                detail={"message": f"mlx-lm stream_generate failed: {exc}"},
+            )
 
     def unload(self, model_id: str) -> UnloadResult:
         loaded = self._loaded.pop(model_id, None)

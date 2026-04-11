@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
 from typing import Any
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
+from starlette.responses import StreamingResponse
 
 from .backends import FakeBackend, RuntimeBackend
 from .kernel import RuntimeKernel
@@ -51,7 +53,7 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
     """Create a minimal owlmlx runtime HTTP app."""
 
     runtime = kernel if kernel is not None else RuntimeKernel(FakeBackend())
-    app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime2")
+    app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime3")
     app.state.kernel = runtime
 
     @app.get("/healthz")
@@ -84,6 +86,22 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
             **payload.params,
         )
         return _result_to_dict(result)
+
+    @app.post("/v1/generate/stream")
+    async def generate_stream(payload: GenerateRequest) -> StreamingResponse:
+        async def event_source():
+            async for event in runtime.generate_stream(
+                payload.prompt,
+                model_id=payload.model_id,
+                **payload.params,
+            ):
+                data = asdict(event)
+                error = data.get("error_code")
+                if error is not None and hasattr(error, "value"):
+                    data["error_code"] = error.value
+                yield json.dumps(data) + "\n"
+
+        return StreamingResponse(event_source(), media_type="application/x-ndjson")
 
     @app.get("/v1/models")
     def models() -> dict[str, Any]:

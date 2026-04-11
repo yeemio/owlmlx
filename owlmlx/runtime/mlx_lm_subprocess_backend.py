@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import select
 import subprocess
 import sys
 import threading
 import time
 from collections import deque
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -25,6 +27,7 @@ from .types import (
     LoadResult,
     LoadedModelInfo,
     RuntimeErrorCode,
+    StreamEvent,
     UnloadResult,
 )
 
@@ -189,12 +192,17 @@ class MlxLmSubprocessBackend:
     def _collect_stderr(self, session: _ChildSession) -> str:
         return "\n".join(session.stderr_lines)
 
-    def _read_payload_line(self, session: _ChildSession) -> tuple[dict[str, Any], str]:
+    def _read_payload_line(
+        self,
+        session: _ChildSession,
+        *,
+        timeout_s: float | None = None,
+    ) -> tuple[dict[str, Any], str]:
         proc = session.proc
         stdout = proc.stdout
         if stdout is None:
             raise ValueError("child stdout pipe is unavailable")
-        deadline = time.monotonic() + self.timeout_s
+        deadline = time.monotonic() + (timeout_s if timeout_s is not None else self.timeout_s)
         discarded: list[str] = []
         while True:
             remaining = deadline - time.monotonic()
@@ -238,13 +246,7 @@ class MlxLmSubprocessBackend:
                     raise ValueError("child stdin pipe is unavailable")
                 proc.stdin.write(json.dumps(request) + "\n")
                 proc.stdin.flush()
-                original_timeout = self.timeout_s
-                if timeout_s is not None:
-                    self.timeout_s = timeout_s
-                try:
-                    payload, discarded = self._read_payload_line(session)
-                finally:
-                    self.timeout_s = original_timeout
+                payload, discarded = self._read_payload_line(session, timeout_s=timeout_s)
         except Exception as exc:
             return MlxLmSubprocessResult(
                 ok=False,
@@ -260,6 +262,60 @@ class MlxLmSubprocessBackend:
             stderr=self._collect_stderr(session),
             payload=payload,
         )
+
+    def _stream_exchange(
+        self,
+        session: _ChildSession,
+        request: dict[str, Any],
+        *,
+        timeout_s: float | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        proc = session.proc
+        if proc.poll() is not None:
+            raise RuntimeError("child process is not running")
+        messages: queue.Queue[tuple[str, dict[str, Any] | None]] = queue.Queue()
+
+        def worker() -> None:
+            try:
+                with self._io_lock:
+                    if proc.stdin is None:
+                        raise ValueError("child stdin pipe is unavailable")
+                    if proc.stdout is None:
+                        raise ValueError("child stdout pipe is unavailable")
+                    proc.stdin.write(json.dumps(request) + "\n")
+                    proc.stdin.flush()
+                    while True:
+                        discarded: list[str] = []
+                        while True:
+                            line = proc.stdout.readline()
+                            if not line:
+                                raise ValueError("child process produced no output")
+                            text = line.strip()
+                            if not text:
+                                continue
+                            try:
+                                payload = json.loads(text)
+                                if isinstance(payload, dict):
+                                    break
+                            except Exception:
+                                discarded.append(text)
+                        messages.put(("payload", payload))
+                        if payload.get("event") == "done" or not payload.get("ok"):
+                            break
+            except Exception as exc:
+                messages.put(("error", {"ok": False, "error": str(exc)}))
+            finally:
+                messages.put(("end", None))
+
+        threading.Thread(target=worker, daemon=True).start()
+        while True:
+            kind, payload = messages.get()
+            if kind == "payload" and payload is not None:
+                yield payload
+                continue
+            if kind == "error" and payload is not None:
+                yield payload
+            return
 
     def _drop_dead_session(self, model_id: str, session: _ChildSession) -> None:
         self._sessions.pop(model_id, None)
@@ -458,6 +514,133 @@ class MlxLmSubprocessBackend:
                 "generation_count": result.payload.get("generation_count"),
             },
         )
+
+    def stream_generate(
+        self,
+        model_id: str,
+        prompt: str,
+        **kwargs: object,
+    ) -> Iterator[StreamEvent]:
+        if model_id not in self._registrations:
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=RuntimeErrorCode.model_not_loaded,
+                detail={"message": f"model not loaded: {model_id}"},
+            )
+            return
+        session = self._sessions.get(model_id)
+        if session is None and self.auto_restart_dead_session:
+            restarted = self._restart_session(model_id, reason="missing session before stream")
+            if restarted.ok:
+                session = self._sessions.get(model_id)
+        if session is None:
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=RuntimeErrorCode.backend_error,
+                detail={"message": f"model session unavailable: {model_id}"},
+            )
+            return
+        if session.proc.poll() is not None:
+            session.last_error = "child process exited unexpectedly"
+            self._drop_dead_session(model_id, session)
+            if self.auto_restart_dead_session:
+                restarted = self._restart_session(model_id, reason="dead child before stream")
+                if restarted.ok:
+                    session = self._sessions.get(model_id)
+                else:
+                    yield StreamEvent(
+                        event="error",
+                        model_id=model_id,
+                        error_code=RuntimeErrorCode.backend_error,
+                        detail={"message": str(restarted.payload.get("error")), "payload": restarted.payload},
+                    )
+                    return
+            else:
+                yield StreamEvent(
+                    event="error",
+                    model_id=model_id,
+                    error_code=RuntimeErrorCode.backend_error,
+                    detail={"message": "child process is not running"},
+                )
+                return
+        assert session is not None
+        try:
+            for payload in self._stream_exchange(
+                session,
+                {
+                    "action": "stream_generate",
+                    "model_id": model_id,
+                    "prompt": prompt,
+                    "params": dict(kwargs),
+                },
+            ):
+                self._last_result = MlxLmSubprocessResult(
+                    ok=bool(payload.get("ok")),
+                    returncode=0 if session.proc.poll() is None else int(session.proc.returncode or 0),
+                    stdout="",
+                    stderr=self._collect_stderr(session),
+                    payload=payload,
+                )
+                if not payload.get("ok"):
+                    error = str(payload.get("error") or self._collect_stderr(session))
+                    self._last_error = error
+                    session.last_error = error
+                    if session.proc.poll() is not None:
+                        self._drop_dead_session(model_id, session)
+                    yield StreamEvent(
+                        event="error",
+                        model_id=model_id,
+                        error_code=RuntimeErrorCode.backend_error,
+                        detail={"message": error, "payload": payload},
+                    )
+                    return
+                event = str(payload.get("event") or "token")
+                if event == "token":
+                    yield StreamEvent(
+                        event="token",
+                        model_id=model_id,
+                        text=str(payload.get("text", "")),
+                        sequence=payload.get("sequence"),
+                        prompt_tokens=payload.get("prompt_tokens"),
+                        completion_tokens=payload.get("completion_tokens"),
+                        finish_reason=payload.get("finish_reason"),
+                        detail={"pid": payload.get("pid")},
+                    )
+                    continue
+                if event == "done":
+                    session.generation_count = int(
+                        payload.get("generation_count") or (session.generation_count + 1)
+                    )
+                    session.last_payload = payload
+                    session.last_error = None
+                    self._last_error = None
+                    yield StreamEvent(
+                        event="done",
+                        model_id=model_id,
+                        sequence=payload.get("sequence"),
+                        prompt_tokens=payload.get("prompt_tokens"),
+                        completion_tokens=payload.get("completion_tokens"),
+                        finish_reason=payload.get("finish_reason"),
+                        detail={
+                            "pid": payload.get("pid"),
+                            "generation_count": payload.get("generation_count"),
+                        },
+                    )
+                    return
+        except Exception as exc:
+            error = str(exc)
+            self._last_error = error
+            session.last_error = error
+            if session.proc.poll() is not None:
+                self._drop_dead_session(model_id, session)
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=RuntimeErrorCode.backend_error,
+                detail={"message": error},
+            )
 
     def unload(self, model_id: str) -> UnloadResult:
         session = self._sessions.pop(model_id, None)

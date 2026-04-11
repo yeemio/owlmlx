@@ -20,8 +20,9 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any, Callable, TypeVar
+from typing import Any, AsyncIterator, Callable, TypeVar
 
 T = TypeVar("T")
 
@@ -129,6 +130,35 @@ class GenerationGate:
         """
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.execute, fn, *args, **kwargs)
+
+    @asynccontextmanager
+    async def stream_session(self) -> AsyncIterator[GenerationResult]:
+        """Hold GenerationGate for the full lifetime of a streaming response."""
+
+        enqueue_time = time.monotonic()
+        self._total_queued += 1
+        was_queued = self._active
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._lock.acquire)
+        wait_time = time.monotonic() - enqueue_time
+        exec_start = time.monotonic()
+        self._active = True
+        try:
+            yield GenerationResult(
+                value=None,
+                wait_time_s=round(wait_time, 4),
+                execution_time_s=0.0,
+                was_queued=was_queued,
+            )
+            self._total_served += 1
+        finally:
+            exec_time = time.monotonic() - exec_start
+            self._active = False
+            self._total_wait_s += wait_time
+            self._total_exec_s += exec_time
+            self._longest_wait_s = max(self._longest_wait_s, wait_time)
+            self._longest_exec_s = max(self._longest_exec_s, exec_time)
+            self._lock.release()
 
     @property
     def is_active(self) -> bool:

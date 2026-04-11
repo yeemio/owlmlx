@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from fastapi.testclient import TestClient
 
 from owlmlx.memory_budget import MachineMemoryProfile
@@ -83,6 +85,24 @@ def test_generate_without_loaded_model_returns_runtime_error() -> None:
     payload = response.json()
     assert payload["ok"] is False
     assert payload["error_code"] == "model_not_loaded"
+
+
+def test_generate_stream_returns_ndjson_events() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    with client.stream(
+        "POST",
+        "/v1/generate/stream",
+        json={"prompt": "hello", "params": {"max_tokens": 4}},
+    ) as response:
+        assert response.status_code == 200
+        lines = [line for line in response.iter_lines() if line]
+
+    payloads = [json.loads(line) for line in lines]
+    assert payloads[0]["event"] == "token"
+    assert payloads[-1]["event"] == "done"
+    assert payloads[0]["model_id"] == "fake-a"
 
 
 def test_load_requires_model_id_validation() -> None:

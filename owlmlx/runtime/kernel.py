@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import asdict
 from typing import Any
 
@@ -29,6 +30,7 @@ from .types import (
     RestartResult,
     RuntimeErrorCode,
     RuntimeStatus,
+    StreamEvent,
     UnloadResult,
 )
 
@@ -164,6 +166,49 @@ class RuntimeKernel:
             execution_time_s=gated.execution_time_s,
             was_queued=gated.was_queued,
         )
+
+    async def generate_stream(
+        self,
+        prompt: str,
+        *,
+        model_id: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamEvent]:
+        """Generate a streamed response through the backend under GenerationGate discipline."""
+
+        target_model = model_id or self._active_model_id
+        if not target_model:
+            yield StreamEvent(
+                event="error",
+                error_code=RuntimeErrorCode.model_not_loaded,
+                detail={"message": "no active model loaded"},
+            )
+            return
+        if target_model not in {m.model_id for m in self.backend.status().loaded_models}:
+            yield StreamEvent(
+                event="error",
+                model_id=target_model,
+                error_code=RuntimeErrorCode.model_not_loaded,
+                detail={"message": f"model not loaded: {target_model}"},
+            )
+            return
+
+        async with self.generation_gate.stream_session() as gate_start:
+            for event in self.backend.stream_generate(target_model, prompt, **kwargs):
+                yield StreamEvent(
+                    event=event.event,
+                    model_id=event.model_id,
+                    text=event.text,
+                    error_code=event.error_code,
+                    finish_reason=event.finish_reason,
+                    sequence=event.sequence,
+                    prompt_tokens=event.prompt_tokens,
+                    completion_tokens=event.completion_tokens,
+                    wait_time_s=gate_start.wait_time_s,
+                    execution_time_s=event.execution_time_s,
+                    was_queued=gate_start.was_queued,
+                    detail=event.detail,
+                )
 
     def unload_model(self, model_id: str) -> UnloadResult:
         """Unload a model through the backend and clear active model if needed."""

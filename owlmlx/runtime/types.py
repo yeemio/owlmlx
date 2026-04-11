@@ -69,6 +69,32 @@ class GenerateResult(RuntimeOperationResult):
 
 
 @dataclass(frozen=True, slots=True)
+class StreamEvent:
+    """A single event emitted during streaming generation."""
+
+    event: str
+    model_id: str | None = None
+    text: str = ""
+    error_code: RuntimeErrorCode | None = None
+    finish_reason: str | None = None
+    sequence: int | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    wait_time_s: float | None = None
+    execution_time_s: float | None = None
+    was_queued: bool = False
+    detail: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class StreamStart:
+    """Queue timing metadata for a streaming generation session."""
+
+    wait_time_s: float
+    was_queued: bool
+
+
+@dataclass(frozen=True, slots=True)
 class UnloadResult(RuntimeOperationResult):
     """Result of unloading a model."""
 

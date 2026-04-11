@@ -34,7 +34,7 @@ Capability labels:
 | Serving-path model inventory registry | supported | `owlmlx/model_inventory.py` — LoadedModelEntry, ModelInventorySnapshot, loaded-memory aggregation, budget integration, runtime-health integration with 18 tests; **platform consumes** via `metrics.py` and `control_service.py` building inventory snapshots |
 | Served-model lineage schema | supported | `owlmlx/model_lineage.py` — ModelLineage, validation, truth inheritance derivation, training-artifact bridge with 20 tests; **platform consumes** via `primary_line_status.py` normalizing and validating catalog lineage |
 | Cache truth contract | supported | `owlmlx/cache_truth.py` — cache profile labels, flag schema, restart-required derivation, and TurboQuant cache-safety rules with 22 tests; **platform consumes** via `distilled_cache_substrate.py` and `primary_line_status.py` |
-| Fully self-owned implementation stack | partial | Eleven truth modules plus Runtime-2 executable kernel exist; persistent child MLX sessions are real, but production serving, lifecycle hardening, eviction/reclaim, and platform migration remain open |
+| Fully self-owned implementation stack | partial | Eleven truth modules plus Runtime-3 executable kernel exist; persistent child MLX sessions and streamed kernel serving are real, but production serving, eviction/reclaim, and platform migration remain open |
 | Queue-based generation gate (owlmlx-owned) | supported | `owlmlx/serving.py` — GenerationGate class with 11 tests; enforces validated concurrency boundary |
 | Formal adoption model (reuse open-source, own truth layer) | supported | Adoption rule frozen in product-definition section 6 |
 | Extraction discipline with wave ordering | supported | Discipline rules frozen in extraction-inventory section 3 |
@@ -73,6 +73,8 @@ Capability labels:
 | Dead child restart policy | supported | Registration survives child death; the next generation request can restart the child session within configured restart-attempt limits |
 | Explicit runtime restart surface | supported | `POST /v1/runtime/restart` restarts one loaded model through `RuntimeKernel.restart_model()` |
 | Serialized concurrent serving validation | supported | `scripts/runtime3_serialized_concurrency_check.py` proves `GenerationGate` remains serial under real concurrent requests against one persistent child session |
+| Real streaming response path | supported | `POST /v1/generate/stream` streams NDJSON events through `RuntimeKernel.generate_stream()`; real local smoke verified on `gpt-oss-20b-MXFP4-Q4` |
+| Same-model benchmark comparison against old platform | supported | `scripts/runtime3_platform_benchmark_compare.py` replays the old platform benchmark prompts through Runtime-3 and freezes same-model deltas |
 | Overflow / NVMe-tier execution path | experimental | Future candidate only; Hypura recorded as external reference in `hypura-overflow-path-reference.md`, not adopted |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction; Gemma has moved to production mainline instead |
 | `gemma-4-31B-it` as production mainline | supported | Production mainline frozen; pilot LoRA PASS; substrate contracts exercised end-to-end |

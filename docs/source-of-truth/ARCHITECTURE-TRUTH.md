@@ -19,7 +19,7 @@ owlmlx 是我们在 Apple Silicon 上的**自有 MLX runtime**。
 
 ### 2.1 owlmlx 今天实际是什么
 
-一个进入 **Runtime-3 serving surface** 阶段的早期 runtime。
+一个完成 **Runtime-3 serving surface + streaming + comparison** 的早期 runtime。
 
 它不再只是 truth derivation library：现在有自有 `RuntimeKernel`、
 backend adapter 边界、FakeBackend、最小 HTTP entry，并且 kernel 自己消费
@@ -30,16 +30,16 @@ memory budget / model inventory / runtime health / GenerationGate。
 
 | 维度 | 现状 | 目标状态 |
 |---|---|---|
-| 能启动 server 吗 | **能，Runtime-3 已有 runtime status / restart surface** | 能：生产级 HTTP serving |
+| 能启动 server 吗 | **能，Runtime-3 已有 runtime status / restart / streaming surface** | 能：生产级 HTTP serving |
 | 能 load model 吗 | **能，persistent child 真实 MLX load 已验证** | 能：真实 MLX 权重加载 |
 | 能 generate token 吗 | **能，persistent child 真实 completion 已验证** | 能：真实模型 completion |
 | 能管理内存吗 | **能做 load 前预算检查和 inventory 状态跟踪** | 能：主动 load/unload/evict/reclaim |
-| 能感知自身状态吗 | **能，从 kernel 自身 backend status 推导 health** | 能：真实 runtime probe 自己 |
-| 能恢复故障吗 | 只能判断"是否 contaminated" | 能：自己执行 restart/recovery |
+| 能感知自身状态吗 | **能，从 kernel 自身 backend status 推导 health，并上推到 runtime surface** | 能：真实 runtime probe 自己 |
+| 能恢复故障吗 | **能做 child ping / next-request restart / explicit restart** | 能：更完整 restart/recovery policy |
 
 ### 2.2 代码盘点
 
-Runtime-3 首批交付后，owlmlx 有 19 个 Python 模块，332 tests。
+Runtime-3 完成交付后，owlmlx 有 19 个 Python 模块，340 tests。
 
 | 模块 | LOC | 性质 | 做什么 |
 |---|---|---|---|
@@ -227,14 +227,16 @@ R11-R18 的价值：给 RuntimeKernel 准备了判断层。
 诚实的 scorecard 拆成两张：
 
 ```
-Truth substrate readiness:  11 truth modules, 332 tests, 7 platform consumers ✓
+Truth substrate readiness:  11 truth modules, 340 tests, 7 platform consumers ✓
 Runtime executability:      Runtime-0 MVP ✓ → Runtime-1 真实模型验证 ✓ → Runtime-2 persistent child ✓
-Runtime serving surface:    Runtime-3 restart/status surface ✓
+Runtime serving surface:    Runtime-3 restart/status/streaming surface ✓
 Subprocess isolation:       父进程永不 import mlx_lm，子进程 abort → 结构化错误 ✓
 Real local smoke baseline:  gpt-oss-20b + Qwen3.5-27B + Qwen3.5-35B-A3B 通过 ✓
 Persistent child proof:     gpt-oss-20b / Qwen3.5-27B 同一 pid 连续 generate 通过 ✓
 Steady-state benchmark:     gpt-oss-20b load≈1.49s, warm median≈0.157s ✓
 Serialized serving proof:   gpt-oss-20b 并发2请求保持 serial gate ✓
+Real streaming proof:       gpt-oss-20b TTFT≈0.218s, real token events through RuntimeKernel ✓
+Same-model comparison:      Qwen3.5-35B-A3B Runtime-3 vs old platform completed ✓
 Production readiness:       not yet
 ```
 

@@ -24,7 +24,8 @@ def _parse_request(line: str) -> dict[str, Any]:
 
 
 def _emit(payload: dict[str, Any]) -> None:
-    print(json.dumps(payload), flush=True)
+    sys.__stdout__.write(json.dumps(payload) + "\n")
+    sys.__stdout__.flush()
 
 
 def main() -> int:
@@ -111,6 +112,74 @@ def main() -> int:
                         "text": str(text),
                         "pid": os.getpid(),
                         "generation_count": generation_count,
+                    }
+                )
+                continue
+
+            if action == "stream_generate":
+                if not current_model_id or model is None or tokenizer is None:
+                    _emit({"ok": False, "error": "no model loaded"})
+                    continue
+                if model_id and str(model_id) != current_model_id:
+                    _emit(
+                        {
+                            "ok": False,
+                            "error": (
+                                f"loaded model is {current_model_id}, "
+                                f"not {model_id}"
+                            ),
+                        }
+                    )
+                    continue
+
+                import mlx_lm  # noqa: PLC0415
+
+                sequence = 0
+                prompt_tokens = None
+                completion_tokens = 0
+                finish_reason = "stop"
+                with redirect_stdout(sys.stderr):
+                    for response in mlx_lm.stream_generate(
+                        model,
+                        tokenizer,
+                        prompt=str(prompt),
+                        **params,
+                    ):
+                        sequence += 1
+                        prompt_tokens = getattr(response, "prompt_tokens", prompt_tokens)
+                        completion_tokens = int(
+                            getattr(response, "generation_tokens", completion_tokens) or 0
+                        )
+                        finish_reason = str(
+                            getattr(response, "finish_reason", finish_reason) or finish_reason
+                        )
+                        _emit(
+                            {
+                                "ok": True,
+                                "action": "stream_event",
+                                "event": "token",
+                                "model_id": current_model_id,
+                                "text": str(getattr(response, "text", "") or ""),
+                                "pid": os.getpid(),
+                                "sequence": sequence,
+                                "prompt_tokens": prompt_tokens,
+                                "completion_tokens": completion_tokens,
+                                "finish_reason": finish_reason,
+                            }
+                        )
+                generation_count += 1
+                _emit(
+                    {
+                        "ok": True,
+                        "action": "stream_done",
+                        "event": "done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "generation_count": generation_count,
+                        "sequence": sequence,
+                        "prompt_tokens": prompt_tokens,
+                        "completion_tokens": completion_tokens,
+                        "finish_reason": finish_reason,
                     }
                 )
                 continue

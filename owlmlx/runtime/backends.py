@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterable
 from typing import Protocol, runtime_checkable
 
 from .types import (
@@ -11,6 +12,7 @@ from .types import (
     LoadResult,
     LoadedModelInfo,
     RuntimeErrorCode,
+    StreamEvent,
     UnloadResult,
 )
 
@@ -26,6 +28,14 @@ class RuntimeBackend(Protocol):
 
     def generate(self, model_id: str, prompt: str, **kwargs: object) -> GenerateResult:
         """Generate text from an already-loaded model."""
+
+    def stream_generate(
+        self,
+        model_id: str,
+        prompt: str,
+        **kwargs: object,
+    ) -> Iterable[StreamEvent]:
+        """Generate a streamed response from an already-loaded model."""
 
     def unload(self, model_id: str) -> UnloadResult:
         """Unload a model from the backend."""
@@ -103,6 +113,56 @@ class FakeBackend:
             prompt_tokens=len(prompt.split()),
             completion_tokens=len(self.completion_suffix.split()),
         )
+
+    def stream_generate(self, model_id: str, prompt: str, **kwargs: object) -> list[StreamEvent]:
+        result = self.generate(model_id, prompt, **kwargs)
+        if not result.ok:
+            return [
+                StreamEvent(
+                    event="error",
+                    model_id=model_id,
+                    error_code=result.error_code,
+                    detail={"message": result.message, **result.detail},
+                )
+            ]
+        words = result.text.split()
+        if not words:
+            return [
+                StreamEvent(
+                    event="done",
+                    model_id=model_id,
+                    text=result.text,
+                    finish_reason="stop",
+                    prompt_tokens=result.prompt_tokens,
+                    completion_tokens=result.completion_tokens,
+                )
+            ]
+        events: list[StreamEvent] = []
+        assembled: list[str] = []
+        for idx, word in enumerate(words, start=1):
+            assembled.append(word)
+            events.append(
+                StreamEvent(
+                    event="token",
+                    model_id=model_id,
+                    text=(" ".join(assembled) + (" " if idx < len(words) else "")),
+                    sequence=idx,
+                    prompt_tokens=result.prompt_tokens,
+                    completion_tokens=idx,
+                )
+            )
+        events.append(
+            StreamEvent(
+                event="done",
+                model_id=model_id,
+                text=result.text,
+                finish_reason="stop",
+                sequence=len(words),
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=result.completion_tokens,
+            )
+        )
+        return events
 
     def unload(self, model_id: str) -> UnloadResult:
         model = self._loaded.pop(model_id, None)

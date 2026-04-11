@@ -86,6 +86,24 @@ def test_generate_specific_unloaded_model_fails() -> None:
     assert result.model_id == "fake-b"
 
 
+def test_generate_stream_after_load_uses_active_model() -> None:
+    kernel = RuntimeKernel(FakeBackend(default_memory_gb=1.0), profile=_small_profile())
+    kernel.load_model("fake-a")
+
+    async def collect():
+        events = []
+        async for event in kernel.generate_stream("hello", max_tokens=8):
+            events.append(event)
+        return events
+
+    events = asyncio.run(collect())
+
+    assert [event.event for event in events][-1] == "done"
+    assert events[0].model_id == "fake-a"
+    assert events[0].wait_time_s is not None
+    assert kernel.status_dict()["generation_gate"]["total_served"] == 1
+
+
 def test_unload_model_clears_active_model() -> None:
     kernel = RuntimeKernel(FakeBackend(), profile=_small_profile())
     kernel.load_model("fake-a")

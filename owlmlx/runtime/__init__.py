@@ -24,6 +24,7 @@ from .types import (
     RuntimeErrorCode,
     RuntimeOperationResult,
     RuntimeStatus,
+    StreamEvent,
     UnloadResult,
 )
 
@@ -44,6 +45,7 @@ __all__ = [
     "RuntimeKernel",
     "RuntimeOperationResult",
     "RuntimeStatus",
+    "StreamEvent",
     "UnloadResult",
     "default_environment_candidates",
     "known_environment_candidates",

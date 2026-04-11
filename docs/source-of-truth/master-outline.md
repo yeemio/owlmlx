@@ -52,29 +52,31 @@ These are runtime-level goals, not temporary integration work.
 7. `runtime-kernel-mvp.md`
 8. `runtime2-benchmark-baseline.md`
 9. `runtime1-environment-diagnostics.md`
-10. `runtime-contracts.md`
-11. `runtime-status-schema.md`
-12. `runtime-governance.md`
-13. `hazardous-operations.md`
-14. `rename-strategy.md`
-15. `contract-mapping.md`
-16. `runtime-contract-adoption-plan.md`
-17. `extraction-inventory.md`
-18. `autonomous-loop-discipline.md`
-19. `large-weight-path-truth.md`
-20. `roadmap.md`
-21. `gemma-high-fidelity-role.md`
-22. `training-substrate-contract.md`
-23. `artifact-layout-contract.md`
-24. `training-to-serving-contract.md`
-25. `capability-absorption-inventory.md`
-26. `ownership-boundary.md`
-27. `model-line-placement.md`
-28. `first-absorption-target.md`
-29. `convergence-posture.md`
-30. `hypura-overflow-path-reference.md`
-31. `model-lineage-schema.md`
-32. `cache-truth-contract.md`
+10. `runtime3-serving-surface.md`
+11. `runtime3-benchmark-and-streaming.md`
+12. `runtime-contracts.md`
+13. `runtime-status-schema.md`
+14. `runtime-governance.md`
+15. `hazardous-operations.md`
+16. `rename-strategy.md`
+17. `contract-mapping.md`
+18. `runtime-contract-adoption-plan.md`
+19. `extraction-inventory.md`
+20. `autonomous-loop-discipline.md`
+21. `large-weight-path-truth.md`
+22. `roadmap.md`
+23. `gemma-high-fidelity-role.md`
+24. `training-substrate-contract.md`
+25. `artifact-layout-contract.md`
+26. `training-to-serving-contract.md`
+27. `capability-absorption-inventory.md`
+28. `ownership-boundary.md`
+29. `model-line-placement.md`
+30. `first-absorption-target.md`
+31. `convergence-posture.md`
+32. `hypura-overflow-path-reference.md`
+33. `model-lineage-schema.md`
+34. `cache-truth-contract.md`
 
 ## 6. Adoption Model
 
@@ -98,16 +100,8 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-The schema-extraction mainline is no longer the dominant path. The current
-question is:
+Runtime-3 is now complete. The next question is:
 
-**How does owlmlx move from a working Runtime-2 persistent child kernel into a
-Runtime-3 serving surface with explicit restart control, honest serialized
-concurrent serving, and fair benchmark truth?**
-
-Concrete sub-questions:
-
-1. Which runtime/control surfaces must exist above backend internals?
-2. How do we prove serialized concurrent serving remains runtime truth under
-   persistent child execution?
-3. What is the first fair comparison shape against the old platform?
+**How does owlmlx move from a completed Runtime-3 serving surface into a more
+deployable Runtime-4 serving runtime with stronger transport semantics,
+reliability policy, and platform-facing migration seams?**

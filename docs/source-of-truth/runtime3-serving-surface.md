@@ -2,7 +2,7 @@
 
 > Status: authoritative
 > Updated: 2026-04-11
-> Scope: Runtime-3 control surface and serialized serving truth
+> Scope: Runtime-3 control surface, serialized serving truth, and handoff to streaming/comparison proof
 
 ## 1. Purpose
 
@@ -11,6 +11,8 @@ Runtime-2 backend internals:
 
 - explicit runtime restart surface
 - honest serialized concurrent serving validation
+- runtime streaming and comparison closure recorded separately in
+  `runtime3-benchmark-and-streaming.md`
 
 ## 2. Runtime Surface
 
@@ -88,7 +90,6 @@ signals are:
 
 This document does not claim:
 
-- streaming tokens are implemented
-- fair old-platform throughput comparison is complete
 - serialized serving has been validated at higher concurrency levels
 - multi-model concurrent serving policy is complete
+- production transport semantics are finished
