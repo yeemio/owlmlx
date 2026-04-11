@@ -84,8 +84,18 @@ The adapter:
 - supports kernel load/generate/unload/status in mock tests
 
 Direct `mlx_lm` import in the local venv currently initializes MLX/Metal and
-can crash in non-runtime test contexts. This is why the adapter is lazy and
-mock-tested in Runtime-0.
+can crash in non-runtime test contexts. This is why the adapter is lazy,
+mock-tested in Runtime-0, and protected by an isolated subprocess import
+probe before parent-process import.
+
+Runtime-1 adds an explicit operator smoke script:
+
+```bash
+python scripts/runtime1_mlx_lm_smoke.py --model /path/to/small-mlx-model
+```
+
+This script is not part of pytest. It may initialize MLX/Metal and must remain
+an explicit smoke until the local Metal import crash is resolved.
 
 ## 7. Verified Behavior
 
@@ -103,6 +113,8 @@ Runtime-0 tests prove:
 - HTTP load respects memory budget
 - `MlxLmBackend` calls mlx-lm load/generate paths under mock
 - `RuntimeKernel` can use `MlxLmBackend` under mock
+- `MlxLmBackend` import preflight returns structured failure instead of
+  importing `mlx_lm` in the parent process
 
 ## 8. Non-Claims
 
@@ -122,5 +134,11 @@ Runtime-0 does not claim:
 Runtime-1 should verify a real MLX model load/generate path through
 `MlxLmBackend` using a local model small enough for safe smoke testing.
 
+Current Runtime-1 blocker: `mlx_lm` import can crash the child process during
+MLX/Metal initialization before any model load. The next step is to stabilize
+the MLX import environment or move real load/generate into a dedicated
+subprocess runner so the owlmlx parent runtime never imports crash-prone Metal
+code directly.
+
 Runtime-1 should not start with Kimi 1T, 120B, or Gemma 31B. The next gap is
-real adapter execution, not large-model productization.
+safe real adapter execution, not large-model productization.

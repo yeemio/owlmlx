@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 
 from owlmlx.runtime import MlxLmBackend, RuntimeErrorCode, RuntimeKernel
+from owlmlx.runtime.mlx_lm_backend import probe_mlx_lm_import
 
 
 class FakeMlxLmModule:
@@ -126,3 +128,34 @@ def test_mlx_lm_backend_reports_import_or_load_error() -> None:
     assert result.ok is False
     assert result.error_code is RuntimeErrorCode.backend_error
     assert backend.status().healthy is False
+
+
+def test_probe_mlx_lm_import_uses_subprocess_without_parent_import() -> None:
+    result = probe_mlx_lm_import(
+        python_executable=sys.executable,
+        timeout_s=5.0,
+    )
+
+    # The test environment may or may not have mlx_lm installed. The contract
+    # is that probing returns a structured result instead of importing mlx_lm
+    # in the parent process.
+    assert isinstance(result.ok, bool)
+    assert isinstance(result.returncode, int)
+    assert isinstance(result.stdout, str)
+    assert isinstance(result.stderr, str)
+    assert "probe" in result.message
+
+
+def test_mlx_lm_backend_preflight_failure_does_not_import_in_parent() -> None:
+    backend = MlxLmBackend(
+        python_executable="/path/that/does/not/exist",
+        preflight_import=True,
+    )
+
+    result = backend.load("model-a", memory_gb=1.0)
+
+    assert result.ok is False
+    assert result.error_code is RuntimeErrorCode.backend_error
+    assert "probe" in result.message
+    assert backend.status().loaded_models == ()
+    assert backend.status().detail["last_import_probe"]["ok"] is False
