@@ -42,8 +42,9 @@ Before listing gaps, this is what owlmlx already owns:
 | 15 | Serving-path abort recovery state machine | `abort_recovery.py` (31 tests) | supported |
 | 16 | Serving-path runtime health semantics | `runtime_health.py` (85 tests) | supported |
 | 17 | Serving-path model inventory registry | `model_inventory.py` (18 tests) | supported |
+| 18 | Served-model lineage schema | `model_lineage.py` (20 tests) | supported |
 
-Total: 9 Python modules, 244 tests, 20 truth documents.
+Total: 10 Python modules, 264 tests, 21 truth documents.
 
 ## 3. Gap-Driven Inventory
 
@@ -238,12 +239,13 @@ future work.
 
 ---
 
-### Gap 8: Model Lineage And Provenance
+### Gap 8: Model Lineage And Provenance — **ABSORBED + CONSUMED**
 
-**What owlmlx lacks:**
-owlmlx has `artifact-layout-contract.md` for training artifacts with
-`metadata.json`, but no concept of served-model lineage: base model origin,
-quantization method, conversion path, runtime version, verified context.
+**What owlmlx now owns:**
+`owlmlx/model_lineage.py` defines served-model lineage schema, validation,
+normalization, truth inheritance rules, and a bridge from training artifact
+metadata to serving lineage. 20 tests. Platform `primary_line_status.py`
+normalizes and validates catalog lineage through owlmlx.
 
 **What the platform has:**
 
@@ -256,10 +258,8 @@ quantization method, conversion path, runtime version, verified context.
 **Platform maturity:** Defined — schema exists, mandatory for stable/backup
 models. Exercised for Distilled-27B conversion path.
 
-**Absorption candidate:** YES — model provenance is runtime truth. "What
-weights are actually being served, and how did they get here?" is a
-question the runtime must answer honestly. owlmlx should own the lineage
-schema; catalog population stays in platform.
+**Remaining boundary:** Catalog population, file hash calculation, upgrade
+gate execution, and user-facing remediation remain platform-owned.
 
 **Current platform source files:**
 - `docs/source-of-truth/local-llm-platform/model-lifecycle-and-upgrade-gate.md`
@@ -299,7 +299,7 @@ because they belong to other architectural layers.
 | Gap 3 | Context concurrency policy | Verified (hardware-proven) | Full boundary ownership |
 | Gap 4 | Memory budget enforcement | Verified (production use) | Full budget logic ownership |
 | Gap 6 | Model lifecycle states | Verified (40+ phases) | **Deferred** — product classification, not runtime truth; no code to absorb |
-| Gap 8 | Model lineage schema | Defined (mandatory for stable) | Full schema ownership |
+| Gap 8 | Model lineage schema | **Absorbed + consumed** | `owlmlx/model_lineage.py` — schema, validation, truth inheritance; platform primary-line status consumes |
 | Gap 5 | Cache profile management | Verified but specialized | Partial: generalized contract only |
 | Gap 7 | Per-model runtime truth | **Partially absorbed + consumed** | `owlmlx/model_inventory.py` — inventory input schema + budget/health derivation; transport remains platform |
 

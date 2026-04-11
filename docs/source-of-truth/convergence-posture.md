@@ -45,18 +45,18 @@ and what should happen next.
 | Model lifecycle states | **Deferred** (R15): 6 states are product lifecycle classification (stable/backup/candidate/experimental/blocked/parked), not runtime substrate truth; `lifecycle.py` has no state enum or transition function to absorb; absorbing would produce orphan enum with no derivation consumer | Platform owns state definitions in `model-lifecycle-and-upgrade-gate.md`, upgrade gates (G1–G7), and LifecycleDaemon execution | **Not a code absorption target** — product policy, not runtime truth |
 | Per-model runtime truth | Model inventory registry absorbed | `owlmlx/model_inventory.py`; platform consumes in metrics/control_service | Endpoint transport and mutations stay platform-owned |
 | Cache truth | Not yet started | distilled_cache_substrate.py | Specialized; needs generalization |
-| Model lineage | Training artifacts have metadata.json | Served model lineage in platform docs | Schema not yet extracted |
+| Model lineage | **Absorbed + consumed** (R16): `owlmlx/model_lineage.py` owns schema, validation, truth inheritance, and training-artifact bridge | Platform owns catalog population, file hash calculation, upgrade-gate execution, and API transport; `primary_line_status.py` consumes owlmlx validation | **Consumption wired** — catalog lineage is normalized and validated through owlmlx |
 
 ### 3.3 Convergence Scorecard
 
 | Metric | Score |
 |---|---|
 | Capabilities with assigned truth owner | **46/46** (100%) |
-| owlmlx-owned capabilities with code | **9/19** (47%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory |
-| owlmlx-owned capabilities consumed by platform | **5/9** (56%) — memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory (platform imports owlmlx truth, no local duplicates) |
+| owlmlx-owned capabilities with code | **10/19** (53%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory, model_lineage |
+| owlmlx-owned capabilities consumed by platform | **6/10** (60%) — memory_budget, context_concurrency, abort_recovery, runtime_health, model_inventory, model_lineage (platform imports owlmlx truth, no local duplicates) |
 | owlmlx-owned capabilities as doc-only | **6/19** (32%) — governance, hazardous-ops, safe-resume, training contracts |
 | owlmlx-owned capabilities deferred (not runtime truth) | **1/19** (5%) — Gap 6 model lifecycle states (product classification, not substrate truth) |
-| owlmlx-owned capabilities to absorb | **3/19** (16%) — Gaps 5, 8 plus remaining per-model mutation/transport schema (Gaps 1+2+3+4 absorbed; Gap 7 inventory layer absorbed; Gap 6 deferred) |
+| owlmlx-owned capabilities to absorb | **2/19** (11%) — Gap 5 cache truth contract plus remaining per-model mutation/transport schema (Gaps 1+2+3+4+8 absorbed; Gap 7 inventory layer absorbed; Gap 6 deferred) |
 | Model lines with formal placement | **6/6** (100%) |
 | Platform capabilities with clear non-absorption reasoning | **14/14** (100%) |
 
@@ -84,8 +84,13 @@ loaded-memory aggregation, and pure budget/health integration. Platform
 `metrics.py` and `control_service.py` fill inventory snapshots; owlmlx
 derives downstream truth.
 
-**Remaining convergence work:** 4 of 19 runtime-owned capabilities still
-need code absorption. The 5 absorbed+consumed capabilities prove the
+**Model lineage schema absorbed and consumed.** R16 now has a canonical
+served-model lineage schema, validation rules, and truth inheritance
+derivation. Platform `primary_line_status.py` normalizes and validates
+catalog lineage through owlmlx.
+
+**Remaining convergence work:** 2 of 19 runtime-owned capabilities still
+need code absorption. The 6 absorbed+consumed capabilities prove the
 pattern for future rounds.
 
 ### 4.2 What This Means Operationally
@@ -125,25 +130,23 @@ and auto-heal policy — these are control-plane orchestration, not runtime
 truth. Absorbing would produce an orphan enum with no derivation chain
 and no platform consumer. R15 remains platform-owned.
 
-The next dominant gap is **Model Lineage Schema** (R16 / Gap 8):
-absorb lineage schema definitions and truth inheritance rules. This
-connects to `training.py`'s existing artifact metadata on the production
-side: training produces artifacts → lineage records how weights reached
-serving state → truth inheritance rules determine what verification
-carries over vs must re-verify.
+~~Model Lineage Schema (R16 / Gap 8) — completed 2026-04-11.~~
+
+The next dominant gap is **Cache Truth Contract** (R18 / Gap 5):
+generalize the Distilled-27B cache substrate contract without absorbing
+specimen-specific cache implementation, dashboard transport, or mutation
+policy.
 
 | Step | Action | Expected Output |
 |---|---|---|
-| 1 | Map lineage sources (`model-lifecycle-and-upgrade-gate.md` §2 + catalog.json) | Field-level mapping to owlmlx schema |
-| 2 | Add owlmlx lineage schema definitions | Immutable dataclasses + validation |
-| 3 | Add truth inheritance derivation | Pure functions: change type → what re-verifies |
-| 4 | Write owlmlx-side tests | Schema validation, inheritance rules, composition with training.py |
-| 5 | Wire platform to consume if seam exists | Catalog lineage validated through owlmlx |
+| 1 | Map cache substrate sources (`distilled_cache_substrate.py`) | Separate generic cache truth from Distilled-specific values |
+| 2 | Add owlmlx cache truth contract | Pure schema + safety rules only |
+| 3 | Write owlmlx-side tests | Cache key safety, profile identity, invalidation rules |
+| 4 | Wire platform to consume if narrow seam exists | Cache substrate summary imports owlmlx schema/rules |
 | 6 | Update source-of-truth docs | Mark absorbed / consumed accurately |
 
-Secondary candidates (after inventory closes):
-- Gap 8: Model lineage schema (R16)
-- Gap 5: Cache truth contract (R18)
+Secondary candidate:
+- Remaining per-model mutation/transport schema work (R17 follow-up)
 
 ### What Has Changed Since Round 5
 
@@ -172,7 +175,7 @@ All 5 success criteria satisfied.
 
 | Rule | Compliance |
 |---|---|
-| Not written as replacement complete state | ✓ 3/19 capabilities still to absorb, 1/19 explicitly deferred |
+| Not written as replacement complete state | ✓ 2/19 capabilities still to absorb, 1/19 explicitly deferred |
 | Not mechanical copy of all platform capabilities | ✓ 14 explicit non-candidates |
 | Not training expansion | ✓ Training explicitly deferred |
 | Not unverified experimental promoted | ✓ All candidates are verified |

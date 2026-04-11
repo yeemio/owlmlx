@@ -43,7 +43,7 @@ runtime truth must have exactly one truth owner.
 | R13 | Memory budget definition and calculation | R | `owlmlx/memory_budget.py` | **Absorbed + consumed** — platform `control_service.py` consumes via `model_inventory.inventory_budget_check()` plus budget constants |
 | R14 | Runtime health semantic tiers | R | `owlmlx/runtime_health.py` | **Absorbed + consumed** — 6 enum types, 7 derivation functions; platform `metrics.py` consumes via `model_inventory.inventory_health_snapshot()` and `derive_platform_status()` |
 | R15 | Model lifecycle state definitions | R | `model-lifecycle-and-upgrade-gate.md` | **Deferred** — 6 states (stable/backup/candidate/experimental/blocked/parked) are product lifecycle classification, not runtime substrate truth; `lifecycle.py` has no state enum or transition function; absorbing would produce an orphan enum with no derivation chain or platform consumer |
-| R16 | Model lineage schema | R | `model-lifecycle-and-upgrade-gate.md` | **To absorb** |
+| R16 | Model lineage schema | R | `owlmlx/model_lineage.py` | **Absorbed + consumed** — canonical lineage schema, validation, and truth inheritance rules; platform `primary_line_status.py` normalizes/validates catalog lineage |
 | R17 | Per-model runtime truth schema | R | `owlmlx/model_inventory.py` | **Absorbed + consumed** — model inventory schema + pure budget/health derivation; platform fills snapshots and keeps transport/probes |
 | R18 | Cache truth contract | R | `llm_router/distilled_cache_substrate.py` | **To absorb** (generalized contract shell) |
 | R19 | Gemma production mainline identity | R | owlmlx docs | Already owned |
@@ -176,13 +176,13 @@ managed.
 | Model | Runtime | Lifecycle State | Special Treatment |
 |---|---|---|---|
 | Distilled-27B (MLX-4bit) | oMLX | Stable (primary default) | Cache substrate (Gap 5) |
-| Distilled-27B (Q4_K_M GGUF) | llama.cpp | Backup | Conversion lineage (R16) |
+| Distilled-27B (Q4_K_M GGUF) | llama.cpp | Backup | Conversion lineage consumed via R16 |
 | Qwen3.5-35B-A3B-4bit | oMLX | Stable (fast general) | None |
 | Mistral-Large Q4-MLX | oMLX | Stable (alternate) | None |
 | MiroThinker-1.7 Q8 | Kimi engine | Stable (search scout) | Lab engine |
 
 These models are platform-managed. owlmlx provides: (a) runtime truth schema
-they conform to, (b) lineage schema (R16, to absorb). Lifecycle state
+they conform to, (b) lineage schema (R16, absorbed + consumed). Lifecycle state
 definitions (R15) remain platform-owned — product classification, not
 runtime truth. The platform manages their catalog placement, routing,
 lifecycle gates, and product surface.
