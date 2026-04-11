@@ -68,7 +68,7 @@ Capability labels:
 |---|---|---|
 | Generalized foreground-interactive runtime | experimental | Not yet established as current truth |
 | Additional runtime paths beyond large-weight | experimental | Future only when real capability truth exists |
-| Real MLX model load/generate through owlmlx | experimental | `MlxLmBackend` exists, `MlxLmSubprocessBackend` isolates real load/generate in child processes; real local model smoke is still blocked by MLX/Metal child import failure in current environment |
+| Real MLX model load/generate through owlmlx | partial | `MlxLmSubprocessBackend` has a real successful local smoke on `gpt-oss-20b-MXFP4-Q4` through the clean `.runtime1-mlx` environment; broader model coverage is not yet established |
 | Overflow / NVMe-tier execution path | experimental | Future candidate only; Hypura recorded as external reference in `hypura-overflow-path-reference.md`, not adopted |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction; Gemma has moved to production mainline instead |
 | `gemma-4-31B-it` as production mainline | supported | Production mainline frozen; pilot LoRA PASS; substrate contracts exercised end-to-end |

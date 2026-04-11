@@ -106,8 +106,12 @@ owlmlx 实际占据的位置：Layer 2 最小 kernel + truth substrate。还不�
 
 | # | 能力 | 现状 | 为什么需要 |
 |---|---|---|---|
-| 1 | **Safe real MLX model loader** | mlx-lm adapter 调用路径存在；真实 load/generate 已移入子进程 runner；真实模型加载未通过 | Runtime-1 必须证明真实权重加载且不崩父进程 |
-| 2 | **Safe real inference engine** | Fake completion + 子进程 mlx-lm runner；真实 generate 未通过 | Runtime-1 必须证明真实 completion 且不崩父进程 |
+| 1 | **Safe real MLX model loader** | mlx-lm adapter 调用路径存在；真实 load/generate 已移入子进程 runner；clean `.runtime1-mlx` 已通过 import probe，`gpt-oss-20b` 首次真实 smoke 已通过 | 下一步要验证更多本地模型，而不是停留在单个成功样本 |
+| 2 | **Safe real inference engine** | Fake completion + 子进程 mlx-lm runner；`gpt-oss-20b` 已完成真实 completion | 下一步要扩大真实 completion 覆盖面并稳定 child lifecycle |
+| 3 | **Production HTTP server** | Runtime-0 最小 FastAPI app | 需要错误码、流式输出、配置、部署入口 |
+| 4 | **Memory controller** | load 前预算检查 + inventory | 要能主动 load/unload/evict/reclaim |
+| 5 | **Self-introspection** | kernel status 可自推导，真实 backend probe 未完成 | runtime 要能 probe 自己的真实 backend |
+| 6 | **Process lifecycle** | 不存在 | 要能启动、停止、restart |
 
 Runtime-1 当前的运行纪律已经明确：
 
@@ -115,10 +119,6 @@ Runtime-1 当前的运行纪律已经明确：
 - 默认环境探测只检查当前解释器
 - 已知危险 MLX venv 只能显式 opt-in 诊断
 - 环境问题要报告成结构化失败，不允许用默认诊断制造重复崩溃
-| 3 | **Production HTTP server** | Runtime-0 最小 FastAPI app | 需要错误码、流式输出、配置、部署入口 |
-| 4 | **Memory controller** | load 前预算检查 + inventory | 要能主动 load/unload/evict/reclaim |
-| 5 | **Self-introspection** | kernel status 可自推导，真实 backend probe 未完成 | runtime 要能 probe 自己的真实 backend |
-| 6 | **Process lifecycle** | 不存在 | 要能启动、停止、restart |
 
 ### 4.2 已经完成的（truth library 价值）
 

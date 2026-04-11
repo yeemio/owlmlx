@@ -137,10 +137,13 @@ Runtime-0 does not claim:
 Runtime-1 should verify a real MLX model load/generate path through
 `MlxLmBackend` using a local model small enough for safe smoke testing.
 
-Current Runtime-1 state: parent-safe subprocess runner exists. Real local model
-smoke is still blocked by MLX/Metal import failure in child processes on the
-current environment. The parent runtime now receives structured subprocess
-failure instead of crashing.
+Current Runtime-1 state:
+
+- parent-safe subprocess runner exists
+- clean-room environment `.runtime1-mlx` can import `mlx_lm 0.31.2`
+- first real local smoke has passed on
+  `/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4`
+- real subprocess generate completed successfully in about `12.07s`
 
 Runtime-1 now also has explicit environment selection discipline:
 
@@ -149,5 +152,9 @@ Runtime-1 now also has explicit environment selection discipline:
 - this avoids default diagnostics triggering repeated child-process aborts on
   environments already known to crash during `import mlx_lm`
 
-Runtime-1 should not start with Kimi 1T, 120B, or Gemma 31B. The next gap is
-safe real adapter execution, not large-model productization.
+Runtime-1 should not jump straight to Kimi 1T, 120B, or Gemma 31B. The next gap
+is widening real-model coverage and turning subprocess success from one proven
+path into a stable baseline.
+
+The current environment truth is frozen separately in
+`runtime1-environment-diagnostics.md`.
