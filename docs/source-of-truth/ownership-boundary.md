@@ -39,7 +39,7 @@ runtime truth must have exactly one truth owner.
 | R9 | Hazardous-operation governance | R | owlmlx docs | Already owned (doc-only) |
 | R10 | Safe-resume contract | R | owlmlx docs | Already owned (doc-only) |
 | R11 | Abort recovery state machine | R | `llm_router/abort_recovery.py` | **To absorb** |
-| R12 | Context concurrency boundary definitions | R | `llm_router/context_concurrency_policy.py` | **To absorb** |
+| R12 | Context concurrency boundary definitions | R | `owlmlx/context_concurrency.py` | **Absorbed** (serving-path) |
 | R13 | Memory budget definition and calculation | R | `owlmlx/memory_budget.py` | **Absorbed** (serving-path) |
 | R14 | Runtime health semantic tiers | R | `ops_dashboard/metrics.py` + `health.py` | **To absorb** |
 | R15 | Model lifecycle state definitions | R | `model-lifecycle-and-upgrade-gate.md` | **To absorb** (states + transition rules only) |

@@ -27,7 +27,8 @@ Capability labels:
 | Training substrate contract (environment, stack, boundary) | supported | Frozen in training-substrate-contract.md; MLX native primary, PyTorch fallback |
 | Training architecture verification rule | supported | Model must pass 5-step LoRA pilot before entering substrate |
 | Serving-path memory budget truth | supported | `owlmlx/memory_budget.py` — MachineMemoryProfile, evaluate_model_fit, budget_snapshot with 32 tests; pure serving-path budget truth |
-| Fully self-owned implementation stack | partial | Five Python modules exist (schema validation + generation gate + serving status + memory budget); lifecycle implementation remains outside owlmlx |
+| Serving-path context concurrency truth | supported | `owlmlx/context_concurrency.py` — CONCURRENCY_GATE, max_concurrency_for_context, gate_entry_for_context, is_high_context, concurrency_gate_snapshot with 34 tests; pure serving-path boundary truth |
+| Fully self-owned implementation stack | partial | Six Python modules exist (schema validation + generation gate + serving status + memory budget + context concurrency); lifecycle implementation remains outside owlmlx |
 | Queue-based generation gate (owlmlx-owned) | supported | `owlmlx/serving.py` — GenerationGate class with 11 tests; enforces validated concurrency boundary |
 | Formal adoption model (reuse open-source, own truth layer) | supported | Adoption rule frozen in product-definition section 6 |
 | Extraction discipline with wave ordering | supported | Discipline rules frozen in extraction-inventory section 3 |

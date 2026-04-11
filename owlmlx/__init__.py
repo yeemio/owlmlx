@@ -1,5 +1,14 @@
 """owlmlx runtime helpers."""
 
+from .context_concurrency import (
+    CONCURRENCY_GATE,
+    HIGH_CONTEXT_THRESHOLD_TOKENS,
+    ConcurrencyGateEntry,
+    concurrency_gate_snapshot,
+    gate_entry_for_context,
+    is_high_context,
+    max_concurrency_for_context,
+)
 from .memory_budget import (
     BudgetEvaluation,
     BudgetVerdict,
@@ -51,12 +60,19 @@ __all__ = [
     "BLOCKED",
     "BudgetEvaluation",
     "BudgetVerdict",
+    "CONCURRENCY_GATE",
+    "ConcurrencyGateEntry",
+    "concurrency_gate_snapshot",
     "default_machine_profile",
     "default_owlmlx_repo",
     "evaluate_model_fit",
     "budget_snapshot",
+    "gate_entry_for_context",
     "GenerationGate",
     "GenerationResult",
+    "HIGH_CONTEXT_THRESHOLD_TOKENS",
+    "is_high_context",
+    "max_concurrency_for_context",
     "MachineMemoryProfile",
     "MANUAL_ONLY",
     "MAX_GENERATION_CONCURRENCY",
