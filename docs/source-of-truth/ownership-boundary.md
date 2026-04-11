@@ -3,7 +3,7 @@
 > Status: authoritative
 > Updated: 2026-04-10
 > Program: owlmlx-platform-capability-absorption-and-convergence
-> Round: 2
+> Round: 6
 
 ## 1. Purpose
 
@@ -38,7 +38,7 @@ runtime truth must have exactly one truth owner.
 | R8 | Memory governance principles | R | owlmlx docs | Already owned (doc-only) |
 | R9 | Hazardous-operation governance | R | owlmlx docs | Already owned (doc-only) |
 | R10 | Safe-resume contract | R | owlmlx docs | Already owned (doc-only) |
-| R11 | Abort recovery state machine | R | `llm_router/abort_recovery.py` | **To absorb** |
+| R11 | Abort recovery state machine | R | `owlmlx/abort_recovery.py` | **Absorbed** (serving-path) |
 | R12 | Context concurrency boundary definitions | R | `owlmlx/context_concurrency.py` | **Absorbed** (serving-path) |
 | R13 | Memory budget definition and calculation | R | `owlmlx/memory_budget.py` | **Absorbed** (serving-path) |
 | R14 | Runtime health semantic tiers | R | `ops_dashboard/metrics.py` + `health.py` | **To absorb** |

@@ -1,5 +1,12 @@
 """owlmlx runtime helpers."""
 
+from .abort_recovery import (
+    MAX_ABORT_HISTORY,
+    SNAPSHOT_RECENT_ABORTS,
+    AbortEvent,
+    AbortRecoveryTracker,
+    SubstrateState,
+)
 from .context_concurrency import (
     CONCURRENCY_GATE,
     HIGH_CONTEXT_THRESHOLD_TOKENS,
@@ -53,6 +60,8 @@ from .training import (
 )
 
 __all__ = [
+    "AbortEvent",
+    "AbortRecoveryTracker",
     "ALLOWED_CAPABILITY_LABELS",
     "ARTIFACT_METADATA_VERSION",
     "ARTIFACT_STATUSES",
@@ -72,12 +81,15 @@ __all__ = [
     "GenerationResult",
     "HIGH_CONTEXT_THRESHOLD_TOKENS",
     "is_high_context",
+    "MAX_ABORT_HISTORY",
     "max_concurrency_for_context",
     "MachineMemoryProfile",
     "MANUAL_ONLY",
     "MAX_GENERATION_CONCURRENCY",
     "PARTIAL",
     "SERVING_FEASIBILITY_VALUES",
+    "SNAPSHOT_RECENT_ABORTS",
+    "SubstrateState",
     "SUPPORTED",
     "TRAINING_METHODS",
     "UNSUPPORTED",

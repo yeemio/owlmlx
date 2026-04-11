@@ -28,7 +28,8 @@ Capability labels:
 | Training architecture verification rule | supported | Model must pass 5-step LoRA pilot before entering substrate |
 | Serving-path memory budget truth | supported | `owlmlx/memory_budget.py` — MachineMemoryProfile, evaluate_model_fit, budget_snapshot with 32 tests; pure serving-path budget truth |
 | Serving-path context concurrency truth | supported | `owlmlx/context_concurrency.py` — CONCURRENCY_GATE, max_concurrency_for_context, gate_entry_for_context, is_high_context, concurrency_gate_snapshot with 34 tests; pure serving-path boundary truth |
-| Fully self-owned implementation stack | partial | Six Python modules exist (schema validation + generation gate + serving status + memory budget + context concurrency); lifecycle implementation remains outside owlmlx |
+| Serving-path abort recovery state machine | supported | `owlmlx/abort_recovery.py` — SubstrateState, AbortEvent, AbortRecoveryTracker with 31 tests; deterministic state machine for substrate health after high-context aborts |
+| Fully self-owned implementation stack | partial | Seven Python modules exist (schema validation + generation gate + serving status + memory budget + context concurrency + abort recovery); lifecycle implementation remains outside owlmlx |
 | Queue-based generation gate (owlmlx-owned) | supported | `owlmlx/serving.py` — GenerationGate class with 11 tests; enforces validated concurrency boundary |
 | Formal adoption model (reuse open-source, own truth layer) | supported | Adoption rule frozen in product-definition section 6 |
 | Extraction discipline with wave ordering | supported | Discipline rules frozen in extraction-inventory section 3 |
@@ -62,12 +63,14 @@ Capability labels:
 |---|---|---|
 | Generalized foreground-interactive runtime | experimental | Not yet established as current truth |
 | Additional runtime paths beyond large-weight | experimental | Future only when real capability truth exists |
+| Overflow / NVMe-tier execution path | experimental | Future candidate only; Hypura recorded as external reference in `hypura-overflow-path-reference.md`, not adopted |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction; Gemma has moved to production mainline instead |
 | `gemma-4-31B-it` as production mainline | supported | Production mainline frozen; pilot LoRA PASS; substrate contracts exercised end-to-end |
 | Platform capability absorption inventory | supported | Gap-driven inventory frozen; 8 gaps identified, 14 non-candidates excluded |
 | Fully internalized replacements for all external runtime mechanisms | partial | Directional goal, not current fact |
 | Full-rewrite of every execution layer | not in scope | Adoption model explicitly rejects this as unnecessary |
 | External runtime features observed but not adopted | not in scope | External reference is not `owlmlx` support |
+| Hypura as an adopted owlmlx backend | not in scope | Current label is external-reference / future-overflow-path-candidate |
 | `Kimi` as permanent name for the whole path | not in scope | Explicitly rejected |
 
 ## 5. Product-Layer Relationship

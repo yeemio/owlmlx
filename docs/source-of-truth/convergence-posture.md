@@ -3,7 +3,7 @@
 > Status: authoritative
 > Updated: 2026-04-10
 > Program: owlmlx-platform-capability-absorption-and-convergence
-> Round: 5
+> Round: 6
 
 ## 1. Purpose
 
@@ -40,7 +40,7 @@ and what should happen next.
 
 | Area | owlmlx Side | Platform Side | Why Still Separate |
 |---|---|---|---|
-| Substrate boundaries | Abort recovery documented as owlmlx-owned (R11); memory budget (R13) and context concurrency (R12) absorbed | Abort recovery code still in router | Two of three substrate boundaries absorbed; abort recovery remains |
+| Substrate boundaries | All three substrate boundaries absorbed: memory budget (R13), context concurrency (R12), abort recovery (R11) | Platform still has original code | **Substrate trio complete**; platform modules can now delegate to owlmlx |
 | Runtime health semantics | Schema validation only | 5-tier load_state, 4-level inference health in metrics.py | Larger scope; second-wave |
 | Model lifecycle states | Ownership assigned (R15) | State machine lives in lifecycle.py + docs | Split absorption needed |
 | Per-model runtime truth | Status schema exists | Endpoint logic in router app.py | Schema extracted; transport stays |
@@ -52,9 +52,9 @@ and what should happen next.
 | Metric | Score |
 |---|---|
 | Capabilities with assigned truth owner | **46/46** (100%) |
-| owlmlx-owned capabilities with code | **6/19** (32%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency |
+| owlmlx-owned capabilities with code | **7/19** (37%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency, abort_recovery |
 | owlmlx-owned capabilities as doc-only | **6/19** (32%) — governance, hazardous-ops, safe-resume, training contracts |
-| owlmlx-owned capabilities to absorb | **7/19** (37%) — Gaps 1, 5-8 from inventory (Gap 3 context concurrency + Gap 4 memory budget absorbed) |
+| owlmlx-owned capabilities to absorb | **6/19** (32%) — Gaps 1, 5-8 from inventory (Gaps 2+3+4 substrate trio fully absorbed) |
 | Model lines with formal placement | **6/6** (100%) |
 | Platform capabilities with clear non-absorption reasoning | **14/14** (100%) |
 
