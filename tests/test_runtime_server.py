@@ -361,6 +361,64 @@ def test_anthropic_messages_accept_assistant_tool_use_blocks() -> None:
     assert "[tool_use:toolu_abc] read_file" in text
 
 
+def test_anthropic_messages_non_stream_can_return_tool_use_blocks() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-a",
+            "messages": [{"role": "user", "content": "inspect files"}],
+            "max_tokens": 4,
+            "tools": [
+                {
+                    "name": "read_file",
+                    "description": "Read a file",
+                    "input_schema": {"type": "object"},
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["stop_reason"] == "tool_use"
+    assert payload["content"][0]["type"] == "tool_use"
+    assert payload["content"][0]["name"] == "read_file"
+    assert payload["content"][0]["id"] == "toolu_fake_001"
+
+
+def test_anthropic_messages_stream_can_return_tool_use_events() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    with client.stream(
+        "POST",
+        "/v1/messages",
+        json={
+            "model": "fake-a",
+            "messages": [{"role": "user", "content": "inspect files"}],
+            "max_tokens": 4,
+            "stream": True,
+            "tools": [
+                {
+                    "name": "read_file",
+                    "description": "Read a file",
+                    "input_schema": {"type": "object"},
+                }
+            ],
+        },
+    ) as response:
+        assert response.status_code == 200
+        chunks = [line for line in response.iter_lines() if line]
+
+    assert "event: message_start" in chunks
+    assert "event: content_block_start" in chunks
+    assert any('"type": "tool_use"' in line or '"type":"tool_use"' in line for line in chunks)
+    assert any('"stop_reason": "tool_use"' in line or '"stop_reason":"tool_use"' in line for line in chunks)
+
+
 def test_openai_models_lists_loaded_models() -> None:
     client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
     client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})

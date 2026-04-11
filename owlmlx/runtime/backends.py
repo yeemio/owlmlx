@@ -126,6 +126,31 @@ class FakeBackend:
             )
         if self.generate_delay_s > 0:
             time.sleep(self.generate_delay_s)
+        tools = kwargs.get("tools")
+        tool_choice = kwargs.get("tool_choice")
+        if isinstance(tools, list) and tools and tool_choice != "none":
+            first = tools[0]
+            if isinstance(first, dict):
+                name = str(first.get("name") or "tool")
+                tool_use_id = "toolu_fake_001"
+                return GenerateResult(
+                    ok=True,
+                    message="generated tool_use",
+                    model_id=model_id,
+                    text="",
+                    finish_reason="tool_use",
+                    prompt_tokens=len(prompt.split()),
+                    completion_tokens=0,
+                    detail={
+                        "tool_uses": [
+                            {
+                                "id": tool_use_id,
+                                "name": name,
+                                "input": {"prompt": prompt},
+                            }
+                        ]
+                    },
+                )
         max_tokens = kwargs.get("max_tokens")
         token_note = f" max_tokens={max_tokens}" if max_tokens is not None else ""
         return GenerateResult(
@@ -133,6 +158,7 @@ class FakeBackend:
             message="generated",
             model_id=model_id,
             text=f"{prompt}{self.completion_suffix}{token_note}",
+            finish_reason="stop",
             prompt_tokens=len(prompt.split()),
             completion_tokens=len(self.completion_suffix.split()),
         )
@@ -155,6 +181,27 @@ class FakeBackend:
                     error_code=result.error_code,
                     detail={"message": result.message, **result.detail},
                 )
+            ]
+        tool_uses = result.detail.get("tool_uses")
+        if isinstance(tool_uses, list) and tool_uses:
+            tool = tool_uses[0]
+            return [
+                StreamEvent(
+                    event="tool_use",
+                    model_id=model_id,
+                    finish_reason="tool_use",
+                    prompt_tokens=result.prompt_tokens,
+                    completion_tokens=0,
+                    detail={"tool_use": tool},
+                ),
+                StreamEvent(
+                    event="done",
+                    model_id=model_id,
+                    finish_reason="tool_use",
+                    prompt_tokens=result.prompt_tokens,
+                    completion_tokens=0,
+                    detail={"tool_use": tool},
+                ),
             ]
         words = result.text.split()
         if not words:
@@ -180,6 +227,7 @@ class FakeBackend:
                     sequence=idx,
                     prompt_tokens=result.prompt_tokens,
                     completion_tokens=idx,
+                    finish_reason=result.finish_reason,
                 )
             )
         events.append(
@@ -187,10 +235,10 @@ class FakeBackend:
                 event="done",
                 model_id=model_id,
                 text=result.text,
-                finish_reason="stop",
                 sequence=len(words),
                 prompt_tokens=result.prompt_tokens,
                 completion_tokens=result.completion_tokens,
+                finish_reason=result.finish_reason or "stop",
             )
         )
         return events

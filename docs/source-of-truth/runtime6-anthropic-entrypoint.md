@@ -52,6 +52,15 @@ These are currently flattened into runtime-native message text before backend
 execution. This is an input-side cutover seam, not a claim of full tool
 protocol parity.
 
+Runtime-6 now also has a minimal output-side `tool_use` seam:
+
+- Anthropic requests may include `tools`
+- the runtime surface can now return `tool_use` blocks from `/v1/messages`
+- Anthropic streaming can now emit `tool_use`-shaped `content_block_start`
+  followed by `message_delta.stop_reason = tool_use`
+
+This currently proves protocol shape, not full backend tool reasoning parity.
+
 ## 3. Architecture Truth
 
 Runtime-6 does not reintroduce the old server-layer prompt hack.
@@ -71,7 +80,7 @@ path, not bolted on as a separate translation-only path.
 
 Runtime-6 does not yet claim:
 
-- tool_use output parity
+- full tool_use output parity across real backends
 - true tool_result semantic execution parity
 - thinking block parity
 - full Claude / Anthropic beta surface

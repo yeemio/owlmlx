@@ -62,6 +62,12 @@ class AnthropicInputMessage(BaseModel):
     content: str | list[AnthropicTextBlock | AnthropicToolUseInputBlock | AnthropicToolResultInputBlock]
 
 
+class AnthropicToolDef(BaseModel):
+    name: str
+    description: str | None = None
+    input_schema: dict[str, Any] = Field(default_factory=dict)
+
+
 class CompletionRequest(BaseModel):
     model: str | None = Field(default=None, min_length=1)
     prompt: str = Field(min_length=1)
@@ -85,6 +91,8 @@ class AnthropicMessagesRequest(BaseModel):
     temperature: float | None = None
     system: str | None = None
     stream: bool = False
+    tools: list[AnthropicToolDef] = Field(default_factory=list)
+    tool_choice: str | dict[str, Any] | None = None
 
 
 class UnloadRequest(BaseModel):
@@ -450,6 +458,10 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
             params["max_tokens"] = payload.max_tokens
         if payload.temperature is not None:
             params["temperature"] = payload.temperature
+        if payload.tools:
+            params["tools"] = [tool.model_dump() for tool in payload.tools]
+        if payload.tool_choice is not None:
+            params["tool_choice"] = payload.tool_choice
         input_tokens = _estimate_input_tokens_from_turns(turns)
 
         if not payload.stream:
@@ -464,13 +476,30 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
                 )
             return JSONResponse(
                 headers={"x-request-id": request_id},
-                content=_anthropic_message_dict(
-                    message_id=message_id,
-                    model=target_model or "unknown",
-                    text=result.text,
-                    stop_reason="end_turn",
-                    input_tokens=result.prompt_tokens or input_tokens,
-                    output_tokens=result.completion_tokens,
+                content=(
+                    {
+                        **_anthropic_message_dict(
+                            message_id=message_id,
+                            model=target_model or "unknown",
+                            text=result.text,
+                            stop_reason="tool_use" if result.finish_reason == "tool_use" else "end_turn",
+                            input_tokens=result.prompt_tokens or input_tokens,
+                            output_tokens=result.completion_tokens,
+                        ),
+                        "content": (
+                            [
+                                {
+                                    "type": "tool_use",
+                                    "id": tool["id"],
+                                    "name": tool["name"],
+                                    "input": tool["input"],
+                                }
+                                for tool in result.detail.get("tool_uses", [])
+                            ]
+                            if result.finish_reason == "tool_use"
+                            else [{"type": "text", "text": result.text}]
+                        ),
+                    }
                 ),
             )
 
@@ -497,11 +526,27 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
                     }
                     yield f"event: content_block_delta\ndata: {json.dumps(chunk)}\n\n"
                     continue
-                if event.event == "done":
+                if event.event == "tool_use":
+                    tool = dict(event.detail.get("tool_use") or {})
+                    start = {
+                        "type": "content_block_start",
+                        "index": 0,
+                        "content_block": {
+                            "type": "tool_use",
+                            "id": tool.get("id"),
+                            "name": tool.get("name"),
+                            "input": tool.get("input") or {},
+                        },
+                    }
+                    yield f"event: content_block_start\ndata: {json.dumps(start)}\n\n"
                     yield "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+                    continue
+                if event.event == "done":
+                    if event.finish_reason != "tool_use":
+                        yield "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
                     message_delta = {
                         "type": "message_delta",
-                        "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                        "delta": {"stop_reason": "tool_use" if event.finish_reason == "tool_use" else "end_turn", "stop_sequence": None},
                         "usage": {"output_tokens": int(event.completion_tokens or 0)},
                     }
                     yield f"event: message_delta\ndata: {json.dumps(message_delta)}\n\n"

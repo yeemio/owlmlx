@@ -75,6 +75,7 @@ class GenerateResult(RuntimeOperationResult):
 
     model_id: str | None = None
     text: str = ""
+    finish_reason: str | None = None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     wait_time_s: float | None = None
