@@ -201,5 +201,8 @@ The next dominant gap is Runtime-2 reliability hardening beyond the backend:
 explicit restart semantics in the HTTP/runtime surface, persistent child SLOs,
 and fair comparison benchmarks against the old platform.
 
+The benchmark truth is frozen separately in
+`runtime2-benchmark-baseline.md`.
+
 The current environment truth is frozen separately in
 `runtime1-environment-diagnostics.md`.

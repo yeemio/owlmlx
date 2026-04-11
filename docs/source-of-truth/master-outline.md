@@ -1,7 +1,7 @@
 # owlmlx Master Outline
 
 > Status: authoritative outline
-> Updated: 2026-04-10
+> Updated: 2026-04-11
 
 ## 1. What `owlmlx` Is
 
@@ -44,34 +44,37 @@ These are runtime-level goals, not temporary integration work.
 ## 5. Core Documents
 
 1. `master-outline.md`
-2. `product-definition.md`
-3. `system-architecture.md`
-4. `repository-boundaries.md`
-5. `runtime-capability-matrix.md`
-6. `runtime-contracts.md`
-7. `runtime-status-schema.md`
-8. `runtime-governance.md`
-9. `hazardous-operations.md`
-10. `rename-strategy.md`
-11. `contract-mapping.md`
-12. `runtime-contract-adoption-plan.md`
-13. `extraction-inventory.md`
-14. `autonomous-loop-discipline.md`
-15. `large-weight-path-truth.md`
-16. `roadmap.md`
-17. `gemma-high-fidelity-role.md`
-18. `training-substrate-contract.md`
-19. `artifact-layout-contract.md`
-20. `training-to-serving-contract.md`
-21. `capability-absorption-inventory.md`
-22. `ownership-boundary.md`
-23. `model-line-placement.md`
-24. `first-absorption-target.md`
-25. `convergence-posture.md`
-26. `hypura-overflow-path-reference.md`
-27. `model-lineage-schema.md`
-28. `cache-truth-contract.md`
-29. `runtime-kernel-mvp.md`
+2. `ARCHITECTURE-TRUTH.md`
+3. `product-definition.md`
+4. `system-architecture.md`
+5. `repository-boundaries.md`
+6. `runtime-capability-matrix.md`
+7. `runtime-kernel-mvp.md`
+8. `runtime2-benchmark-baseline.md`
+9. `runtime1-environment-diagnostics.md`
+10. `runtime-contracts.md`
+11. `runtime-status-schema.md`
+12. `runtime-governance.md`
+13. `hazardous-operations.md`
+14. `rename-strategy.md`
+15. `contract-mapping.md`
+16. `runtime-contract-adoption-plan.md`
+17. `extraction-inventory.md`
+18. `autonomous-loop-discipline.md`
+19. `large-weight-path-truth.md`
+20. `roadmap.md`
+21. `gemma-high-fidelity-role.md`
+22. `training-substrate-contract.md`
+23. `artifact-layout-contract.md`
+24. `training-to-serving-contract.md`
+25. `capability-absorption-inventory.md`
+26. `ownership-boundary.md`
+27. `model-line-placement.md`
+28. `first-absorption-target.md`
+29. `convergence-posture.md`
+30. `hypura-overflow-path-reference.md`
+31. `model-lineage-schema.md`
+32. `cache-truth-contract.md`
 
 ## 6. Adoption Model
 
@@ -95,17 +98,16 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-The training-and-production program is complete. The platform capability
-absorption and convergence program is now in progress. The current question is:
+The schema-extraction mainline is no longer the dominant path. The current
+question is:
 
-**Which mature capabilities from the original local LLM platform should owlmlx
-absorb as runtime-owned truth, which must stay in the platform control-plane or
-shell layers, and how do we prevent owlmlx from becoming a parallel system?**
+**How does owlmlx complete Runtime-2 from a working persistent child kernel into
+a reliable runtime surface with explicit health, restart, and benchmark truth?**
 
 Concrete sub-questions:
 
-1. Where is the ownership boundary between owlmlx (runtime truth) and the
-   platform (control-plane, routing, product entry)?
-2. How do Gemma, Kimi 1T, gpt-oss-120b, and other model lines sit in the
-   unified architecture?
-3. Which remaining absorption target should follow R18 cache truth?
+1. How should child health and restart semantics appear at the runtime/API
+   surface, not just inside backend internals?
+2. What is the honest steady-state performance baseline for persistent child
+   serving on this machine?
+3. Which Runtime-2 reliability gaps remain before Runtime-3 should begin?

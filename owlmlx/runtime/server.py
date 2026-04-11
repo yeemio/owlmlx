@@ -1,4 +1,4 @@
-"""Minimal HTTP entry for owlmlx Runtime-0."""
+"""Minimal HTTP entry for owlmlx runtime."""
 
 from __future__ import annotations
 
@@ -45,17 +45,21 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
     """Create a minimal owlmlx runtime HTTP app."""
 
     runtime = kernel if kernel is not None else RuntimeKernel(FakeBackend())
-    app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime0")
+    app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime2")
     app.state.kernel = runtime
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
         status = runtime.status_dict()
+        backend_detail = status["backend"]["detail"]
         return {
             "ok": status["backend"]["healthy"],
             "readiness": status["health"]["readiness"],
             "active_model_id": status["active_model_id"],
             "model_count": status["inventory"]["model_count"],
+            "backend_error": backend_detail.get("last_error"),
+            "persistent_child": backend_detail.get("persistent_child", False),
+            "child_health": backend_detail.get("child_health", {}),
         }
 
     @app.post("/v1/load")
@@ -82,8 +86,14 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
             "active_model_id": status["active_model_id"],
             "inventory": status["inventory"],
             "budget": status["budget"],
+            "health": status["health"],
+            "generation_gate": status["generation_gate"],
             "backend": status["backend"],
         }
+
+    @app.get("/v1/runtime/status")
+    def runtime_status() -> dict[str, Any]:
+        return runtime.status_dict()
 
     @app.post("/v1/unload")
     def unload_model(payload: UnloadRequest) -> dict[str, Any]:

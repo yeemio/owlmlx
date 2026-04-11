@@ -26,6 +26,8 @@ def test_healthz_uses_kernel_status() -> None:
     assert payload["ok"] is True
     assert payload["readiness"] == "degraded"
     assert payload["model_count"] == 0
+    assert payload["persistent_child"] is False
+    assert payload["child_health"] == {}
 
 
 def test_load_generate_models_unload_roundtrip() -> None:
@@ -39,6 +41,8 @@ def test_load_generate_models_unload_roundtrip() -> None:
     assert models.status_code == 200
     assert models.json()["active_model_id"] == "fake-a"
     assert models.json()["inventory"]["model_count"] == 1
+    assert models.json()["health"]["readiness"] == "ready"
+    assert models.json()["generation_gate"]["max_concurrent"] == 1
 
     generated = client.post(
         "/v1/generate",
@@ -111,3 +115,17 @@ def test_load_rejects_negative_memory_validation() -> None:
     response = client.post("/v1/load", json={"model_id": "bad", "memory_gb": -1.0})
 
     assert response.status_code == 422
+
+
+def test_runtime_status_returns_full_kernel_snapshot() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.get("/v1/runtime/status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["active_model_id"] == "fake-a"
+    assert payload["backend"]["backend_name"] == "fake"
+    assert payload["inventory"]["model_count"] == 1
+    assert payload["health"]["readiness"] == "ready"
