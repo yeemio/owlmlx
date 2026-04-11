@@ -230,6 +230,7 @@ R11-R18 的价值：给 RuntimeKernel 准备了判断层。
 Truth substrate readiness:  11 truth modules, 340 tests, 7 platform consumers ✓
 Runtime executability:      Runtime-0 MVP ✓ → Runtime-1 真实模型验证 ✓ → Runtime-2 persistent child ✓
 Runtime serving surface:    Runtime-3 restart/status/streaming surface ✓
+Runtime migration seam:     Runtime-4 chat/completions + SSE + model discovery ✓
 Subprocess isolation:       父进程永不 import mlx_lm，子进程 abort → 结构化错误 ✓
 Real local smoke baseline:  gpt-oss-20b + Qwen3.5-27B + Qwen3.5-35B-A3B 通过 ✓
 Persistent child proof:     gpt-oss-20b / Qwen3.5-27B 同一 pid 连续 generate 通过 ✓

@@ -2,7 +2,7 @@
 
 > Status: authoritative
 > Updated: 2026-04-11
-> Scope: Runtime-4 first delivery — transport semantics hardening and platform-facing API seam
+> Scope: Runtime-4 transport semantics hardening and platform-facing API seam
 
 ## 1. Purpose
 
@@ -12,9 +12,10 @@ Runtime-4 starts where Runtime-3 ended:
   same-model comparison truth
 - Runtime-4 begins the move toward a more deployable serving runtime
 
-This first Runtime-4 delivery adds:
+Runtime-4 adds:
 
 - OpenAI-style `chat/completions` compatibility surface
+- OpenAI-style model discovery seam
 - explicit SSE transport for streaming compatibility
 - backend reliability-path consolidation for persistent child sessions
 
@@ -23,6 +24,7 @@ This first Runtime-4 delivery adds:
 New endpoint:
 
 - `POST /v1/chat/completions`
+- `GET /v1/openai/models`
 
 Supported modes:
 
@@ -30,6 +32,12 @@ Supported modes:
 |---|---|---|
 | non-stream | JSON | minimal OpenAI-style chat completion response |
 | stream | SSE | `text/event-stream` with `data:` chunks and terminal `[DONE]` |
+
+Model discovery:
+
+| Path | Meaning |
+|---|---|
+| `GET /v1/openai/models` | migration seam exposing currently loaded models in OpenAI-style list shape |
 
 This is a migration seam, not a full OpenAI server.
 
@@ -42,6 +50,8 @@ Runtime-4 currently supports:
 - `max_tokens`
 - `temperature`
 - `stream`
+- request-id response headers on compatibility endpoints
+- OpenAI-style HTTP status/error object on `chat/completions` failures
 
 Runtime-4 does not yet claim support for:
 
@@ -71,6 +81,7 @@ Runtime-4 truth:
 This is the first direct platform-facing migration seam in owlmlx runtime:
 
 - upper layers can target a familiar `chat/completions` shape
+- upper layers can discover loaded models through a familiar list shape
 - streaming transport is no longer only owlmlx-specific NDJSON
 - migration can begin without forcing full platform rewrite on day one
 
@@ -82,4 +93,4 @@ This document does not claim:
 - production auth / rate limiting / tracing
 - tools / function calling support
 - platform migration is complete
-- Runtime-4 is complete
+- Runtime-5 is complete

@@ -54,29 +54,30 @@ These are runtime-level goals, not temporary integration work.
 9. `runtime1-environment-diagnostics.md`
 10. `runtime3-serving-surface.md`
 11. `runtime3-benchmark-and-streaming.md`
-12. `runtime-contracts.md`
-13. `runtime-status-schema.md`
-14. `runtime-governance.md`
-15. `hazardous-operations.md`
-16. `rename-strategy.md`
-17. `contract-mapping.md`
-18. `runtime-contract-adoption-plan.md`
-19. `extraction-inventory.md`
-20. `autonomous-loop-discipline.md`
-21. `large-weight-path-truth.md`
-22. `roadmap.md`
-23. `gemma-high-fidelity-role.md`
-24. `training-substrate-contract.md`
-25. `artifact-layout-contract.md`
-26. `training-to-serving-contract.md`
-27. `capability-absorption-inventory.md`
-28. `ownership-boundary.md`
-29. `model-line-placement.md`
-30. `first-absorption-target.md`
-31. `convergence-posture.md`
-32. `hypura-overflow-path-reference.md`
-33. `model-lineage-schema.md`
-34. `cache-truth-contract.md`
+12. `runtime4-transport-and-migration.md`
+13. `runtime-contracts.md`
+14. `runtime-status-schema.md`
+15. `runtime-governance.md`
+16. `hazardous-operations.md`
+17. `rename-strategy.md`
+18. `contract-mapping.md`
+19. `runtime-contract-adoption-plan.md`
+20. `extraction-inventory.md`
+21. `autonomous-loop-discipline.md`
+22. `large-weight-path-truth.md`
+23. `roadmap.md`
+24. `gemma-high-fidelity-role.md`
+25. `training-substrate-contract.md`
+26. `artifact-layout-contract.md`
+27. `training-to-serving-contract.md`
+28. `capability-absorption-inventory.md`
+29. `ownership-boundary.md`
+30. `model-line-placement.md`
+31. `first-absorption-target.md`
+32. `convergence-posture.md`
+33. `hypura-overflow-path-reference.md`
+34. `model-lineage-schema.md`
+35. `cache-truth-contract.md`
 
 ## 6. Adoption Model
 
@@ -100,8 +101,8 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-Runtime-4 has now started. The current question is:
+Runtime-4 is now complete. The next question is:
 
-**How does owlmlx move from a completed Runtime-3 serving surface into a more
-deployable Runtime-4 serving runtime with stronger transport semantics,
-reliability policy, and platform-facing migration seams?**
+**How does owlmlx move from a completed Runtime-4 migration seam into a more
+deployable Runtime-5 serving runtime with fuller control-plane integration,
+transport hardening, and platform migration closure?**

@@ -2,14 +2,14 @@
 
 > Status: authoritative
 > Updated: 2026-04-11
-> Milestone: Runtime-3
+> Milestone: Runtime-4
 
 ## 1. Purpose
 
 Runtime-0 moved `owlmlx` from a truth derivation library into an executable
-runtime kernel MVP. Runtime-3 extends that kernel into a persistent-child
-runtime with explicit control surface, real streaming, and same-model benchmark
-comparison against the old platform.
+runtime kernel MVP. Runtime-4 extends that kernel into a persistent-child
+runtime with explicit control surface, real streaming, same-model benchmark
+comparison, and the first platform-facing compatibility seam.
 
 This milestone does not make `owlmlx` production-ready. It proves that owlmlx
 now has its own runtime control object, backend adapter boundary, HTTP entry,
@@ -220,3 +220,11 @@ Runtime-3 is now complete above that backend baseline:
 
 The current environment truth is frozen separately in
 `runtime1-environment-diagnostics.md`.
+
+Runtime-4 now adds the first platform migration seam:
+
+- `POST /v1/chat/completions` for minimal OpenAI-style chat compatibility
+- `GET /v1/openai/models` for loaded-model discovery in list form
+- `text/event-stream` SSE compatibility when `stream=true`
+- request-id response headers on compatibility endpoints
+- unified backend recovery path via `_ensure_session()`

@@ -10,6 +10,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
+from starlette.responses import JSONResponse
 from starlette.responses import StreamingResponse
 
 from .backends import FakeBackend, RuntimeBackend
@@ -104,11 +105,32 @@ def _openai_response_dict(
     return payload
 
 
+def _compat_error_response(
+    *,
+    request_id: str,
+    message: str,
+    code: str,
+    status_code: int,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        headers={"x-request-id": request_id},
+        content={
+            "id": request_id,
+            "object": "error",
+            "error": {
+                "message": message,
+                "code": code,
+            },
+        },
+    )
+
+
 def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
     """Create a minimal owlmlx runtime HTTP app."""
 
     runtime = kernel if kernel is not None else RuntimeKernel(FakeBackend())
-    app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime3")
+    app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime4")
     app.state.kernel = runtime
 
     @app.get("/healthz")
@@ -162,6 +184,7 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
     async def chat_completions(payload: ChatCompletionRequest):
         target_model = payload.model or runtime.active_model_id
         completion_id = f"chatcmpl-{uuid.uuid4().hex}"
+        request_id = f"req_{uuid.uuid4().hex}"
         prompt = _messages_to_prompt(payload.messages)
         params: dict[str, Any] = {}
         if payload.max_tokens is not None:
@@ -172,14 +195,23 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
         if not payload.stream:
             result = await runtime.generate(prompt, model_id=target_model, **params)
             if not result.ok:
-                return _result_to_dict(result)
-            return _openai_response_dict(
-                completion_id=completion_id,
-                model=target_model or "unknown",
-                text=result.text,
-                finish_reason="stop",
-                prompt_tokens=result.prompt_tokens,
-                completion_tokens=result.completion_tokens,
+                status_code = 404 if result.error_code and result.error_code.value == "model_not_loaded" else 503
+                return _compat_error_response(
+                    request_id=request_id,
+                    message=result.message,
+                    code=result.error_code.value if result.error_code is not None else "backend_error",
+                    status_code=status_code,
+                )
+            return JSONResponse(
+                headers={"x-request-id": request_id},
+                content=_openai_response_dict(
+                    completion_id=completion_id,
+                    model=target_model or "unknown",
+                    text=result.text,
+                    finish_reason="stop",
+                    prompt_tokens=result.prompt_tokens,
+                    completion_tokens=result.completion_tokens,
+                ),
             )
 
         async def sse_source():
@@ -229,7 +261,31 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
                     yield "data: [DONE]\n\n"
                     return
 
-        return StreamingResponse(sse_source(), media_type="text/event-stream")
+        return StreamingResponse(
+            sse_source(),
+            media_type="text/event-stream",
+            headers={"x-request-id": request_id},
+        )
+
+    @app.get("/v1/openai/models")
+    def openai_models():
+        request_id = f"req_{uuid.uuid4().hex}"
+        status = runtime.status_dict()
+        entries = status["inventory"]["entries"]
+        return JSONResponse(
+            headers={"x-request-id": request_id},
+            content={
+                "object": "list",
+                "data": [
+                    {
+                        "id": entry["model_id"],
+                        "object": "model",
+                        "owned_by": "owlmlx",
+                    }
+                    for entry in entries
+                ],
+            },
+        )
 
     @app.get("/v1/models")
     def models() -> dict[str, Any]:
