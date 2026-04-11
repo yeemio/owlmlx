@@ -8,6 +8,7 @@ from typing import Protocol, runtime_checkable
 
 from .types import (
     BackendStatus,
+    ChatTurn,
     GenerateResult,
     LoadResult,
     LoadedModelInfo,
@@ -29,6 +30,14 @@ class RuntimeBackend(Protocol):
     def generate(self, model_id: str, prompt: str, **kwargs: object) -> GenerateResult:
         """Generate text from an already-loaded model."""
 
+    def generate_messages(
+        self,
+        model_id: str,
+        messages: list[ChatTurn],
+        **kwargs: object,
+    ) -> GenerateResult:
+        """Generate text from structured chat messages."""
+
     def stream_generate(
         self,
         model_id: str,
@@ -37,11 +46,25 @@ class RuntimeBackend(Protocol):
     ) -> Iterable[StreamEvent]:
         """Generate a streamed response from an already-loaded model."""
 
+    def stream_generate_messages(
+        self,
+        model_id: str,
+        messages: list[ChatTurn],
+        **kwargs: object,
+    ) -> Iterable[StreamEvent]:
+        """Generate a streamed response from structured chat messages."""
+
     def unload(self, model_id: str) -> UnloadResult:
         """Unload a model from the backend."""
 
     def status(self) -> BackendStatus:
         """Return backend health and loaded model inventory."""
+
+
+def render_chat_messages(messages: list[ChatTurn]) -> str:
+    """Fallback chat rendering for backends without tokenizer templating."""
+
+    return "\n".join(f"{message.role}: {message.content}" for message in messages)
 
 
 class FakeBackend:
@@ -114,6 +137,14 @@ class FakeBackend:
             completion_tokens=len(self.completion_suffix.split()),
         )
 
+    def generate_messages(
+        self,
+        model_id: str,
+        messages: list[ChatTurn],
+        **kwargs: object,
+    ) -> GenerateResult:
+        return self.generate(model_id, render_chat_messages(messages), **kwargs)
+
     def stream_generate(self, model_id: str, prompt: str, **kwargs: object) -> list[StreamEvent]:
         result = self.generate(model_id, prompt, **kwargs)
         if not result.ok:
@@ -163,6 +194,14 @@ class FakeBackend:
             )
         )
         return events
+
+    def stream_generate_messages(
+        self,
+        model_id: str,
+        messages: list[ChatTurn],
+        **kwargs: object,
+    ) -> list[StreamEvent]:
+        return self.stream_generate(model_id, render_chat_messages(messages), **kwargs)
 
     def unload(self, model_id: str) -> UnloadResult:
         model = self._loaded.pop(model_id, None)

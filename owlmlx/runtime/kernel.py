@@ -25,6 +25,7 @@ from owlmlx.serving import GenerationGate
 
 from .backends import RuntimeBackend
 from .types import (
+    ChatTurn,
     GenerateResult,
     LoadResult,
     RestartResult,
@@ -116,16 +117,10 @@ class RuntimeKernel:
             self._active_model_id = model_id
         return result
 
-    async def generate(
-        self,
-        prompt: str,
-        *,
-        model_id: str | None = None,
-        **kwargs: Any,
-    ) -> GenerateResult:
-        """Generate text through the backend under GenerationGate discipline."""
+    def _resolve_target_model(self, model_id: str | None) -> str | None:
+        return model_id or self._active_model_id
 
-        target_model = model_id or self._active_model_id
+    def _assert_loaded_model(self, target_model: str | None) -> GenerateResult | None:
         if not target_model:
             return GenerateResult(
                 ok=False,
@@ -139,9 +134,67 @@ class RuntimeKernel:
                 error_code=RuntimeErrorCode.model_not_loaded,
                 model_id=target_model,
             )
+        return None
+
+    async def generate(
+        self,
+        prompt: str,
+        *,
+        model_id: str | None = None,
+        **kwargs: Any,
+    ) -> GenerateResult:
+        """Generate text through the backend under GenerationGate discipline."""
+
+        target_model = self._resolve_target_model(model_id)
+        invalid = self._assert_loaded_model(target_model)
+        if invalid is not None:
+            return invalid
 
         def call_backend() -> GenerateResult:
+            assert target_model is not None
             return self.backend.generate(target_model, prompt, **kwargs)
+
+        gated = await self.generation_gate.execute_async(call_backend)
+        result = gated.value
+        if not isinstance(result, GenerateResult):
+            return GenerateResult(
+                ok=False,
+                message="backend returned invalid generation result",
+                error_code=RuntimeErrorCode.backend_error,
+                model_id=target_model,
+                detail={"raw_result": repr(result)},
+            )
+        return GenerateResult(
+            ok=result.ok,
+            message=result.message,
+            error_code=result.error_code,
+            detail=result.detail,
+            model_id=result.model_id,
+            text=result.text,
+            prompt_tokens=result.prompt_tokens,
+            completion_tokens=result.completion_tokens,
+            wait_time_s=gated.wait_time_s,
+            execution_time_s=gated.execution_time_s,
+            was_queued=gated.was_queued,
+        )
+
+    async def generate_messages(
+        self,
+        messages: list[ChatTurn],
+        *,
+        model_id: str | None = None,
+        **kwargs: Any,
+    ) -> GenerateResult:
+        """Generate text from structured chat messages."""
+
+        target_model = self._resolve_target_model(model_id)
+        invalid = self._assert_loaded_model(target_model)
+        if invalid is not None:
+            return invalid
+
+        def call_backend() -> GenerateResult:
+            assert target_model is not None
+            return self.backend.generate_messages(target_model, messages, **kwargs)
 
         gated = await self.generation_gate.execute_async(call_backend)
         result = gated.value
@@ -176,7 +229,7 @@ class RuntimeKernel:
     ) -> AsyncIterator[StreamEvent]:
         """Generate a streamed response through the backend under GenerationGate discipline."""
 
-        target_model = model_id or self._active_model_id
+        target_model = self._resolve_target_model(model_id)
         if not target_model:
             yield StreamEvent(
                 event="error",
@@ -195,6 +248,49 @@ class RuntimeKernel:
 
         async with self.generation_gate.stream_session() as gate_start:
             for event in self.backend.stream_generate(target_model, prompt, **kwargs):
+                yield StreamEvent(
+                    event=event.event,
+                    model_id=event.model_id,
+                    text=event.text,
+                    error_code=event.error_code,
+                    finish_reason=event.finish_reason,
+                    sequence=event.sequence,
+                    prompt_tokens=event.prompt_tokens,
+                    completion_tokens=event.completion_tokens,
+                    wait_time_s=gate_start.wait_time_s,
+                    execution_time_s=event.execution_time_s,
+                    was_queued=gate_start.was_queued,
+                    detail=event.detail,
+                )
+
+    async def generate_stream_messages(
+        self,
+        messages: list[ChatTurn],
+        *,
+        model_id: str | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamEvent]:
+        """Stream a response from structured chat messages."""
+
+        target_model = self._resolve_target_model(model_id)
+        if not target_model:
+            yield StreamEvent(
+                event="error",
+                error_code=RuntimeErrorCode.model_not_loaded,
+                detail={"message": "no active model loaded"},
+            )
+            return
+        if target_model not in {m.model_id for m in self.backend.status().loaded_models}:
+            yield StreamEvent(
+                event="error",
+                model_id=target_model,
+                error_code=RuntimeErrorCode.model_not_loaded,
+                detail={"message": f"model not loaded: {target_model}"},
+            )
+            return
+
+        async with self.generation_gate.stream_session() as gate_start:
+            for event in self.backend.stream_generate_messages(target_model, messages, **kwargs):
                 yield StreamEvent(
                     event=event.event,
                     model_id=event.model_id,

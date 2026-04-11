@@ -77,6 +77,8 @@ Capability labels:
 | Same-model benchmark comparison against old platform | supported | `scripts/runtime3_platform_benchmark_compare.py` replays the old platform benchmark prompts through Runtime-3 and freezes same-model deltas |
 | OpenAI-style migration seam | supported | `POST /v1/chat/completions` provides a minimal compatibility surface for upper-layer migration |
 | SSE streaming compatibility surface | supported | `POST /v1/chat/completions` with `stream=true` emits `text/event-stream` chunks plus terminal `[DONE]` |
+| Runtime-native chat message path | supported | Structured messages now flow through `RuntimeKernel.generate_messages()` and backend-native message handling instead of server-only prompt flattening |
+| OpenAI-style completions compatibility surface | supported | `POST /v1/completions` now provides prompt-style non-stream and SSE streaming compatibility |
 | Overflow / NVMe-tier execution path | experimental | Future candidate only; Hypura recorded as external reference in `hypura-overflow-path-reference.md`, not adopted |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction; Gemma has moved to production mainline instead |
 | `gemma-4-31B-it` as production mainline | supported | Production mainline frozen; pilot LoRA PASS; substrate contracts exercised end-to-end |

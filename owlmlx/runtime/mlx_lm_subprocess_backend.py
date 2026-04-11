@@ -23,6 +23,7 @@ from typing import Any
 
 from .types import (
     BackendStatus,
+    ChatTurn,
     GenerateResult,
     LoadResult,
     LoadedModelInfo,
@@ -534,6 +535,66 @@ class MlxLmSubprocessBackend:
             },
         )
 
+    def generate_messages(
+        self,
+        model_id: str,
+        messages: list[ChatTurn],
+        **kwargs: object,
+    ) -> GenerateResult:
+        session, error = self._ensure_session(model_id, reason_prefix="generate messages")
+        if error is not None:
+            return error
+        assert session is not None
+
+        result = self._exchange(
+            session,
+            {
+                "action": "generate_messages",
+                "model_id": model_id,
+                "messages": [
+                    {"role": message.role, "content": message.content}
+                    for message in messages
+                ],
+                "params": dict(kwargs),
+            },
+        )
+        self._last_result = result
+        if not result.ok:
+            error = str(result.payload.get("error") or result.stderr or result.returncode)
+            self._last_error = error
+            session.last_error = error
+            if session.proc.poll() is not None:
+                self._drop_dead_session(model_id, session)
+            return GenerateResult(
+                ok=False,
+                message=f"mlx-lm subprocess message generate failed: {error}",
+                error_code=RuntimeErrorCode.backend_error,
+                model_id=model_id,
+                detail={
+                    "returncode": result.returncode,
+                    "stdout": result.stdout[-2000:],
+                    "stderr": result.stderr[-2000:],
+                    "payload": result.payload,
+                },
+            )
+
+        session.generation_count += 1
+        session.last_payload = result.payload
+        session.last_error = None
+        self._last_error = None
+        return GenerateResult(
+            ok=True,
+            message="generated",
+            model_id=model_id,
+            text=str(result.payload.get("text", "")),
+            detail={
+                "returncode": result.returncode,
+                "pid": result.payload.get("pid"),
+                "generation_count": result.payload.get("generation_count"),
+                "message_count": result.payload.get("message_count"),
+            },
+        )
+
     def stream_generate(
         self,
         model_id: str,
@@ -610,6 +671,105 @@ class MlxLmSubprocessBackend:
                         detail={
                             "pid": payload.get("pid"),
                             "generation_count": payload.get("generation_count"),
+                        },
+                    )
+                    return
+        except Exception as exc:
+            error = str(exc)
+            self._last_error = error
+            session.last_error = error
+            if session.proc.poll() is not None:
+                self._drop_dead_session(model_id, session)
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=RuntimeErrorCode.backend_error,
+                detail={"message": error},
+            )
+
+    def stream_generate_messages(
+        self,
+        model_id: str,
+        messages: list[ChatTurn],
+        **kwargs: object,
+    ) -> Iterator[StreamEvent]:
+        session, error = self._ensure_session(model_id, reason_prefix="stream messages")
+        if error is not None:
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=error.error_code,
+                detail={"message": error.message, **error.detail},
+            )
+            return
+        assert session is not None
+        try:
+            for payload in self._stream_exchange(
+                session,
+                {
+                    "action": "stream_generate_messages",
+                    "model_id": model_id,
+                    "messages": [
+                        {"role": message.role, "content": message.content}
+                        for message in messages
+                    ],
+                    "params": dict(kwargs),
+                },
+            ):
+                self._last_result = MlxLmSubprocessResult(
+                    ok=bool(payload.get("ok")),
+                    returncode=0 if session.proc.poll() is None else int(session.proc.returncode or 0),
+                    stdout="",
+                    stderr=self._collect_stderr(session),
+                    payload=payload,
+                )
+                if not payload.get("ok"):
+                    error = str(payload.get("error") or self._collect_stderr(session))
+                    self._last_error = error
+                    session.last_error = error
+                    if session.proc.poll() is not None:
+                        self._drop_dead_session(model_id, session)
+                    yield StreamEvent(
+                        event="error",
+                        model_id=model_id,
+                        error_code=RuntimeErrorCode.backend_error,
+                        detail={"message": error, "payload": payload},
+                    )
+                    return
+                event = str(payload.get("event") or "token")
+                if event == "token":
+                    yield StreamEvent(
+                        event="token",
+                        model_id=model_id,
+                        text=str(payload.get("text", "")),
+                        sequence=payload.get("sequence"),
+                        prompt_tokens=payload.get("prompt_tokens"),
+                        completion_tokens=payload.get("completion_tokens"),
+                        finish_reason=payload.get("finish_reason"),
+                        detail={
+                            "pid": payload.get("pid"),
+                            "message_count": payload.get("message_count"),
+                        },
+                    )
+                    continue
+                if event == "done":
+                    session.generation_count = int(
+                        payload.get("generation_count") or (session.generation_count + 1)
+                    )
+                    session.last_payload = payload
+                    session.last_error = None
+                    self._last_error = None
+                    yield StreamEvent(
+                        event="done",
+                        model_id=model_id,
+                        sequence=payload.get("sequence"),
+                        prompt_tokens=payload.get("prompt_tokens"),
+                        completion_tokens=payload.get("completion_tokens"),
+                        finish_reason=payload.get("finish_reason"),
+                        detail={
+                            "pid": payload.get("pid"),
+                            "generation_count": payload.get("generation_count"),
+                            "message_count": payload.get("message_count"),
                         },
                     )
                     return

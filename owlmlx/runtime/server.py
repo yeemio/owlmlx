@@ -15,6 +15,7 @@ from starlette.responses import StreamingResponse
 
 from .backends import FakeBackend, RuntimeBackend
 from .kernel import RuntimeKernel
+from .types import ChatTurn
 
 
 class LoadRequest(BaseModel):
@@ -35,6 +36,14 @@ class GenerateRequest(BaseModel):
 class ChatMessage(BaseModel):
     role: str
     content: str
+
+
+class CompletionRequest(BaseModel):
+    model: str | None = Field(default=None, min_length=1)
+    prompt: str = Field(min_length=1)
+    max_tokens: int | None = Field(default=None, ge=1)
+    temperature: float | None = None
+    stream: bool = False
 
 
 class ChatCompletionRequest(BaseModel):
@@ -65,8 +74,8 @@ def _result_to_dict(result: Any) -> dict[str, Any]:
     return data
 
 
-def _messages_to_prompt(messages: list[ChatMessage]) -> str:
-    return "\n".join(f"{message.role}: {message.content}" for message in messages)
+def _messages_to_turns(messages: list[ChatMessage]) -> list[ChatTurn]:
+    return [ChatTurn(role=message.role, content=message.content) for message in messages]
 
 
 def _openai_response_dict(
@@ -126,11 +135,33 @@ def _compat_error_response(
     )
 
 
+def _openai_completion_dict(
+    *,
+    completion_id: str,
+    model: str,
+    text: str,
+    finish_reason: str = "stop",
+) -> dict[str, Any]:
+    return {
+        "id": completion_id,
+        "object": "text_completion",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "text": text,
+                "finish_reason": finish_reason,
+            }
+        ],
+    }
+
+
 def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
     """Create a minimal owlmlx runtime HTTP app."""
 
     runtime = kernel if kernel is not None else RuntimeKernel(FakeBackend())
-    app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime4")
+    app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime5")
     app.state.kernel = runtime
 
     @app.get("/healthz")
@@ -185,7 +216,7 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
         target_model = payload.model or runtime.active_model_id
         completion_id = f"chatcmpl-{uuid.uuid4().hex}"
         request_id = f"req_{uuid.uuid4().hex}"
-        prompt = _messages_to_prompt(payload.messages)
+        messages = _messages_to_turns(payload.messages)
         params: dict[str, Any] = {}
         if payload.max_tokens is not None:
             params["max_tokens"] = payload.max_tokens
@@ -193,7 +224,7 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
             params["temperature"] = payload.temperature
 
         if not payload.stream:
-            result = await runtime.generate(prompt, model_id=target_model, **params)
+            result = await runtime.generate_messages(messages, model_id=target_model, **params)
             if not result.ok:
                 status_code = 404 if result.error_code and result.error_code.value == "model_not_loaded" else 503
                 return _compat_error_response(
@@ -215,7 +246,11 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
             )
 
         async def sse_source():
-            async for event in runtime.generate_stream(prompt, model_id=target_model, **params):
+            async for event in runtime.generate_stream_messages(
+                messages,
+                model_id=target_model,
+                **params,
+            ):
                 if event.event == "token":
                     chunk = {
                         "id": completion_id,
@@ -263,6 +298,95 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
 
         return StreamingResponse(
             sse_source(),
+            media_type="text/event-stream",
+            headers={"x-request-id": request_id},
+        )
+
+    @app.post("/v1/completions")
+    async def completions(payload: CompletionRequest):
+        target_model = payload.model or runtime.active_model_id
+        completion_id = f"cmpl-{uuid.uuid4().hex}"
+        request_id = f"req_{uuid.uuid4().hex}"
+        params: dict[str, Any] = {}
+        if payload.max_tokens is not None:
+            params["max_tokens"] = payload.max_tokens
+        if payload.temperature is not None:
+            params["temperature"] = payload.temperature
+
+        if not payload.stream:
+            result = await runtime.generate(payload.prompt, model_id=target_model, **params)
+            if not result.ok:
+                status_code = 404 if result.error_code and result.error_code.value == "model_not_loaded" else 503
+                return _compat_error_response(
+                    request_id=request_id,
+                    message=result.message,
+                    code=result.error_code.value if result.error_code is not None else "backend_error",
+                    status_code=status_code,
+                )
+            return JSONResponse(
+                headers={"x-request-id": request_id},
+                content=_openai_completion_dict(
+                    completion_id=completion_id,
+                    model=target_model or "unknown",
+                    text=result.text,
+                    finish_reason="stop",
+                ),
+            )
+
+        async def sse_completion_source():
+            async for event in runtime.generate_stream(
+                payload.prompt,
+                model_id=target_model,
+                **params,
+            ):
+                if event.event == "token":
+                    chunk = {
+                        "id": completion_id,
+                        "object": "text_completion",
+                        "created": int(time.time()),
+                        "model": target_model or "unknown",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "text": event.text,
+                                "finish_reason": None,
+                            }
+                        ],
+                    }
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                    continue
+                if event.event == "done":
+                    chunk = {
+                        "id": completion_id,
+                        "object": "text_completion",
+                        "created": int(time.time()),
+                        "model": target_model or "unknown",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "text": "",
+                                "finish_reason": event.finish_reason or "stop",
+                            }
+                        ],
+                    }
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                if event.event == "error":
+                    chunk = {
+                        "id": completion_id,
+                        "object": "error",
+                        "error": {
+                            "message": event.detail.get("message", "stream generation failed"),
+                            "code": event.error_code.value if event.error_code is not None else "backend_error",
+                        },
+                    }
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+        return StreamingResponse(
+            sse_completion_source(),
             media_type="text/event-stream",
             headers={"x-request-id": request_id},
         )

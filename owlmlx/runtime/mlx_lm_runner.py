@@ -16,6 +16,25 @@ from contextlib import redirect_stdout
 from typing import Any
 
 
+def _fallback_prompt_from_messages(messages: list[dict[str, Any]]) -> str:
+    return "\n".join(
+        f"{str(message.get('role') or 'user')}: {str(message.get('content') or '')}"
+        for message in messages
+    )
+
+
+def _prompt_from_messages(tokenizer: Any, messages: list[dict[str, Any]]) -> str:
+    if hasattr(tokenizer, "apply_chat_template"):
+        return str(
+            tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+        )
+    return _fallback_prompt_from_messages(messages)
+
+
 def _parse_request(line: str) -> dict[str, Any]:
     try:
         return json.loads(line or "{}")
@@ -43,6 +62,7 @@ def main() -> int:
         action = str(request.get("action") or "").strip().lower()
         model_id = request.get("model_id")
         prompt = request.get("prompt", "")
+        messages = list(request.get("messages") or [])
         params = dict(request.get("params") or {})
 
         try:
@@ -116,6 +136,46 @@ def main() -> int:
                 )
                 continue
 
+            if action == "generate_messages":
+                if not current_model_id or model is None or tokenizer is None:
+                    _emit({"ok": False, "error": "no model loaded"})
+                    continue
+                if model_id and str(model_id) != current_model_id:
+                    _emit(
+                        {
+                            "ok": False,
+                            "error": (
+                                f"loaded model is {current_model_id}, "
+                                f"not {model_id}"
+                            ),
+                        }
+                    )
+                    continue
+
+                import mlx_lm  # noqa: PLC0415
+
+                rendered_prompt = _prompt_from_messages(tokenizer, messages)
+                with redirect_stdout(sys.stderr):
+                    text = mlx_lm.generate(
+                        model,
+                        tokenizer,
+                        prompt=rendered_prompt,
+                        **params,
+                    )
+                generation_count += 1
+                _emit(
+                    {
+                        "ok": True,
+                        "action": "generate_messages",
+                        "model_id": current_model_id,
+                        "text": str(text),
+                        "pid": os.getpid(),
+                        "generation_count": generation_count,
+                        "message_count": len(messages),
+                    }
+                )
+                continue
+
             if action == "stream_generate":
                 if not current_model_id or model is None or tokenizer is None:
                     _emit({"ok": False, "error": "no model loaded"})
@@ -180,6 +240,77 @@ def main() -> int:
                         "prompt_tokens": prompt_tokens,
                         "completion_tokens": completion_tokens,
                         "finish_reason": finish_reason,
+                    }
+                )
+                continue
+
+            if action == "stream_generate_messages":
+                if not current_model_id or model is None or tokenizer is None:
+                    _emit({"ok": False, "error": "no model loaded"})
+                    continue
+                if model_id and str(model_id) != current_model_id:
+                    _emit(
+                        {
+                            "ok": False,
+                            "error": (
+                                f"loaded model is {current_model_id}, "
+                                f"not {model_id}"
+                            ),
+                        }
+                    )
+                    continue
+
+                import mlx_lm  # noqa: PLC0415
+
+                rendered_prompt = _prompt_from_messages(tokenizer, messages)
+                sequence = 0
+                prompt_tokens = None
+                completion_tokens = 0
+                finish_reason = "stop"
+                with redirect_stdout(sys.stderr):
+                    for response in mlx_lm.stream_generate(
+                        model,
+                        tokenizer,
+                        prompt=rendered_prompt,
+                        **params,
+                    ):
+                        sequence += 1
+                        prompt_tokens = getattr(response, "prompt_tokens", prompt_tokens)
+                        completion_tokens = int(
+                            getattr(response, "generation_tokens", completion_tokens) or 0
+                        )
+                        finish_reason = str(
+                            getattr(response, "finish_reason", finish_reason) or finish_reason
+                        )
+                        _emit(
+                            {
+                                "ok": True,
+                                "action": "stream_message_event",
+                                "event": "token",
+                                "model_id": current_model_id,
+                                "text": str(getattr(response, "text", "") or ""),
+                                "pid": os.getpid(),
+                                "sequence": sequence,
+                                "prompt_tokens": prompt_tokens,
+                                "completion_tokens": completion_tokens,
+                                "finish_reason": finish_reason,
+                                "message_count": len(messages),
+                            }
+                        )
+                generation_count += 1
+                _emit(
+                    {
+                        "ok": True,
+                        "action": "stream_message_done",
+                        "event": "done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "generation_count": generation_count,
+                        "sequence": sequence,
+                        "prompt_tokens": prompt_tokens,
+                        "completion_tokens": completion_tokens,
+                        "finish_reason": finish_reason,
+                        "message_count": len(messages),
                     }
                 )
                 continue

@@ -12,6 +12,20 @@ from enum import Enum
 from typing import Any
 
 
+@dataclass(frozen=True, slots=True)
+class ChatTurn:
+    """A structured chat message passed through runtime layers."""
+
+    role: str
+    content: str
+
+    def __post_init__(self) -> None:
+        if not self.role:
+            raise ValueError("role must be non-empty")
+        if not self.content:
+            raise ValueError("content must be non-empty")
+
+
 class RuntimeErrorCode(str, Enum):
     """Canonical runtime operation error codes."""
 

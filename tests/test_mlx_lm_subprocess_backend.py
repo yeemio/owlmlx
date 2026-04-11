@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from owlmlx.runtime import MlxLmSubprocessBackend, RuntimeErrorCode, RuntimeKernel
+from owlmlx.runtime.types import ChatTurn
 
 
 def _write_runner(
@@ -45,10 +46,19 @@ def _write_runner(
                     "        print(json.dumps({'ok': True, 'action': 'load', 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
                     "    elif action == 'generate':",
                     *generate_body.splitlines(),
+                    "    elif action == 'generate_messages':",
+                    "        count += 1",
+                    "        text = ' | '.join(f\"{m['role']}:{m['content']}\" for m in req.get('messages', []))",
+                    "        print(json.dumps({'ok': True, 'action': 'generate_messages', 'text': text + ' :: child', 'pid': os.getpid(), 'generation_count': count, 'message_count': len(req.get('messages', []))}), flush=True)",
                     "    elif action == 'stream_generate':",
                     "        count += 1",
                     "        print(json.dumps({'ok': True, 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
                     "        print(json.dumps({'ok': True, 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                    "    elif action == 'stream_generate_messages':",
+                    "        count += 1",
+                    "        text = ' | '.join(f\"{m['role']}:{m['content']}\" for m in req.get('messages', []))",
+                    "        print(json.dumps({'ok': True, 'event': 'token', 'text': text, 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming', 'message_count': len(req.get('messages', []))}), flush=True)",
+                    "        print(json.dumps({'ok': True, 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop', 'message_count': len(req.get('messages', []))}), flush=True)",
                     "    elif action == 'ping':",
                     "        print(json.dumps({'ok': True, 'action': 'ping', 'model_id': loaded, 'pid': os.getpid(), 'generation_count': count}), flush=True)",
                     "    elif action in ('shutdown', 'unload'):",
@@ -130,6 +140,48 @@ def test_subprocess_backend_stream_generate_reuses_same_child(tmp_path: Path) ->
     assert events[0].text == "hello"
     assert events[0].detail["pid"] == events[1].detail["pid"]
     assert backend.status().detail["children"]["model-a"]["generation_count"] == 1
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_generate_messages_reuses_same_child(tmp_path: Path) -> None:
+    runner = _write_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    result = backend.generate_messages(
+        "model-a",
+        [ChatTurn(role="system", content="be terse"), ChatTurn(role="user", content="hello")],
+        max_tokens=4,
+    )
+
+    assert result.ok is True
+    assert result.text == "system:be terse | user:hello :: child"
+    assert result.detail["message_count"] == 2
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_stream_generate_messages_reuses_same_child(tmp_path: Path) -> None:
+    runner = _write_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    events = list(
+        backend.stream_generate_messages(
+            "model-a",
+            [ChatTurn(role="user", content="hello"), ChatTurn(role="assistant", content="hi")],
+            max_tokens=4,
+        )
+    )
+
+    assert [event.event for event in events] == ["token", "done"]
+    assert events[0].text == "user:hello | assistant:hi"
+    assert events[0].detail["message_count"] == 2
     backend.unload("model-a")
 
 

@@ -17,6 +17,7 @@ from .mlx_lm_backend import MlxLmBackend
 from .mlx_lm_subprocess_backend import MlxLmSubprocessBackend
 from .types import (
     BackendStatus,
+    ChatTurn,
     GenerateResult,
     LoadResult,
     LoadedModelInfo,
@@ -30,6 +31,7 @@ from .types import (
 
 __all__ = [
     "BackendStatus",
+    "ChatTurn",
     "FakeBackend",
     "GenerateResult",
     "LoadResult",

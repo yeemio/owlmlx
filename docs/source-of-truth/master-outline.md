@@ -101,8 +101,8 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-Runtime-4 is now complete. The next question is:
+Runtime-5 is now complete. The next question is:
 
-**How does owlmlx move from a completed Runtime-4 migration seam into a more
-deployable Runtime-5 serving runtime with fuller control-plane integration,
-transport hardening, and platform migration closure?**
+**How does owlmlx move from a completed Runtime-5 compat entrypoint layer into
+a Runtime-6 serving runtime with deeper control-plane integration, transport
+completion, and real platform cutover?**

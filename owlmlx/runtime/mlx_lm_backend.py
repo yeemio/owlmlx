@@ -15,8 +15,10 @@ from dataclasses import dataclass
 from collections.abc import Iterator
 from typing import Any
 
+from .backends import render_chat_messages
 from .types import (
     BackendStatus,
+    ChatTurn,
     GenerateResult,
     LoadResult,
     LoadedModelInfo,
@@ -104,6 +106,19 @@ class MlxLmBackend:
         self._last_error: str | None = None
         self._last_probe: MlxLmImportProbeResult | None = None
 
+    @staticmethod
+    def _prompt_from_messages(tokenizer: Any, messages: list[ChatTurn]) -> str:
+        payload = [{"role": message.role, "content": message.content} for message in messages]
+        if hasattr(tokenizer, "apply_chat_template"):
+            return str(
+                tokenizer.apply_chat_template(
+                    payload,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+            )
+        return render_chat_messages(messages)
+
     def _mlx_lm(self) -> Any:
         if self._module is None:
             self._module = importlib.import_module("mlx_lm")
@@ -184,6 +199,43 @@ class MlxLmBackend:
             text=str(text),
         )
 
+    def generate_messages(
+        self,
+        model_id: str,
+        messages: list[ChatTurn],
+        **kwargs: object,
+    ) -> GenerateResult:
+        loaded = self._loaded.get(model_id)
+        if loaded is None:
+            return GenerateResult(
+                ok=False,
+                message=f"model not loaded: {model_id}",
+                error_code=RuntimeErrorCode.model_not_loaded,
+                model_id=model_id,
+            )
+
+        model, tokenizer, _info = loaded
+        try:
+            module = self._mlx_lm()
+            prompt = self._prompt_from_messages(tokenizer, messages)
+            text = module.generate(model, tokenizer, prompt=prompt, **kwargs)
+        except Exception as exc:
+            self._last_error = str(exc)
+            return GenerateResult(
+                ok=False,
+                message=f"mlx-lm generate_messages failed: {exc}",
+                error_code=RuntimeErrorCode.backend_error,
+                model_id=model_id,
+            )
+
+        self._last_error = None
+        return GenerateResult(
+            ok=True,
+            message="generated",
+            model_id=model_id,
+            text=str(text),
+        )
+
     def stream_generate(
         self,
         model_id: str,
@@ -223,6 +275,48 @@ class MlxLmBackend:
                 model_id=model_id,
                 error_code=RuntimeErrorCode.backend_error,
                 detail={"message": f"mlx-lm stream_generate failed: {exc}"},
+            )
+
+    def stream_generate_messages(
+        self,
+        model_id: str,
+        messages: list[ChatTurn],
+        **kwargs: object,
+    ) -> Iterator[StreamEvent]:
+        loaded = self._loaded.get(model_id)
+        if loaded is None:
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=RuntimeErrorCode.model_not_loaded,
+                detail={"message": f"model not loaded: {model_id}"},
+            )
+            return
+
+        model, tokenizer, _info = loaded
+        try:
+            module = self._mlx_lm()
+            prompt = self._prompt_from_messages(tokenizer, messages)
+            sequence = 0
+            for response in module.stream_generate(model, tokenizer, prompt=prompt, **kwargs):
+                sequence += 1
+                yield StreamEvent(
+                    event="token",
+                    model_id=model_id,
+                    text=str(getattr(response, "text", "") or ""),
+                    sequence=sequence,
+                    prompt_tokens=getattr(response, "prompt_tokens", None),
+                    completion_tokens=getattr(response, "generation_tokens", None),
+                    finish_reason=getattr(response, "finish_reason", None),
+                )
+            yield StreamEvent(event="done", model_id=model_id, sequence=sequence, finish_reason="stop")
+        except Exception as exc:
+            self._last_error = str(exc)
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=RuntimeErrorCode.backend_error,
+                detail={"message": f"mlx-lm stream_generate_messages failed: {exc}"},
             )
 
     def unload(self, model_id: str) -> UnloadResult:
