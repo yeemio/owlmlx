@@ -126,6 +126,16 @@ class FakeBackend:
             )
         if self.generate_delay_s > 0:
             time.sleep(self.generate_delay_s)
+        if "[tool_result:" in prompt:
+            return GenerateResult(
+                ok=True,
+                message="generated final response after tool_result",
+                model_id=model_id,
+                text=f"{prompt}{self.completion_suffix}",
+                finish_reason="stop",
+                prompt_tokens=len(prompt.split()),
+                completion_tokens=len(self.completion_suffix.split()),
+            )
         tools = kwargs.get("tools")
         tool_choice = kwargs.get("tool_choice")
         if isinstance(tools, list) and tools and tool_choice != "none":

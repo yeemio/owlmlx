@@ -419,6 +419,55 @@ def test_anthropic_messages_stream_can_return_tool_use_events() -> None:
     assert any('"stop_reason": "tool_use"' in line or '"stop_reason":"tool_use"' in line for line in chunks)
 
 
+def test_anthropic_messages_with_tool_result_then_returns_final_text() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-a",
+            "messages": [
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "toolu_fake_001",
+                            "name": "read_file",
+                            "input": {"path": "README.md"},
+                        }
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": "toolu_fake_001",
+                            "content": "README contents",
+                        }
+                    ],
+                },
+            ],
+            "max_tokens": 4,
+            "tools": [
+                {
+                    "name": "read_file",
+                    "description": "Read a file",
+                    "input_schema": {"type": "object"},
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["stop_reason"] == "end_turn"
+    assert payload["content"][0]["type"] == "text"
+    assert "[tool_result:toolu_fake_001] README contents" in payload["content"][0]["text"]
+
+
 def test_openai_models_lists_loaded_models() -> None:
     client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
     client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})

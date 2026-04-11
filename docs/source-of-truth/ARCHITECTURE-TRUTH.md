@@ -19,14 +19,13 @@ owlmlx 是我们在 Apple Silicon 上的**自有 MLX runtime**。
 
 ### 2.1 owlmlx 今天实际是什么
 
-一个完成 **Runtime-3 serving surface + streaming + comparison** 的早期 runtime。
+一个完成 **Runtime-7 first real Owl consumer cutover** 的早期 runtime。
 
 它不再只是 truth derivation library：现在有自有 `RuntimeKernel`、
 backend adapter 边界、FakeBackend、最小 HTTP entry，并且 kernel 自己消费
 memory budget / model inventory / runtime health / GenerationGate。
 
-但它仍不是 production runtime：真实 MLX 模型加载、生产 serving hardening、
-进程生命周期和平台迁移还未完成。
+但它仍不是 production runtime：生产 serving hardening、控制面迁移和平台替换还未完成。
 
 | 维度 | 现状 | 目标状态 |
 |---|---|---|
@@ -39,7 +38,7 @@ memory budget / model inventory / runtime health / GenerationGate。
 
 ### 2.2 代码盘点
 
-Runtime-3 完成交付后，owlmlx 有 19 个 Python 模块，340 tests。
+Runtime-7 完成交付后，owlmlx 有 19 个 Python 模块，357 tests。
 
 | 模块 | LOC | 性质 | 做什么 |
 |---|---|---|---|
@@ -63,7 +62,7 @@ Runtime-3 完成交付后，owlmlx 有 19 个 Python 模块，340 tests。
 | runtime/mlx_lm_subprocess_backend.py | ~220 | **subprocess backend** | 父进程安全的 mlx-lm 持久 child lifecycle：`load once -> generate many -> unload` |
 | runtime/mlx_environment.py | ~150 | **environment probe** | 安全环境选择 + 结构化诊断，default vs known 分离 |
 
-**关键事实：Runtime-3 已把 Runtime-2 的 child health / restart 语义和 serialized serving truth 上推到 runtime surface。父进程仍永不 import mlx_lm。**
+**关键事实：Runtime-7 已证明 `owlcc` 可以把 Anthropic-shaped真实 tool loop 直接打到 `owlmlx /v1/messages`。父进程仍永不 import mlx_lm。**
 
 ### 2.3 文档盘点
 
@@ -193,7 +192,7 @@ Runtime-3 当前的运行纪律已经明确：
 
 第一版不追求性能，不强制真实模型加载。目标是架构闭环，不是跑 31B。
 
-### 7.2 实际内部结构（Runtime-3）
+### 7.2 实际内部结构（Runtime-7）
 
 ```
 owlmlx/
@@ -227,12 +226,13 @@ R11-R18 的价值：给 RuntimeKernel 准备了判断层。
 诚实的 scorecard 拆成两张：
 
 ```
-Truth substrate readiness:  11 truth modules, 352 tests, 7 platform consumers ✓
+Truth substrate readiness:  11 truth modules, 357 tests, 7 platform consumers ✓
 Runtime executability:      Runtime-0 MVP ✓ → Runtime-1 真实模型验证 ✓ → Runtime-2 persistent child ✓
 Runtime serving surface:    Runtime-3 restart/status/streaming surface ✓
 Runtime migration seam:     Runtime-4 chat/completions + SSE + model discovery ✓
 Runtime compat entrypoints: Runtime-5 backend-owned message handling + completions/chat compatibility ✓
-Anthropic cutover seam:     Runtime-6 `/v1/messages` + count_tokens + Anthropic SSE started ✓
+Anthropic cutover seam:     Runtime-6 `/v1/messages` + count_tokens + Anthropic SSE + tool-use seam ✓
+Real Owl consumer cutover:  Runtime-7 `owlcc run` direct endpoint tool loop completed ✓
 Subprocess isolation:       父进程永不 import mlx_lm，子进程 abort → 结构化错误 ✓
 Real local smoke baseline:  gpt-oss-20b + Qwen3.5-27B + Qwen3.5-35B-A3B 通过 ✓
 Persistent child proof:     gpt-oss-20b / Qwen3.5-27B 同一 pid 连续 generate 通过 ✓

@@ -78,6 +78,8 @@ These are runtime-level goals, not temporary integration work.
 33. `hypura-overflow-path-reference.md`
 34. `model-lineage-schema.md`
 35. `cache-truth-contract.md`
+36. `runtime6-anthropic-entrypoint.md`
+37. `runtime7-owlcc-cutover-verification.md`
 
 ## 6. Adoption Model
 
@@ -101,8 +103,7 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-Runtime-6 is now in progress. The next question is:
+Runtime-7 is now complete. The next question is:
 
-**How does owlmlx move from the first Runtime-6 Anthropic-compatible entrypoint
-into deeper owlcoda/owlcc cutover, fuller Anthropic semantics, and real
-platform replacement?**
+**How does owlmlx move from first real owlcc cutover proof into deeper
+owlcoda cutover, control-plane integration, and real platform replacement?**

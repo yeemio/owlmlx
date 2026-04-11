@@ -81,6 +81,7 @@ Capability labels:
 | OpenAI-style completions compatibility surface | supported | `POST /v1/completions` now provides prompt-style non-stream and SSE streaming compatibility |
 | Anthropic-style messages entrypoint | supported | `POST /v1/messages` now provides Anthropic-compatible non-stream and SSE event semantics for owlcoda/owlcc-style clients |
 | Anthropic count-tokens entrypoint | supported | `POST /v1/messages/count_tokens` returns estimated `input_tokens` for Anthropic-compatible clients |
+| First real Owl consumer cutover proof | supported | `owlcc run` now completes a real direct-endpoint tool loop against `owlmlx /v1/messages`; Runtime-7 freezes the first real consumer cutover verdict |
 | Overflow / NVMe-tier execution path | experimental | Future candidate only; Hypura recorded as external reference in `hypura-overflow-path-reference.md`, not adopted |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction; Gemma has moved to production mainline instead |
 | `gemma-4-31B-it` as production mainline | supported | Production mainline frozen; pilot LoRA PASS; substrate contracts exercised end-to-end |

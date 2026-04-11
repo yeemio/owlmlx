@@ -306,7 +306,7 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
     """Create a minimal owlmlx runtime HTTP app."""
 
     runtime = kernel if kernel is not None else RuntimeKernel(FakeBackend())
-    app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime5")
+    app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime7")
     app.state.kernel = runtime
 
     @app.get("/healthz")

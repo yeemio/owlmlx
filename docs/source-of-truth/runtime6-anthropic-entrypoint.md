@@ -1,6 +1,6 @@
 # Runtime-6 Anthropic Entrypoint
 
-> Status: in progress
+> Status: complete
 > Updated: 2026-04-11
 > Scope: Anthropic-compatible entrypoints for owlcoda/owlcc cutover
 
@@ -88,3 +88,6 @@ Runtime-6 does not yet claim:
 - control-plane integration closure
 
 This is an entrypoint seam, not final platform replacement.
+
+Runtime-7 then extended this from protocol seam to first real `owlcc` cutover
+verification.
