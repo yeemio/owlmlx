@@ -105,6 +105,48 @@ def test_generate_stream_returns_ndjson_events() -> None:
     assert payloads[0]["model_id"] == "fake-a"
 
 
+def test_chat_completions_non_stream_provides_openai_shape() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-a",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["object"] == "chat.completion"
+    assert payload["model"] == "fake-a"
+    assert payload["choices"][0]["message"]["role"] == "assistant"
+
+
+def test_chat_completions_stream_provides_sse_chunks() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    with client.stream(
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "fake-a",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+            "stream": True,
+        },
+    ) as response:
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+        chunks = [line for line in response.iter_lines() if line]
+
+    assert chunks[0].startswith("data: ")
+    assert chunks[-1] == "data: [DONE]"
+
+
 def test_load_requires_model_id_validation() -> None:
     client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
 

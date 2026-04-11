@@ -100,7 +100,7 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-Runtime-3 is now complete. The next question is:
+Runtime-4 has now started. The current question is:
 
 **How does owlmlx move from a completed Runtime-3 serving surface into a more
 deployable Runtime-4 serving runtime with stronger transport semantics,

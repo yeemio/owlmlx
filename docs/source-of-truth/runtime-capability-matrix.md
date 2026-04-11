@@ -75,6 +75,8 @@ Capability labels:
 | Serialized concurrent serving validation | supported | `scripts/runtime3_serialized_concurrency_check.py` proves `GenerationGate` remains serial under real concurrent requests against one persistent child session |
 | Real streaming response path | supported | `POST /v1/generate/stream` streams NDJSON events through `RuntimeKernel.generate_stream()`; real local smoke verified on `gpt-oss-20b-MXFP4-Q4` |
 | Same-model benchmark comparison against old platform | supported | `scripts/runtime3_platform_benchmark_compare.py` replays the old platform benchmark prompts through Runtime-3 and freezes same-model deltas |
+| OpenAI-style migration seam | supported | `POST /v1/chat/completions` provides a minimal compatibility surface for upper-layer migration |
+| SSE streaming compatibility surface | supported | `POST /v1/chat/completions` with `stream=true` emits `text/event-stream` chunks plus terminal `[DONE]` |
 | Overflow / NVMe-tier execution path | experimental | Future candidate only; Hypura recorded as external reference in `hypura-overflow-path-reference.md`, not adopted |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction; Gemma has moved to production mainline instead |
 | `gemma-4-31B-it` as production mainline | supported | Production mainline frozen; pilot LoRA PASS; substrate contracts exercised end-to-end |

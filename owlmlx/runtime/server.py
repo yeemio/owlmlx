@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import time
+import uuid
 from dataclasses import asdict
 from typing import Any
 
@@ -29,6 +31,19 @@ class GenerateRequest(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatCompletionRequest(BaseModel):
+    model: str | None = Field(default=None, min_length=1)
+    messages: list[ChatMessage]
+    max_tokens: int | None = Field(default=None, ge=1)
+    temperature: float | None = None
+    stream: bool = False
+
+
 class UnloadRequest(BaseModel):
     """HTTP request body for model unload."""
 
@@ -47,6 +62,46 @@ def _result_to_dict(result: Any) -> dict[str, Any]:
     if error is not None and hasattr(error, "value"):
         data["error_code"] = error.value
     return data
+
+
+def _messages_to_prompt(messages: list[ChatMessage]) -> str:
+    return "\n".join(f"{message.role}: {message.content}" for message in messages)
+
+
+def _openai_response_dict(
+    *,
+    completion_id: str,
+    model: str,
+    text: str,
+    finish_reason: str = "stop",
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
+) -> dict[str, Any]:
+    usage = None
+    if prompt_tokens is not None or completion_tokens is not None:
+        pt = int(prompt_tokens or 0)
+        ct = int(completion_tokens or 0)
+        usage = {
+            "prompt_tokens": pt,
+            "completion_tokens": ct,
+            "total_tokens": pt + ct,
+        }
+    payload = {
+        "id": completion_id,
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": text},
+                "finish_reason": finish_reason,
+            }
+        ],
+    }
+    if usage is not None:
+        payload["usage"] = usage
+    return payload
 
 
 def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
@@ -102,6 +157,79 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
                 yield json.dumps(data) + "\n"
 
         return StreamingResponse(event_source(), media_type="application/x-ndjson")
+
+    @app.post("/v1/chat/completions")
+    async def chat_completions(payload: ChatCompletionRequest):
+        target_model = payload.model or runtime.active_model_id
+        completion_id = f"chatcmpl-{uuid.uuid4().hex}"
+        prompt = _messages_to_prompt(payload.messages)
+        params: dict[str, Any] = {}
+        if payload.max_tokens is not None:
+            params["max_tokens"] = payload.max_tokens
+        if payload.temperature is not None:
+            params["temperature"] = payload.temperature
+
+        if not payload.stream:
+            result = await runtime.generate(prompt, model_id=target_model, **params)
+            if not result.ok:
+                return _result_to_dict(result)
+            return _openai_response_dict(
+                completion_id=completion_id,
+                model=target_model or "unknown",
+                text=result.text,
+                finish_reason="stop",
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=result.completion_tokens,
+            )
+
+        async def sse_source():
+            async for event in runtime.generate_stream(prompt, model_id=target_model, **params):
+                if event.event == "token":
+                    chunk = {
+                        "id": completion_id,
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": target_model or "unknown",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {"content": event.text},
+                                "finish_reason": None,
+                            }
+                        ],
+                    }
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                elif event.event == "done":
+                    chunk = {
+                        "id": completion_id,
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": target_model or "unknown",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {},
+                                "finish_reason": event.finish_reason or "stop",
+                            }
+                        ],
+                    }
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                elif event.event == "error":
+                    chunk = {
+                        "id": completion_id,
+                        "object": "error",
+                        "error": {
+                            "message": event.detail.get("message", "stream generation failed"),
+                            "code": event.error_code.value if event.error_code is not None else "backend_error",
+                        },
+                    }
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+        return StreamingResponse(sse_source(), media_type="text/event-stream")
 
     @app.get("/v1/models")
     def models() -> dict[str, Any]:

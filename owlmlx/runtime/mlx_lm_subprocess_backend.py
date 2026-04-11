@@ -422,9 +422,14 @@ class MlxLmSubprocessBackend:
                 proc.kill()
                 proc.wait(timeout=2.0)
 
-    def generate(self, model_id: str, prompt: str, **kwargs: object) -> GenerateResult:
+    def _ensure_session(
+        self,
+        model_id: str,
+        *,
+        reason_prefix: str,
+    ) -> tuple[_ChildSession | None, GenerateResult | None]:
         if model_id not in self._registrations:
-            return GenerateResult(
+            return None, GenerateResult(
                 ok=False,
                 message=f"model not loaded: {model_id}",
                 error_code=RuntimeErrorCode.model_not_loaded,
@@ -432,11 +437,14 @@ class MlxLmSubprocessBackend:
             )
         session = self._sessions.get(model_id)
         if session is None and self.auto_restart_dead_session:
-            restarted = self._restart_session(model_id, reason="missing session before generate")
+            restarted = self._restart_session(
+                model_id,
+                reason=f"missing session before {reason_prefix}",
+            )
             if restarted.ok:
                 session = self._sessions.get(model_id)
         if session is None:
-            return GenerateResult(
+            return None, GenerateResult(
                 ok=False,
                 message=f"model session unavailable: {model_id}",
                 error_code=RuntimeErrorCode.backend_error,
@@ -446,14 +454,17 @@ class MlxLmSubprocessBackend:
             session.last_error = "child process exited unexpectedly"
             self._drop_dead_session(model_id, session)
             if self.auto_restart_dead_session:
-                restarted = self._restart_session(model_id, reason="dead child before generate")
+                restarted = self._restart_session(
+                    model_id,
+                    reason=f"dead child before {reason_prefix}",
+                )
                 if restarted.ok:
                     session = self._sessions.get(model_id)
                 else:
-                    return GenerateResult(
+                    return None, GenerateResult(
                         ok=False,
                         message=(
-                            "mlx-lm subprocess generate failed: "
+                            f"mlx-lm subprocess {reason_prefix} failed: "
                             f"{restarted.payload.get('error')}"
                         ),
                         error_code=RuntimeErrorCode.backend_error,
@@ -461,13 +472,21 @@ class MlxLmSubprocessBackend:
                         detail={"payload": restarted.payload},
                     )
             else:
-                return GenerateResult(
+                return None, GenerateResult(
                     ok=False,
-                    message="mlx-lm subprocess generate failed: child process is not running",
+                    message=(
+                        f"mlx-lm subprocess {reason_prefix} failed: child process is not running"
+                    ),
                     error_code=RuntimeErrorCode.backend_error,
                     model_id=model_id,
                     detail={"stderr": self._collect_stderr(session)},
                 )
+        return session, None
+
+    def generate(self, model_id: str, prompt: str, **kwargs: object) -> GenerateResult:
+        session, error = self._ensure_session(model_id, reason_prefix="generate")
+        if error is not None:
+            return error
         assert session is not None
 
         result = self._exchange(
@@ -521,50 +540,15 @@ class MlxLmSubprocessBackend:
         prompt: str,
         **kwargs: object,
     ) -> Iterator[StreamEvent]:
-        if model_id not in self._registrations:
+        session, error = self._ensure_session(model_id, reason_prefix="stream")
+        if error is not None:
             yield StreamEvent(
                 event="error",
                 model_id=model_id,
-                error_code=RuntimeErrorCode.model_not_loaded,
-                detail={"message": f"model not loaded: {model_id}"},
+                error_code=error.error_code,
+                detail={"message": error.message, **error.detail},
             )
             return
-        session = self._sessions.get(model_id)
-        if session is None and self.auto_restart_dead_session:
-            restarted = self._restart_session(model_id, reason="missing session before stream")
-            if restarted.ok:
-                session = self._sessions.get(model_id)
-        if session is None:
-            yield StreamEvent(
-                event="error",
-                model_id=model_id,
-                error_code=RuntimeErrorCode.backend_error,
-                detail={"message": f"model session unavailable: {model_id}"},
-            )
-            return
-        if session.proc.poll() is not None:
-            session.last_error = "child process exited unexpectedly"
-            self._drop_dead_session(model_id, session)
-            if self.auto_restart_dead_session:
-                restarted = self._restart_session(model_id, reason="dead child before stream")
-                if restarted.ok:
-                    session = self._sessions.get(model_id)
-                else:
-                    yield StreamEvent(
-                        event="error",
-                        model_id=model_id,
-                        error_code=RuntimeErrorCode.backend_error,
-                        detail={"message": str(restarted.payload.get("error")), "payload": restarted.payload},
-                    )
-                    return
-            else:
-                yield StreamEvent(
-                    event="error",
-                    model_id=model_id,
-                    error_code=RuntimeErrorCode.backend_error,
-                    detail={"message": "child process is not running"},
-                )
-                return
         assert session is not None
         try:
             for payload in self._stream_exchange(
