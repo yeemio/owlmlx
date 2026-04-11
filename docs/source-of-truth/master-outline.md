@@ -68,6 +68,7 @@ These are runtime-level goals, not temporary integration work.
 23. `model-line-placement.md`
 24. `first-absorption-target.md`
 25. `convergence-posture.md`
+26. `hypura-overflow-path-reference.md`
 
 ## 6. Adoption Model
 
@@ -75,6 +76,10 @@ These are runtime-level goals, not temporary integration work.
 not require full rewrite of every execution layer. What `owlmlx` owns is
 identity, principles, governance, truth contracts, and path semantics. What it
 borrows freely is MLX substrate, loader machinery, and proven serving patterns.
+
+External systems such as Hypura may be recorded as research references when
+they illuminate future runtime paths. Recording a reference does not promote it
+to an adopted backend or supported owlmlx capability.
 
 The formal adoption rule is frozen in `product-definition.md` section 6.
 

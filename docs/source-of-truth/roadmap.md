@@ -231,6 +231,7 @@ Candidate areas:
 - second large-weight specimen family
 - high-fidelity teacher/reference path
 - alternate specialization paths
+- overflow / NVMe-tier execution path
 
 Acceptance:
 
@@ -241,6 +242,12 @@ Current live candidate:
 
 - `gemma-4-31B-it` as the first serious high-fidelity teacher/reference
   specimen candidate
+
+External reference:
+
+- Hypura is recorded as a future overflow-path reference in
+  `hypura-overflow-path-reference.md`. It is not an adopted backend and should
+  not be used to reopen current Kimi large-weight serving boundaries.
 
 ## 6. Training And Production Program
 

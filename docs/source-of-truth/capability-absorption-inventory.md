@@ -45,34 +45,19 @@ Total: 7 Python modules, 141 tests, 20 truth documents.
 
 ## 3. Gap-Driven Inventory
 
-### Gap 1: Runtime Health Semantics
+### Gap 1: Runtime Health Semantics — **ABSORBED + CONSUMED**
 
-**What owlmlx lacks:**
-owlmlx validates runtime status schema shapes but does not define or own the
-health semantic tiers themselves. It cannot answer "is this model truly
-loaded and inference-capable?" — only "does this JSON shape validate?"
+**What owlmlx now owns:**
+`owlmlx/runtime_health.py` — 6 enum types (LoadState, InferenceHealth,
+WaitTier, TruthLevel, RuntimeReadiness, PlatformStatus), 7 derivation
+functions, 3 normalization functions. 85 tests. Platform `metrics.py`
+imports `derive_wait_tier()` and `derive_platform_status()`.
 
-**What the platform has:**
-
-- 3-level health semantics: liveness / readiness / deep diagnosis
-  (system-architecture.md §4)
-- 5-tier `load_state`: `true_loaded` / `inferred_loaded` / `cold` /
-  `unavailable` / `unknown` (test_phase22_runtime_truth.py)
-- Backend inference health: `serving` / `stale` / `reachable_not_serving` /
-  `down` (system-architecture.md §2.3.6)
-- `read_platform_readiness()` composite in `ops_dashboard/metrics.py`
-
-**Platform maturity:** Verified — tested across 80+ phases, 5-tier truth
-exercised with real oMLX introspection.
-
-**Absorption candidate:** YES — runtime health tiers are runtime truth, not
-platform policy. owlmlx should own the semantic definitions; platform
-consumes them.
-
-**Current platform source files:**
-- `ops_dashboard/metrics.py` (health definitions)
-- `ops_dashboard/health.py` (probing logic)
-- `tests/test_phase22_runtime_truth.py`
+**What the platform retains:**
+All HTTP/socket/tmux probing, backend-specific introspection (oMLX
+engine_pool, vLLM model lists), preflight check execution, recovery
+actions, dashboard rendering. Platform assigns raw load_state values
+from probe results; owlmlx derives composite labels.
 
 ---
 
@@ -311,7 +296,7 @@ because they belong to other architectural layers.
 
 | Gap | Capability | Maturity | Absorption Type |
 |---|---|---|---|
-| Gap 1 | Runtime health semantics | Verified (80+ phases) | Full schema + semantic ownership |
+| Gap 1 | Runtime health semantics | **Absorbed + consumed** | `owlmlx/runtime_health.py` — 6 enums, 7 derivation functions, 85 tests; platform consumes |
 | Gap 2 | Abort recovery state machine | Verified (field-tested) | Full module absorption |
 | Gap 3 | Context concurrency policy | Verified (hardware-proven) | Full boundary ownership |
 | Gap 4 | Memory budget enforcement | Verified (production use) | Full budget logic ownership |

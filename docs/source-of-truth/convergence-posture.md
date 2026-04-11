@@ -41,7 +41,7 @@ and what should happen next.
 | Area | owlmlx Side | Platform Side | Why Still Separate |
 |---|---|---|---|
 | Substrate boundaries | All three substrate boundaries absorbed: memory budget (R13), context concurrency (R12), abort recovery (R11) | **Platform consumes owlmlx truth** — `control_service.py` imports `owlmlx.memory_budget`, `context_concurrency_policy.py` imports `owlmlx.context_concurrency`, `abort_recovery.py` delegates state tracking to `owlmlx.abort_recovery.AbortRecoveryTracker` | **Consumption wired**; local duplicate definitions removed |
-| Runtime health semantics | Schema validation only | 5-tier load_state, 4-level inference health in metrics.py | Larger scope; second-wave |
+| Runtime health semantics | **Absorbed + consumed** (R14): 6 enums, 7 derivation functions in `owlmlx/runtime_health.py`; platform imports `derive_wait_tier()` and `derive_platform_status()` | Platform owns all probing (HTTP, socket, tmux), backend-specific introspection, preflight check execution, recovery actions | **Consumption wired** — inline derivation chains replaced |
 | Model lifecycle states | Ownership assigned (R15) | State machine lives in lifecycle.py + docs | Split absorption needed |
 | Per-model runtime truth | Status schema exists | Endpoint logic in router app.py | Schema extracted; transport stays |
 | Cache truth | Not yet started | distilled_cache_substrate.py | Specialized; needs generalization |
@@ -52,10 +52,10 @@ and what should happen next.
 | Metric | Score |
 |---|---|
 | Capabilities with assigned truth owner | **46/46** (100%) |
-| owlmlx-owned capabilities with code | **7/19** (37%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency, abort_recovery |
-| owlmlx-owned capabilities consumed by platform | **3/7** (43%) — memory_budget, context_concurrency, abort_recovery (platform imports owlmlx truth, no local duplicates) |
+| owlmlx-owned capabilities with code | **8/19** (42%) — runtime_status, serving, serving_status, training, memory_budget, context_concurrency, abort_recovery, runtime_health |
+| owlmlx-owned capabilities consumed by platform | **4/8** (50%) — memory_budget, context_concurrency, abort_recovery, runtime_health (platform imports owlmlx truth, no local duplicates) |
 | owlmlx-owned capabilities as doc-only | **6/19** (32%) — governance, hazardous-ops, safe-resume, training contracts |
-| owlmlx-owned capabilities to absorb | **6/19** (32%) — Gaps 1, 5-8 from inventory (Gaps 2+3+4 substrate trio fully absorbed) |
+| owlmlx-owned capabilities to absorb | **5/19** (26%) — Gaps 5-8 from inventory (Gaps 1+2+3+4 fully absorbed) |
 | Model lines with formal placement | **6/6** (100%) |
 | Platform capabilities with clear non-absorption reasoning | **14/14** (100%) |
 
