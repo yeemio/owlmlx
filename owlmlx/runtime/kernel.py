@@ -83,9 +83,11 @@ class RuntimeKernel:
     def load_model(self, model_id: str, *, memory_gb: float | None = None) -> LoadResult:
         """Load a model after owlmlx memory-budget preflight."""
 
-        requested_gb = self.backend.status().detail.get("default_memory_gb", memory_gb)
-        if memory_gb is not None:
-            requested_gb = memory_gb
+        requested_gb = (
+            memory_gb
+            if memory_gb is not None
+            else self.backend.status().detail.get("default_memory_gb")
+        )
         if requested_gb is None:
             return LoadResult(
                 ok=False,

@@ -6,9 +6,31 @@ from dataclasses import asdict
 from typing import Any
 
 from fastapi import FastAPI
+from pydantic import BaseModel, Field
 
 from .backends import FakeBackend, RuntimeBackend
 from .kernel import RuntimeKernel
+
+
+class LoadRequest(BaseModel):
+    """HTTP request body for model load."""
+
+    model_id: str = Field(min_length=1)
+    memory_gb: float | None = Field(default=None, ge=0)
+
+
+class GenerateRequest(BaseModel):
+    """HTTP request body for generation."""
+
+    prompt: str
+    model_id: str | None = Field(default=None, min_length=1)
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class UnloadRequest(BaseModel):
+    """HTTP request body for model unload."""
+
+    model_id: str = Field(min_length=1)
 
 
 def _result_to_dict(result: Any) -> dict[str, Any]:
@@ -37,19 +59,19 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
         }
 
     @app.post("/v1/load")
-    def load_model(payload: dict[str, Any]) -> dict[str, Any]:
+    def load_model(payload: LoadRequest) -> dict[str, Any]:
         result = runtime.load_model(
-            str(payload["model_id"]),
-            memory_gb=payload.get("memory_gb"),
+            payload.model_id,
+            memory_gb=payload.memory_gb,
         )
         return _result_to_dict(result)
 
     @app.post("/v1/generate")
-    async def generate(payload: dict[str, Any]) -> dict[str, Any]:
+    async def generate(payload: GenerateRequest) -> dict[str, Any]:
         result = await runtime.generate(
-            str(payload.get("prompt", "")),
-            model_id=payload.get("model_id"),
-            **dict(payload.get("params") or {}),
+            payload.prompt,
+            model_id=payload.model_id,
+            **payload.params,
         )
         return _result_to_dict(result)
 
@@ -64,8 +86,8 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
         }
 
     @app.post("/v1/unload")
-    def unload_model(payload: dict[str, Any]) -> dict[str, Any]:
-        result = runtime.unload_model(str(payload["model_id"]))
+    def unload_model(payload: UnloadRequest) -> dict[str, Any]:
+        result = runtime.unload_model(payload.model_id)
         return _result_to_dict(result)
 
     return app

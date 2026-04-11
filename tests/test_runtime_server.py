@@ -79,3 +79,35 @@ def test_generate_without_loaded_model_returns_runtime_error() -> None:
     payload = response.json()
     assert payload["ok"] is False
     assert payload["error_code"] == "model_not_loaded"
+
+
+def test_load_requires_model_id_validation() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+
+    response = client.post("/v1/load", json={"memory_gb": 1.0})
+
+    assert response.status_code == 422
+
+
+def test_unload_requires_model_id_validation() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+
+    response = client.post("/v1/unload", json={})
+
+    assert response.status_code == 422
+
+
+def test_generate_requires_prompt_validation() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+
+    response = client.post("/v1/generate", json={"params": {"max_tokens": 4}})
+
+    assert response.status_code == 422
+
+
+def test_load_rejects_negative_memory_validation() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+
+    response = client.post("/v1/load", json={"model_id": "bad", "memory_gb": -1.0})
+
+    assert response.status_code == 422
