@@ -68,7 +68,9 @@ Capability labels:
 |---|---|---|
 | Generalized foreground-interactive runtime | experimental | Not yet established as current truth |
 | Additional runtime paths beyond large-weight | experimental | Future only when real capability truth exists |
-| Real MLX model load/generate through owlmlx | supported | `MlxLmSubprocessBackend` has real successful local smokes through the clean `.runtime1-mlx` environment on `gpt-oss-20b-MXFP4-Q4`, `Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit`, and `Qwen3.5-35B-A3B-4bit`; Runtime-2 further proves persistent child reuse on `gpt-oss-20b` and `Qwen3.5-27B` |
+| Real MLX model load/generate through owlmlx | supported | `MlxLmSubprocessBackend` has real successful local smokes through the clean `.runtime1-mlx` environment on `gpt-oss-20b-MXFP4-Q4`, `Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit`, and `Qwen3.5-35B-A3B-4bit`; Runtime-2 further proves persistent child reuse on `gpt-oss-20b` and `Qwen3.5-27B` and has a steady-state benchmark script |
+| Persistent child health probe | supported | Backend `status()` actively issues `ping` to live child sessions and surfaces `child_health` in status detail |
+| Dead child restart policy | supported | Registration survives child death; the next generation request can restart the child session within configured restart-attempt limits |
 | Overflow / NVMe-tier execution path | experimental | Future candidate only; Hypura recorded as external reference in `hypura-overflow-path-reference.md`, not adopted |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction; Gemma has moved to production mainline instead |
 | `gemma-4-31B-it` as production mainline | supported | Production mainline frozen; pilot LoRA PASS; substrate contracts exercised end-to-end |

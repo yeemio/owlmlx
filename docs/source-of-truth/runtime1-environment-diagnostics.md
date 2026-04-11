@@ -120,3 +120,9 @@ Current answer on `unload`:
 - in Runtime-1 one-shot mode, `unload` was only a registration boundary
 - in Runtime-2 persistent mode, `unload` is a real child teardown boundary
 - Runtime-2 `generate` reuses the already-loaded child process
+
+First Runtime-2 steady-state benchmark on the clean environment:
+
+| Model | Load | Warm mean | Warm median | Warm min | Warm max |
+|---|---|---|---|---|---|
+| gpt-oss-20b-MXFP4-Q4 | `1.4891s` | `0.1677s` | `0.1571s` | `0.1341s` | `0.2448s` |

@@ -112,6 +112,22 @@ def test_subprocess_backend_generate_reuses_same_child(tmp_path: Path) -> None:
     backend.unload("model-a")
 
 
+def test_subprocess_backend_status_performs_ping_health_probe(tmp_path: Path) -> None:
+    runner = _write_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    status = backend.status()
+
+    assert status.healthy is True
+    assert status.detail["child_health"]["model-a"]["ok"] is True
+    assert status.detail["child_health"]["model-a"]["pid"] == status.detail["children"]["model-a"]["pid"]
+    backend.unload("model-a")
+
+
 def test_subprocess_backend_generate_requires_loaded_model(tmp_path: Path) -> None:
     runner = _write_runner(tmp_path)
     backend = MlxLmSubprocessBackend(
@@ -228,3 +244,28 @@ def test_subprocess_backend_drops_dead_child_after_generate_crash(tmp_path: Path
     assert result.error_code is RuntimeErrorCode.backend_error
     assert backend.status().detail["children"] == {}
     assert backend.status().healthy is False
+
+
+def test_subprocess_backend_auto_restarts_dead_child_on_next_generate(tmp_path: Path) -> None:
+    runner = _write_runner(tmp_path, crash_on_generate=True)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+        max_restart_attempts=2,
+    )
+    loaded = backend.load("model-a", memory_gb=1.0)
+    assert loaded.ok is True
+
+    first = backend.generate("model-a", "hello")
+    assert first.ok is False
+
+    ok_runner = _write_runner(tmp_path, ok=True)
+    backend.runner_module = ok_runner
+
+    second = backend.generate("model-a", "again")
+
+    assert second.ok is True
+    status = backend.status()
+    assert status.detail["children"]["model-a"]["restart_count"] == 1
+    assert status.detail["child_health"]["model-a"]["ok"] is True
+    backend.unload("model-a")

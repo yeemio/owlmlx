@@ -39,7 +39,7 @@ memory budget / model inventory / runtime health / GenerationGate。
 
 ### 2.2 代码盘点
 
-Runtime-2 后，owlmlx 有 19 个 Python 模块，329 tests。
+Runtime-2 hardening 后，owlmlx 有 19 个 Python 模块，331 tests。
 
 | 模块 | LOC | 性质 | 做什么 |
 |---|---|---|---|
@@ -113,8 +113,8 @@ owlmlx 实际占据的位置：Layer 2 最小 kernel + truth substrate。还不�
 | 2 | **Safe real inference engine** | persistent child 已完成真实 `generate many` | 下一步是 steady-state metrics、restart policy、streaming |
 | 3 | **Production HTTP server** | Runtime-0 最小 FastAPI app | 需要错误码、流式输出、配置、部署入口 |
 | 4 | **Memory controller** | load 前预算检查 + inventory | 要能主动 load/unload/evict/reclaim |
-| 5 | **Self-introspection** | kernel status 可自推导，真实 backend probe 未完成 | runtime 要能 probe 自己的真实 backend |
-| 6 | **Process lifecycle** | 不存在 | 要能启动、停止、restart |
+| 5 | **Self-introspection** | kernel status 可自推导；persistent child `ping` health probe 已接入 backend status | 下一步是把 probe 结果上推到更明确的 runtime/API 语义 |
+| 6 | **Process lifecycle** | persistent child `load / unload / next-request restart` 已存在 | 下一步是 restart policy 的更高层治理和 SLO |
 
 Runtime-2 当前的运行纪律已经明确：
 
@@ -123,6 +123,8 @@ Runtime-2 当前的运行纪律已经明确：
 - 已知危险 MLX venv 只能显式 opt-in 诊断
 - 环境问题要报告成结构化失败，不允许用默认诊断制造重复崩溃
 - 真实模型会话必须通过 persistent child lifecycle，不回退到 one-shot 默认路径
+- child health 以 `ping` 为准，不允许只看进程是否还活着
+- dead child restart 只在保留 registration 的前提下发生，不在当前失败请求里偷偷重试
 
 ### 4.2 已经完成的（truth library 价值）
 
@@ -224,11 +226,12 @@ R11-R18 的价值：给 RuntimeKernel 准备了判断层。
 诚实的 scorecard 拆成两张：
 
 ```
-Truth substrate readiness:  11 truth modules, 329 tests, 7 platform consumers ✓
+Truth substrate readiness:  11 truth modules, 331 tests, 7 platform consumers ✓
 Runtime executability:      Runtime-0 MVP ✓ → Runtime-1 真实模型验证 ✓ → Runtime-2 persistent child ✓
 Subprocess isolation:       父进程永不 import mlx_lm，子进程 abort → 结构化错误 ✓
 Real local smoke baseline:  gpt-oss-20b + Qwen3.5-27B + Qwen3.5-35B-A3B 通过 ✓
 Persistent child proof:     gpt-oss-20b / Qwen3.5-27B 同一 pid 连续 generate 通过 ✓
+Steady-state benchmark:     gpt-oss-20b load≈1.49s, warm median≈0.157s ✓
 Production readiness:       not yet
 ```
 

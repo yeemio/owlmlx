@@ -165,6 +165,8 @@ Runtime-2 is now the active kernel milestone. It has verified:
 - persistent child lifecycle through `MlxLmSubprocessBackend`
 - `load once -> generate many -> explicit unload`
 - real local model reuse in the clean `.runtime1-mlx` environment
+- child health probe through runner `ping`
+- dead child restart on the next generation request when registration remains
 
 Runtime-2 real local smoke results:
 
@@ -178,8 +180,26 @@ Runtime-2 real local smoke results:
   - `generate #2` reused the same child in about `0.4322s`
 
 This closes the Runtime-1 one-shot performance bottleneck. The dominant gap is
-no longer cold-start-per-request. It is now Runtime-2 hardening: persistent
-child health probe, restart policy, and steady-state serving metrics.
+no longer cold-start-per-request.
+
+Runtime-2 hardening is now partially complete:
+
+- child health probe is exposed through backend `status()`
+- dead child restart policy exists at the backend layer
+- steady-state benchmark tooling exists in `scripts/runtime2_steady_state_benchmark.py`
+
+First steady-state benchmark baseline:
+
+- `gpt-oss-20b-MXFP4-Q4`
+  - `load_time_s`: about `1.4891s`
+  - `warm_generate_mean_s`: about `0.1677s`
+  - `warm_generate_median_s`: about `0.1571s`
+  - `warm_generate_min_s`: about `0.1341s`
+  - `warm_generate_max_s`: about `0.2448s`
+
+The next dominant gap is Runtime-2 reliability hardening beyond the backend:
+explicit restart semantics in the HTTP/runtime surface, persistent child SLOs,
+and fair comparison benchmarks against the old platform.
 
 The current environment truth is frozen separately in
 `runtime1-environment-diagnostics.md`.

@@ -82,24 +82,32 @@ class MlxLmSubprocessBackend:
         python_executable: str | None = None,
         runner_module: str = "owlmlx.runtime.mlx_lm_runner",
         timeout_s: float = 600.0,
+        health_probe_timeout_s: float = 2.0,
+        auto_restart_dead_session: bool = True,
+        max_restart_attempts: int = 1,
         extra_pythonpath: tuple[str, ...] = (),
     ) -> None:
         self.python_executable = python_executable or sys.executable
         self.runner_module = runner_module
         self.timeout_s = timeout_s
+        self.health_probe_timeout_s = health_probe_timeout_s
+        self.auto_restart_dead_session = auto_restart_dead_session
+        self.max_restart_attempts = max_restart_attempts
         self.extra_pythonpath = extra_pythonpath
+        self._registrations: dict[str, LoadedModelInfo] = {}
         self._sessions: dict[str, _ChildSession] = {}
+        self._restart_counts: dict[str, int] = {}
         self._last_error: str | None = None
         self._last_result: MlxLmSubprocessResult | None = None
         self._io_lock = threading.Lock()
 
     def load(self, model_id: str, *, memory_gb: float | None = None) -> LoadResult:
-        if model_id in self._sessions:
+        if model_id in self._registrations:
             return LoadResult(
                 ok=False,
                 message=f"model already loaded: {model_id}",
                 error_code=RuntimeErrorCode.model_already_loaded,
-                model=self._sessions[model_id].model,
+                model=self._registrations[model_id],
             )
         info = LoadedModelInfo(
             model_id=model_id,
@@ -135,7 +143,9 @@ class MlxLmSubprocessBackend:
             )
 
         session.last_payload = result.payload
+        self._registrations[model_id] = info
         self._sessions[model_id] = session
+        self._restart_counts[model_id] = 0
         self._last_error = None
         return LoadResult(
             ok=True,
@@ -210,6 +220,8 @@ class MlxLmSubprocessBackend:
         self,
         session: _ChildSession,
         request: dict[str, Any],
+        *,
+        timeout_s: float | None = None,
     ) -> MlxLmSubprocessResult:
         proc = session.proc
         if proc.poll() is not None:
@@ -226,7 +238,13 @@ class MlxLmSubprocessBackend:
                     raise ValueError("child stdin pipe is unavailable")
                 proc.stdin.write(json.dumps(request) + "\n")
                 proc.stdin.flush()
-                payload, discarded = self._read_payload_line(session)
+                original_timeout = self.timeout_s
+                if timeout_s is not None:
+                    self.timeout_s = timeout_s
+                try:
+                    payload, discarded = self._read_payload_line(session)
+                finally:
+                    self.timeout_s = original_timeout
         except Exception as exc:
             return MlxLmSubprocessResult(
                 ok=False,
@@ -247,6 +265,92 @@ class MlxLmSubprocessBackend:
         self._sessions.pop(model_id, None)
         self._last_error = session.last_error or "child process exited unexpectedly"
 
+    def _probe_session(self, model_id: str, session: _ChildSession) -> dict[str, Any]:
+        result = self._exchange(
+            session,
+            {"action": "ping", "model_id": model_id},
+            timeout_s=self.health_probe_timeout_s,
+        )
+        if result.ok:
+            session.last_payload = result.payload
+            session.last_error = None
+            return {
+                "ok": True,
+                "pid": result.payload.get("pid"),
+                "generation_count": result.payload.get("generation_count"),
+            }
+        error = str(result.payload.get("error") or result.stderr or result.returncode)
+        session.last_error = error
+        if session.proc.poll() is not None:
+            self._drop_dead_session(model_id, session)
+        return {
+            "ok": False,
+            "error": error,
+            "returncode": result.returncode,
+        }
+
+    def _restart_session(self, model_id: str, *, reason: str) -> MlxLmSubprocessResult:
+        model = self._registrations.get(model_id)
+        if model is None:
+            return MlxLmSubprocessResult(
+                ok=False,
+                returncode=-1,
+                stdout="",
+                stderr="",
+                payload={"ok": False, "error": f"no registration for {model_id}"},
+            )
+        restart_count = self._restart_counts.get(model_id, 0)
+        if restart_count >= self.max_restart_attempts:
+            return MlxLmSubprocessResult(
+                ok=False,
+                returncode=-1,
+                stdout="",
+                stderr="",
+                payload={
+                    "ok": False,
+                    "error": (
+                        f"restart attempts exhausted for {model_id}: "
+                        f"{restart_count}/{self.max_restart_attempts}"
+                    ),
+                },
+            )
+        session = self._start_session(model)
+        result = self._exchange(
+            session,
+            {"action": "load", "model_id": model_id},
+        )
+        self._last_result = result
+        if result.ok:
+            session.last_payload = result.payload
+            session.last_error = None
+            self._sessions[model_id] = session
+            self._restart_counts[model_id] = restart_count + 1
+            self._last_error = None
+            return MlxLmSubprocessResult(
+                ok=True,
+                returncode=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                payload={
+                    **result.payload,
+                    "restart_count": self._restart_counts[model_id],
+                    "restart_reason": reason,
+                },
+            )
+        self._terminate_session(session)
+        self._last_error = str(result.payload.get("error") or result.stderr or result.returncode)
+        return MlxLmSubprocessResult(
+            ok=False,
+            returncode=result.returncode,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            payload={
+                **result.payload,
+                "restart_count": restart_count,
+                "restart_reason": reason,
+            },
+        )
+
     def _terminate_session(self, session: _ChildSession) -> None:
         proc = session.proc
         try:
@@ -263,24 +367,52 @@ class MlxLmSubprocessBackend:
                 proc.wait(timeout=2.0)
 
     def generate(self, model_id: str, prompt: str, **kwargs: object) -> GenerateResult:
-        session = self._sessions.get(model_id)
-        if session is None:
+        if model_id not in self._registrations:
             return GenerateResult(
                 ok=False,
                 message=f"model not loaded: {model_id}",
                 error_code=RuntimeErrorCode.model_not_loaded,
                 model_id=model_id,
             )
+        session = self._sessions.get(model_id)
+        if session is None and self.auto_restart_dead_session:
+            restarted = self._restart_session(model_id, reason="missing session before generate")
+            if restarted.ok:
+                session = self._sessions.get(model_id)
+        if session is None:
+            return GenerateResult(
+                ok=False,
+                message=f"model session unavailable: {model_id}",
+                error_code=RuntimeErrorCode.backend_error,
+                model_id=model_id,
+            )
         if session.proc.poll() is not None:
             session.last_error = "child process exited unexpectedly"
             self._drop_dead_session(model_id, session)
-            return GenerateResult(
-                ok=False,
-                message="mlx-lm subprocess generate failed: child process is not running",
-                error_code=RuntimeErrorCode.backend_error,
-                model_id=model_id,
-                detail={"stderr": self._collect_stderr(session)},
-            )
+            if self.auto_restart_dead_session:
+                restarted = self._restart_session(model_id, reason="dead child before generate")
+                if restarted.ok:
+                    session = self._sessions.get(model_id)
+                else:
+                    return GenerateResult(
+                        ok=False,
+                        message=(
+                            "mlx-lm subprocess generate failed: "
+                            f"{restarted.payload.get('error')}"
+                        ),
+                        error_code=RuntimeErrorCode.backend_error,
+                        model_id=model_id,
+                        detail={"payload": restarted.payload},
+                    )
+            else:
+                return GenerateResult(
+                    ok=False,
+                    message="mlx-lm subprocess generate failed: child process is not running",
+                    error_code=RuntimeErrorCode.backend_error,
+                    model_id=model_id,
+                    detail={"stderr": self._collect_stderr(session)},
+                )
+        assert session is not None
 
         result = self._exchange(
             session,
@@ -336,6 +468,8 @@ class MlxLmSubprocessBackend:
                 error_code=RuntimeErrorCode.model_not_loaded,
                 model_id=model_id,
             )
+        self._registrations.pop(model_id, None)
+        self._restart_counts.pop(model_id, None)
         result = self._exchange(
             session,
             {
@@ -377,24 +511,32 @@ class MlxLmSubprocessBackend:
             session = self._sessions[model_id]
             session.last_error = "child process exited unexpectedly"
             self._drop_dead_session(model_id, session)
+        child_health = {}
+        for model_id, session in list(self._sessions.items()):
+            child_health[model_id] = self._probe_session(model_id, session)
         return BackendStatus(
             backend_name=self.name,
             healthy=self._last_error is None,
             loaded_models=tuple(
-                session.model for session in self._sessions.values()
+                self._registrations[model_id]
+                for model_id in self._registrations
             ),
             detail={
-                "model_count": len(self._sessions),
+                "model_count": len(self._registrations),
                 "persistent_child": True,
                 "last_error": self._last_error,
+                "auto_restart_dead_session": self.auto_restart_dead_session,
+                "max_restart_attempts": self.max_restart_attempts,
                 "children": {
                     model_id: {
                         "pid": session.pid,
                         "alive": session.proc.poll() is None,
                         "generation_count": session.generation_count,
+                        "restart_count": self._restart_counts.get(model_id, 0),
                     }
                     for model_id, session in self._sessions.items()
                 },
+                "child_health": child_health,
                 "last_subprocess": (
                     {
                         "ok": self._last_result.ok,
