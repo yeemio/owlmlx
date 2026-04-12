@@ -457,6 +457,11 @@ def test_anthropic_messages_stream_can_return_tool_use_events() -> None:
     assert any('"type": "tool_use"' in line or '"type":"tool_use"' in line for line in chunks)
     assert any('"type": "input_json_delta"' in line or '"type":"input_json_delta"' in line for line in chunks)
     assert any('"stop_reason": "tool_use"' in line or '"stop_reason":"tool_use"' in line for line in chunks)
+    tool_start_index = next(i for i, line in enumerate(chunks) if '"type": "tool_use"' in line or '"type":"tool_use"' in line)
+    assert not any(
+        '"content_block":{"type":"text","text":""}' in line or '"content_block": {"type": "text", "text": ""}' in line
+        for line in chunks[:tool_start_index + 1]
+    )
 
 
 def test_anthropic_messages_with_tools_do_not_force_tool_use_by_default() -> None:

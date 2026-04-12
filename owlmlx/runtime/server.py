@@ -524,17 +524,20 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
                 "event: message_start\n"
                 f"data: {json.dumps({'type': 'message_start', 'message': _anthropic_message_dict(message_id=message_id, model=target_model or 'unknown', text='', stop_reason=None, input_tokens=input_tokens, output_tokens=0)})}\n\n"
             )
-            yield (
-                "event: content_block_start\n"
-                "data: {\"type\":\"content_block_start\",\"index\":0,"
-                "\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
-            )
+            text_block_started = False
             async for event in runtime.generate_stream_messages(
                 turns,
                 model_id=target_model,
                 **params,
             ):
                 if event.event == "token":
+                    if not text_block_started:
+                        yield (
+                            "event: content_block_start\n"
+                            "data: {\"type\":\"content_block_start\",\"index\":0,"
+                            "\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+                        )
+                        text_block_started = True
                     chunk = {
                         "type": "content_block_delta",
                         "index": 0,
@@ -570,7 +573,8 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
                     continue
                 if event.event == "done":
                     if event.finish_reason != "tool_use":
-                        yield "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+                        if text_block_started:
+                            yield "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
                     message_delta = {
                         "type": "message_delta",
                         "delta": {"stop_reason": "tool_use" if event.finish_reason == "tool_use" else "end_turn", "stop_sequence": None},
