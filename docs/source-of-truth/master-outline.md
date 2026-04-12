@@ -84,6 +84,7 @@ These are runtime-level goals, not temporary integration work.
 39. `runtime9-source-first-and-replacement-verdict.md`
 40. `runtime10-replacement-hardening-and-parity.md`
 41. `runtime11-degraded-routing-and-replacement-closure.md`
+42. `runtime12-replacement-readiness-verdict.md`
 
 ## 6. Adoption Model
 
@@ -107,7 +108,7 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-Runtime-11 is now complete. The next question is:
+Runtime-12 is now complete. The next question is:
 
-**How does owlmlx move from degraded-routing closure into a final production
-replacement decision?**
+**Does the team now start production replacement work, or explicitly hold the
+old platform in place while parity gaps remain?**

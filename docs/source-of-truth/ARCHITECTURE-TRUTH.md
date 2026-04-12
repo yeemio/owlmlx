@@ -62,7 +62,7 @@ Runtime-7 完成交付后，owlmlx 有 19 个 Python 模块，357 tests。
 | runtime/mlx_lm_subprocess_backend.py | ~220 | **subprocess backend** | 父进程安全的 mlx-lm 持久 child lifecycle：`load once -> generate many -> unload` |
 | runtime/mlx_environment.py | ~150 | **environment probe** | 安全环境选择 + 结构化诊断，default vs known 分离 |
 
-**关键事实：Runtime-11 已把 `owlcoda` 在 `auto + healthz-only` 下的本地协议歧义收成 fail-closed；它不会再静默回退到 `/v1/chat/completions`。旧平台结论仍是 not yet replaceable。父进程仍永不 import mlx_lm。**
+**关键事实：Runtime-12 已把 replacement verdict 提升为控制面显式输出：launch readiness、operability、replaceability 不再混在一起。旧平台结论仍是 not yet replaceable。父进程仍永不 import mlx_lm。**
 
 ### 2.3 文档盘点
 
@@ -239,6 +239,7 @@ Control-plane operability:  Runtime-9 runtime probe + preflight + dry-run agains
 Source-first tool loop:     Runtime-10 real source-first tool loop against `owlmlx` ✓
 Downgrade-path hardening:   Runtime-10 `healthz` no longer fabricates transport protocol ✓
 Degraded-routing closure:   Runtime-11 `auto + healthz-only` local routing now fails closed ✓
+Replacement readiness:     Runtime-12 `doctor` now emits explicit verdict + blocker list ✓
 Replacement verdict:        Runtime-9 = old platform not yet replaceable ✓
 Subprocess isolation:       父进程永不 import mlx_lm，子进程 abort → 结构化错误 ✓
 Real local smoke baseline:  gpt-oss-20b + Qwen3.5-27B + Qwen3.5-35B-A3B 通过 ✓

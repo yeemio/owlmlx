@@ -88,6 +88,7 @@ Capability labels:
 | OwlCoda control-plane operability against direct owlmlx | supported | Runtime-9 promotes runtime probe, preflight, server health, and dry-run to consume `/v1/runtime/status` as first-class truth |
 | Control-plane downgrade-path hardening | supported | Runtime-10 makes `healthz` a liveness-only fallback; it no longer fabricates `openai_chat` protocol when richer runtime truth is absent |
 | Degraded local routing now fails closed | supported | Runtime-11 blocks `localRuntimeProtocol=auto` when only `/healthz` is reachable; it no longer silently falls through to `/v1/chat/completions` for local models |
+| Replacement readiness verdict surface | supported | Runtime-12 promotes replacement readiness into explicit `doctor` output with a blocker list; launch readiness and replacement readiness are now distinct control-plane truths |
 | Old platform production replacement verdict | partial | Runtime-9 now freezes a real verdict: not yet replaceable; prompt-path cutover and first control-plane operability are proven, full parity and production closure are not |
 | Overflow / NVMe-tier execution path | experimental | Future candidate only; Hypura recorded as external reference in `hypura-overflow-path-reference.md`, not adopted |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction; Gemma has moved to production mainline instead |
