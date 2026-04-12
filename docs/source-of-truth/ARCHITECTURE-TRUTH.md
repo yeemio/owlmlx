@@ -1,7 +1,7 @@
 # owlmlx 架构真源
 
 > Status: **唯一权威** — 与本文件冲突的其他文档，以本文件为准
-> Updated: 2026-04-11
+> Updated: 2026-04-12
 
 ## 1. owlmlx 是什么
 
@@ -19,7 +19,7 @@ owlmlx 是我们在 Apple Silicon 上的**自有 MLX runtime**。
 
 ### 2.1 owlmlx 今天实际是什么
 
-一个完成 **Runtime-7 first real Owl consumer cutover** 的早期 runtime。
+一个完成 **Runtime-8 Owl ecosystem client cutover** 的早期 runtime。
 
 它不再只是 truth derivation library：现在有自有 `RuntimeKernel`、
 backend adapter 边界、FakeBackend、最小 HTTP entry，并且 kernel 自己消费
@@ -233,6 +233,7 @@ Runtime migration seam:     Runtime-4 chat/completions + SSE + model discovery �
 Runtime compat entrypoints: Runtime-5 backend-owned message handling + completions/chat compatibility ✓
 Anthropic cutover seam:     Runtime-6 `/v1/messages` + count_tokens + Anthropic SSE + tool-use seam ✓
 Real Owl consumer cutover:  Runtime-7 `owlcc run` direct endpoint tool loop completed ✓
+Real OwlCoda cutover:       Runtime-8 native/headless + native REPL + resume/tool-loop continuation ✓
 Subprocess isolation:       父进程永不 import mlx_lm，子进程 abort → 结构化错误 ✓
 Real local smoke baseline:  gpt-oss-20b + Qwen3.5-27B + Qwen3.5-35B-A3B 通过 ✓
 Persistent child proof:     gpt-oss-20b / Qwen3.5-27B 同一 pid 连续 generate 通过 ✓

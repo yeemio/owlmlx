@@ -1,6 +1,6 @@
 # Runtime-8 OwlCoda Cutover Verification
 
-> Status: partial cutover verified
+> Status: Runtime-8 complete
 > Updated: 2026-04-12
 
 ## 1. Goal
@@ -8,10 +8,10 @@
 Validate that `owlcoda` native/headless can consume `owlmlx /v1/messages` as a
 real Anthropic-shaped runtime endpoint, not just a mocked schema surface.
 
-Runtime-8 is split into two verified-but-incomplete steps so far:
+Runtime-8 was split into two execution steps:
 
 - Runtime-8A: `owlcoda` native/headless direct cutover
-- Runtime-8B: `owlcoda --native` REPL cutover + first control-plane seam
+- Runtime-8B: `owlcoda --native` REPL cutover + state/recovery proof + first control-plane seam
 
 The work intentionally starts from the narrowest real path and then expands.
 
@@ -132,7 +132,50 @@ Result:
 
 This is the first verified `owlcoda --native` REPL cutover into `owlmlx`.
 
-### 5.2 Runtime-8B protocol cleanup
+### 5.2 Stateful multi-turn and recovery verification
+
+Runtime-8B then verified that the REPL cutover was not single-turn only.
+
+An isolated `HOME` / `OWLCODA_HOME` was used so that session persistence could
+be inspected without touching the user's real session store.
+
+Verification flow:
+
+1. start a fresh `owlcoda --native` REPL against `owlmlx`
+2. complete one non-tool turn
+3. inspect and record the session id
+4. exit the REPL cleanly
+5. start a second REPL with `resumeSession=<same id>`
+6. verify the restored conversation state
+7. run a resumed tool loop:
+   - `tool_use`
+   - tool execution
+   - `tool_result`
+   - final assistant continuation
+
+Verified facts:
+
+- resumed session id remained stable across both REPL runs
+- resumed REPL started with the prior turn history already present
+- post-resume tool loop completed successfully
+- persisted session file contained the expected sequence:
+  - initial user turn
+  - initial assistant turn
+  - resumed user turn
+  - assistant `tool_use`
+  - user `tool_result`
+  - final assistant continuation
+
+Result:
+
+- session id: stable
+- turns before resume: `2`
+- turns after resumed tool loop: `6`
+- outcome: success
+This is the first verified state/recovery proof for direct `owlcoda` REPL
+consumption of `owlmlx`.
+
+### 5.3 Runtime-8B protocol cleanup
 
 Runtime-8B exposed one protocol cleanliness issue in `owlmlx` streaming:
 
@@ -148,7 +191,7 @@ Fix:
 - streamed `tool_use` no longer emits an empty preceding text block
 - regression is covered in `tests/test_runtime_server.py`
 
-### 5.3 First control-plane seam
+### 5.4 First control-plane seam
 
 `owlcoda` previously treated `/v1/models` as the only runtime reachability
 surface in native REPL preflight and `/doctor`.
@@ -168,10 +211,12 @@ Fix:
 
 This is the first verified control-plane seam between `owlcoda` and `owlmlx`.
 
-## 6. What Runtime-8 Proves So Far
+## 6. What Runtime-8 Proves
 
 - `owlcoda` native/headless can directly consume `owlmlx /v1/messages`
 - `owlcoda --native` REPL can directly consume `owlmlx /v1/messages`
+- `owlcoda --native` REPL can resume a persisted session and continue through a
+  resumed tool loop against `owlmlx`
 - `owlmlx` Anthropic streaming surface is compatible with `owlcoda`'s
   native consumer for:
   - text streaming
@@ -184,7 +229,6 @@ This is the first verified control-plane seam between `owlcoda` and `owlmlx`.
 ## 7. What Runtime-8 Does Not Yet Prove
 
 - source-first mode cutover
-- full multi-turn state/recovery behavior under REPL cutover
 - production backend reasoning quality
 - full control-plane integration
 - production replacement of the old platform
@@ -192,15 +236,21 @@ This is the first verified control-plane seam between `owlcoda` and `owlmlx`.
 ## 8. Runtime-8 Status
 
 - Runtime-8A: complete
-- Runtime-8B: in progress
-- Runtime-8 overall: open
+- Runtime-8B: complete
+- Runtime-8 overall: complete
 
 ## 9. Next Runtime-8 Work
 
-The next Runtime-8 step should expand from REPL proof into stronger state and
-integration validation:
+Runtime-8 is the point where `owlmlx` stops being only an internally verified
+runtime and becomes a runtime directly consumed by both Owl ecosystem clients:
 
-1. stronger stateful multi-turn verification
-2. explicit state/recovery validation
-3. deeper control-plane integration
-4. final Runtime-8 cutover verdict
+- Runtime-7: `owlcc`
+- Runtime-8: `owlcoda`
+
+The next phase should move from verified cutover into deeper integration and
+replacement work:
+
+1. source-first parity and cutover judgment
+2. deeper control-plane integration
+3. production-backend validation under OwlCoda consumption
+4. replacement verdicts instead of seam-only proof
