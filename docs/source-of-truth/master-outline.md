@@ -83,6 +83,7 @@ These are runtime-level goals, not temporary integration work.
 38. `runtime8-owlcoda-cutover-verification.md`
 39. `runtime9-source-first-and-replacement-verdict.md`
 40. `runtime10-replacement-hardening-and-parity.md`
+41. `runtime11-degraded-routing-and-replacement-closure.md`
 
 ## 6. Adoption Model
 
@@ -106,7 +107,7 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-Runtime-10 is now complete. The next question is:
+Runtime-11 is now complete. The next question is:
 
-**How does owlmlx move from first replacement-grade hardening into a final
-production replacement decision?**
+**How does owlmlx move from degraded-routing closure into a final production
+replacement decision?**
