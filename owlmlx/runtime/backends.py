@@ -127,14 +127,15 @@ class FakeBackend:
         if self.generate_delay_s > 0:
             time.sleep(self.generate_delay_s)
         if "[tool_result:" in prompt:
+            exact_reply = self._extract_exact_reply(prompt)
             return GenerateResult(
                 ok=True,
                 message="generated final response after tool_result",
                 model_id=model_id,
-                text=f"{prompt}{self.completion_suffix}",
+                text=exact_reply or f"{prompt}{self.completion_suffix}",
                 finish_reason="stop",
                 prompt_tokens=len(prompt.split()),
-                completion_tokens=len(self.completion_suffix.split()),
+                completion_tokens=len((exact_reply or self.completion_suffix).split()),
             )
         tools = kwargs.get("tools")
         if isinstance(tools, list) and tools and self._should_emit_tool_use(prompt, kwargs):
@@ -165,10 +166,22 @@ class FakeBackend:
         tool_choice = kwargs.get("tool_choice")
         if tool_choice == "none":
             return False
-        return "[force_tool_use]" in prompt
+        lowered = prompt.lower()
+        return (
+            "[force_tool_use]" in prompt
+            or "run the shell command" in lowered
+            or "use bash" in lowered
+            or "run bash" in lowered
+        )
 
     def _build_tool_use(self, tools: list[object], prompt: str) -> dict[str, object]:
         for tool in tools:
+            if isinstance(tool, dict) and str(tool.get("name") or "") == "Bash":
+                return {
+                    "id": "toolu_fake_001",
+                    "name": "Bash",
+                    "input": {"command": self._extract_shell_command(prompt)},
+                }
             if isinstance(tool, dict) and str(tool.get("name") or "") == "Sleep":
                 return {
                     "id": "toolu_fake_001",
@@ -187,6 +200,27 @@ class FakeBackend:
             "name": "tool",
             "input": {"prompt": prompt},
         }
+
+    def _extract_shell_command(self, prompt: str) -> str:
+        lowered = prompt.lower()
+        marker = "run the shell command "
+        idx = lowered.find(marker)
+        if idx != -1:
+            remainder = prompt[idx + len(marker):].strip()
+            for sep in (" and then", "\n", "."):
+                if sep in remainder:
+                    remainder = remainder.split(sep, 1)[0].strip()
+            return remainder or "pwd"
+        return "pwd"
+
+    def _extract_exact_reply(self, prompt: str) -> str | None:
+        lowered = prompt.lower()
+        marker = "reply with exactly:"
+        idx = lowered.rfind(marker)
+        if idx == -1:
+            return None
+        exact = prompt[idx + len(marker):].strip()
+        return exact or None
 
     def generate_messages(
         self,

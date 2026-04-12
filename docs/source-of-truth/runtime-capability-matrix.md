@@ -84,7 +84,9 @@ Capability labels:
 | First real Owl consumer cutover proof | supported | `owlcc run` now completes a real direct-endpoint tool loop against `owlmlx /v1/messages`; Runtime-7 freezes the first real consumer cutover verdict |
 | First real OwlCoda cutover proof | supported | `owlcoda` native/headless and `owlcoda --native` REPL now both consume `owlmlx /v1/messages`; Runtime-8 adds resumed session continuation and first control-plane seam |
 | Source-first OwlCoda cutover | supported | Runtime-9 proves the upstream source-first prompt path can execute through `owlcoda serve -> owlmlx /v1/messages` with local runtime protocol auto-detected as Anthropic Messages |
+| Source-first OwlCoda tool-loop parity | partial | Runtime-10 proves a real source-first tool loop against `owlmlx`; stronger than prompt-only cutover, but still not full source-first parity |
 | OwlCoda control-plane operability against direct owlmlx | supported | Runtime-9 promotes runtime probe, preflight, server health, and dry-run to consume `/v1/runtime/status` as first-class truth |
+| Control-plane downgrade-path hardening | supported | Runtime-10 makes `healthz` a liveness-only fallback; it no longer fabricates `openai_chat` protocol when richer runtime truth is absent |
 | Old platform production replacement verdict | partial | Runtime-9 now freezes a real verdict: not yet replaceable; prompt-path cutover and first control-plane operability are proven, full parity and production closure are not |
 | Overflow / NVMe-tier execution path | experimental | Future candidate only; Hypura recorded as external reference in `hypura-overflow-path-reference.md`, not adopted |
 | High-fidelity teacher/reference runtime path | experimental | Candidate direction; Gemma has moved to production mainline instead |
