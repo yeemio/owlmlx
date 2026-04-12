@@ -1,7 +1,7 @@
 # owlmlx Master Outline
 
 > Status: authoritative outline
-> Updated: 2026-04-11
+> Updated: 2026-04-12
 
 ## 1. What `owlmlx` Is
 
@@ -81,6 +81,7 @@ These are runtime-level goals, not temporary integration work.
 36. `runtime6-anthropic-entrypoint.md`
 37. `runtime7-owlcc-cutover-verification.md`
 38. `runtime8-owlcoda-cutover-verification.md`
+39. `runtime9-source-first-and-replacement-verdict.md`
 
 ## 6. Adoption Model
 
@@ -104,7 +105,8 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-Runtime-7 is now complete. The next question is:
+Runtime-9 is now complete. The next question is:
 
-**How does owlmlx move from first OwlCoda native/headless cutover proof into
-full OwlCoda REPL cutover, control-plane integration, and real platform replacement?**
+**How does owlmlx move from verified OwlCoda source-first cutover and first
+operable control-plane into full parity and an actual replacement-grade
+decision?**

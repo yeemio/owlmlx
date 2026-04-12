@@ -19,7 +19,7 @@ owlmlx 是我们在 Apple Silicon 上的**自有 MLX runtime**。
 
 ### 2.1 owlmlx 今天实际是什么
 
-一个完成 **Runtime-8 Owl ecosystem client cutover** 的早期 runtime。
+一个完成 **Runtime-9 source-first cutover verdict** 的早期 runtime。
 
 它不再只是 truth derivation library：现在有自有 `RuntimeKernel`、
 backend adapter 边界、FakeBackend、最小 HTTP entry，并且 kernel 自己消费
@@ -62,7 +62,7 @@ Runtime-7 完成交付后，owlmlx 有 19 个 Python 模块，357 tests。
 | runtime/mlx_lm_subprocess_backend.py | ~220 | **subprocess backend** | 父进程安全的 mlx-lm 持久 child lifecycle：`load once -> generate many -> unload` |
 | runtime/mlx_environment.py | ~150 | **environment probe** | 安全环境选择 + 结构化诊断，default vs known 分离 |
 
-**关键事实：Runtime-7 已证明 `owlcc` 可以把 Anthropic-shaped真实 tool loop 直接打到 `owlmlx /v1/messages`。父进程仍永不 import mlx_lm。**
+**关键事实：Runtime-9 已证明 `owlcoda` source-first prompt path 可以经 `owlcoda serve -> owlmlx /v1/messages` 真正切入；同时给出更硬的结论：旧平台仍 not yet replaceable。父进程仍永不 import mlx_lm。**
 
 ### 2.3 文档盘点
 
@@ -234,6 +234,9 @@ Runtime compat entrypoints: Runtime-5 backend-owned message handling + completio
 Anthropic cutover seam:     Runtime-6 `/v1/messages` + count_tokens + Anthropic SSE + tool-use seam ✓
 Real Owl consumer cutover:  Runtime-7 `owlcc run` direct endpoint tool loop completed ✓
 Real OwlCoda cutover:       Runtime-8 native/headless + native REPL + resume/tool-loop continuation ✓
+Source-first cutover:       Runtime-9 source-first prompt path through `owlcoda serve -> owlmlx` ✓
+Control-plane operability:  Runtime-9 runtime probe + preflight + dry-run against direct `owlmlx` ✓
+Replacement verdict:        Runtime-9 = old platform not yet replaceable ✓
 Subprocess isolation:       父进程永不 import mlx_lm，子进程 abort → 结构化错误 ✓
 Real local smoke baseline:  gpt-oss-20b + Qwen3.5-27B + Qwen3.5-35B-A3B 通过 ✓
 Persistent child proof:     gpt-oss-20b / Qwen3.5-27B 同一 pid 连续 generate 通过 ✓
