@@ -134,6 +134,8 @@ def test_restart_model_roundtrip_keeps_model_loaded() -> None:
     assert result.ok is True
     assert result.model_id == "fake-a"
     assert result.restarted_model is not None
+    assert result.stage == "completed"
+    assert result.retryable is False
     status = kernel.status_dict()
     assert status["active_model_id"] == "fake-a"
     assert status["inventory"]["model_count"] == 1
@@ -146,6 +148,59 @@ def test_restart_missing_model_fails() -> None:
 
     assert result.ok is False
     assert result.error_code is RuntimeErrorCode.model_not_loaded
+    assert result.stage == "preflight"
+    assert result.retryable is False
+
+
+class _UnloadFailBackend(FakeBackend):
+    def unload(self, model_id: str):
+        loaded = self._loaded.get(model_id)
+        return type(super().unload("missing"))(
+            ok=False,
+            message="forced unload failure",
+            error_code=RuntimeErrorCode.backend_error,
+            model_id=model_id,
+            freed_gb=loaded.memory_gb if loaded is not None else 0.0,
+        )
+
+
+class _LoadFailBackend(FakeBackend):
+    def __init__(self) -> None:
+        super().__init__()
+        self._load_calls = 0
+
+    def load(self, model_id: str, *, memory_gb: float | None = None):
+        self._load_calls += 1
+        if self._load_calls == 1:
+            return super().load(model_id, memory_gb=memory_gb)
+        return type(super().load("missing", memory_gb=memory_gb))(
+            ok=False,
+            message="forced reload failure",
+            error_code=RuntimeErrorCode.backend_error,
+            model=None,
+        )
+
+
+def test_restart_model_exposes_unload_failure_stage() -> None:
+    kernel = RuntimeKernel(_UnloadFailBackend(), profile=_small_profile())
+    kernel.load_model("fake-a")
+
+    result = kernel.restart_model("fake-a")
+
+    assert result.ok is False
+    assert result.stage == "unload"
+    assert result.retryable is True
+
+
+def test_restart_model_exposes_load_failure_stage() -> None:
+    kernel = RuntimeKernel(_LoadFailBackend(), profile=_small_profile())
+    kernel.load_model("fake-a")
+
+    result = kernel.restart_model("fake-a")
+
+    assert result.ok is False
+    assert result.stage == "load"
+    assert result.retryable is True
 
 
 def test_backend_unhealthy_status_blocks_readiness() -> None:
@@ -180,3 +235,33 @@ def test_concurrent_generations_are_serialized_by_gate() -> None:
     assert gate["total_queued"] == 2
     assert first.was_queued is False or second.was_queued is False
     assert first.was_queued is True or second.was_queued is True
+
+
+def test_status_dict_exposes_governance_observations() -> None:
+    kernel = RuntimeKernel(FakeBackend(default_memory_gb=1.0), profile=_small_profile())
+
+    kernel.load_model("model-a")
+    kernel.load_model("model-b")
+    explicit = asyncio.run(kernel.generate("hello-explicit", model_id="model-a"))
+    unload = kernel.unload_model("model-b")
+    restart = kernel.restart_model("model-a")
+
+    assert explicit.ok is True
+    assert unload.ok is True
+    assert restart.ok is True
+
+    status = kernel.status_dict()
+
+    assert "governance_observations" in status
+    assert status["contract"]["diagnostic_sections"] == [
+        "backend.detail",
+        "governance_observations",
+        "generation_gate",
+    ]
+    assert status["governance_observations"] == {
+        "transition_count": 4,
+        "recent_window_runs": 2,
+        "active_reassignment_visible": True,
+        "restart_restore_visible": True,
+        "explicit_targeting_evidence_visible": True,
+    }

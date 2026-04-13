@@ -70,8 +70,15 @@ This repository does not own:
 
 ## Current Working Assumption
 
-The repository has completed source-of-truth bootstrap mode (Phase 0–1E) and
-is approaching Phase 2 (large-weight path productization). The immediate
-question is no longer "how to freeze the boundary" but "what is the first
-concrete implementation deliverable that proves owlmlx can own runtime code,
-not just documentation."
+The repository has completed source-of-truth bootstrap mode and now operates as
+an executable early runtime.
+
+The immediate goal is no longer boundary freeze or specimen-first progress. It
+is:
+
+- replacement-grade stability alignment versus `oMLX` / `vMLX`
+
+The immediate question is:
+
+- which replacement-grade stability gap most limits `owlmlx` next, and what is
+  the next executable runtime-owned closure round

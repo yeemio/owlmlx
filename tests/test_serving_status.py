@@ -96,6 +96,7 @@ def test_generation_gate_status_embedded() -> None:
     assert gen["total_served"] == 1
     assert gen["max_concurrent"] == 1
     assert gen["queue_discipline"] == "serial"
+    assert gen["queue_policy"] == "ticketed_fifo"
 
 
 def test_extra_fields_merged() -> None:

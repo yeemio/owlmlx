@@ -330,10 +330,16 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
         status = runtime.status_dict()
         backend_detail = status["backend"]["detail"]
         return {
+            "contract": {
+                "surface": "owlmlx.healthz",
+                "version": "stabilization1",
+            },
+            "runtime": "owlmlx",
             "ok": status["backend"]["healthy"],
             "readiness": status["health"]["readiness"],
             "active_model_id": status["active_model_id"],
             "model_count": status["inventory"]["model_count"],
+            "backend_name": status["backend"]["backend_name"],
             "backend_error": backend_detail.get("last_error"),
             "persistent_child": backend_detail.get("persistent_child", False),
             "child_health": backend_detail.get("child_health", {}),

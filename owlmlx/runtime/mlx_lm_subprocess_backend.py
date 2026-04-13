@@ -84,6 +84,7 @@ class MlxLmSubprocessBackend:
         self,
         *,
         python_executable: str | None = None,
+        env_overrides: dict[str, str] | None = None,
         runner_module: str = "owlmlx.runtime.mlx_lm_runner",
         timeout_s: float = 600.0,
         health_probe_timeout_s: float = 2.0,
@@ -92,6 +93,7 @@ class MlxLmSubprocessBackend:
         extra_pythonpath: tuple[str, ...] = (),
     ) -> None:
         self.python_executable = python_executable or sys.executable
+        self.env_overrides = dict(env_overrides or {})
         self.runner_module = runner_module
         self.timeout_s = timeout_s
         self.health_probe_timeout_s = health_probe_timeout_s
@@ -163,6 +165,7 @@ class MlxLmSubprocessBackend:
 
     def _build_env(self) -> dict[str, str]:
         env = os.environ.copy()
+        env.update(self.env_overrides)
         if self.extra_pythonpath:
             existing = env.get("PYTHONPATH")
             env["PYTHONPATH"] = os.pathsep.join(
@@ -841,6 +844,34 @@ class MlxLmSubprocessBackend:
         child_health = {}
         for model_id, session in list(self._sessions.items()):
             child_health[model_id] = self._probe_session(model_id, session)
+        restartable_models: list[str] = []
+        restart_exhausted_models: list[str] = []
+        for model_id in self._registrations:
+            if model_id in self._sessions:
+                continue
+            restart_count = self._restart_counts.get(model_id, 0)
+            if self.auto_restart_dead_session and restart_count < self.max_restart_attempts:
+                restartable_models.append(model_id)
+            else:
+                restart_exhausted_models.append(model_id)
+        children = {
+            model_id: {
+                "pid": session.pid,
+                "alive": session.proc.poll() is None,
+                "generation_count": session.generation_count,
+                "restart_count": self._restart_counts.get(model_id, 0),
+            }
+            for model_id, session in self._sessions.items()
+        }
+        repeated_generation_models = sorted(
+            model_id
+            for model_id, child in children.items()
+            if int(child.get("generation_count", 0)) >= 2
+        )
+        reuse_counter = sum(
+            max(int(child.get("generation_count", 0)) - 1, 0)
+            for child in children.values()
+        )
         return BackendStatus(
             backend_name=self.name,
             healthy=self._last_error is None,
@@ -854,16 +885,26 @@ class MlxLmSubprocessBackend:
                 "last_error": self._last_error,
                 "auto_restart_dead_session": self.auto_restart_dead_session,
                 "max_restart_attempts": self.max_restart_attempts,
-                "children": {
-                    model_id: {
-                        "pid": session.pid,
-                        "alive": session.proc.poll() is None,
-                        "generation_count": session.generation_count,
-                        "restart_count": self._restart_counts.get(model_id, 0),
-                    }
-                    for model_id, session in self._sessions.items()
-                },
+                "children": children,
                 "child_health": child_health,
+                "cache_runtime_observations": {
+                    "persistent_child_reuse_visible": bool(repeated_generation_models),
+                    "total_generation_count": sum(
+                        int(child.get("generation_count", 0))
+                        for child in children.values()
+                    ),
+                    "reuse_counter": reuse_counter,
+                    "repeated_generation_models": repeated_generation_models,
+                    "cache_counter_visibility": {
+                        "residency": False,
+                        "reuse": reuse_counter > 0,
+                        "eviction": False,
+                    },
+                },
+                "recoverability": {
+                    "restartable_models": restartable_models,
+                    "restart_exhausted_models": restart_exhausted_models,
+                },
                 "last_subprocess": (
                     {
                         "ok": self._last_result.ok,

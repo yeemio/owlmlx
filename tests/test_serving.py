@@ -37,6 +37,7 @@ def test_status_reflects_idle_after_generation() -> None:
     assert status["generation_gate"] == "idle"
     assert status["max_concurrent"] == 1
     assert status["queue_discipline"] == "serial"
+    assert status["queue_policy"] == "ticketed_fifo"
     assert status["total_served"] == 1
     assert status["total_queued"] == 1
 
@@ -60,6 +61,7 @@ def test_reset_counters() -> None:
     assert status["total_served"] == 0
     assert status["total_queued"] == 0
     assert status["total_wait_s"] == 0.0
+    assert status["queue_policy"] == "ticketed_fifo"
 
 
 def test_concurrent_callers_are_serialized() -> None:
@@ -117,6 +119,47 @@ def test_concurrent_callers_are_serialized() -> None:
 
     # Status should reflect both served
     assert gate.status["total_served"] == 2
+
+
+def test_concurrent_callers_follow_fifo_ticket_order() -> None:
+    """Queued callers should execute in the same order they were ticketed."""
+    gate = GenerationGate()
+    order: list[str] = []
+    first_entered = threading.Event()
+    release_first = threading.Event()
+    results: list[GenerationResult | None] = [None, None, None]
+
+    def generate(name: str, *, hold: bool = False) -> str:
+        order.append(f"{name}_start")
+        if hold:
+            first_entered.set()
+            release_first.wait(timeout=5)
+        time.sleep(0.01)
+        order.append(f"{name}_end")
+        return name
+
+    def run(idx: int, name: str, *, hold: bool = False) -> None:
+        results[idx] = gate.execute(generate, name, hold=hold)
+
+    t1 = threading.Thread(target=run, args=(0, "A"), kwargs={"hold": True})
+    t2 = threading.Thread(target=run, args=(1, "B"))
+    t3 = threading.Thread(target=run, args=(2, "C"))
+
+    t1.start()
+    first_entered.wait(timeout=5)
+    t2.start()
+    time.sleep(0.01)
+    t3.start()
+    time.sleep(0.02)
+    release_first.set()
+
+    t1.join(timeout=10)
+    t2.join(timeout=10)
+    t3.join(timeout=10)
+
+    assert [result.value for result in results] == ["A", "B", "C"]
+    assert order == ["A_start", "A_end", "B_start", "B_end", "C_start", "C_end"]
+    assert gate.status["queue_policy"] == "ticketed_fifo"
 
 
 def test_generation_exception_does_not_break_gate() -> None:

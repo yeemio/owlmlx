@@ -8,6 +8,7 @@ do not require runtime extras.
 from __future__ import annotations
 
 import importlib
+import os
 import subprocess
 import sys
 import time
@@ -39,30 +40,35 @@ class MlxLmImportProbeResult:
     message: str
 
 
-def probe_mlx_lm_import(
+def probe_python_snippet(
     *,
+    code: str,
     python_executable: str | None = None,
     timeout_s: float = 20.0,
+    execution_mode: str = "default_metal",
+    launch_mode: str = "direct_exec",
 ) -> MlxLmImportProbeResult:
-    """Probe mlx-lm import without risking the parent runtime process.
-
-    Importing ``mlx_lm`` initializes MLX/Metal in some environments. When
-    Metal initialization crashes through Objective-C, Python cannot catch it.
-    Running the import in a subprocess lets RuntimeKernel report a backend
-    error instead of crashing the owlmlx process.
-    """
+    """Probe one Python snippet in an isolated subprocess."""
 
     executable = python_executable or sys.executable
-    code = (
-        "import mlx_lm; "
-        "print(getattr(mlx_lm, '__version__', 'unknown'))"
-    )
+    env = os.environ.copy()
+    argv: list[str]
+    if execution_mode == "force_cpu":
+        env["MLX_FORCE_CPU"] = "1"
+        if launch_mode == "env_wrapper":
+            argv = ["/usr/bin/env", "MLX_FORCE_CPU=1", executable, "-c", code]
+        else:
+            argv = [executable, "-c", code]
+    else:
+        argv = [executable, "-c", code]
+
     try:
         proc = subprocess.run(
-            [executable, "-c", code],
+            argv,
             capture_output=True,
             text=True,
             timeout=timeout_s,
+            env=None if launch_mode == "env_wrapper" and execution_mode == "force_cpu" else env,
         )
     except Exception as exc:
         return MlxLmImportProbeResult(
@@ -70,7 +76,7 @@ def probe_mlx_lm_import(
             returncode=-1,
             stdout="",
             stderr=str(exc),
-            message=f"mlx-lm import probe failed to run: {exc}",
+            message=f"python snippet probe failed to run: {exc}",
         )
 
     ok = proc.returncode == 0
@@ -80,9 +86,46 @@ def probe_mlx_lm_import(
         stdout=proc.stdout.strip(),
         stderr=proc.stderr.strip(),
         message=(
-            "mlx-lm import probe passed"
+            "python snippet probe passed"
             if ok
-            else f"mlx-lm import probe failed with return code {proc.returncode}"
+            else f"python snippet probe failed with return code {proc.returncode}"
+        ),
+    )
+
+
+def probe_mlx_lm_import(
+    *,
+    python_executable: str | None = None,
+    timeout_s: float = 20.0,
+    execution_mode: str = "default_metal",
+) -> MlxLmImportProbeResult:
+    """Probe mlx-lm import without risking the parent runtime process.
+
+    Importing ``mlx_lm`` initializes MLX/Metal in some environments. When
+    Metal initialization crashes through Objective-C, Python cannot catch it.
+    Running the import in a subprocess lets RuntimeKernel report a backend
+    error instead of crashing the owlmlx process.
+    """
+
+    code = (
+        "import mlx_lm; "
+        "print(getattr(mlx_lm, '__version__', 'unknown'))"
+    )
+    result = probe_python_snippet(
+        code=code,
+        python_executable=python_executable,
+        timeout_s=timeout_s,
+        execution_mode=execution_mode,
+    )
+    return MlxLmImportProbeResult(
+        ok=result.ok,
+        returncode=result.returncode,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        message=(
+            "mlx-lm import probe passed"
+            if result.ok
+            else f"mlx-lm import probe failed with return code {result.returncode}"
         ),
     )
 

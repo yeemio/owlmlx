@@ -123,6 +123,8 @@ class RestartResult(RuntimeOperationResult):
 
     model_id: str | None = None
     restarted_model: LoadedModelInfo | None = None
+    stage: str | None = None
+    retryable: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -61,14 +61,50 @@ class GenerationGate:
     """
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._condition = threading.Condition()
         self._active = False
+        self._next_ticket = 0
+        self._serving_ticket = 0
+        self._waiters = 0
         self._total_served = 0
         self._total_queued = 0
         self._total_wait_s = 0.0
         self._total_exec_s = 0.0
         self._longest_wait_s = 0.0
         self._longest_exec_s = 0.0
+
+    def _begin_turn(self) -> tuple[bool, float, float]:
+        """Claim the next FIFO execution slot and return queue metadata."""
+        enqueue_time = time.monotonic()
+        with self._condition:
+            ticket = self._next_ticket
+            self._next_ticket += 1
+            self._total_queued += 1
+            was_queued = self._active or ticket != self._serving_ticket
+            self._waiters += 1
+            try:
+                while self._active or ticket != self._serving_ticket:
+                    self._condition.wait()
+                wait_time = time.monotonic() - enqueue_time
+                self._active = True
+            finally:
+                self._waiters -= 1
+        return was_queued, wait_time, time.monotonic()
+
+    def _finish_turn(self, *, exec_start: float, wait_time: float, served: bool) -> float:
+        """Release the current FIFO slot and update gate metrics."""
+        exec_time = time.monotonic() - exec_start
+        with self._condition:
+            if served:
+                self._total_served += 1
+            self._active = False
+            self._serving_ticket += 1
+            self._total_wait_s += wait_time
+            self._total_exec_s += exec_time
+            self._longest_wait_s = max(self._longest_wait_s, wait_time)
+            self._longest_exec_s = max(self._longest_exec_s, exec_time)
+            self._condition.notify_all()
+        return exec_time
 
     def execute(self, fn: Callable[..., T], *args: Any, **kwargs: Any) -> GenerationResult:
         """Execute a generation function under the gate lock (blocking).
@@ -85,24 +121,17 @@ class GenerationGate:
         Returns:
             GenerationResult with the return value and timing metadata.
         """
-        enqueue_time = time.monotonic()
-        self._total_queued += 1
-        was_queued = self._active
-
-        with self._lock:
-            wait_time = time.monotonic() - enqueue_time
-            self._active = True
-            exec_start = time.monotonic()
-            try:
-                result = fn(*args, **kwargs)
-                self._total_served += 1
-            finally:
-                exec_time = time.monotonic() - exec_start
-                self._active = False
-                self._total_wait_s += wait_time
-                self._total_exec_s += exec_time
-                self._longest_wait_s = max(self._longest_wait_s, wait_time)
-                self._longest_exec_s = max(self._longest_exec_s, exec_time)
+        was_queued, wait_time, exec_start = self._begin_turn()
+        served = False
+        try:
+            result = fn(*args, **kwargs)
+            served = True
+        finally:
+            exec_time = self._finish_turn(
+                exec_start=exec_start,
+                wait_time=wait_time,
+                served=served,
+            )
 
         return GenerationResult(
             value=result,
@@ -135,14 +164,10 @@ class GenerationGate:
     async def stream_session(self) -> AsyncIterator[GenerationResult]:
         """Hold GenerationGate for the full lifetime of a streaming response."""
 
-        enqueue_time = time.monotonic()
-        self._total_queued += 1
-        was_queued = self._active
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self._lock.acquire)
-        wait_time = time.monotonic() - enqueue_time
-        exec_start = time.monotonic()
-        self._active = True
+        was_queued, wait_time, exec_start = await loop.run_in_executor(
+            None, self._begin_turn
+        )
         try:
             yield GenerationResult(
                 value=None,
@@ -150,20 +175,14 @@ class GenerationGate:
                 execution_time_s=0.0,
                 was_queued=was_queued,
             )
-            self._total_served += 1
         finally:
-            exec_time = time.monotonic() - exec_start
-            self._active = False
-            self._total_wait_s += wait_time
-            self._total_exec_s += exec_time
-            self._longest_wait_s = max(self._longest_wait_s, wait_time)
-            self._longest_exec_s = max(self._longest_exec_s, exec_time)
-            self._lock.release()
+            self._finish_turn(exec_start=exec_start, wait_time=wait_time, served=True)
 
     @property
     def is_active(self) -> bool:
         """Whether a generation is currently in progress."""
-        return self._active
+        with self._condition:
+            return self._active
 
     @property
     def status(self) -> dict[str, Any]:
@@ -172,23 +191,27 @@ class GenerationGate:
         This dict is intended to be embedded in path-level runtime status
         payloads. It exposes honest serving discipline truth.
         """
-        return {
-            "generation_gate": "active" if self._active else "idle",
-            "max_concurrent": MAX_GENERATION_CONCURRENCY,
-            "queue_discipline": "serial",
-            "total_served": self._total_served,
-            "total_queued": self._total_queued,
-            "total_wait_s": round(self._total_wait_s, 3),
-            "total_exec_s": round(self._total_exec_s, 3),
-            "longest_wait_s": round(self._longest_wait_s, 3),
-            "longest_exec_s": round(self._longest_exec_s, 3),
-        }
+        with self._condition:
+            return {
+                "generation_gate": "active" if self._active else "idle",
+                "max_concurrent": MAX_GENERATION_CONCURRENCY,
+                "queue_discipline": "serial",
+                "queue_policy": "ticketed_fifo",
+                "waiters": self._waiters,
+                "total_served": self._total_served,
+                "total_queued": self._total_queued,
+                "total_wait_s": round(self._total_wait_s, 3),
+                "total_exec_s": round(self._total_exec_s, 3),
+                "longest_wait_s": round(self._longest_wait_s, 3),
+                "longest_exec_s": round(self._longest_exec_s, 3),
+            }
 
     def reset_counters(self) -> None:
         """Reset serving counters. Does not affect the lock state."""
-        self._total_served = 0
-        self._total_queued = 0
-        self._total_wait_s = 0.0
-        self._total_exec_s = 0.0
-        self._longest_wait_s = 0.0
-        self._longest_exec_s = 0.0
+        with self._condition:
+            self._total_served = 0
+            self._total_queued = 0
+            self._total_wait_s = 0.0
+            self._total_exec_s = 0.0
+            self._longest_wait_s = 0.0
+            self._longest_exec_s = 0.0

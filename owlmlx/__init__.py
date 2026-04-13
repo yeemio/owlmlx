@@ -27,6 +27,104 @@ from .cache_truth import (
     turboquant_cache_safety,
     turboquant_cache_safety_to_dict,
 )
+from .cache_scheduler_status import (
+    CacheSchedulerStatus,
+    build_cache_scheduler_status,
+    cache_scheduler_status_to_dict,
+)
+from .cache_closure_rung import (
+    CacheClosureRung,
+    build_cache_closure_rung,
+    cache_closure_rung_to_dict,
+)
+from .cache_counter_gap import (
+    CacheCounterGap,
+    build_cache_counter_gap,
+    cache_counter_gap_to_dict,
+)
+from .cache_counter_feasibility import (
+    CacheCounterFeasibility,
+    build_cache_counter_feasibility,
+    cache_counter_feasibility_to_dict,
+)
+from .cache_scheduler_turboquant_split import (
+    CacheSchedulerTurboQuantSplit,
+    build_cache_scheduler_turboquant_split,
+    cache_scheduler_turboquant_split_to_dict,
+)
+from .cache_scheduler_floor_gap import (
+    CacheSchedulerFloorGap,
+    build_cache_scheduler_floor_gap,
+    cache_scheduler_floor_gap_to_dict,
+)
+from .cache_scheduler_implementation_backlog import (
+    CacheSchedulerImplementationBacklog,
+    build_cache_scheduler_implementation_backlog,
+    cache_scheduler_implementation_backlog_to_dict,
+)
+from .cache_scheduler_branch_selection import (
+    CacheSchedulerBranchSelection,
+    build_cache_scheduler_branch_selection,
+    cache_scheduler_branch_selection_to_dict,
+)
+from .cache_turboquant_preconditions_gap import (
+    CacheTurboQuantPreconditionsGap,
+    build_cache_turboquant_preconditions_gap,
+    cache_turboquant_preconditions_gap_to_dict,
+)
+from .dominant_gap_reselection import (
+    DominantGapReselection,
+    build_dominant_gap_reselection,
+    dominant_gap_reselection_to_dict,
+)
+from .multi_model_governance_status import (
+    MultiModelGovernanceStatus,
+    build_multi_model_governance_status,
+    multi_model_governance_status_to_dict,
+)
+from .multi_model_governance_controls import (
+    MultiModelGovernanceControls,
+    build_multi_model_governance_controls,
+    multi_model_governance_controls_to_dict,
+)
+from .multi_model_governance_transition_ledger import (
+    MultiModelGovernanceTransitionLedger,
+    build_multi_model_governance_transition_ledger,
+    multi_model_governance_transition_ledger_to_dict,
+)
+from .multi_model_governance_policy_gap import (
+    MultiModelGovernancePolicyGap,
+    build_multi_model_governance_policy_gap,
+    multi_model_governance_policy_gap_to_dict,
+)
+from .heavy_weight_repeatability_status import (
+    HeavyWeightRuntimeRepeatabilityStatus,
+    build_heavy_weight_runtime_repeatability_status,
+    heavy_weight_repeatability_status_to_dict,
+)
+from .customer_runtime_evidence import (
+    CustomerRuntimeEvidenceLedger,
+    build_customer_runtime_evidence,
+    customer_runtime_evidence_to_dict,
+)
+from .cache_residency_evidence import (
+    CacheResidencyEvidence,
+    CacheResidencyMetrics,
+    build_cache_residency_evidence,
+    cache_residency_evidence_to_dict,
+    cache_residency_metrics_to_dict,
+    normalize_cache_residency_metrics,
+)
+from .cache_repeatability_evidence import (
+    CacheRepeatabilityEvidence,
+    build_cache_repeatability_evidence,
+    cache_repeatability_evidence_to_dict,
+)
+from .turboquant_readiness import (
+    TurboQuantReadiness,
+    build_turboquant_readiness,
+    turboquant_readiness_to_dict,
+)
 from .context_concurrency import (
     CONCURRENCY_GATE,
     HIGH_CONTEXT_THRESHOLD_TOKENS,
@@ -147,6 +245,25 @@ __all__ = [
     "CacheFlags",
     "CacheProfile",
     "CacheProfileSnapshot",
+    "CacheResidencyEvidence",
+    "CacheResidencyMetrics",
+    "CacheRepeatabilityEvidence",
+    "CacheCounterGap",
+    "CacheCounterFeasibility",
+    "CacheSchedulerTurboQuantSplit",
+    "CacheSchedulerFloorGap",
+    "CacheSchedulerImplementationBacklog",
+    "CacheSchedulerBranchSelection",
+    "CacheTurboQuantPreconditionsGap",
+    "DominantGapReselection",
+    "CacheClosureRung",
+    "CacheSchedulerStatus",
+    "HeavyWeightRuntimeRepeatabilityStatus",
+    "CustomerRuntimeEvidenceLedger",
+    "MultiModelGovernanceStatus",
+    "MultiModelGovernanceControls",
+    "MultiModelGovernanceTransitionLedger",
+    "MultiModelGovernancePolicyGap",
     "ConcurrencyGateEntry",
     "concurrency_gate_snapshot",
     "default_machine_profile",
@@ -196,13 +313,52 @@ __all__ = [
     "RuntimeKernel",
     "TRAINING_METHODS",
     "TurboQuantCacheSafety",
+    "TurboQuantReadiness",
     "TruthInheritance",
     "TruthInheritanceLevel",
     "UNSUPPORTED",
     "UnloadResult",
     "ValidationResult",
     "build_artifact_metadata",
+    "build_cache_residency_evidence",
+    "build_cache_repeatability_evidence",
+    "build_cache_counter_gap",
+    "build_cache_counter_feasibility",
+    "build_cache_scheduler_turboquant_split",
+    "build_cache_scheduler_floor_gap",
+    "build_cache_scheduler_implementation_backlog",
+    "build_cache_scheduler_branch_selection",
+    "build_cache_turboquant_preconditions_gap",
+    "build_dominant_gap_reselection",
+    "build_cache_closure_rung",
+    "build_cache_scheduler_status",
+    "build_heavy_weight_runtime_repeatability_status",
+    "build_customer_runtime_evidence",
+    "build_multi_model_governance_status",
+    "build_multi_model_governance_controls",
+    "build_multi_model_governance_transition_ledger",
+    "build_multi_model_governance_policy_gap",
+    "build_turboquant_readiness",
     "build_large_weight_serving_status",
+    "cache_residency_evidence_to_dict",
+    "cache_residency_metrics_to_dict",
+    "cache_repeatability_evidence_to_dict",
+    "cache_counter_gap_to_dict",
+    "cache_counter_feasibility_to_dict",
+    "cache_scheduler_turboquant_split_to_dict",
+    "cache_scheduler_floor_gap_to_dict",
+    "cache_scheduler_implementation_backlog_to_dict",
+    "cache_scheduler_branch_selection_to_dict",
+    "cache_turboquant_preconditions_gap_to_dict",
+    "dominant_gap_reselection_to_dict",
+    "cache_closure_rung_to_dict",
+    "cache_scheduler_status_to_dict",
+    "heavy_weight_repeatability_status_to_dict",
+    "customer_runtime_evidence_to_dict",
+    "multi_model_governance_status_to_dict",
+    "multi_model_governance_controls_to_dict",
+    "multi_model_governance_transition_ledger_to_dict",
+    "multi_model_governance_policy_gap_to_dict",
     "cache_flags_to_dict",
     "cache_profile_from_flags",
     "cache_profile_snapshot",
@@ -220,6 +376,7 @@ __all__ = [
     "normalize_core_runtime_status",
     "normalize_cache_flags",
     "normalize_cache_profile",
+    "normalize_cache_residency_metrics",
     "normalize_inventory_entry",
     "normalize_inventory_snapshot",
     "normalize_large_weight_runtime_status",
@@ -233,6 +390,7 @@ __all__ = [
     "read_artifact_metadata",
     "truth_inheritance_for_change",
     "turboquant_cache_safety",
+    "turboquant_readiness_to_dict",
     "turboquant_cache_safety_to_dict",
     "validate_artifact_for_serving",
     "validate_model_lineage",

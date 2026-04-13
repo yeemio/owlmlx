@@ -123,6 +123,17 @@ def test_subprocess_backend_generate_reuses_same_child(tmp_path: Path) -> None:
     assert first.detail["generation_count"] == 1
     assert second.detail["generation_count"] == 2
     assert backend.status().detail["children"]["model-a"]["generation_count"] == 2
+    assert (
+        backend.status().detail["cache_runtime_observations"]["persistent_child_reuse_visible"]
+        is True
+    )
+    assert backend.status().detail["cache_runtime_observations"]["reuse_counter"] == 1
+    assert backend.status().detail["cache_runtime_observations"]["cache_counter_visibility"][
+        "reuse"
+    ] is True
+    assert backend.status().detail["cache_runtime_observations"][
+        "repeated_generation_models"
+    ] == ["model-a"]
     backend.unload("model-a")
 
 
@@ -342,3 +353,72 @@ def test_subprocess_backend_auto_restarts_dead_child_on_next_generate(tmp_path: 
     assert status.detail["children"]["model-a"]["restart_count"] == 1
     assert status.detail["child_health"]["model-a"]["ok"] is True
     backend.unload("model-a")
+
+
+def test_subprocess_backend_status_reports_restartable_model_after_dead_child(tmp_path: Path) -> None:
+    runner = _write_runner(tmp_path, crash_on_generate=True)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+        max_restart_attempts=2,
+    )
+    loaded = backend.load("model-a", memory_gb=1.0)
+    assert loaded.ok is True
+
+    result = backend.generate("model-a", "hello")
+    assert result.ok is False
+
+    status = backend.status()
+    assert status.detail["recoverability"]["restartable_models"] == ["model-a"]
+    assert status.detail["recoverability"]["restart_exhausted_models"] == []
+
+
+def test_subprocess_backend_status_reports_restart_exhausted_model(tmp_path: Path) -> None:
+    runner = _write_runner(tmp_path, crash_on_generate=True)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+        max_restart_attempts=0,
+    )
+    loaded = backend.load("model-a", memory_gb=1.0)
+    assert loaded.ok is True
+
+    result = backend.generate("model-a", "hello")
+    assert result.ok is False
+
+    status = backend.status()
+    assert status.detail["recoverability"]["restartable_models"] == []
+    assert status.detail["recoverability"]["restart_exhausted_models"] == ["model-a"]
+
+
+def test_subprocess_backend_survives_repeated_restart_generate_unload_cycles(tmp_path: Path) -> None:
+    runner = _write_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    kernel = RuntimeKernel(backend)
+
+    for index in range(3):
+        model_id = f"model-{index}"
+        loaded = kernel.load_model(model_id, memory_gb=1.0)
+        assert loaded.ok is True
+
+        generated = asyncio.run(kernel.generate(f"hello-{index}", max_tokens=4))
+        assert generated.ok is True
+        assert generated.text == f"hello-{index} :: child"
+
+        restarted = kernel.restart_model(model_id)
+        assert restarted.ok is True
+        assert restarted.model_id == model_id
+
+        generated_after_restart = asyncio.run(kernel.generate(f"again-{index}", max_tokens=4))
+        assert generated_after_restart.ok is True
+        assert generated_after_restart.text == f"again-{index} :: child"
+
+        unloaded = kernel.unload_model(model_id)
+        assert unloaded.ok is True
+
+    status = backend.status()
+    assert status.loaded_models == ()
+    assert status.detail["children"] == {}

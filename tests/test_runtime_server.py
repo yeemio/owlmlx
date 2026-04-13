@@ -25,9 +25,13 @@ def test_healthz_uses_kernel_status() -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["contract"]["surface"] == "owlmlx.healthz"
+    assert payload["contract"]["version"] == "stabilization1"
+    assert payload["runtime"] == "owlmlx"
     assert payload["ok"] is True
     assert payload["readiness"] == "degraded"
     assert payload["model_count"] == 0
+    assert payload["backend_name"] == "fake"
     assert payload["persistent_child"] is False
     assert payload["child_health"] == {}
 
@@ -298,6 +302,27 @@ def test_anthropic_messages_stream_provides_sse_events() -> None:
     assert "event: content_block_start" in chunks
     assert "event: content_block_delta" in chunks
     assert "event: message_stop" in chunks
+
+
+def test_anthropic_messages_stream_missing_model_returns_error_event() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+
+    with client.stream(
+        "POST",
+        "/v1/messages",
+        json={
+            "model": "missing",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+            "stream": True,
+        },
+    ) as response:
+        assert response.status_code == 200
+        chunks = [line for line in response.iter_lines() if line]
+
+    assert "event: message_start" in chunks
+    assert any(line.startswith("event: error") for line in chunks)
+    assert not any(line.startswith("event: message_stop") for line in chunks)
 
 
 def test_anthropic_messages_missing_model_returns_error_shape() -> None:
@@ -671,10 +696,24 @@ def test_runtime_status_returns_full_kernel_snapshot() -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["contract"]["surface"] == "owlmlx.runtime.status"
+    assert payload["contract"]["version"] == "stabilization1"
+    assert "summary" in payload
+    assert payload["summary"]["runtime"] == "owlmlx"
+    assert payload["summary"]["model_count"] == 1
     assert payload["active_model_id"] == "fake-a"
     assert payload["backend"]["backend_name"] == "fake"
     assert payload["inventory"]["model_count"] == 1
     assert payload["health"]["readiness"] == "ready"
+    assert payload["restart"]["restartable_models"] == []
+    assert payload["restart"]["restart_exhausted_models"] == []
+    assert payload["contract"]["diagnostic_sections"] == [
+        "backend.detail",
+        "governance_observations",
+        "generation_gate",
+    ]
+    assert payload["governance_observations"]["transition_count"] == 1
+    assert payload["governance_observations"]["active_reassignment_visible"] is False
 
 
 def test_runtime_restart_endpoint_restarts_loaded_model() -> None:
@@ -687,6 +726,8 @@ def test_runtime_restart_endpoint_restarts_loaded_model() -> None:
     payload = response.json()
     assert payload["ok"] is True
     assert payload["model_id"] == "fake-a"
+    assert payload["stage"] == "completed"
+    assert payload["retryable"] is False
     models = client.get("/v1/models").json()
     assert models["active_model_id"] == "fake-a"
     assert models["inventory"]["model_count"] == 1
@@ -701,3 +742,5 @@ def test_runtime_restart_endpoint_requires_loaded_model() -> None:
     payload = response.json()
     assert payload["ok"] is False
     assert payload["error_code"] == "model_not_loaded"
+    assert payload["stage"] == "preflight"
+    assert payload["retryable"] is False

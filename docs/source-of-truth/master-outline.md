@@ -1,7 +1,7 @@
 # owlmlx Master Outline
 
 > Status: authoritative outline
-> Updated: 2026-04-12
+> Updated: 2026-04-13
 
 ## 1. What `owlmlx` Is
 
@@ -85,6 +85,30 @@ These are runtime-level goals, not temporary integration work.
 40. `runtime10-replacement-hardening-and-parity.md`
 41. `runtime11-degraded-routing-and-replacement-closure.md`
 42. `runtime12-replacement-readiness-verdict.md`
+43. `stabilization1-upstream-contract-freeze.md`
+44. `stabilization2-mlx-environment-readiness.md`
+45. `stabilization2-large-weight-specimen-gate.md`
+46. `stabilization2-mlx-import-blocker.md`
+47. `stabilization2-mlx-host-forensics.md`
+48. `stabilization3-verified-baseline-resolution.md`
+49. `replacement-grade-stability-gaps.md`
+50. `phase45-host-stable-execution-status.md`
+51. `phase45-cache-scheduler-status.md`
+52. `phase45-cache-residency-evidence.md`
+53. `phase45-cache-repeatability-evidence.md`
+54. `phase45-turboquant-readiness.md`
+55. `phase45-cache-closure-rung.md`
+56. `phase45-multi-model-governance-status.md`
+57. `phase45-multi-model-governance-controls.md`
+58. `phase45-multi-model-governance-transition-ledger.md`
+59. `phase45-multi-model-governance-policy-gap.md`
+60. `phase45-heavy-weight-repeatability-status.md`
+61. `phase45-customer-runtime-evidence-ledger.md`
+62. `phase45-cache-scheduler-floor-gap.md`
+63. `phase45-cache-scheduler-implementation-backlog.md`
+64. `phase45-cache-turboquant-preconditions-gap.md`
+65. `phase45-dominant-gap-reselection.md`
+66. `phase45-cache-scheduler-branch-selection.md`
 
 ## 6. Adoption Model
 
@@ -108,7 +132,28 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-Runtime-12 is now complete. The next question is:
+The current top-level goal is no longer specimen-first.
 
-**Does the team now start production replacement work, or explicitly hold the
-old platform in place while parity gaps remain?**
+The next question is:
+
+**Which replacement-grade stability gap most limits `owlmlx` versus `oMLX` /
+`vMLX`, and what is the next executable closure round?**
+
+The current host-level answer is now frozen:
+
+- this host is **not** a candidate for deeper replacement-grade runtime
+  validation
+
+The current dominant gap is:
+
+- `cache_scheduler_depth`
+
+The current heavy-weight answer is now frozen:
+
+- `owlmlx.heavy_weight_runtime_repeatability` exists
+- current result remains `local_blocked` on this host
+- the exact external blocker is now explicit
+
+The next executable closure round is:
+
+- dominant-gap reselection after both scheduler implementation backlog and TurboQuant preconditions are frozen exact on the cache branch

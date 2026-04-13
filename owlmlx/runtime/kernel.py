@@ -58,6 +58,11 @@ class RuntimeKernel:
         self.generation_gate = generation_gate if generation_gate is not None else GenerationGate()
         self.abort_recovery = abort_recovery if abort_recovery is not None else AbortRecoveryTracker()
         self._active_model_id: str | None = None
+        self._governance_transition_count = 0
+        self._governance_recent_window_runs = 0
+        self._governance_active_reassignment_visible = False
+        self._governance_restart_restore_visible = False
+        self._governance_explicit_targeting_evidence_visible = False
 
     @property
     def active_model_id(self) -> str | None:
@@ -114,11 +119,42 @@ class RuntimeKernel:
 
         result = self.backend.load(model_id, memory_gb=memory_gb)
         if result.ok:
+            previous_active = self._active_model_id
             self._active_model_id = model_id
+            self._record_governance_transition(
+                previous_active=previous_active,
+                new_active=self._active_model_id,
+            )
         return result
 
     def _resolve_target_model(self, model_id: str | None) -> str | None:
         return model_id or self._active_model_id
+
+    def _record_governance_transition(
+        self,
+        *,
+        previous_active: str | None,
+        new_active: str | None,
+    ) -> None:
+        self._governance_transition_count += 1
+        if (
+            previous_active is not None
+            and new_active is not None
+            and previous_active != new_active
+        ):
+            self._governance_active_reassignment_visible = True
+
+    def _record_governance_explicit_targeting(self, requested_model_id: str | None) -> None:
+        if requested_model_id is None:
+            return
+        self._governance_explicit_targeting_evidence_visible = True
+        self._governance_recent_window_runs += 1
+
+    def _record_governance_restart_restore(self, *, restored_active: bool) -> None:
+        if not restored_active:
+            return
+        self._governance_restart_restore_visible = True
+        self._governance_recent_window_runs += 1
 
     def _assert_loaded_model(self, target_model: str | None) -> GenerateResult | None:
         if not target_model:
@@ -164,6 +200,8 @@ class RuntimeKernel:
                 model_id=target_model,
                 detail={"raw_result": repr(result)},
             )
+        if result.ok:
+            self._record_governance_explicit_targeting(model_id)
         return GenerateResult(
             ok=result.ok,
             message=result.message,
@@ -207,6 +245,8 @@ class RuntimeKernel:
                 model_id=target_model,
                 detail={"raw_result": repr(result)},
             )
+        if result.ok:
+            self._record_governance_explicit_targeting(model_id)
         return GenerateResult(
             ok=result.ok,
             message=result.message,
@@ -249,7 +289,10 @@ class RuntimeKernel:
             return
 
         async with self.generation_gate.stream_session() as gate_start:
+            saw_non_error_event = False
             for event in self.backend.stream_generate(target_model, prompt, **kwargs):
+                if event.event != "error":
+                    saw_non_error_event = True
                 yield StreamEvent(
                     event=event.event,
                     model_id=event.model_id,
@@ -264,6 +307,8 @@ class RuntimeKernel:
                     was_queued=gate_start.was_queued,
                     detail=event.detail,
                 )
+            if saw_non_error_event:
+                self._record_governance_explicit_targeting(model_id)
 
     async def generate_stream_messages(
         self,
@@ -292,7 +337,10 @@ class RuntimeKernel:
             return
 
         async with self.generation_gate.stream_session() as gate_start:
+            saw_non_error_event = False
             for event in self.backend.stream_generate_messages(target_model, messages, **kwargs):
+                if event.event != "error":
+                    saw_non_error_event = True
                 yield StreamEvent(
                     event=event.event,
                     model_id=event.model_id,
@@ -307,14 +355,22 @@ class RuntimeKernel:
                     was_queued=gate_start.was_queued,
                     detail=event.detail,
                 )
+            if saw_non_error_event:
+                self._record_governance_explicit_targeting(model_id)
 
     def unload_model(self, model_id: str) -> UnloadResult:
         """Unload a model through the backend and clear active model if needed."""
 
+        previous_active = self._active_model_id
         result = self.backend.unload(model_id)
         if result.ok and self._active_model_id == model_id:
             remaining = self.backend.status().loaded_models
             self._active_model_id = remaining[-1].model_id if remaining else None
+        if result.ok:
+            self._record_governance_transition(
+                previous_active=previous_active,
+                new_active=self._active_model_id,
+            )
         return result
 
     def restart_model(self, model_id: str) -> RestartResult:
@@ -331,8 +387,11 @@ class RuntimeKernel:
                 message=f"model not loaded: {model_id}",
                 error_code=RuntimeErrorCode.model_not_loaded,
                 model_id=model_id,
+                stage="preflight",
+                retryable=False,
             )
 
+        previous_active = self._active_model_id
         was_active = self._active_model_id == model_id
         unloaded = self.backend.unload(model_id)
         if not unloaded.ok:
@@ -341,6 +400,8 @@ class RuntimeKernel:
                 message=f"restart unload failed: {unloaded.message}",
                 error_code=unloaded.error_code or RuntimeErrorCode.backend_error,
                 model_id=model_id,
+                stage="unload",
+                retryable=True,
                 detail={"unload": asdict(unloaded)},
             )
 
@@ -351,18 +412,29 @@ class RuntimeKernel:
                 message=f"restart load failed: {reloaded.message}",
                 error_code=reloaded.error_code or RuntimeErrorCode.backend_error,
                 model_id=model_id,
+                stage="load",
+                retryable=True,
                 detail={
                     "unload": asdict(unloaded),
                     "load": asdict(reloaded),
                 },
-            )
+        )
         if was_active:
             self._active_model_id = model_id
+        self._record_governance_transition(
+            previous_active=previous_active,
+            new_active=self._active_model_id,
+        )
+        self._record_governance_restart_restore(
+            restored_active=was_active and self._active_model_id == model_id
+        )
         return RestartResult(
             ok=True,
             message=f"restarted {model_id}",
             model_id=model_id,
             restarted_model=reloaded.model,
+            stage="completed",
+            retryable=False,
             detail={
                 "unload": asdict(unloaded),
                 "load": asdict(reloaded),
@@ -418,7 +490,45 @@ class RuntimeKernel:
         """Return RuntimeStatus as a JSON-ready dict."""
 
         status = self.status()
+        backend_detail = status.backend.detail
+        recoverability = backend_detail.get("recoverability", {})
+        summary = {
+            "runtime": "owlmlx",
+            "backend_name": status.backend.backend_name,
+            "backend_healthy": status.backend.healthy,
+            "readiness": status.health.get("readiness"),
+            "block_reason": status.health.get("block_reason"),
+            "active_model_id": status.active_model_id,
+            "model_count": status.inventory.get("model_count", 0),
+            "persistent_child": backend_detail.get("persistent_child", False),
+        }
+        governance_observations = {
+            "transition_count": self._governance_transition_count,
+            "recent_window_runs": self._governance_recent_window_runs,
+            "active_reassignment_visible": self._governance_active_reassignment_visible,
+            "restart_restore_visible": self._governance_restart_restore_visible,
+            "explicit_targeting_evidence_visible": (
+                self._governance_explicit_targeting_evidence_visible
+            ),
+        }
         return {
+            "contract": {
+                "surface": "owlmlx.runtime.status",
+                "version": "stabilization1",
+                "stable_sections": [
+                    "summary",
+                    "health",
+                    "inventory",
+                    "budget",
+                    "restart",
+                ],
+                "diagnostic_sections": [
+                    "backend.detail",
+                    "governance_observations",
+                    "generation_gate",
+                ],
+            },
+            "summary": summary,
             "backend": {
                 "backend_name": status.backend.backend_name,
                 "healthy": status.backend.healthy,
@@ -428,6 +538,18 @@ class RuntimeKernel:
             "inventory": status.inventory,
             "budget": status.budget,
             "health": status.health,
+            "restart": {
+                "active_model_id": status.active_model_id,
+                "restartable_models": list(recoverability.get("restartable_models", [])),
+                "restart_exhausted_models": list(
+                    recoverability.get("restart_exhausted_models", [])
+                ),
+                "auto_restart_dead_session": backend_detail.get(
+                    "auto_restart_dead_session",
+                    False,
+                ),
+            },
+            "governance_observations": governance_observations,
             "generation_gate": status.generation_gate,
             "active_model_id": status.active_model_id,
         }
