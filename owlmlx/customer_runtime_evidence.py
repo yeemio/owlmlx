@@ -28,6 +28,22 @@ from .cache_scheduler_branch_selection import (
     CacheSchedulerBranchSelection,
     build_cache_scheduler_branch_selection,
 )
+from .cache_continuous_batching_feasibility import (
+    CacheContinuousBatchingFeasibility,
+    build_cache_continuous_batching_feasibility,
+)
+from .cache_batching_mechanism_subgap import (
+    CacheBatchingMechanismSubgap,
+    build_cache_batching_mechanism_subgap,
+)
+from .cache_request_aggregation_window_exactness import (
+    CacheRequestAggregationWindowExactness,
+    build_cache_request_aggregation_window_exactness,
+)
+from .cache_pre_gate_cohort_window_feasibility import (
+    CachePreGateCohortWindowFeasibility,
+    build_cache_pre_gate_cohort_window_feasibility,
+)
 from .cache_turboquant_preconditions_gap import (
     CacheTurboQuantPreconditionsGap,
     build_cache_turboquant_preconditions_gap,
@@ -85,6 +101,10 @@ _VERIFICATION_ASSETS: dict[str, dict[str, list[str]]] = {
             "tests/test_cache_scheduler_floor_gap.py",
             "tests/test_cache_scheduler_implementation_backlog.py",
             "tests/test_cache_scheduler_branch_selection.py",
+            "tests/test_cache_continuous_batching_feasibility.py",
+            "tests/test_cache_batching_mechanism_subgap.py",
+            "tests/test_cache_request_aggregation_window_exactness.py",
+            "tests/test_cache_pre_gate_cohort_window_feasibility.py",
             "tests/test_cache_turboquant_preconditions_gap.py",
             "tests/test_cache_repeatability_evidence.py",
             "tests/test_turboquant_readiness.py",
@@ -99,6 +119,10 @@ _VERIFICATION_ASSETS: dict[str, dict[str, list[str]]] = {
             "scripts/runtime_cache_scheduler_floor_gap.py",
             "scripts/runtime_cache_scheduler_implementation_backlog.py",
             "scripts/runtime_cache_scheduler_branch_selection.py",
+            "scripts/runtime_cache_continuous_batching_feasibility.py",
+            "scripts/runtime_cache_batching_mechanism_subgap.py",
+            "scripts/runtime_cache_request_aggregation_window_exactness.py",
+            "scripts/runtime_cache_pre_gate_cohort_window_feasibility.py",
             "scripts/runtime_cache_turboquant_preconditions_gap.py",
             "scripts/runtime_turboquant_readiness.py",
         ],
@@ -139,6 +163,10 @@ _CONTRACT_SURFACES = {
     "cache_scheduler_depth_scheduler_floor": "owlmlx.cache_scheduler_floor_gap",
     "cache_scheduler_depth_scheduler_backlog": "owlmlx.cache_scheduler_implementation_backlog",
     "cache_scheduler_depth_scheduler_branch_selection": "owlmlx.cache_scheduler_branch_selection",
+    "cache_scheduler_depth_continuous_batching_feasibility": "owlmlx.cache_continuous_batching_feasibility",
+    "cache_scheduler_depth_batching_mechanism_subgap": "owlmlx.cache_batching_mechanism_subgap",
+    "cache_scheduler_depth_request_aggregation_window_exactness": "owlmlx.cache_request_aggregation_window_exactness",
+    "cache_scheduler_depth_pre_gate_cohort_window_feasibility": "owlmlx.cache_pre_gate_cohort_window_feasibility",
     "cache_scheduler_depth_turboquant_preconditions": "owlmlx.cache_turboquant_preconditions_gap",
     "multi_model_lifecycle_governance_controls": (
         "owlmlx.multi_model_governance_controls"
@@ -165,6 +193,10 @@ class CustomerRuntimeEvidenceLedger:
     cache_scheduler_floor_gap: CacheSchedulerFloorGap
     cache_scheduler_implementation_backlog: CacheSchedulerImplementationBacklog
     cache_scheduler_branch_selection: CacheSchedulerBranchSelection
+    cache_continuous_batching_feasibility: CacheContinuousBatchingFeasibility
+    cache_batching_mechanism_subgap: CacheBatchingMechanismSubgap
+    cache_request_aggregation_window_exactness: CacheRequestAggregationWindowExactness
+    cache_pre_gate_cohort_window_feasibility: CachePreGateCohortWindowFeasibility
     cache_turboquant_preconditions_gap: CacheTurboQuantPreconditionsGap
     dominant_gap_reselection: DominantGapReselection
     multi_model_governance: MultiModelGovernanceStatus
@@ -278,6 +310,54 @@ def _coerce_cache_scheduler_branch_selection(
         return value
     return build_cache_scheduler_branch_selection(
         scheduler_backlog=cache_scheduler_implementation_backlog
+    )
+
+
+def _coerce_cache_continuous_batching_feasibility(
+    value: CacheContinuousBatchingFeasibility | None,
+    *,
+    cache_scheduler_branch_selection: CacheSchedulerBranchSelection,
+) -> CacheContinuousBatchingFeasibility:
+    if isinstance(value, CacheContinuousBatchingFeasibility):
+        return value
+    return build_cache_continuous_batching_feasibility(
+        branch_selection=cache_scheduler_branch_selection
+    )
+
+
+def _coerce_cache_batching_mechanism_subgap(
+    value: CacheBatchingMechanismSubgap | None,
+    *,
+    cache_continuous_batching_feasibility: CacheContinuousBatchingFeasibility,
+) -> CacheBatchingMechanismSubgap:
+    if isinstance(value, CacheBatchingMechanismSubgap):
+        return value
+    return build_cache_batching_mechanism_subgap(
+        feasibility=cache_continuous_batching_feasibility
+    )
+
+
+def _coerce_cache_request_aggregation_window_exactness(
+    value: CacheRequestAggregationWindowExactness | None,
+    *,
+    cache_batching_mechanism_subgap: CacheBatchingMechanismSubgap,
+) -> CacheRequestAggregationWindowExactness:
+    if isinstance(value, CacheRequestAggregationWindowExactness):
+        return value
+    return build_cache_request_aggregation_window_exactness(
+        mechanism_subgap=cache_batching_mechanism_subgap
+    )
+
+
+def _coerce_cache_pre_gate_cohort_window_feasibility(
+    value: CachePreGateCohortWindowFeasibility | None,
+    *,
+    cache_request_aggregation_window_exactness: CacheRequestAggregationWindowExactness,
+) -> CachePreGateCohortWindowFeasibility:
+    if isinstance(value, CachePreGateCohortWindowFeasibility):
+        return value
+    return build_cache_pre_gate_cohort_window_feasibility(
+        aggregation_exactness=cache_request_aggregation_window_exactness
     )
 
 
@@ -439,6 +519,10 @@ def build_customer_runtime_evidence(
     cache_scheduler_floor_gap: CacheSchedulerFloorGap | None = None,
     cache_scheduler_implementation_backlog: CacheSchedulerImplementationBacklog | None = None,
     cache_scheduler_branch_selection: CacheSchedulerBranchSelection | None = None,
+    cache_continuous_batching_feasibility: CacheContinuousBatchingFeasibility | None = None,
+    cache_batching_mechanism_subgap: CacheBatchingMechanismSubgap | None = None,
+    cache_request_aggregation_window_exactness: CacheRequestAggregationWindowExactness | None = None,
+    cache_pre_gate_cohort_window_feasibility: CachePreGateCohortWindowFeasibility | None = None,
     cache_turboquant_preconditions_gap: CacheTurboQuantPreconditionsGap | None = None,
     dominant_gap_reselection: DominantGapReselection | None = None,
     multi_model_governance: MultiModelGovernanceStatus | None = None,
@@ -489,6 +573,28 @@ def build_customer_runtime_evidence(
     cache_scheduler_branch_selection_status = _coerce_cache_scheduler_branch_selection(
         cache_scheduler_branch_selection,
         cache_scheduler_implementation_backlog=cache_scheduler_implementation_backlog_status,
+    )
+    cache_continuous_batching_feasibility_status = (
+        _coerce_cache_continuous_batching_feasibility(
+            cache_continuous_batching_feasibility,
+            cache_scheduler_branch_selection=cache_scheduler_branch_selection_status,
+        )
+    )
+    cache_batching_mechanism_subgap_status = _coerce_cache_batching_mechanism_subgap(
+        cache_batching_mechanism_subgap,
+        cache_continuous_batching_feasibility=cache_continuous_batching_feasibility_status,
+    )
+    cache_request_aggregation_window_exactness_status = (
+        _coerce_cache_request_aggregation_window_exactness(
+            cache_request_aggregation_window_exactness,
+            cache_batching_mechanism_subgap=cache_batching_mechanism_subgap_status,
+        )
+    )
+    cache_pre_gate_cohort_window_feasibility_status = (
+        _coerce_cache_pre_gate_cohort_window_feasibility(
+            cache_pre_gate_cohort_window_feasibility,
+            cache_request_aggregation_window_exactness=cache_request_aggregation_window_exactness_status,
+        )
     )
     cache_turboquant_preconditions_gap_status = (
         _coerce_cache_turboquant_preconditions_gap(
@@ -603,7 +709,7 @@ def build_customer_runtime_evidence(
                 == "implementation_gap_exact"
             ):
                 recommended_next_step = (
-                    "treat cache as continuous-batching-first scheduler work on this path; the serial ticketed FIFO GenerationGate is now frozen exact, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    "treat cache as pre-gate admission-hook work on this path; request_aggregation_window is now exact, but owlmlx still has no runtime-owned cohort window before whole-request gate claim, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
                 )
             elif cache_scheduler_floor_gap_status.floor_rung == "serial_floor_exact":
                 recommended_next_step = (
@@ -635,6 +741,10 @@ def build_customer_runtime_evidence(
         cache_scheduler_floor_gap=cache_scheduler_floor_gap_status,
         cache_scheduler_implementation_backlog=cache_scheduler_implementation_backlog_status,
         cache_scheduler_branch_selection=cache_scheduler_branch_selection_status,
+        cache_continuous_batching_feasibility=cache_continuous_batching_feasibility_status,
+        cache_batching_mechanism_subgap=cache_batching_mechanism_subgap_status,
+        cache_request_aggregation_window_exactness=cache_request_aggregation_window_exactness_status,
+        cache_pre_gate_cohort_window_feasibility=cache_pre_gate_cohort_window_feasibility_status,
         cache_turboquant_preconditions_gap=cache_turboquant_preconditions_gap_status,
         dominant_gap_reselection=dominant_gap_reselection_status,
         multi_model_governance=governance_status,
@@ -717,6 +827,51 @@ def customer_runtime_evidence_to_dict(
         ]
         cache_closure_level = ledger.cache_scheduler_branch_selection.selection_rung
         cache_blocked_reason = ledger.cache_scheduler_branch_selection.residual_blocker
+    if (
+        ledger.cache_continuous_batching_feasibility.feasibility_rung
+        == "feasibility_blocker_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_continuous_batching_feasibility"
+        ]
+        cache_closure_level = (
+            ledger.cache_continuous_batching_feasibility.feasibility_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_continuous_batching_feasibility.residual_blocker
+        )
+    if ledger.cache_batching_mechanism_subgap.subgap_rung == "mechanism_subgap_exact":
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_batching_mechanism_subgap"
+        ]
+        cache_closure_level = ledger.cache_batching_mechanism_subgap.subgap_rung
+        cache_blocked_reason = ledger.cache_batching_mechanism_subgap.residual_blocker
+    if (
+        ledger.cache_request_aggregation_window_exactness.exactness_rung
+        == "aggregation_window_blocker_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_request_aggregation_window_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_request_aggregation_window_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_request_aggregation_window_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_gate_cohort_window_feasibility.feasibility_rung
+        == "cohort_window_boundary_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_gate_cohort_window_feasibility"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_gate_cohort_window_feasibility.feasibility_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_gate_cohort_window_feasibility.residual_blocker
+        )
 
     gap_evidence = [
         _gap_entry(

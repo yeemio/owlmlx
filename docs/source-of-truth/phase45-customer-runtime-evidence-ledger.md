@@ -185,6 +185,25 @@ The scheduler backlog is now also branch-selected:
 - `multi_worker_scheduler_depth` is still present, but only as a
   `safety_revalidation_required` secondary branch on the current path
 
+The cache gap is now narrower again:
+
+- `owlmlx.cache_continuous_batching_feasibility` freezes continuous batching as
+  an exact feasibility blocker, not just a selected implementation branch
+- `owlmlx.cache_batching_mechanism_subgap` then freezes the next exact local
+  mechanism as `request_aggregation_window`
+- `owlmlx.cache_request_aggregation_window_exactness` then freezes the ingress
+  blocker under that mechanism:
+  - no pre-gate admission window exists yet
+  - the generation gate still claims the session before cohort formation
+- `owlmlx.cache_pre_gate_cohort_window_feasibility` then freezes the next
+  stronger truth:
+  - owlmlx still does not own any queueing/admission seam before whole-request
+    gate claim
+  - a pre-gate cohort window is therefore not locally expressible yet on the
+    current path
+- `shared_prefill_batch_step` and `interleaved_decode_scheduler` remain
+  explicit but secondary behind aggregate admission
+
 TurboQuant can now also be read more narrowly as an exact-but-secondary branch:
 
 - `owlmlx.cache_turboquant_preconditions_gap` freezes the exact missing
@@ -229,3 +248,6 @@ It only claims:
 - once cache remains dominant, the next scheduler implementation branch can
   also be selected from runtime truth through
   `owlmlx.cache_scheduler_branch_selection`
+- once `continuous_batching` is the selected branch, the runtime can freeze
+  whether it is merely absent or structurally blocked through
+  `owlmlx.cache_continuous_batching_feasibility`

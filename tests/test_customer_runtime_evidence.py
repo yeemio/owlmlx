@@ -500,6 +500,9 @@ def test_customer_runtime_evidence_moves_dominant_gap_to_cache_when_governance_p
     cache = next(
         item for item in payload["gap_evidence"] if item["gap_id"] == "cache_scheduler_depth"
     )
-    assert cache["contract_surface"] == "owlmlx.cache_scheduler_branch_selection"
-    assert cache["closure_level"] == "branch_selection_exact"
-    assert "continuous-batching-first scheduler work" in payload["summary"]["recommended_next_step"]
+    assert (
+        cache["contract_surface"]
+        == "owlmlx.cache_pre_gate_cohort_window_feasibility"
+    )
+    assert cache["closure_level"] == "cohort_window_boundary_exact"
+    assert "pre-gate admission-hook work" in payload["summary"]["recommended_next_step"]

@@ -1,7 +1,7 @@
 # owlmlx Master Outline
 
 > Status: authoritative outline
-> Updated: 2026-04-13
+> Updated: 2026-04-15
 
 ## 1. What `owlmlx` Is
 
@@ -109,6 +109,10 @@ These are runtime-level goals, not temporary integration work.
 64. `phase45-cache-turboquant-preconditions-gap.md`
 65. `phase45-dominant-gap-reselection.md`
 66. `phase45-cache-scheduler-branch-selection.md`
+67. `phase45-cache-continuous-batching-feasibility.md`
+68. `phase45-cache-batching-mechanism-subgap.md`
+69. `phase45-request-aggregation-window-exactness.md`
+70. `phase45-pre-gate-cohort-window-feasibility.md`
 
 ## 6. Adoption Model
 
@@ -132,19 +136,24 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-The current top-level goal is no longer specimen-first.
+The current top-level goal is no longer specimen-first and no longer broad
+replacement storytelling.
 
 The next question is:
 
-**Which replacement-grade stability gap most limits `owlmlx` versus `oMLX` /
-`vMLX`, and what is the next executable closure round?**
+**How does `owlmlx` become a supported-host runtime substrate that upper layers
+can trust without inflating replacement claims?**
 
 The current host-level answer is now frozen:
 
 - this host is **not** a candidate for deeper replacement-grade runtime
   validation
 
-The current dominant gap is:
+The current gating program priority is:
+
+- establish one supported-host execution baseline
+
+The current locally reducible dominant gap is:
 
 - `cache_scheduler_depth`
 
@@ -156,4 +165,19 @@ The current heavy-weight answer is now frozen:
 
 The next executable closure round is:
 
-- dominant-gap reselection after both scheduler implementation backlog and TurboQuant preconditions are frozen exact on the cache branch
+- one of:
+  - supported-host baseline establishment on a distinct host/system image
+  - local cache/scheduler closure work on the `cache_scheduler_depth` branch
+
+The current next exact scheduler subgap is:
+
+- `request_aggregation_window`
+
+The current next exact ingress blocker is:
+
+- `missing_pre_gate_admission_window`
+
+The current next exact runtime-owned boundary question is:
+
+- can owlmlx expose a bounded pre-gate admission hook without breaking the
+  validated serial safety boundary after whole-request gate claim?

@@ -67,6 +67,26 @@ from .cache_scheduler_branch_selection import (
     build_cache_scheduler_branch_selection,
     cache_scheduler_branch_selection_to_dict,
 )
+from .cache_continuous_batching_feasibility import (
+    CacheContinuousBatchingFeasibility,
+    build_cache_continuous_batching_feasibility,
+    cache_continuous_batching_feasibility_to_dict,
+)
+from .cache_batching_mechanism_subgap import (
+    CacheBatchingMechanismSubgap,
+    build_cache_batching_mechanism_subgap,
+    cache_batching_mechanism_subgap_to_dict,
+)
+from .cache_request_aggregation_window_exactness import (
+    CacheRequestAggregationWindowExactness,
+    build_cache_request_aggregation_window_exactness,
+    cache_request_aggregation_window_exactness_to_dict,
+)
+from .cache_pre_gate_cohort_window_feasibility import (
+    CachePreGateCohortWindowFeasibility,
+    build_cache_pre_gate_cohort_window_feasibility,
+    cache_pre_gate_cohort_window_feasibility_to_dict,
+)
 from .cache_turboquant_preconditions_gap import (
     CacheTurboQuantPreconditionsGap,
     build_cache_turboquant_preconditions_gap,
@@ -254,6 +274,10 @@ __all__ = [
     "CacheSchedulerFloorGap",
     "CacheSchedulerImplementationBacklog",
     "CacheSchedulerBranchSelection",
+    "CacheContinuousBatchingFeasibility",
+    "CacheBatchingMechanismSubgap",
+    "CacheRequestAggregationWindowExactness",
+    "CachePreGateCohortWindowFeasibility",
     "CacheTurboQuantPreconditionsGap",
     "DominantGapReselection",
     "CacheClosureRung",
@@ -328,6 +352,10 @@ __all__ = [
     "build_cache_scheduler_floor_gap",
     "build_cache_scheduler_implementation_backlog",
     "build_cache_scheduler_branch_selection",
+    "build_cache_continuous_batching_feasibility",
+    "build_cache_batching_mechanism_subgap",
+    "build_cache_request_aggregation_window_exactness",
+    "build_cache_pre_gate_cohort_window_feasibility",
     "build_cache_turboquant_preconditions_gap",
     "build_dominant_gap_reselection",
     "build_cache_closure_rung",
@@ -349,6 +377,10 @@ __all__ = [
     "cache_scheduler_floor_gap_to_dict",
     "cache_scheduler_implementation_backlog_to_dict",
     "cache_scheduler_branch_selection_to_dict",
+    "cache_continuous_batching_feasibility_to_dict",
+    "cache_batching_mechanism_subgap_to_dict",
+    "cache_request_aggregation_window_exactness_to_dict",
+    "cache_pre_gate_cohort_window_feasibility_to_dict",
     "cache_turboquant_preconditions_gap_to_dict",
     "dominant_gap_reselection_to_dict",
     "cache_closure_rung_to_dict",

@@ -229,6 +229,31 @@ Reason:
     - `continuous_batching` is the next locally reducible branch
     - `multi_worker_scheduler_depth` stays secondary until concurrency safety
       is revalidated
+  - that selected branch is now narrowed further as
+    `owlmlx.cache_continuous_batching_feasibility`:
+    - the current path is blocked by exact missing batching mechanisms
+    - `continuous_batching` is therefore not just absent, but structurally
+      blocked on the active path until request aggregation / interleaved
+      scheduling exists
+  - that feasibility blocker is now narrowed again as
+    `owlmlx.cache_batching_mechanism_subgap`:
+    - `request_aggregation_window` is the first exact local mechanism subgap
+    - `shared_prefill_batch_step` stays secondary
+    - `interleaved_decode_scheduler` stays secondary behind aggregate
+      admission and full-session stream release
+  - that selected mechanism is now narrowed again as
+    `owlmlx.cache_request_aggregation_window_exactness`:
+    - no pre-gate admission window exists on the current path
+    - whole-request gate entry still claims the session before cohort
+      formation
+    - aggregated child dispatch and stream release remain downstream
+      dependencies
+  - that ingress blocker is now narrowed again as
+    `owlmlx.cache_pre_gate_cohort_window_feasibility`:
+    - no runtime-owned cohort window exists before gate claim
+    - `GenerationGate` has no pre-admission hook
+    - the validated serial safety boundary still begins only after
+      whole-request gate claim
   - the TurboQuant branch is now frozen exactly as
     `owlmlx.cache_turboquant_preconditions_gap`:
     - `bits_in_cache_key`

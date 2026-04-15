@@ -178,6 +178,14 @@ replacement-grade stability alignment without claiming parity:
   - direct runtime-owned answer for the exact scheduler implementation work that remains once the serial floor is already exact
 - `owlmlx.cache_scheduler_branch_selection`
   - direct runtime-owned answer for which scheduler branch should be worked next once the backlog is already exact
+- `owlmlx.cache_continuous_batching_feasibility`
+  - direct runtime-owned answer for whether continuous batching is merely absent or is exact-feasibility-blocked on the active path
+- `owlmlx.cache_batching_mechanism_subgap`
+  - direct runtime-owned answer for which missing batching mechanism is the next exact local subgap once continuous batching is already proven structurally blocked
+- `owlmlx.cache_request_aggregation_window_exactness`
+  - direct runtime-owned answer for the exact ingress and dependency blockers underneath request aggregation once that mechanism is already selected
+- `owlmlx.cache_pre_gate_cohort_window_feasibility`
+  - direct runtime-owned answer for whether owlmlx owns any cohort/admission seam before whole-request gate claim on the active path
 - `owlmlx.cache_turboquant_preconditions_gap`
   - direct runtime-owned answer for the exact TurboQuant safe-activation requirements still missing on the active cache path
 - `owlmlx.dominant_gap_reselection`
@@ -211,6 +219,7 @@ These surfaces are still narrower than `/v1/runtime/status`. They exist so
 - whether the scheduler branch itself is now frozen as a serial single-worker floor
 - whether the scheduler branch has now narrowed further into an implementation backlog rather than a truth-gap
 - whether the next scheduler branch is `continuous_batching` or a different exact path once the backlog is already frozen
+- whether `continuous_batching` is merely absent or structurally blocked once it is already the selected scheduler branch
 - whether the TurboQuant branch itself is now frozen as an exact set of missing preconditions rather than a generic safety posture
 - whether cache remains the next locally reducible dominant gap once governance is policy-gap exact and heavy-weight repeatability is externally blocked
 - what multi-model lifecycle behavior the runtime actually owns today
