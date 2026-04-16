@@ -28,6 +28,30 @@ from .cache_scheduler_branch_selection import (
     CacheSchedulerBranchSelection,
     build_cache_scheduler_branch_selection,
 )
+from .cache_scheduler_turboquant_branch_reselection import (
+    CacheSchedulerTurboQuantBranchReselection,
+    build_cache_scheduler_turboquant_branch_reselection,
+)
+from .cache_continuous_batching_branch_reduction import (
+    CacheContinuousBatchingBranchReduction,
+    build_cache_continuous_batching_branch_reduction,
+)
+from .cache_request_aggregation_window_reentry import (
+    CacheRequestAggregationWindowReentry,
+    build_cache_request_aggregation_window_reentry,
+)
+from .cache_request_aggregation_active_seam import (
+    CacheRequestAggregationActiveSeam,
+    build_cache_request_aggregation_active_seam,
+)
+from .cache_pre_gate_admission_window_seam import (
+    CachePreGateAdmissionWindowSeam,
+    build_cache_pre_gate_admission_window_seam,
+)
+from .cache_structural_ingress_seam import (
+    CacheStructuralIngressSeam,
+    build_cache_structural_ingress_seam,
+)
 from .cache_continuous_batching_feasibility import (
     CacheContinuousBatchingFeasibility,
     build_cache_continuous_batching_feasibility,
@@ -43,6 +67,122 @@ from .cache_request_aggregation_window_exactness import (
 from .cache_pre_gate_cohort_window_feasibility import (
     CachePreGateCohortWindowFeasibility,
     build_cache_pre_gate_cohort_window_feasibility,
+)
+from .cache_pre_gate_admission_hook_exactness import (
+    CachePreGateAdmissionHookExactness,
+    build_cache_pre_gate_admission_hook_exactness,
+)
+from .cache_admission_hook_safety_contract import (
+    CacheAdmissionHookSafetyContract,
+    build_cache_admission_hook_safety_contract,
+)
+from .cache_pre_claim_admission_contract import (
+    CachePreClaimAdmissionContract,
+    build_cache_pre_claim_admission_contract,
+)
+from .cache_pre_claim_staging_seam_exactness import (
+    CachePreClaimStagingSeamExactness,
+    build_cache_pre_claim_staging_seam_exactness,
+)
+from .cache_pre_claim_metadata_ticket_ownership import (
+    CachePreClaimMetadataTicketOwnership,
+    build_cache_pre_claim_metadata_ticket_ownership,
+)
+from .cache_pre_claim_inert_state_semantics import (
+    CachePreClaimInertStateSemantics,
+    build_cache_pre_claim_inert_state_semantics,
+)
+from .cache_pre_claim_marker_lifetime import (
+    CachePreClaimMarkerLifetime,
+    build_cache_pre_claim_marker_lifetime,
+)
+from .cache_pre_claim_marker_visibility import (
+    CachePreClaimMarkerVisibility,
+    build_cache_pre_claim_marker_visibility,
+)
+from .cache_pre_claim_marker_trigger_inputs import (
+    CachePreClaimMarkerTriggerInputs,
+    build_cache_pre_claim_marker_trigger_inputs,
+)
+from .cache_pre_claim_marker_reader_writer_ownership import (
+    CachePreClaimMarkerReaderWriterOwnership,
+    build_cache_pre_claim_marker_reader_writer_ownership,
+)
+from .cache_pre_claim_marker_state_carrier import (
+    CachePreClaimMarkerStateCarrier,
+    build_cache_pre_claim_marker_state_carrier,
+)
+from .cache_pre_claim_marker_clear_observer_boundary import (
+    CachePreClaimMarkerClearObserverBoundary,
+    build_cache_pre_claim_marker_clear_observer_boundary,
+)
+from .cache_pre_claim_marker_immutability_boundary import (
+    CachePreClaimMarkerImmutabilityBoundary,
+    build_cache_pre_claim_marker_immutability_boundary,
+)
+from .cache_pre_claim_marker_payload_shape_exactness import (
+    CachePreClaimMarkerPayloadShapeExactness,
+    build_cache_pre_claim_marker_payload_shape_exactness,
+)
+from .cache_pre_claim_marker_encoding_carrier_exactness import (
+    CachePreClaimMarkerEncodingCarrierExactness,
+    build_cache_pre_claim_marker_encoding_carrier_exactness,
+)
+from .cache_pre_claim_marker_storage_locality_exactness import (
+    CachePreClaimMarkerStorageLocalityExactness,
+    build_cache_pre_claim_marker_storage_locality_exactness,
+)
+from .cache_pre_claim_marker_locality_access_exactness import (
+    CachePreClaimMarkerLocalityAccessExactness,
+    build_cache_pre_claim_marker_locality_access_exactness,
+)
+from .cache_pre_claim_marker_locality_isolation_exactness import (
+    CachePreClaimMarkerLocalityIsolationExactness,
+    build_cache_pre_claim_marker_locality_isolation_exactness,
+)
+from .cache_pre_claim_marker_locality_lifetime_coupling import (
+    CachePreClaimMarkerLocalityLifetimeCoupling,
+    build_cache_pre_claim_marker_locality_lifetime_coupling,
+)
+from .cache_pre_claim_marker_reclaim_reset_exactness import (
+    CachePreClaimMarkerReclaimResetExactness,
+    build_cache_pre_claim_marker_reclaim_reset_exactness,
+)
+from .cache_pre_claim_admission_carrier_construction import (
+    CachePreClaimAdmissionCarrierConstruction,
+    build_cache_pre_claim_admission_carrier_construction,
+)
+from .cache_pre_claim_admission_carrier_field_exactness import (
+    CachePreClaimAdmissionCarrierFieldExactness,
+    build_cache_pre_claim_admission_carrier_field_exactness,
+)
+from .cache_pre_claim_admission_carrier_encoding_exactness import (
+    CachePreClaimAdmissionCarrierEncodingExactness,
+    build_cache_pre_claim_admission_carrier_encoding_exactness,
+)
+from .cache_pre_claim_admission_carrier_locality_exactness import (
+    CachePreClaimAdmissionCarrierLocalityExactness,
+    build_cache_pre_claim_admission_carrier_locality_exactness,
+)
+from .cache_pre_claim_admission_carrier_locality_access_exactness import (
+    CachePreClaimAdmissionCarrierLocalityAccessExactness,
+    build_cache_pre_claim_admission_carrier_locality_access_exactness,
+)
+from .cache_pre_claim_admission_carrier_locality_isolation_exactness import (
+    CachePreClaimAdmissionCarrierLocalityIsolationExactness,
+    build_cache_pre_claim_admission_carrier_locality_isolation_exactness,
+)
+from .cache_pre_claim_admission_carrier_locality_lifetime_coupling import (
+    CachePreClaimAdmissionCarrierLocalityLifetimeCoupling,
+    build_cache_pre_claim_admission_carrier_locality_lifetime_coupling,
+)
+from .cache_pre_claim_admission_carrier_reclaim_reset_exactness import (
+    CachePreClaimAdmissionCarrierReclaimResetExactness,
+    build_cache_pre_claim_admission_carrier_reclaim_reset_exactness,
+)
+from .cache_pre_claim_admission_carrier_branch_reselection import (
+    CachePreClaimAdmissionCarrierBranchReselection,
+    build_cache_pre_claim_admission_carrier_branch_reselection,
 )
 from .cache_turboquant_preconditions_gap import (
     CacheTurboQuantPreconditionsGap,
@@ -101,10 +241,46 @@ _VERIFICATION_ASSETS: dict[str, dict[str, list[str]]] = {
             "tests/test_cache_scheduler_floor_gap.py",
             "tests/test_cache_scheduler_implementation_backlog.py",
             "tests/test_cache_scheduler_branch_selection.py",
+            "tests/test_cache_scheduler_turboquant_branch_reselection.py",
+            "tests/test_cache_continuous_batching_branch_reduction.py",
+            "tests/test_cache_request_aggregation_window_reentry.py",
+            "tests/test_cache_request_aggregation_active_seam.py",
+            "tests/test_cache_pre_gate_admission_window_seam.py",
+            "tests/test_cache_pre_gate_admission_hook_harness.py",
+            "tests/test_cache_structural_ingress_seam.py",
             "tests/test_cache_continuous_batching_feasibility.py",
             "tests/test_cache_batching_mechanism_subgap.py",
             "tests/test_cache_request_aggregation_window_exactness.py",
             "tests/test_cache_pre_gate_cohort_window_feasibility.py",
+            "tests/test_cache_pre_gate_admission_hook_exactness.py",
+            "tests/test_cache_admission_hook_safety_contract.py",
+            "tests/test_cache_pre_claim_admission_contract.py",
+            "tests/test_cache_pre_claim_staging_seam_exactness.py",
+            "tests/test_cache_pre_claim_metadata_ticket_ownership.py",
+            "tests/test_cache_pre_claim_inert_state_semantics.py",
+            "tests/test_cache_pre_claim_marker_lifetime.py",
+            "tests/test_cache_pre_claim_marker_visibility.py",
+            "tests/test_cache_pre_claim_marker_trigger_inputs.py",
+            "tests/test_cache_pre_claim_marker_reader_writer_ownership.py",
+            "tests/test_cache_pre_claim_marker_state_carrier.py",
+            "tests/test_cache_pre_claim_marker_clear_observer_boundary.py",
+            "tests/test_cache_pre_claim_marker_immutability_boundary.py",
+            "tests/test_cache_pre_claim_marker_payload_shape_exactness.py",
+            "tests/test_cache_pre_claim_marker_encoding_carrier_exactness.py",
+            "tests/test_cache_pre_claim_marker_storage_locality_exactness.py",
+            "tests/test_cache_pre_claim_marker_locality_access_exactness.py",
+            "tests/test_cache_pre_claim_marker_locality_isolation_exactness.py",
+            "tests/test_cache_pre_claim_marker_locality_lifetime_coupling.py",
+            "tests/test_cache_pre_claim_marker_reclaim_reset_exactness.py",
+            "tests/test_cache_pre_claim_admission_carrier_construction.py",
+            "tests/test_cache_pre_claim_admission_carrier_field_exactness.py",
+            "tests/test_cache_pre_claim_admission_carrier_encoding_exactness.py",
+            "tests/test_cache_pre_claim_admission_carrier_locality_exactness.py",
+            "tests/test_cache_pre_claim_admission_carrier_locality_access_exactness.py",
+            "tests/test_cache_pre_claim_admission_carrier_locality_isolation_exactness.py",
+            "tests/test_cache_pre_claim_admission_carrier_locality_lifetime_coupling.py",
+            "tests/test_cache_pre_claim_admission_carrier_reclaim_reset_exactness.py",
+            "tests/test_cache_pre_claim_admission_carrier_branch_reselection.py",
             "tests/test_cache_turboquant_preconditions_gap.py",
             "tests/test_cache_repeatability_evidence.py",
             "tests/test_turboquant_readiness.py",
@@ -119,10 +295,45 @@ _VERIFICATION_ASSETS: dict[str, dict[str, list[str]]] = {
             "scripts/runtime_cache_scheduler_floor_gap.py",
             "scripts/runtime_cache_scheduler_implementation_backlog.py",
             "scripts/runtime_cache_scheduler_branch_selection.py",
+            "scripts/runtime_cache_scheduler_turboquant_branch_reselection.py",
+            "scripts/runtime_cache_continuous_batching_branch_reduction.py",
+            "scripts/runtime_cache_request_aggregation_window_reentry.py",
+            "scripts/runtime_cache_request_aggregation_active_seam.py",
+            "scripts/runtime_cache_pre_gate_admission_window_seam.py",
+            "scripts/runtime_cache_structural_ingress_seam.py",
             "scripts/runtime_cache_continuous_batching_feasibility.py",
             "scripts/runtime_cache_batching_mechanism_subgap.py",
             "scripts/runtime_cache_request_aggregation_window_exactness.py",
             "scripts/runtime_cache_pre_gate_cohort_window_feasibility.py",
+            "scripts/runtime_cache_pre_gate_admission_hook_exactness.py",
+            "scripts/runtime_cache_admission_hook_safety_contract.py",
+            "scripts/runtime_cache_pre_claim_admission_contract.py",
+            "scripts/runtime_cache_pre_claim_staging_seam_exactness.py",
+            "scripts/runtime_cache_pre_claim_metadata_ticket_ownership.py",
+            "scripts/runtime_cache_pre_claim_inert_state_semantics.py",
+            "scripts/runtime_cache_pre_claim_marker_lifetime.py",
+            "scripts/runtime_cache_pre_claim_marker_visibility.py",
+            "scripts/runtime_cache_pre_claim_marker_trigger_inputs.py",
+            "scripts/runtime_cache_pre_claim_marker_reader_writer_ownership.py",
+            "scripts/runtime_cache_pre_claim_marker_state_carrier.py",
+            "scripts/runtime_cache_pre_claim_marker_clear_observer_boundary.py",
+            "scripts/runtime_cache_pre_claim_marker_immutability_boundary.py",
+            "scripts/runtime_cache_pre_claim_marker_payload_shape_exactness.py",
+            "scripts/runtime_cache_pre_claim_marker_encoding_carrier_exactness.py",
+            "scripts/runtime_cache_pre_claim_marker_storage_locality_exactness.py",
+            "scripts/runtime_cache_pre_claim_marker_locality_access_exactness.py",
+            "scripts/runtime_cache_pre_claim_marker_locality_isolation_exactness.py",
+            "scripts/runtime_cache_pre_claim_marker_locality_lifetime_coupling.py",
+            "scripts/runtime_cache_pre_claim_marker_reclaim_reset_exactness.py",
+            "scripts/runtime_cache_pre_claim_admission_carrier_construction.py",
+            "scripts/runtime_cache_pre_claim_admission_carrier_field_exactness.py",
+            "scripts/runtime_cache_pre_claim_admission_carrier_encoding_exactness.py",
+            "scripts/runtime_cache_pre_claim_admission_carrier_locality_exactness.py",
+            "scripts/runtime_cache_pre_claim_admission_carrier_locality_access_exactness.py",
+            "scripts/runtime_cache_pre_claim_admission_carrier_locality_isolation_exactness.py",
+            "scripts/runtime_cache_pre_claim_admission_carrier_locality_lifetime_coupling.py",
+            "scripts/runtime_cache_pre_claim_admission_carrier_reclaim_reset_exactness.py",
+            "scripts/runtime_cache_pre_claim_admission_carrier_branch_reselection.py",
             "scripts/runtime_cache_turboquant_preconditions_gap.py",
             "scripts/runtime_turboquant_readiness.py",
         ],
@@ -163,10 +374,45 @@ _CONTRACT_SURFACES = {
     "cache_scheduler_depth_scheduler_floor": "owlmlx.cache_scheduler_floor_gap",
     "cache_scheduler_depth_scheduler_backlog": "owlmlx.cache_scheduler_implementation_backlog",
     "cache_scheduler_depth_scheduler_branch_selection": "owlmlx.cache_scheduler_branch_selection",
+    "cache_scheduler_depth_scheduler_turboquant_branch_reselection": "owlmlx.cache_scheduler_turboquant_branch_reselection",
+    "cache_scheduler_depth_continuous_batching_branch_reduction": "owlmlx.cache_continuous_batching_branch_reduction",
+    "cache_scheduler_depth_request_aggregation_window_reentry": "owlmlx.cache_request_aggregation_window_reentry",
+    "cache_scheduler_depth_request_aggregation_active_seam": "owlmlx.cache_request_aggregation_active_seam",
+    "cache_scheduler_depth_pre_gate_admission_window_seam": "owlmlx.cache_pre_gate_admission_window_seam",
+    "cache_scheduler_depth_structural_ingress_seam": "owlmlx.cache_structural_ingress_seam",
     "cache_scheduler_depth_continuous_batching_feasibility": "owlmlx.cache_continuous_batching_feasibility",
     "cache_scheduler_depth_batching_mechanism_subgap": "owlmlx.cache_batching_mechanism_subgap",
     "cache_scheduler_depth_request_aggregation_window_exactness": "owlmlx.cache_request_aggregation_window_exactness",
     "cache_scheduler_depth_pre_gate_cohort_window_feasibility": "owlmlx.cache_pre_gate_cohort_window_feasibility",
+    "cache_scheduler_depth_pre_gate_admission_hook_exactness": "owlmlx.cache_pre_gate_admission_hook_exactness",
+    "cache_scheduler_depth_admission_hook_safety_contract": "owlmlx.cache_admission_hook_safety_contract",
+    "cache_scheduler_depth_pre_claim_admission_contract": "owlmlx.cache_pre_claim_admission_contract",
+    "cache_scheduler_depth_pre_claim_staging_seam_exactness": "owlmlx.cache_pre_claim_staging_seam_exactness",
+    "cache_scheduler_depth_pre_claim_metadata_ticket_ownership": "owlmlx.cache_pre_claim_metadata_ticket_ownership",
+    "cache_scheduler_depth_pre_claim_inert_state_semantics": "owlmlx.cache_pre_claim_inert_state_semantics",
+    "cache_scheduler_depth_pre_claim_marker_lifetime": "owlmlx.cache_pre_claim_marker_lifetime",
+    "cache_scheduler_depth_pre_claim_marker_visibility": "owlmlx.cache_pre_claim_marker_visibility",
+    "cache_scheduler_depth_pre_claim_marker_trigger_inputs": "owlmlx.cache_pre_claim_marker_trigger_inputs",
+    "cache_scheduler_depth_pre_claim_marker_reader_writer_ownership": "owlmlx.cache_pre_claim_marker_reader_writer_ownership",
+    "cache_scheduler_depth_pre_claim_marker_state_carrier": "owlmlx.cache_pre_claim_marker_state_carrier",
+    "cache_scheduler_depth_pre_claim_marker_clear_observer_boundary": "owlmlx.cache_pre_claim_marker_clear_observer_boundary",
+    "cache_scheduler_depth_pre_claim_marker_immutability_boundary": "owlmlx.cache_pre_claim_marker_immutability_boundary",
+    "cache_scheduler_depth_pre_claim_marker_payload_shape_exactness": "owlmlx.cache_pre_claim_marker_payload_shape_exactness",
+    "cache_scheduler_depth_pre_claim_marker_encoding_carrier_exactness": "owlmlx.cache_pre_claim_marker_encoding_carrier_exactness",
+    "cache_scheduler_depth_pre_claim_marker_storage_locality_exactness": "owlmlx.cache_pre_claim_marker_storage_locality_exactness",
+    "cache_scheduler_depth_pre_claim_marker_locality_access_exactness": "owlmlx.cache_pre_claim_marker_locality_access_exactness",
+    "cache_scheduler_depth_pre_claim_marker_locality_isolation_exactness": "owlmlx.cache_pre_claim_marker_locality_isolation_exactness",
+    "cache_scheduler_depth_pre_claim_marker_locality_lifetime_coupling": "owlmlx.cache_pre_claim_marker_locality_lifetime_coupling",
+    "cache_scheduler_depth_pre_claim_marker_reclaim_reset_exactness": "owlmlx.cache_pre_claim_marker_reclaim_reset_exactness",
+    "cache_scheduler_depth_pre_claim_admission_carrier_construction": "owlmlx.cache_pre_claim_admission_carrier_construction",
+    "cache_scheduler_depth_pre_claim_admission_carrier_field_exactness": "owlmlx.cache_pre_claim_admission_carrier_field_exactness",
+    "cache_scheduler_depth_pre_claim_admission_carrier_encoding_exactness": "owlmlx.cache_pre_claim_admission_carrier_encoding_exactness",
+    "cache_scheduler_depth_pre_claim_admission_carrier_locality_exactness": "owlmlx.cache_pre_claim_admission_carrier_locality_exactness",
+    "cache_scheduler_depth_pre_claim_admission_carrier_locality_access_exactness": "owlmlx.cache_pre_claim_admission_carrier_locality_access_exactness",
+    "cache_scheduler_depth_pre_claim_admission_carrier_locality_isolation_exactness": "owlmlx.cache_pre_claim_admission_carrier_locality_isolation_exactness",
+    "cache_scheduler_depth_pre_claim_admission_carrier_locality_lifetime_coupling": "owlmlx.cache_pre_claim_admission_carrier_locality_lifetime_coupling",
+    "cache_scheduler_depth_pre_claim_admission_carrier_reclaim_reset_exactness": "owlmlx.cache_pre_claim_admission_carrier_reclaim_reset_exactness",
+    "cache_scheduler_depth_pre_claim_admission_carrier_branch_reselection": "owlmlx.cache_pre_claim_admission_carrier_branch_reselection",
     "cache_scheduler_depth_turboquant_preconditions": "owlmlx.cache_turboquant_preconditions_gap",
     "multi_model_lifecycle_governance_controls": (
         "owlmlx.multi_model_governance_controls"
@@ -193,10 +439,45 @@ class CustomerRuntimeEvidenceLedger:
     cache_scheduler_floor_gap: CacheSchedulerFloorGap
     cache_scheduler_implementation_backlog: CacheSchedulerImplementationBacklog
     cache_scheduler_branch_selection: CacheSchedulerBranchSelection
+    cache_scheduler_turboquant_branch_reselection: CacheSchedulerTurboQuantBranchReselection
+    cache_continuous_batching_branch_reduction: CacheContinuousBatchingBranchReduction
+    cache_request_aggregation_window_reentry: CacheRequestAggregationWindowReentry
+    cache_request_aggregation_active_seam: CacheRequestAggregationActiveSeam
+    cache_pre_gate_admission_window_seam: CachePreGateAdmissionWindowSeam
+    cache_structural_ingress_seam: CacheStructuralIngressSeam
     cache_continuous_batching_feasibility: CacheContinuousBatchingFeasibility
     cache_batching_mechanism_subgap: CacheBatchingMechanismSubgap
     cache_request_aggregation_window_exactness: CacheRequestAggregationWindowExactness
     cache_pre_gate_cohort_window_feasibility: CachePreGateCohortWindowFeasibility
+    cache_pre_gate_admission_hook_exactness: CachePreGateAdmissionHookExactness
+    cache_admission_hook_safety_contract: CacheAdmissionHookSafetyContract
+    cache_pre_claim_admission_contract: CachePreClaimAdmissionContract
+    cache_pre_claim_staging_seam_exactness: CachePreClaimStagingSeamExactness
+    cache_pre_claim_metadata_ticket_ownership: CachePreClaimMetadataTicketOwnership
+    cache_pre_claim_inert_state_semantics: CachePreClaimInertStateSemantics
+    cache_pre_claim_marker_lifetime: CachePreClaimMarkerLifetime
+    cache_pre_claim_marker_visibility: CachePreClaimMarkerVisibility
+    cache_pre_claim_marker_trigger_inputs: CachePreClaimMarkerTriggerInputs
+    cache_pre_claim_marker_reader_writer_ownership: CachePreClaimMarkerReaderWriterOwnership
+    cache_pre_claim_marker_state_carrier: CachePreClaimMarkerStateCarrier
+    cache_pre_claim_marker_clear_observer_boundary: CachePreClaimMarkerClearObserverBoundary
+    cache_pre_claim_marker_immutability_boundary: CachePreClaimMarkerImmutabilityBoundary
+    cache_pre_claim_marker_payload_shape_exactness: CachePreClaimMarkerPayloadShapeExactness
+    cache_pre_claim_marker_encoding_carrier_exactness: CachePreClaimMarkerEncodingCarrierExactness
+    cache_pre_claim_marker_storage_locality_exactness: CachePreClaimMarkerStorageLocalityExactness
+    cache_pre_claim_marker_locality_access_exactness: CachePreClaimMarkerLocalityAccessExactness
+    cache_pre_claim_marker_locality_isolation_exactness: CachePreClaimMarkerLocalityIsolationExactness
+    cache_pre_claim_marker_locality_lifetime_coupling: CachePreClaimMarkerLocalityLifetimeCoupling
+    cache_pre_claim_marker_reclaim_reset_exactness: CachePreClaimMarkerReclaimResetExactness
+    cache_pre_claim_admission_carrier_construction: CachePreClaimAdmissionCarrierConstruction
+    cache_pre_claim_admission_carrier_field_exactness: CachePreClaimAdmissionCarrierFieldExactness
+    cache_pre_claim_admission_carrier_encoding_exactness: CachePreClaimAdmissionCarrierEncodingExactness
+    cache_pre_claim_admission_carrier_locality_exactness: CachePreClaimAdmissionCarrierLocalityExactness
+    cache_pre_claim_admission_carrier_locality_access_exactness: CachePreClaimAdmissionCarrierLocalityAccessExactness
+    cache_pre_claim_admission_carrier_locality_isolation_exactness: CachePreClaimAdmissionCarrierLocalityIsolationExactness
+    cache_pre_claim_admission_carrier_locality_lifetime_coupling: CachePreClaimAdmissionCarrierLocalityLifetimeCoupling
+    cache_pre_claim_admission_carrier_reclaim_reset_exactness: CachePreClaimAdmissionCarrierReclaimResetExactness
+    cache_pre_claim_admission_carrier_branch_reselection: CachePreClaimAdmissionCarrierBranchReselection
     cache_turboquant_preconditions_gap: CacheTurboQuantPreconditionsGap
     dominant_gap_reselection: DominantGapReselection
     multi_model_governance: MultiModelGovernanceStatus
@@ -313,6 +594,22 @@ def _coerce_cache_scheduler_branch_selection(
     )
 
 
+def _coerce_cache_scheduler_turboquant_branch_reselection(
+    value: CacheSchedulerTurboQuantBranchReselection | None,
+    *,
+    cache_pre_claim_admission_carrier_branch_reselection: CachePreClaimAdmissionCarrierBranchReselection,
+    cache_scheduler_branch_selection: CacheSchedulerBranchSelection,
+    cache_turboquant_preconditions_gap: CacheTurboQuantPreconditionsGap,
+) -> CacheSchedulerTurboQuantBranchReselection:
+    if isinstance(value, CacheSchedulerTurboQuantBranchReselection):
+        return value
+    return build_cache_scheduler_turboquant_branch_reselection(
+        carrier_branch_reselection=cache_pre_claim_admission_carrier_branch_reselection,
+        scheduler_branch_selection=cache_scheduler_branch_selection,
+        turboquant_preconditions_gap=cache_turboquant_preconditions_gap,
+    )
+
+
 def _coerce_cache_continuous_batching_feasibility(
     value: CacheContinuousBatchingFeasibility | None,
     *,
@@ -322,6 +619,76 @@ def _coerce_cache_continuous_batching_feasibility(
         return value
     return build_cache_continuous_batching_feasibility(
         branch_selection=cache_scheduler_branch_selection
+    )
+
+
+def _coerce_cache_continuous_batching_branch_reduction(
+    value: CacheContinuousBatchingBranchReduction | None,
+    *,
+    cache_scheduler_turboquant_branch_reselection: CacheSchedulerTurboQuantBranchReselection,
+    cache_batching_mechanism_subgap: CacheBatchingMechanismSubgap,
+) -> CacheContinuousBatchingBranchReduction:
+    if isinstance(value, CacheContinuousBatchingBranchReduction):
+        return value
+    return build_cache_continuous_batching_branch_reduction(
+        scheduler_turboquant_branch_reselection=cache_scheduler_turboquant_branch_reselection,
+        batching_mechanism_subgap=cache_batching_mechanism_subgap,
+    )
+
+
+def _coerce_cache_request_aggregation_window_reentry(
+    value: CacheRequestAggregationWindowReentry | None,
+    *,
+    cache_continuous_batching_branch_reduction: CacheContinuousBatchingBranchReduction,
+    cache_request_aggregation_window_exactness: CacheRequestAggregationWindowExactness,
+) -> CacheRequestAggregationWindowReentry:
+    if isinstance(value, CacheRequestAggregationWindowReentry):
+        return value
+    return build_cache_request_aggregation_window_reentry(
+        continuous_batching_branch_reduction=cache_continuous_batching_branch_reduction,
+        request_aggregation_window_exactness=cache_request_aggregation_window_exactness,
+    )
+
+
+def _coerce_cache_request_aggregation_active_seam(
+    value: CacheRequestAggregationActiveSeam | None,
+    *,
+    cache_request_aggregation_window_reentry: CacheRequestAggregationWindowReentry,
+    cache_request_aggregation_window_exactness: CacheRequestAggregationWindowExactness,
+) -> CacheRequestAggregationActiveSeam:
+    if isinstance(value, CacheRequestAggregationActiveSeam):
+        return value
+    return build_cache_request_aggregation_active_seam(
+        request_aggregation_window_reentry=cache_request_aggregation_window_reentry,
+        request_aggregation_window_exactness=cache_request_aggregation_window_exactness,
+    )
+
+
+def _coerce_cache_pre_gate_admission_window_seam(
+    value: CachePreGateAdmissionWindowSeam | None,
+    *,
+    cache_request_aggregation_active_seam: CacheRequestAggregationActiveSeam,
+    cache_pre_gate_admission_hook_exactness: CachePreGateAdmissionHookExactness,
+) -> CachePreGateAdmissionWindowSeam:
+    if isinstance(value, CachePreGateAdmissionWindowSeam):
+        return value
+    return build_cache_pre_gate_admission_window_seam(
+        request_aggregation_active_seam=cache_request_aggregation_active_seam,
+        pre_gate_admission_hook_exactness=cache_pre_gate_admission_hook_exactness,
+    )
+
+
+def _coerce_cache_structural_ingress_seam(
+    value: CacheStructuralIngressSeam | None,
+    *,
+    cache_pre_gate_admission_window_seam: CachePreGateAdmissionWindowSeam,
+    cache_pre_claim_staging_seam_exactness: CachePreClaimStagingSeamExactness,
+) -> CacheStructuralIngressSeam:
+    if isinstance(value, CacheStructuralIngressSeam):
+        return value
+    return build_cache_structural_ingress_seam(
+        pre_gate_admission_window_seam=cache_pre_gate_admission_window_seam,
+        pre_claim_staging_seam_exactness=cache_pre_claim_staging_seam_exactness,
     )
 
 
@@ -358,6 +725,356 @@ def _coerce_cache_pre_gate_cohort_window_feasibility(
         return value
     return build_cache_pre_gate_cohort_window_feasibility(
         aggregation_exactness=cache_request_aggregation_window_exactness
+    )
+
+
+def _coerce_cache_pre_gate_admission_hook_exactness(
+    value: CachePreGateAdmissionHookExactness | None,
+    *,
+    cache_pre_gate_cohort_window_feasibility: CachePreGateCohortWindowFeasibility,
+) -> CachePreGateAdmissionHookExactness:
+    if isinstance(value, CachePreGateAdmissionHookExactness):
+        return value
+    return build_cache_pre_gate_admission_hook_exactness(
+        cohort_window_feasibility=cache_pre_gate_cohort_window_feasibility
+    )
+
+
+def _coerce_cache_admission_hook_safety_contract(
+    value: CacheAdmissionHookSafetyContract | None,
+    *,
+    cache_pre_gate_admission_hook_exactness: CachePreGateAdmissionHookExactness,
+) -> CacheAdmissionHookSafetyContract:
+    if isinstance(value, CacheAdmissionHookSafetyContract):
+        return value
+    return build_cache_admission_hook_safety_contract(
+        admission_hook_exactness=cache_pre_gate_admission_hook_exactness
+    )
+
+
+def _coerce_cache_pre_claim_admission_contract(
+    value: CachePreClaimAdmissionContract | None,
+    *,
+    cache_admission_hook_safety_contract: CacheAdmissionHookSafetyContract,
+) -> CachePreClaimAdmissionContract:
+    if isinstance(value, CachePreClaimAdmissionContract):
+        return value
+    return build_cache_pre_claim_admission_contract(
+        safety_contract=cache_admission_hook_safety_contract
+    )
+
+
+def _coerce_cache_pre_claim_staging_seam_exactness(
+    value: CachePreClaimStagingSeamExactness | None,
+    *,
+    cache_pre_claim_admission_contract: CachePreClaimAdmissionContract,
+) -> CachePreClaimStagingSeamExactness:
+    if isinstance(value, CachePreClaimStagingSeamExactness):
+        return value
+    return build_cache_pre_claim_staging_seam_exactness(
+        pre_claim_contract=cache_pre_claim_admission_contract
+    )
+
+
+def _coerce_cache_pre_claim_metadata_ticket_ownership(
+    value: CachePreClaimMetadataTicketOwnership | None,
+    *,
+    cache_pre_claim_staging_seam_exactness: CachePreClaimStagingSeamExactness,
+) -> CachePreClaimMetadataTicketOwnership:
+    if isinstance(value, CachePreClaimMetadataTicketOwnership):
+        return value
+    return build_cache_pre_claim_metadata_ticket_ownership(
+        staging_seam_exactness=cache_pre_claim_staging_seam_exactness
+    )
+
+
+def _coerce_cache_pre_claim_inert_state_semantics(
+    value: CachePreClaimInertStateSemantics | None,
+    *,
+    cache_pre_claim_metadata_ticket_ownership: CachePreClaimMetadataTicketOwnership,
+    cache_pre_gate_cohort_window_feasibility: CachePreGateCohortWindowFeasibility,
+) -> CachePreClaimInertStateSemantics:
+    if isinstance(value, CachePreClaimInertStateSemantics):
+        return value
+    return build_cache_pre_claim_inert_state_semantics(
+        metadata_ticket_ownership=cache_pre_claim_metadata_ticket_ownership,
+        cohort_window_feasibility=cache_pre_gate_cohort_window_feasibility,
+    )
+
+
+def _coerce_cache_pre_claim_marker_lifetime(
+    value: CachePreClaimMarkerLifetime | None,
+    *,
+    cache_pre_claim_inert_state_semantics: CachePreClaimInertStateSemantics,
+) -> CachePreClaimMarkerLifetime:
+    if isinstance(value, CachePreClaimMarkerLifetime):
+        return value
+    return build_cache_pre_claim_marker_lifetime(
+        inert_state_semantics=cache_pre_claim_inert_state_semantics
+    )
+
+
+def _coerce_cache_pre_claim_marker_visibility(
+    value: CachePreClaimMarkerVisibility | None,
+    *,
+    cache_pre_claim_marker_lifetime: CachePreClaimMarkerLifetime,
+) -> CachePreClaimMarkerVisibility:
+    if isinstance(value, CachePreClaimMarkerVisibility):
+        return value
+    return build_cache_pre_claim_marker_visibility(
+        marker_lifetime=cache_pre_claim_marker_lifetime
+    )
+
+
+def _coerce_cache_pre_claim_marker_trigger_inputs(
+    value: CachePreClaimMarkerTriggerInputs | None,
+    *,
+    cache_pre_claim_marker_visibility: CachePreClaimMarkerVisibility,
+) -> CachePreClaimMarkerTriggerInputs:
+    if isinstance(value, CachePreClaimMarkerTriggerInputs):
+        return value
+    return build_cache_pre_claim_marker_trigger_inputs(
+        marker_visibility=cache_pre_claim_marker_visibility
+    )
+
+
+def _coerce_cache_pre_claim_marker_reader_writer_ownership(
+    value: CachePreClaimMarkerReaderWriterOwnership | None,
+    *,
+    cache_pre_claim_marker_trigger_inputs: CachePreClaimMarkerTriggerInputs,
+) -> CachePreClaimMarkerReaderWriterOwnership:
+    if isinstance(value, CachePreClaimMarkerReaderWriterOwnership):
+        return value
+    return build_cache_pre_claim_marker_reader_writer_ownership(
+        trigger_inputs=cache_pre_claim_marker_trigger_inputs
+    )
+
+
+def _coerce_cache_pre_claim_marker_state_carrier(
+    value: CachePreClaimMarkerStateCarrier | None,
+    *,
+    cache_pre_claim_marker_reader_writer_ownership: CachePreClaimMarkerReaderWriterOwnership,
+) -> CachePreClaimMarkerStateCarrier:
+    if isinstance(value, CachePreClaimMarkerStateCarrier):
+        return value
+    return build_cache_pre_claim_marker_state_carrier(
+        reader_writer_ownership=cache_pre_claim_marker_reader_writer_ownership
+    )
+
+
+def _coerce_cache_pre_claim_marker_clear_observer_boundary(
+    value: CachePreClaimMarkerClearObserverBoundary | None,
+    *,
+    cache_pre_claim_marker_state_carrier: CachePreClaimMarkerStateCarrier,
+) -> CachePreClaimMarkerClearObserverBoundary:
+    if isinstance(value, CachePreClaimMarkerClearObserverBoundary):
+        return value
+    return build_cache_pre_claim_marker_clear_observer_boundary(
+        state_carrier=cache_pre_claim_marker_state_carrier
+    )
+
+
+def _coerce_cache_pre_claim_marker_immutability_boundary(
+    value: CachePreClaimMarkerImmutabilityBoundary | None,
+    *,
+    cache_pre_claim_marker_clear_observer_boundary: CachePreClaimMarkerClearObserverBoundary,
+) -> CachePreClaimMarkerImmutabilityBoundary:
+    if isinstance(value, CachePreClaimMarkerImmutabilityBoundary):
+        return value
+    return build_cache_pre_claim_marker_immutability_boundary(
+        clear_observer_boundary=cache_pre_claim_marker_clear_observer_boundary
+    )
+
+
+def _coerce_cache_pre_claim_marker_payload_shape_exactness(
+    value: CachePreClaimMarkerPayloadShapeExactness | None,
+    *,
+    cache_pre_claim_marker_immutability_boundary: CachePreClaimMarkerImmutabilityBoundary,
+) -> CachePreClaimMarkerPayloadShapeExactness:
+    if isinstance(value, CachePreClaimMarkerPayloadShapeExactness):
+        return value
+    return build_cache_pre_claim_marker_payload_shape_exactness(
+        immutability_boundary=cache_pre_claim_marker_immutability_boundary
+    )
+
+
+def _coerce_cache_pre_claim_marker_encoding_carrier_exactness(
+    value: CachePreClaimMarkerEncodingCarrierExactness | None,
+    *,
+    cache_pre_claim_marker_payload_shape_exactness: CachePreClaimMarkerPayloadShapeExactness,
+) -> CachePreClaimMarkerEncodingCarrierExactness:
+    if isinstance(value, CachePreClaimMarkerEncodingCarrierExactness):
+        return value
+    return build_cache_pre_claim_marker_encoding_carrier_exactness(
+        payload_shape=cache_pre_claim_marker_payload_shape_exactness
+    )
+
+
+def _coerce_cache_pre_claim_marker_storage_locality_exactness(
+    value: CachePreClaimMarkerStorageLocalityExactness | None,
+    *,
+    cache_pre_claim_marker_encoding_carrier_exactness: CachePreClaimMarkerEncodingCarrierExactness,
+) -> CachePreClaimMarkerStorageLocalityExactness:
+    if isinstance(value, CachePreClaimMarkerStorageLocalityExactness):
+        return value
+    return build_cache_pre_claim_marker_storage_locality_exactness(
+        encoding_carrier=cache_pre_claim_marker_encoding_carrier_exactness
+    )
+
+
+def _coerce_cache_pre_claim_marker_locality_access_exactness(
+    value: CachePreClaimMarkerLocalityAccessExactness | None,
+    *,
+    cache_pre_claim_marker_storage_locality_exactness: CachePreClaimMarkerStorageLocalityExactness,
+) -> CachePreClaimMarkerLocalityAccessExactness:
+    if isinstance(value, CachePreClaimMarkerLocalityAccessExactness):
+        return value
+    return build_cache_pre_claim_marker_locality_access_exactness(
+        storage_locality=cache_pre_claim_marker_storage_locality_exactness
+    )
+
+
+def _coerce_cache_pre_claim_marker_locality_isolation_exactness(
+    value: CachePreClaimMarkerLocalityIsolationExactness | None,
+    *,
+    cache_pre_claim_marker_locality_access_exactness: CachePreClaimMarkerLocalityAccessExactness,
+) -> CachePreClaimMarkerLocalityIsolationExactness:
+    if isinstance(value, CachePreClaimMarkerLocalityIsolationExactness):
+        return value
+    return build_cache_pre_claim_marker_locality_isolation_exactness(
+        locality_access=cache_pre_claim_marker_locality_access_exactness
+    )
+
+
+def _coerce_cache_pre_claim_marker_locality_lifetime_coupling(
+    value: CachePreClaimMarkerLocalityLifetimeCoupling | None,
+    *,
+    cache_pre_claim_marker_locality_isolation_exactness: CachePreClaimMarkerLocalityIsolationExactness,
+) -> CachePreClaimMarkerLocalityLifetimeCoupling:
+    if isinstance(value, CachePreClaimMarkerLocalityLifetimeCoupling):
+        return value
+    return build_cache_pre_claim_marker_locality_lifetime_coupling(
+        locality_isolation=cache_pre_claim_marker_locality_isolation_exactness
+    )
+
+
+def _coerce_cache_pre_claim_marker_reclaim_reset_exactness(
+    value: CachePreClaimMarkerReclaimResetExactness | None,
+    *,
+    cache_pre_claim_marker_locality_lifetime_coupling: CachePreClaimMarkerLocalityLifetimeCoupling,
+) -> CachePreClaimMarkerReclaimResetExactness:
+    if isinstance(value, CachePreClaimMarkerReclaimResetExactness):
+        return value
+    return build_cache_pre_claim_marker_reclaim_reset_exactness(
+        locality_lifetime_coupling=cache_pre_claim_marker_locality_lifetime_coupling
+    )
+
+
+def _coerce_cache_pre_claim_admission_carrier_construction(
+    value: CachePreClaimAdmissionCarrierConstruction | None,
+    *,
+    cache_pre_claim_marker_reclaim_reset_exactness: CachePreClaimMarkerReclaimResetExactness,
+) -> CachePreClaimAdmissionCarrierConstruction:
+    if isinstance(value, CachePreClaimAdmissionCarrierConstruction):
+        return value
+    return build_cache_pre_claim_admission_carrier_construction(
+        reclaim_reset=cache_pre_claim_marker_reclaim_reset_exactness
+    )
+
+
+def _coerce_cache_pre_claim_admission_carrier_field_exactness(
+    value: CachePreClaimAdmissionCarrierFieldExactness | None,
+    *,
+    cache_pre_claim_admission_carrier_construction: CachePreClaimAdmissionCarrierConstruction,
+) -> CachePreClaimAdmissionCarrierFieldExactness:
+    if isinstance(value, CachePreClaimAdmissionCarrierFieldExactness):
+        return value
+    return build_cache_pre_claim_admission_carrier_field_exactness(
+        construction=cache_pre_claim_admission_carrier_construction
+    )
+
+
+def _coerce_cache_pre_claim_admission_carrier_encoding_exactness(
+    value: CachePreClaimAdmissionCarrierEncodingExactness | None,
+    *,
+    cache_pre_claim_admission_carrier_field_exactness: CachePreClaimAdmissionCarrierFieldExactness,
+) -> CachePreClaimAdmissionCarrierEncodingExactness:
+    if isinstance(value, CachePreClaimAdmissionCarrierEncodingExactness):
+        return value
+    return build_cache_pre_claim_admission_carrier_encoding_exactness(
+        field_exactness=cache_pre_claim_admission_carrier_field_exactness
+    )
+
+
+def _coerce_cache_pre_claim_admission_carrier_locality_exactness(
+    value: CachePreClaimAdmissionCarrierLocalityExactness | None,
+    *,
+    cache_pre_claim_admission_carrier_encoding_exactness: CachePreClaimAdmissionCarrierEncodingExactness,
+) -> CachePreClaimAdmissionCarrierLocalityExactness:
+    if isinstance(value, CachePreClaimAdmissionCarrierLocalityExactness):
+        return value
+    return build_cache_pre_claim_admission_carrier_locality_exactness(
+        encoding_exactness=cache_pre_claim_admission_carrier_encoding_exactness
+    )
+
+
+def _coerce_cache_pre_claim_admission_carrier_locality_access_exactness(
+    value: CachePreClaimAdmissionCarrierLocalityAccessExactness | None,
+    *,
+    cache_pre_claim_admission_carrier_locality_exactness: CachePreClaimAdmissionCarrierLocalityExactness,
+) -> CachePreClaimAdmissionCarrierLocalityAccessExactness:
+    if isinstance(value, CachePreClaimAdmissionCarrierLocalityAccessExactness):
+        return value
+    return build_cache_pre_claim_admission_carrier_locality_access_exactness(
+        locality_exactness=cache_pre_claim_admission_carrier_locality_exactness
+    )
+
+
+def _coerce_cache_pre_claim_admission_carrier_locality_isolation_exactness(
+    value: CachePreClaimAdmissionCarrierLocalityIsolationExactness | None,
+    *,
+    cache_pre_claim_admission_carrier_locality_access_exactness: CachePreClaimAdmissionCarrierLocalityAccessExactness,
+) -> CachePreClaimAdmissionCarrierLocalityIsolationExactness:
+    if isinstance(value, CachePreClaimAdmissionCarrierLocalityIsolationExactness):
+        return value
+    return build_cache_pre_claim_admission_carrier_locality_isolation_exactness(
+        locality_access=cache_pre_claim_admission_carrier_locality_access_exactness
+    )
+
+
+def _coerce_cache_pre_claim_admission_carrier_locality_lifetime_coupling(
+    value: CachePreClaimAdmissionCarrierLocalityLifetimeCoupling | None,
+    *,
+    cache_pre_claim_admission_carrier_locality_isolation_exactness: CachePreClaimAdmissionCarrierLocalityIsolationExactness,
+) -> CachePreClaimAdmissionCarrierLocalityLifetimeCoupling:
+    if isinstance(value, CachePreClaimAdmissionCarrierLocalityLifetimeCoupling):
+        return value
+    return build_cache_pre_claim_admission_carrier_locality_lifetime_coupling(
+        locality_isolation=cache_pre_claim_admission_carrier_locality_isolation_exactness
+    )
+
+
+def _coerce_cache_pre_claim_admission_carrier_reclaim_reset_exactness(
+    value: CachePreClaimAdmissionCarrierReclaimResetExactness | None,
+    *,
+    cache_pre_claim_admission_carrier_locality_lifetime_coupling: CachePreClaimAdmissionCarrierLocalityLifetimeCoupling,
+) -> CachePreClaimAdmissionCarrierReclaimResetExactness:
+    if isinstance(value, CachePreClaimAdmissionCarrierReclaimResetExactness):
+        return value
+    return build_cache_pre_claim_admission_carrier_reclaim_reset_exactness(
+        locality_lifetime_coupling=cache_pre_claim_admission_carrier_locality_lifetime_coupling
+    )
+
+
+def _coerce_cache_pre_claim_admission_carrier_branch_reselection(
+    value: CachePreClaimAdmissionCarrierBranchReselection | None,
+    *,
+    cache_pre_claim_admission_carrier_reclaim_reset_exactness: CachePreClaimAdmissionCarrierReclaimResetExactness,
+) -> CachePreClaimAdmissionCarrierBranchReselection:
+    if isinstance(value, CachePreClaimAdmissionCarrierBranchReselection):
+        return value
+    return build_cache_pre_claim_admission_carrier_branch_reselection(
+        reclaim_reset_exactness=cache_pre_claim_admission_carrier_reclaim_reset_exactness
     )
 
 
@@ -519,10 +1236,45 @@ def build_customer_runtime_evidence(
     cache_scheduler_floor_gap: CacheSchedulerFloorGap | None = None,
     cache_scheduler_implementation_backlog: CacheSchedulerImplementationBacklog | None = None,
     cache_scheduler_branch_selection: CacheSchedulerBranchSelection | None = None,
+    cache_scheduler_turboquant_branch_reselection: CacheSchedulerTurboQuantBranchReselection | None = None,
+    cache_continuous_batching_branch_reduction: CacheContinuousBatchingBranchReduction | None = None,
+    cache_request_aggregation_window_reentry: CacheRequestAggregationWindowReentry | None = None,
+    cache_request_aggregation_active_seam: CacheRequestAggregationActiveSeam | None = None,
+    cache_pre_gate_admission_window_seam: CachePreGateAdmissionWindowSeam | None = None,
+    cache_structural_ingress_seam: CacheStructuralIngressSeam | None = None,
     cache_continuous_batching_feasibility: CacheContinuousBatchingFeasibility | None = None,
     cache_batching_mechanism_subgap: CacheBatchingMechanismSubgap | None = None,
     cache_request_aggregation_window_exactness: CacheRequestAggregationWindowExactness | None = None,
     cache_pre_gate_cohort_window_feasibility: CachePreGateCohortWindowFeasibility | None = None,
+    cache_pre_gate_admission_hook_exactness: CachePreGateAdmissionHookExactness | None = None,
+    cache_admission_hook_safety_contract: CacheAdmissionHookSafetyContract | None = None,
+    cache_pre_claim_admission_contract: CachePreClaimAdmissionContract | None = None,
+    cache_pre_claim_staging_seam_exactness: CachePreClaimStagingSeamExactness | None = None,
+    cache_pre_claim_metadata_ticket_ownership: CachePreClaimMetadataTicketOwnership | None = None,
+    cache_pre_claim_inert_state_semantics: CachePreClaimInertStateSemantics | None = None,
+    cache_pre_claim_marker_lifetime: CachePreClaimMarkerLifetime | None = None,
+    cache_pre_claim_marker_visibility: CachePreClaimMarkerVisibility | None = None,
+    cache_pre_claim_marker_trigger_inputs: CachePreClaimMarkerTriggerInputs | None = None,
+    cache_pre_claim_marker_reader_writer_ownership: CachePreClaimMarkerReaderWriterOwnership | None = None,
+    cache_pre_claim_marker_state_carrier: CachePreClaimMarkerStateCarrier | None = None,
+    cache_pre_claim_marker_clear_observer_boundary: CachePreClaimMarkerClearObserverBoundary | None = None,
+    cache_pre_claim_marker_immutability_boundary: CachePreClaimMarkerImmutabilityBoundary | None = None,
+    cache_pre_claim_marker_payload_shape_exactness: CachePreClaimMarkerPayloadShapeExactness | None = None,
+    cache_pre_claim_marker_encoding_carrier_exactness: CachePreClaimMarkerEncodingCarrierExactness | None = None,
+    cache_pre_claim_marker_storage_locality_exactness: CachePreClaimMarkerStorageLocalityExactness | None = None,
+    cache_pre_claim_marker_locality_access_exactness: CachePreClaimMarkerLocalityAccessExactness | None = None,
+    cache_pre_claim_marker_locality_isolation_exactness: CachePreClaimMarkerLocalityIsolationExactness | None = None,
+    cache_pre_claim_marker_locality_lifetime_coupling: CachePreClaimMarkerLocalityLifetimeCoupling | None = None,
+    cache_pre_claim_marker_reclaim_reset_exactness: CachePreClaimMarkerReclaimResetExactness | None = None,
+    cache_pre_claim_admission_carrier_construction: CachePreClaimAdmissionCarrierConstruction | None = None,
+    cache_pre_claim_admission_carrier_field_exactness: CachePreClaimAdmissionCarrierFieldExactness | None = None,
+    cache_pre_claim_admission_carrier_encoding_exactness: CachePreClaimAdmissionCarrierEncodingExactness | None = None,
+    cache_pre_claim_admission_carrier_locality_exactness: CachePreClaimAdmissionCarrierLocalityExactness | None = None,
+    cache_pre_claim_admission_carrier_locality_access_exactness: CachePreClaimAdmissionCarrierLocalityAccessExactness | None = None,
+    cache_pre_claim_admission_carrier_locality_isolation_exactness: CachePreClaimAdmissionCarrierLocalityIsolationExactness | None = None,
+    cache_pre_claim_admission_carrier_locality_lifetime_coupling: CachePreClaimAdmissionCarrierLocalityLifetimeCoupling | None = None,
+    cache_pre_claim_admission_carrier_reclaim_reset_exactness: CachePreClaimAdmissionCarrierReclaimResetExactness | None = None,
+    cache_pre_claim_admission_carrier_branch_reselection: CachePreClaimAdmissionCarrierBranchReselection | None = None,
     cache_turboquant_preconditions_gap: CacheTurboQuantPreconditionsGap | None = None,
     dominant_gap_reselection: DominantGapReselection | None = None,
     multi_model_governance: MultiModelGovernanceStatus | None = None,
@@ -596,11 +1348,221 @@ def build_customer_runtime_evidence(
             cache_request_aggregation_window_exactness=cache_request_aggregation_window_exactness_status,
         )
     )
+    cache_pre_gate_admission_hook_exactness_status = (
+        _coerce_cache_pre_gate_admission_hook_exactness(
+            cache_pre_gate_admission_hook_exactness,
+            cache_pre_gate_cohort_window_feasibility=cache_pre_gate_cohort_window_feasibility_status,
+        )
+    )
+    cache_admission_hook_safety_contract_status = (
+        _coerce_cache_admission_hook_safety_contract(
+            cache_admission_hook_safety_contract,
+            cache_pre_gate_admission_hook_exactness=cache_pre_gate_admission_hook_exactness_status,
+        )
+    )
+    cache_pre_claim_admission_contract_status = (
+        _coerce_cache_pre_claim_admission_contract(
+            cache_pre_claim_admission_contract,
+            cache_admission_hook_safety_contract=cache_admission_hook_safety_contract_status,
+        )
+    )
+    cache_pre_claim_staging_seam_exactness_status = (
+        _coerce_cache_pre_claim_staging_seam_exactness(
+            cache_pre_claim_staging_seam_exactness,
+            cache_pre_claim_admission_contract=cache_pre_claim_admission_contract_status,
+        )
+    )
+    cache_pre_claim_metadata_ticket_ownership_status = (
+        _coerce_cache_pre_claim_metadata_ticket_ownership(
+            cache_pre_claim_metadata_ticket_ownership,
+            cache_pre_claim_staging_seam_exactness=cache_pre_claim_staging_seam_exactness_status,
+        )
+    )
+    cache_pre_claim_inert_state_semantics_status = (
+        _coerce_cache_pre_claim_inert_state_semantics(
+            cache_pre_claim_inert_state_semantics,
+            cache_pre_claim_metadata_ticket_ownership=cache_pre_claim_metadata_ticket_ownership_status,
+            cache_pre_gate_cohort_window_feasibility=cache_pre_gate_cohort_window_feasibility_status,
+        )
+    )
+    cache_pre_claim_marker_lifetime_status = _coerce_cache_pre_claim_marker_lifetime(
+        cache_pre_claim_marker_lifetime,
+        cache_pre_claim_inert_state_semantics=cache_pre_claim_inert_state_semantics_status,
+    )
+    cache_pre_claim_marker_visibility_status = _coerce_cache_pre_claim_marker_visibility(
+        cache_pre_claim_marker_visibility,
+        cache_pre_claim_marker_lifetime=cache_pre_claim_marker_lifetime_status,
+    )
+    cache_pre_claim_marker_trigger_inputs_status = _coerce_cache_pre_claim_marker_trigger_inputs(
+        cache_pre_claim_marker_trigger_inputs,
+        cache_pre_claim_marker_visibility=cache_pre_claim_marker_visibility_status,
+    )
+    cache_pre_claim_marker_reader_writer_ownership_status = (
+        _coerce_cache_pre_claim_marker_reader_writer_ownership(
+            cache_pre_claim_marker_reader_writer_ownership,
+            cache_pre_claim_marker_trigger_inputs=cache_pre_claim_marker_trigger_inputs_status,
+        )
+    )
+    cache_pre_claim_marker_state_carrier_status = (
+        _coerce_cache_pre_claim_marker_state_carrier(
+            cache_pre_claim_marker_state_carrier,
+            cache_pre_claim_marker_reader_writer_ownership=cache_pre_claim_marker_reader_writer_ownership_status,
+        )
+    )
+    cache_pre_claim_marker_clear_observer_boundary_status = (
+        _coerce_cache_pre_claim_marker_clear_observer_boundary(
+            cache_pre_claim_marker_clear_observer_boundary,
+            cache_pre_claim_marker_state_carrier=cache_pre_claim_marker_state_carrier_status,
+        )
+    )
+    cache_pre_claim_marker_immutability_boundary_status = (
+        _coerce_cache_pre_claim_marker_immutability_boundary(
+            cache_pre_claim_marker_immutability_boundary,
+            cache_pre_claim_marker_clear_observer_boundary=cache_pre_claim_marker_clear_observer_boundary_status,
+        )
+    )
+    cache_pre_claim_marker_payload_shape_exactness_status = (
+        _coerce_cache_pre_claim_marker_payload_shape_exactness(
+            cache_pre_claim_marker_payload_shape_exactness,
+            cache_pre_claim_marker_immutability_boundary=cache_pre_claim_marker_immutability_boundary_status,
+        )
+    )
+    cache_pre_claim_marker_encoding_carrier_exactness_status = (
+        _coerce_cache_pre_claim_marker_encoding_carrier_exactness(
+            cache_pre_claim_marker_encoding_carrier_exactness,
+            cache_pre_claim_marker_payload_shape_exactness=cache_pre_claim_marker_payload_shape_exactness_status,
+        )
+    )
+    cache_pre_claim_marker_storage_locality_exactness_status = (
+        _coerce_cache_pre_claim_marker_storage_locality_exactness(
+            cache_pre_claim_marker_storage_locality_exactness,
+            cache_pre_claim_marker_encoding_carrier_exactness=cache_pre_claim_marker_encoding_carrier_exactness_status,
+        )
+    )
+    cache_pre_claim_marker_locality_access_exactness_status = (
+        _coerce_cache_pre_claim_marker_locality_access_exactness(
+            cache_pre_claim_marker_locality_access_exactness,
+            cache_pre_claim_marker_storage_locality_exactness=cache_pre_claim_marker_storage_locality_exactness_status,
+        )
+    )
+    cache_pre_claim_marker_locality_isolation_exactness_status = (
+        _coerce_cache_pre_claim_marker_locality_isolation_exactness(
+            cache_pre_claim_marker_locality_isolation_exactness,
+            cache_pre_claim_marker_locality_access_exactness=cache_pre_claim_marker_locality_access_exactness_status,
+        )
+    )
+    cache_pre_claim_marker_locality_lifetime_coupling_status = (
+        _coerce_cache_pre_claim_marker_locality_lifetime_coupling(
+            cache_pre_claim_marker_locality_lifetime_coupling,
+            cache_pre_claim_marker_locality_isolation_exactness=cache_pre_claim_marker_locality_isolation_exactness_status,
+        )
+    )
+    cache_pre_claim_marker_reclaim_reset_exactness_status = (
+        _coerce_cache_pre_claim_marker_reclaim_reset_exactness(
+            cache_pre_claim_marker_reclaim_reset_exactness,
+            cache_pre_claim_marker_locality_lifetime_coupling=cache_pre_claim_marker_locality_lifetime_coupling_status,
+        )
+    )
+    cache_pre_claim_admission_carrier_construction_status = (
+        _coerce_cache_pre_claim_admission_carrier_construction(
+            cache_pre_claim_admission_carrier_construction,
+            cache_pre_claim_marker_reclaim_reset_exactness=cache_pre_claim_marker_reclaim_reset_exactness_status,
+        )
+    )
+    cache_pre_claim_admission_carrier_field_exactness_status = (
+        _coerce_cache_pre_claim_admission_carrier_field_exactness(
+            cache_pre_claim_admission_carrier_field_exactness,
+            cache_pre_claim_admission_carrier_construction=cache_pre_claim_admission_carrier_construction_status,
+        )
+    )
+    cache_pre_claim_admission_carrier_encoding_exactness_status = (
+        _coerce_cache_pre_claim_admission_carrier_encoding_exactness(
+            cache_pre_claim_admission_carrier_encoding_exactness,
+            cache_pre_claim_admission_carrier_field_exactness=cache_pre_claim_admission_carrier_field_exactness_status,
+        )
+    )
+    cache_pre_claim_admission_carrier_locality_exactness_status = (
+        _coerce_cache_pre_claim_admission_carrier_locality_exactness(
+            cache_pre_claim_admission_carrier_locality_exactness,
+            cache_pre_claim_admission_carrier_encoding_exactness=cache_pre_claim_admission_carrier_encoding_exactness_status,
+        )
+    )
+    cache_pre_claim_admission_carrier_locality_access_exactness_status = (
+        _coerce_cache_pre_claim_admission_carrier_locality_access_exactness(
+            cache_pre_claim_admission_carrier_locality_access_exactness,
+            cache_pre_claim_admission_carrier_locality_exactness=cache_pre_claim_admission_carrier_locality_exactness_status,
+        )
+    )
+    cache_pre_claim_admission_carrier_locality_isolation_exactness_status = (
+        _coerce_cache_pre_claim_admission_carrier_locality_isolation_exactness(
+            cache_pre_claim_admission_carrier_locality_isolation_exactness,
+            cache_pre_claim_admission_carrier_locality_access_exactness=cache_pre_claim_admission_carrier_locality_access_exactness_status,
+        )
+    )
+    cache_pre_claim_admission_carrier_locality_lifetime_coupling_status = (
+        _coerce_cache_pre_claim_admission_carrier_locality_lifetime_coupling(
+            cache_pre_claim_admission_carrier_locality_lifetime_coupling,
+            cache_pre_claim_admission_carrier_locality_isolation_exactness=cache_pre_claim_admission_carrier_locality_isolation_exactness_status,
+        )
+    )
+    cache_pre_claim_admission_carrier_reclaim_reset_exactness_status = (
+        _coerce_cache_pre_claim_admission_carrier_reclaim_reset_exactness(
+            cache_pre_claim_admission_carrier_reclaim_reset_exactness,
+            cache_pre_claim_admission_carrier_locality_lifetime_coupling=cache_pre_claim_admission_carrier_locality_lifetime_coupling_status,
+        )
+    )
+    cache_pre_claim_admission_carrier_branch_reselection_status = (
+        _coerce_cache_pre_claim_admission_carrier_branch_reselection(
+            cache_pre_claim_admission_carrier_branch_reselection,
+            cache_pre_claim_admission_carrier_reclaim_reset_exactness=cache_pre_claim_admission_carrier_reclaim_reset_exactness_status,
+        )
+    )
     cache_turboquant_preconditions_gap_status = (
         _coerce_cache_turboquant_preconditions_gap(
             cache_turboquant_preconditions_gap,
             cache_closure=cache_status,
         )
+    )
+    cache_scheduler_turboquant_branch_reselection_status = (
+        _coerce_cache_scheduler_turboquant_branch_reselection(
+            cache_scheduler_turboquant_branch_reselection,
+            cache_pre_claim_admission_carrier_branch_reselection=cache_pre_claim_admission_carrier_branch_reselection_status,
+            cache_scheduler_branch_selection=cache_scheduler_branch_selection_status,
+            cache_turboquant_preconditions_gap=cache_turboquant_preconditions_gap_status,
+        )
+    )
+    cache_continuous_batching_branch_reduction_status = (
+        _coerce_cache_continuous_batching_branch_reduction(
+            cache_continuous_batching_branch_reduction,
+            cache_scheduler_turboquant_branch_reselection=cache_scheduler_turboquant_branch_reselection_status,
+            cache_batching_mechanism_subgap=cache_batching_mechanism_subgap_status,
+        )
+    )
+    cache_request_aggregation_window_reentry_status = (
+        _coerce_cache_request_aggregation_window_reentry(
+            cache_request_aggregation_window_reentry,
+            cache_continuous_batching_branch_reduction=cache_continuous_batching_branch_reduction_status,
+            cache_request_aggregation_window_exactness=cache_request_aggregation_window_exactness_status,
+        )
+    )
+    cache_request_aggregation_active_seam_status = (
+        _coerce_cache_request_aggregation_active_seam(
+            cache_request_aggregation_active_seam,
+            cache_request_aggregation_window_reentry=cache_request_aggregation_window_reentry_status,
+            cache_request_aggregation_window_exactness=cache_request_aggregation_window_exactness_status,
+        )
+    )
+    cache_pre_gate_admission_window_seam_status = (
+        _coerce_cache_pre_gate_admission_window_seam(
+            cache_pre_gate_admission_window_seam,
+            cache_request_aggregation_active_seam=cache_request_aggregation_active_seam_status,
+            cache_pre_gate_admission_hook_exactness=cache_pre_gate_admission_hook_exactness_status,
+        )
+    )
+    cache_structural_ingress_seam_status = _coerce_cache_structural_ingress_seam(
+        cache_structural_ingress_seam,
+        cache_pre_gate_admission_window_seam=cache_pre_gate_admission_window_seam_status,
+        cache_pre_claim_staging_seam_exactness=cache_pre_claim_staging_seam_exactness_status,
     )
     governance_status = _coerce_governance(multi_model_governance)
     governance_controls = _coerce_governance_controls(multi_model_governance_controls)
@@ -708,9 +1670,178 @@ def build_customer_runtime_evidence(
                 cache_scheduler_implementation_backlog_status.backlog_rung
                 == "implementation_gap_exact"
             ):
-                recommended_next_step = (
-                    "treat cache as pre-gate admission-hook work on this path; request_aggregation_window is now exact, but owlmlx still has no runtime-owned cohort window before whole-request gate claim, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
-                )
+                if (
+                    cache_structural_ingress_seam_status.seam_rung
+                    == "structural_ingress_seam_introduced"
+                ):
+                    recommended_next_step = (
+                        "treat cache as structural ingress seam introduced only; the bounded pre-gate hook now exists before whole-request gate claim, but request aggregation, continuous batching, child parallelism, stream-path rewrites, and cache parity remain out of scope for this round, while the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_gate_admission_window_seam_status.seam_rung
+                    == "pre_gate_admission_window_seam_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as pre-gate admission-window seam work on this path; request aggregation remains the active cache subchain, the active seam is now the missing bounded pre-gate admission hook before whole-request gate claim, child exchange and stream hold stay secondary, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_request_aggregation_active_seam_status.seam_rung
+                    == "aggregation_active_seam_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as request-aggregation active-seam work on this path; request_aggregation_window remains the active cache subchain, the active seam is now the missing pre-gate admission window before whole-request gate claim, child exchange and stream hold stay secondary, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_request_aggregation_window_reentry_status.reentry_rung
+                    == "aggregation_reentry_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as request-aggregation-window reentry work on this path; scheduler depth remains the selected cache branch, continuous batching remains the selected scheduler sub-branch, request_aggregation_window is now the active reentered cache subchain, shared_prefill_batch_step and interleaved_decode_scheduler stay secondary, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_continuous_batching_branch_reduction_status.reduction_rung
+                    == "continuous_batching_branch_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as continuous-batching reduction work on this path; scheduler depth remains the selected cache branch, continuous batching remains the selected scheduler sub-branch, request_aggregation_window is now the next exact reduction target, shared_prefill_batch_step and interleaved_decode_scheduler stay secondary until aggregated admission exists, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_scheduler_turboquant_branch_reselection_status.reselection_rung
+                    == "scheduler_turboquant_branch_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as scheduler-depth work on this path; the carrier-local exactness chain is complete, scheduler depth is reselected as the next honest cache branch, TurboQuant stays exact-but-secondary, post-claim max_concurrent=1 and ticketed FIFO remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_admission_carrier_branch_reselection_status.reselection_rung
+                    == "carrier_branch_reselection_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as scheduler-vs-TurboQuant branch reselection work on this path; the admission-carrier exactness chain is now complete, so any next cache reduction must move outside the carrier-local branch without weakening the already-frozen ingress invariants, post-claim max_concurrent=1 and ticketed FIFO remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions remain exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_admission_carrier_reclaim_reset_exactness_status.exactness_rung
+                    == "admission_carrier_reclaim_reset_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as admission-carrier branch reselection work on this path; the bounded inert pre-claim carrier now resets to a fully empty inert state before any later reuse, no prior request history or execution-bearing residue may survive reclaim, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_admission_carrier_locality_lifetime_coupling_status.exactness_rung
+                    == "admission_carrier_locality_lifetime_coupling_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as admission-carrier reclaim-reset exactness work on this path; the bounded inert pre-claim carrier is now coupled only to its own staged-request lifetime before claim, reclaimed only by same-request pre-claim discard or gate-claim expiry transition, may not survive into cross-request reuse or retained scheduler/backend/stream lifetime, only staged metadata snapshot building, observational ticket reservation, same-request pre-claim drop/cancel reset, and same-request pre-claim discard observation may reach it, the carrier remains isolated per staged request and lives only in single-request staged locality adjacent to metadata/ticket state, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_admission_carrier_locality_isolation_exactness_status.exactness_rung
+                    == "admission_carrier_locality_isolation_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as admission-carrier locality-lifetime coupling work on this path; the bounded inert pre-claim carrier now remains isolated per staged request before claim, no shared scheduler/backend/stream pending-state carrier locality or cross-request carrier merge may exist, only staged metadata snapshot building, observational ticket reservation, same-request pre-claim drop/cancel reset, and same-request pre-claim discard observation may reach it, the carrier still lives only in single-request staged locality adjacent to metadata/ticket state, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_admission_carrier_locality_access_exactness_status.exactness_rung
+                    == "admission_carrier_locality_access_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as admission-carrier locality-isolation exactness work on this path; only staged metadata snapshot building, observational ticket reservation, same-request pre-claim drop/cancel reset, and same-request pre-claim discard observation may reach the bounded inert pre-claim carrier before claim, queue/cohort scheduler, child/backend payload, stream-handle, and execution-entitlement paths may not access it, the carrier still lives only in single-request staged locality adjacent to metadata/ticket state, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_admission_carrier_locality_exactness_status.exactness_rung
+                    == "admission_carrier_locality_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as admission-carrier locality-access exactness work on this path; the bounded inert pre-claim carrier may now live only in single-request staged locality adjacent to metadata/ticket state and outside queue, scheduler, child/stream, and execution-owned locality, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_admission_carrier_encoding_exactness_status.exactness_rung
+                    == "admission_carrier_encoding_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as admission-carrier locality exactness work on this path; a bounded pre-claim carrier now encodes immutable request metadata, observational ticket reservation, and a fully reset inert marker presence bit only as one inert pre-claim record, no queue identity, scheduler priority, batch membership, child/stream attachment, or execution-bearing encoding may exist before claim, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_admission_carrier_field_exactness_status.exactness_rung
+                    == "admission_carrier_field_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as admission-carrier field-encoding exactness work on this path; a bounded pre-claim carrier is now frozen to immutable request metadata, observational ticket reservation, and a fully reset inert marker presence bit only, no queue identity, scheduler priority, batch membership, child/stream attachment, or execution-bearing field may exist before claim, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_admission_carrier_construction_status.exactness_rung
+                    == "admission_carrier_construction_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as admission-carrier field exactness work on this path; any bounded pre-claim carrier is now frozen to immutable request metadata, observational ticket reservation, and a fully reset inert marker slot only, no queue-owned or execution-bearing carrier may exist before claim, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_marker_reclaim_reset_exactness_status.exactness_rung
+                    == "reclaim_reset_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as pre-claim admission-carrier construction work on this path; reclaim now resets the adjacent marker slot to a fully inert empty state before any later reuse, no stale history or execution-bearing residue may survive reclaim, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_marker_locality_lifetime_coupling_status.exactness_rung
+                    == "locality_lifetime_coupling_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as marker reclaim-reset exactness work on this path; isolated marker locality is now coupled only to its own staged-request lifetime, reclaim may occur only by same-request pre-claim discard or gate-claim expiry, no cross-request slot reuse or scheduler/backend/stream-retained lifetime may exist before claim, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_marker_locality_isolation_exactness_status.exactness_rung
+                    == "locality_isolation_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as marker locality-lifetime coupling work on this path; the adjacent inert marker slot is now isolated per staged request, no shared pending-state locality may exist before whole-request gate claim, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_marker_locality_access_exactness_status.exactness_rung
+                    == "locality_access_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as marker locality-isolation work on this path; only explicit pre-claim drop/cancel logic, gate-claim expiry, and pre-claim discard observation may reach the adjacent inert marker slot, no scheduler or backend path may access it before whole-request gate claim, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_marker_storage_locality_exactness_status.exactness_rung
+                    == "storage_locality_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as marker locality-access work on this path; the inert boolean marker slot now lives only adjacent to staged metadata and outside ticket identity, no queue or scheduler locality may own it before whole-request gate claim, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_marker_encoding_carrier_exactness_status.exactness_rung
+                    == "encoding_carrier_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as marker storage-locality work on this path; pre-claim marker presence now lives only in one inert boolean slot, no queue or ticket identity may be encoded before whole-request gate claim, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_marker_payload_shape_exactness_status.exactness_rung
+                    == "payload_shape_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as marker encoding work on this path; pre-claim marker state now collapses to pure presence/absence only, no reason-code or priority payload may exist before whole-request gate claim, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_marker_immutability_boundary_status.exactness_rung
+                    == "immutability_boundary_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as marker payload-shape work on this path; marker state may only change by clear-only semantics before whole-request gate claim, no pre-claim path may rewrite payload or priority, ticket reservation must remain observational-only, immutable request metadata must remain read-only, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_pre_claim_marker_clear_observer_boundary_status.exactness_rung
+                    == "clear_observer_boundary_exact"
+                ):
+                    recommended_next_step = (
+                        "treat cache as marker immutability work on this path; only explicit pre-claim drop/cancel logic and gate-claim expiry may clear the inert marker carrier, pre-claim discard may only observe it, no pre-claim path may acquire hidden marker mutation rights beyond clear-only semantics, ticket reservation must remain observational-only, immutable request metadata must remain read-only before whole-request gate claim, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                else:
+                    recommended_next_step = (
+                        "treat cache as marker clear-observer boundary work on this path; only explicit pre-claim drop/cancel logic and gate-claim expiry may clear the inert marker carrier, pre-claim discard may only observe it, marker clear ownership may not leak into scheduler selection or execution routing, ticket reservation must remain observational-only, immutable request metadata must remain read-only before whole-request gate claim, post-claim max_concurrent=1 and ticketed FIFO must remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, TurboQuant preconditions are also exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                    )
             elif cache_scheduler_floor_gap_status.floor_rung == "serial_floor_exact":
                 recommended_next_step = (
                     "treat cache as scheduler-implementation work on this path; the active floor is still serial_single_worker, TurboQuant stays exact but secondary, and the governance policy gap and supported-host blocker remain exact"
@@ -741,10 +1872,45 @@ def build_customer_runtime_evidence(
         cache_scheduler_floor_gap=cache_scheduler_floor_gap_status,
         cache_scheduler_implementation_backlog=cache_scheduler_implementation_backlog_status,
         cache_scheduler_branch_selection=cache_scheduler_branch_selection_status,
+        cache_scheduler_turboquant_branch_reselection=cache_scheduler_turboquant_branch_reselection_status,
+        cache_continuous_batching_branch_reduction=cache_continuous_batching_branch_reduction_status,
+        cache_request_aggregation_window_reentry=cache_request_aggregation_window_reentry_status,
+        cache_request_aggregation_active_seam=cache_request_aggregation_active_seam_status,
+        cache_pre_gate_admission_window_seam=cache_pre_gate_admission_window_seam_status,
+        cache_structural_ingress_seam=cache_structural_ingress_seam_status,
         cache_continuous_batching_feasibility=cache_continuous_batching_feasibility_status,
         cache_batching_mechanism_subgap=cache_batching_mechanism_subgap_status,
         cache_request_aggregation_window_exactness=cache_request_aggregation_window_exactness_status,
         cache_pre_gate_cohort_window_feasibility=cache_pre_gate_cohort_window_feasibility_status,
+        cache_pre_gate_admission_hook_exactness=cache_pre_gate_admission_hook_exactness_status,
+        cache_admission_hook_safety_contract=cache_admission_hook_safety_contract_status,
+        cache_pre_claim_admission_contract=cache_pre_claim_admission_contract_status,
+        cache_pre_claim_staging_seam_exactness=cache_pre_claim_staging_seam_exactness_status,
+        cache_pre_claim_metadata_ticket_ownership=cache_pre_claim_metadata_ticket_ownership_status,
+        cache_pre_claim_inert_state_semantics=cache_pre_claim_inert_state_semantics_status,
+        cache_pre_claim_marker_lifetime=cache_pre_claim_marker_lifetime_status,
+        cache_pre_claim_marker_visibility=cache_pre_claim_marker_visibility_status,
+        cache_pre_claim_marker_trigger_inputs=cache_pre_claim_marker_trigger_inputs_status,
+        cache_pre_claim_marker_reader_writer_ownership=cache_pre_claim_marker_reader_writer_ownership_status,
+        cache_pre_claim_marker_state_carrier=cache_pre_claim_marker_state_carrier_status,
+        cache_pre_claim_marker_clear_observer_boundary=cache_pre_claim_marker_clear_observer_boundary_status,
+        cache_pre_claim_marker_immutability_boundary=cache_pre_claim_marker_immutability_boundary_status,
+        cache_pre_claim_marker_payload_shape_exactness=cache_pre_claim_marker_payload_shape_exactness_status,
+        cache_pre_claim_marker_encoding_carrier_exactness=cache_pre_claim_marker_encoding_carrier_exactness_status,
+        cache_pre_claim_marker_storage_locality_exactness=cache_pre_claim_marker_storage_locality_exactness_status,
+        cache_pre_claim_marker_locality_access_exactness=cache_pre_claim_marker_locality_access_exactness_status,
+        cache_pre_claim_marker_locality_isolation_exactness=cache_pre_claim_marker_locality_isolation_exactness_status,
+        cache_pre_claim_marker_locality_lifetime_coupling=cache_pre_claim_marker_locality_lifetime_coupling_status,
+        cache_pre_claim_marker_reclaim_reset_exactness=cache_pre_claim_marker_reclaim_reset_exactness_status,
+        cache_pre_claim_admission_carrier_construction=cache_pre_claim_admission_carrier_construction_status,
+        cache_pre_claim_admission_carrier_field_exactness=cache_pre_claim_admission_carrier_field_exactness_status,
+        cache_pre_claim_admission_carrier_encoding_exactness=cache_pre_claim_admission_carrier_encoding_exactness_status,
+        cache_pre_claim_admission_carrier_locality_exactness=cache_pre_claim_admission_carrier_locality_exactness_status,
+        cache_pre_claim_admission_carrier_locality_access_exactness=cache_pre_claim_admission_carrier_locality_access_exactness_status,
+        cache_pre_claim_admission_carrier_locality_isolation_exactness=cache_pre_claim_admission_carrier_locality_isolation_exactness_status,
+        cache_pre_claim_admission_carrier_locality_lifetime_coupling=cache_pre_claim_admission_carrier_locality_lifetime_coupling_status,
+        cache_pre_claim_admission_carrier_reclaim_reset_exactness=cache_pre_claim_admission_carrier_reclaim_reset_exactness_status,
+        cache_pre_claim_admission_carrier_branch_reselection=cache_pre_claim_admission_carrier_branch_reselection_status,
         cache_turboquant_preconditions_gap=cache_turboquant_preconditions_gap_status,
         dominant_gap_reselection=dominant_gap_reselection_status,
         multi_model_governance=governance_status,
@@ -872,6 +2038,429 @@ def customer_runtime_evidence_to_dict(
         cache_blocked_reason = (
             ledger.cache_pre_gate_cohort_window_feasibility.residual_blocker
         )
+    if (
+        ledger.cache_pre_gate_admission_hook_exactness.exactness_rung
+        == "admission_hook_blocker_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_gate_admission_hook_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_gate_admission_hook_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_gate_admission_hook_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_admission_hook_safety_contract.contract_rung
+        == "safety_contract_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_admission_hook_safety_contract"
+        ]
+        cache_closure_level = (
+            ledger.cache_admission_hook_safety_contract.contract_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_admission_hook_safety_contract.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_admission_contract.contract_rung
+        == "pre_claim_contract_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_admission_contract"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_admission_contract.contract_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_admission_contract.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_staging_seam_exactness.exactness_rung
+        == "staging_seam_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_staging_seam_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_staging_seam_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_staging_seam_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_metadata_ticket_ownership.exactness_rung
+        == "ownership_boundary_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_metadata_ticket_ownership"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_metadata_ticket_ownership.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_metadata_ticket_ownership.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_inert_state_semantics.exactness_rung
+        == "inert_state_semantics_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_inert_state_semantics"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_inert_state_semantics.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_inert_state_semantics.residual_blocker
+        )
+    if ledger.cache_pre_claim_marker_lifetime.exactness_rung == "marker_lifetime_exact":
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_lifetime"
+        ]
+        cache_closure_level = ledger.cache_pre_claim_marker_lifetime.exactness_rung
+        cache_blocked_reason = ledger.cache_pre_claim_marker_lifetime.residual_blocker
+    if ledger.cache_pre_claim_marker_visibility.exactness_rung == "marker_visibility_exact":
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_visibility"
+        ]
+        cache_closure_level = ledger.cache_pre_claim_marker_visibility.exactness_rung
+        cache_blocked_reason = ledger.cache_pre_claim_marker_visibility.residual_blocker
+    if ledger.cache_pre_claim_marker_trigger_inputs.exactness_rung == "trigger_inputs_exact":
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_trigger_inputs"
+        ]
+        cache_closure_level = ledger.cache_pre_claim_marker_trigger_inputs.exactness_rung
+        cache_blocked_reason = ledger.cache_pre_claim_marker_trigger_inputs.residual_blocker
+    if (
+        ledger.cache_pre_claim_marker_reader_writer_ownership.exactness_rung
+        == "reader_writer_ownership_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_reader_writer_ownership"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_marker_reader_writer_ownership.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_marker_reader_writer_ownership.residual_blocker
+        )
+    if ledger.cache_pre_claim_marker_state_carrier.exactness_rung == "state_carrier_exact":
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_state_carrier"
+        ]
+        cache_closure_level = ledger.cache_pre_claim_marker_state_carrier.exactness_rung
+        cache_blocked_reason = ledger.cache_pre_claim_marker_state_carrier.residual_blocker
+    if (
+        ledger.cache_pre_claim_marker_clear_observer_boundary.exactness_rung
+        == "clear_observer_boundary_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_clear_observer_boundary"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_marker_clear_observer_boundary.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_marker_clear_observer_boundary.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_marker_immutability_boundary.exactness_rung
+        == "immutability_boundary_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_immutability_boundary"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_marker_immutability_boundary.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_marker_immutability_boundary.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_marker_payload_shape_exactness.exactness_rung
+        == "payload_shape_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_payload_shape_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_marker_payload_shape_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_marker_payload_shape_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_marker_encoding_carrier_exactness.exactness_rung
+        == "encoding_carrier_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_encoding_carrier_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_marker_encoding_carrier_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_marker_encoding_carrier_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_marker_storage_locality_exactness.exactness_rung
+        == "storage_locality_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_storage_locality_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_marker_storage_locality_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_marker_storage_locality_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_marker_locality_access_exactness.exactness_rung
+        == "locality_access_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_locality_access_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_marker_locality_access_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_marker_locality_access_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_marker_locality_isolation_exactness.exactness_rung
+        == "locality_isolation_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_locality_isolation_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_marker_locality_isolation_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_marker_locality_isolation_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_marker_locality_lifetime_coupling.exactness_rung
+        == "locality_lifetime_coupling_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_locality_lifetime_coupling"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_marker_locality_lifetime_coupling.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_marker_locality_lifetime_coupling.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_marker_reclaim_reset_exactness.exactness_rung
+        == "reclaim_reset_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_marker_reclaim_reset_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_marker_reclaim_reset_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_marker_reclaim_reset_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_admission_carrier_construction.exactness_rung
+        == "admission_carrier_construction_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_admission_carrier_construction"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_admission_carrier_construction.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_admission_carrier_construction.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_admission_carrier_field_exactness.exactness_rung
+        == "admission_carrier_field_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_admission_carrier_field_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_admission_carrier_field_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_admission_carrier_field_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_admission_carrier_encoding_exactness.exactness_rung
+        == "admission_carrier_encoding_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_admission_carrier_encoding_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_admission_carrier_encoding_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_admission_carrier_encoding_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_admission_carrier_locality_exactness.exactness_rung
+        == "admission_carrier_locality_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_admission_carrier_locality_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_admission_carrier_locality_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_admission_carrier_locality_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_admission_carrier_locality_access_exactness.exactness_rung
+        == "admission_carrier_locality_access_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_admission_carrier_locality_access_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_admission_carrier_locality_access_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_admission_carrier_locality_access_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_admission_carrier_locality_isolation_exactness.exactness_rung
+        == "admission_carrier_locality_isolation_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_admission_carrier_locality_isolation_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_admission_carrier_locality_isolation_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_admission_carrier_locality_isolation_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_admission_carrier_locality_lifetime_coupling.exactness_rung
+        == "admission_carrier_locality_lifetime_coupling_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_admission_carrier_locality_lifetime_coupling"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_admission_carrier_locality_lifetime_coupling.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_admission_carrier_locality_lifetime_coupling.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_admission_carrier_reclaim_reset_exactness.exactness_rung
+        == "admission_carrier_reclaim_reset_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_admission_carrier_reclaim_reset_exactness"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_admission_carrier_reclaim_reset_exactness.exactness_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_admission_carrier_reclaim_reset_exactness.residual_blocker
+        )
+    if (
+        ledger.cache_pre_claim_admission_carrier_branch_reselection.reselection_rung
+        == "carrier_branch_reselection_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_claim_admission_carrier_branch_reselection"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_claim_admission_carrier_branch_reselection.reselection_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_claim_admission_carrier_branch_reselection.residual_blocker
+        )
+    if (
+        ledger.cache_scheduler_turboquant_branch_reselection.reselection_rung
+        == "scheduler_turboquant_branch_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_scheduler_turboquant_branch_reselection"
+        ]
+        cache_closure_level = (
+            ledger.cache_scheduler_turboquant_branch_reselection.reselection_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_scheduler_turboquant_branch_reselection.residual_blocker
+        )
+    if (
+        ledger.cache_continuous_batching_branch_reduction.reduction_rung
+        == "continuous_batching_branch_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_continuous_batching_branch_reduction"
+        ]
+        cache_closure_level = (
+            ledger.cache_continuous_batching_branch_reduction.reduction_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_continuous_batching_branch_reduction.residual_blocker
+        )
+    if (
+        ledger.cache_request_aggregation_window_reentry.reentry_rung
+        == "aggregation_reentry_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_request_aggregation_window_reentry"
+        ]
+        cache_closure_level = (
+            ledger.cache_request_aggregation_window_reentry.reentry_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_request_aggregation_window_reentry.residual_blocker
+        )
+    if (
+        ledger.cache_request_aggregation_active_seam.seam_rung
+        == "aggregation_active_seam_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_request_aggregation_active_seam"
+        ]
+        cache_closure_level = (
+            ledger.cache_request_aggregation_active_seam.seam_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_request_aggregation_active_seam.residual_blocker
+        )
+    if (
+        ledger.cache_pre_gate_admission_window_seam.seam_rung
+        == "pre_gate_admission_window_seam_exact"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_pre_gate_admission_window_seam"
+        ]
+        cache_closure_level = (
+            ledger.cache_pre_gate_admission_window_seam.seam_rung
+        )
+        cache_blocked_reason = (
+            ledger.cache_pre_gate_admission_window_seam.residual_blocker
+        )
+    if (
+        ledger.cache_structural_ingress_seam.seam_rung
+        == "structural_ingress_seam_introduced"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_structural_ingress_seam"
+        ]
+        cache_closure_level = ledger.cache_structural_ingress_seam.seam_rung
+        cache_blocked_reason = ledger.cache_structural_ingress_seam.residual_blocker
 
     gap_evidence = [
         _gap_entry(

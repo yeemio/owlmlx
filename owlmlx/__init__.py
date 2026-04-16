@@ -67,6 +67,36 @@ from .cache_scheduler_branch_selection import (
     build_cache_scheduler_branch_selection,
     cache_scheduler_branch_selection_to_dict,
 )
+from .cache_scheduler_turboquant_branch_reselection import (
+    CacheSchedulerTurboQuantBranchReselection,
+    build_cache_scheduler_turboquant_branch_reselection,
+    cache_scheduler_turboquant_branch_reselection_to_dict,
+)
+from .cache_continuous_batching_branch_reduction import (
+    CacheContinuousBatchingBranchReduction,
+    build_cache_continuous_batching_branch_reduction,
+    cache_continuous_batching_branch_reduction_to_dict,
+)
+from .cache_request_aggregation_window_reentry import (
+    CacheRequestAggregationWindowReentry,
+    build_cache_request_aggregation_window_reentry,
+    cache_request_aggregation_window_reentry_to_dict,
+)
+from .cache_request_aggregation_active_seam import (
+    CacheRequestAggregationActiveSeam,
+    build_cache_request_aggregation_active_seam,
+    cache_request_aggregation_active_seam_to_dict,
+)
+from .cache_pre_gate_admission_window_seam import (
+    CachePreGateAdmissionWindowSeam,
+    build_cache_pre_gate_admission_window_seam,
+    cache_pre_gate_admission_window_seam_to_dict,
+)
+from .cache_structural_ingress_seam import (
+    CacheStructuralIngressSeam,
+    build_cache_structural_ingress_seam,
+    cache_structural_ingress_seam_to_dict,
+)
 from .cache_continuous_batching_feasibility import (
     CacheContinuousBatchingFeasibility,
     build_cache_continuous_batching_feasibility,
@@ -86,6 +116,151 @@ from .cache_pre_gate_cohort_window_feasibility import (
     CachePreGateCohortWindowFeasibility,
     build_cache_pre_gate_cohort_window_feasibility,
     cache_pre_gate_cohort_window_feasibility_to_dict,
+)
+from .cache_pre_gate_admission_hook_exactness import (
+    CachePreGateAdmissionHookExactness,
+    build_cache_pre_gate_admission_hook_exactness,
+    cache_pre_gate_admission_hook_exactness_to_dict,
+)
+from .cache_admission_hook_safety_contract import (
+    CacheAdmissionHookSafetyContract,
+    build_cache_admission_hook_safety_contract,
+    cache_admission_hook_safety_contract_to_dict,
+)
+from .cache_pre_claim_admission_contract import (
+    CachePreClaimAdmissionContract,
+    build_cache_pre_claim_admission_contract,
+    cache_pre_claim_admission_contract_to_dict,
+)
+from .cache_pre_claim_staging_seam_exactness import (
+    CachePreClaimStagingSeamExactness,
+    build_cache_pre_claim_staging_seam_exactness,
+    cache_pre_claim_staging_seam_exactness_to_dict,
+)
+from .cache_pre_claim_metadata_ticket_ownership import (
+    CachePreClaimMetadataTicketOwnership,
+    build_cache_pre_claim_metadata_ticket_ownership,
+    cache_pre_claim_metadata_ticket_ownership_to_dict,
+)
+from .cache_pre_claim_inert_state_semantics import (
+    CachePreClaimInertStateSemantics,
+    build_cache_pre_claim_inert_state_semantics,
+    cache_pre_claim_inert_state_semantics_to_dict,
+)
+from .cache_pre_claim_marker_lifetime import (
+    CachePreClaimMarkerLifetime,
+    build_cache_pre_claim_marker_lifetime,
+    cache_pre_claim_marker_lifetime_to_dict,
+)
+from .cache_pre_claim_marker_visibility import (
+    CachePreClaimMarkerVisibility,
+    build_cache_pre_claim_marker_visibility,
+    cache_pre_claim_marker_visibility_to_dict,
+)
+from .cache_pre_claim_marker_trigger_inputs import (
+    CachePreClaimMarkerTriggerInputs,
+    build_cache_pre_claim_marker_trigger_inputs,
+    cache_pre_claim_marker_trigger_inputs_to_dict,
+)
+from .cache_pre_claim_marker_reader_writer_ownership import (
+    CachePreClaimMarkerReaderWriterOwnership,
+    build_cache_pre_claim_marker_reader_writer_ownership,
+    cache_pre_claim_marker_reader_writer_ownership_to_dict,
+)
+from .cache_pre_claim_marker_state_carrier import (
+    CachePreClaimMarkerStateCarrier,
+    build_cache_pre_claim_marker_state_carrier,
+    cache_pre_claim_marker_state_carrier_to_dict,
+)
+from .cache_pre_claim_marker_clear_observer_boundary import (
+    CachePreClaimMarkerClearObserverBoundary,
+    build_cache_pre_claim_marker_clear_observer_boundary,
+    cache_pre_claim_marker_clear_observer_boundary_to_dict,
+)
+from .cache_pre_claim_marker_immutability_boundary import (
+    CachePreClaimMarkerImmutabilityBoundary,
+    build_cache_pre_claim_marker_immutability_boundary,
+    cache_pre_claim_marker_immutability_boundary_to_dict,
+)
+from .cache_pre_claim_marker_payload_shape_exactness import (
+    CachePreClaimMarkerPayloadShapeExactness,
+    build_cache_pre_claim_marker_payload_shape_exactness,
+    cache_pre_claim_marker_payload_shape_exactness_to_dict,
+)
+from .cache_pre_claim_marker_encoding_carrier_exactness import (
+    CachePreClaimMarkerEncodingCarrierExactness,
+    build_cache_pre_claim_marker_encoding_carrier_exactness,
+    cache_pre_claim_marker_encoding_carrier_exactness_to_dict,
+)
+from .cache_pre_claim_marker_storage_locality_exactness import (
+    CachePreClaimMarkerStorageLocalityExactness,
+    build_cache_pre_claim_marker_storage_locality_exactness,
+    cache_pre_claim_marker_storage_locality_exactness_to_dict,
+)
+from .cache_pre_claim_marker_locality_access_exactness import (
+    CachePreClaimMarkerLocalityAccessExactness,
+    build_cache_pre_claim_marker_locality_access_exactness,
+    cache_pre_claim_marker_locality_access_exactness_to_dict,
+)
+from .cache_pre_claim_marker_locality_isolation_exactness import (
+    CachePreClaimMarkerLocalityIsolationExactness,
+    build_cache_pre_claim_marker_locality_isolation_exactness,
+    cache_pre_claim_marker_locality_isolation_exactness_to_dict,
+)
+from .cache_pre_claim_marker_locality_lifetime_coupling import (
+    CachePreClaimMarkerLocalityLifetimeCoupling,
+    build_cache_pre_claim_marker_locality_lifetime_coupling,
+    cache_pre_claim_marker_locality_lifetime_coupling_to_dict,
+)
+from .cache_pre_claim_marker_reclaim_reset_exactness import (
+    CachePreClaimMarkerReclaimResetExactness,
+    build_cache_pre_claim_marker_reclaim_reset_exactness,
+    cache_pre_claim_marker_reclaim_reset_exactness_to_dict,
+)
+from .cache_pre_claim_admission_carrier_construction import (
+    CachePreClaimAdmissionCarrierConstruction,
+    build_cache_pre_claim_admission_carrier_construction,
+    cache_pre_claim_admission_carrier_construction_to_dict,
+)
+from .cache_pre_claim_admission_carrier_field_exactness import (
+    CachePreClaimAdmissionCarrierFieldExactness,
+    build_cache_pre_claim_admission_carrier_field_exactness,
+    cache_pre_claim_admission_carrier_field_exactness_to_dict,
+)
+from .cache_pre_claim_admission_carrier_encoding_exactness import (
+    CachePreClaimAdmissionCarrierEncodingExactness,
+    build_cache_pre_claim_admission_carrier_encoding_exactness,
+    cache_pre_claim_admission_carrier_encoding_exactness_to_dict,
+)
+from .cache_pre_claim_admission_carrier_locality_exactness import (
+    CachePreClaimAdmissionCarrierLocalityExactness,
+    build_cache_pre_claim_admission_carrier_locality_exactness,
+    cache_pre_claim_admission_carrier_locality_exactness_to_dict,
+)
+from .cache_pre_claim_admission_carrier_locality_access_exactness import (
+    CachePreClaimAdmissionCarrierLocalityAccessExactness,
+    build_cache_pre_claim_admission_carrier_locality_access_exactness,
+    cache_pre_claim_admission_carrier_locality_access_exactness_to_dict,
+)
+from .cache_pre_claim_admission_carrier_locality_isolation_exactness import (
+    CachePreClaimAdmissionCarrierLocalityIsolationExactness,
+    build_cache_pre_claim_admission_carrier_locality_isolation_exactness,
+    cache_pre_claim_admission_carrier_locality_isolation_exactness_to_dict,
+)
+from .cache_pre_claim_admission_carrier_locality_lifetime_coupling import (
+    CachePreClaimAdmissionCarrierLocalityLifetimeCoupling,
+    build_cache_pre_claim_admission_carrier_locality_lifetime_coupling,
+    cache_pre_claim_admission_carrier_locality_lifetime_coupling_to_dict,
+)
+from .cache_pre_claim_admission_carrier_reclaim_reset_exactness import (
+    CachePreClaimAdmissionCarrierReclaimResetExactness,
+    build_cache_pre_claim_admission_carrier_reclaim_reset_exactness,
+    cache_pre_claim_admission_carrier_reclaim_reset_exactness_to_dict,
+)
+from .cache_pre_claim_admission_carrier_branch_reselection import (
+    CachePreClaimAdmissionCarrierBranchReselection,
+    build_cache_pre_claim_admission_carrier_branch_reselection,
+    cache_pre_claim_admission_carrier_branch_reselection_to_dict,
 )
 from .cache_turboquant_preconditions_gap import (
     CacheTurboQuantPreconditionsGap,
@@ -274,10 +449,44 @@ __all__ = [
     "CacheSchedulerFloorGap",
     "CacheSchedulerImplementationBacklog",
     "CacheSchedulerBranchSelection",
+    "CacheSchedulerTurboQuantBranchReselection",
+    "CacheContinuousBatchingBranchReduction",
+    "CacheRequestAggregationWindowReentry",
+    "CacheRequestAggregationActiveSeam",
+    "CachePreGateAdmissionWindowSeam",
     "CacheContinuousBatchingFeasibility",
     "CacheBatchingMechanismSubgap",
     "CacheRequestAggregationWindowExactness",
     "CachePreGateCohortWindowFeasibility",
+    "CachePreGateAdmissionHookExactness",
+    "CacheAdmissionHookSafetyContract",
+    "CachePreClaimAdmissionContract",
+    "CachePreClaimStagingSeamExactness",
+    "CachePreClaimMetadataTicketOwnership",
+    "CachePreClaimInertStateSemantics",
+    "CachePreClaimMarkerLifetime",
+    "CachePreClaimMarkerVisibility",
+    "CachePreClaimMarkerTriggerInputs",
+    "CachePreClaimMarkerReaderWriterOwnership",
+    "CachePreClaimMarkerStateCarrier",
+    "CachePreClaimMarkerClearObserverBoundary",
+    "CachePreClaimMarkerImmutabilityBoundary",
+    "CachePreClaimMarkerPayloadShapeExactness",
+    "CachePreClaimMarkerEncodingCarrierExactness",
+    "CachePreClaimMarkerStorageLocalityExactness",
+    "CachePreClaimMarkerLocalityAccessExactness",
+    "CachePreClaimMarkerLocalityIsolationExactness",
+    "CachePreClaimMarkerLocalityLifetimeCoupling",
+    "CachePreClaimMarkerReclaimResetExactness",
+    "CachePreClaimAdmissionCarrierConstruction",
+    "CachePreClaimAdmissionCarrierFieldExactness",
+    "CachePreClaimAdmissionCarrierEncodingExactness",
+    "CachePreClaimAdmissionCarrierLocalityExactness",
+    "CachePreClaimAdmissionCarrierLocalityAccessExactness",
+    "CachePreClaimAdmissionCarrierLocalityIsolationExactness",
+    "CachePreClaimAdmissionCarrierLocalityLifetimeCoupling",
+    "CachePreClaimAdmissionCarrierReclaimResetExactness",
+    "CachePreClaimAdmissionCarrierBranchReselection",
     "CacheTurboQuantPreconditionsGap",
     "DominantGapReselection",
     "CacheClosureRung",
@@ -352,10 +561,42 @@ __all__ = [
     "build_cache_scheduler_floor_gap",
     "build_cache_scheduler_implementation_backlog",
     "build_cache_scheduler_branch_selection",
+    "build_cache_scheduler_turboquant_branch_reselection",
+    "build_cache_continuous_batching_branch_reduction",
+    "build_cache_request_aggregation_window_reentry",
+    "build_cache_request_aggregation_active_seam",
+    "build_cache_pre_gate_admission_window_seam",
+    "build_cache_structural_ingress_seam",
     "build_cache_continuous_batching_feasibility",
     "build_cache_batching_mechanism_subgap",
     "build_cache_request_aggregation_window_exactness",
     "build_cache_pre_gate_cohort_window_feasibility",
+    "build_cache_pre_gate_admission_hook_exactness",
+    "build_cache_admission_hook_safety_contract",
+    "build_cache_pre_claim_admission_contract",
+    "build_cache_pre_claim_staging_seam_exactness",
+    "build_cache_pre_claim_metadata_ticket_ownership",
+    "build_cache_pre_claim_inert_state_semantics",
+    "build_cache_pre_claim_marker_lifetime",
+    "build_cache_pre_claim_marker_visibility",
+    "build_cache_pre_claim_marker_trigger_inputs",
+    "build_cache_pre_claim_marker_reader_writer_ownership",
+    "build_cache_pre_claim_marker_state_carrier",
+    "build_cache_pre_claim_marker_clear_observer_boundary",
+    "build_cache_pre_claim_marker_immutability_boundary",
+    "build_cache_pre_claim_marker_payload_shape_exactness",
+    "build_cache_pre_claim_marker_encoding_carrier_exactness",
+    "build_cache_pre_claim_marker_storage_locality_exactness",
+    "build_cache_pre_claim_marker_locality_access_exactness",
+    "build_cache_pre_claim_marker_locality_isolation_exactness",
+    "build_cache_pre_claim_marker_locality_lifetime_coupling",
+    "build_cache_pre_claim_marker_reclaim_reset_exactness",
+    "build_cache_pre_claim_admission_carrier_construction",
+    "build_cache_pre_claim_admission_carrier_field_exactness",
+    "build_cache_pre_claim_admission_carrier_encoding_exactness",
+    "build_cache_pre_claim_admission_carrier_locality_exactness",
+    "build_cache_pre_claim_admission_carrier_reclaim_reset_exactness",
+    "build_cache_pre_claim_admission_carrier_branch_reselection",
     "build_cache_turboquant_preconditions_gap",
     "build_dominant_gap_reselection",
     "build_cache_closure_rung",
@@ -377,10 +618,42 @@ __all__ = [
     "cache_scheduler_floor_gap_to_dict",
     "cache_scheduler_implementation_backlog_to_dict",
     "cache_scheduler_branch_selection_to_dict",
+    "cache_scheduler_turboquant_branch_reselection_to_dict",
+    "cache_continuous_batching_branch_reduction_to_dict",
+    "cache_request_aggregation_window_reentry_to_dict",
+    "cache_request_aggregation_active_seam_to_dict",
+    "cache_pre_gate_admission_window_seam_to_dict",
+    "cache_structural_ingress_seam_to_dict",
     "cache_continuous_batching_feasibility_to_dict",
     "cache_batching_mechanism_subgap_to_dict",
     "cache_request_aggregation_window_exactness_to_dict",
     "cache_pre_gate_cohort_window_feasibility_to_dict",
+    "cache_pre_gate_admission_hook_exactness_to_dict",
+    "cache_admission_hook_safety_contract_to_dict",
+    "cache_pre_claim_admission_contract_to_dict",
+    "cache_pre_claim_staging_seam_exactness_to_dict",
+    "cache_pre_claim_metadata_ticket_ownership_to_dict",
+    "cache_pre_claim_inert_state_semantics_to_dict",
+    "cache_pre_claim_marker_lifetime_to_dict",
+    "cache_pre_claim_marker_visibility_to_dict",
+    "cache_pre_claim_marker_trigger_inputs_to_dict",
+    "cache_pre_claim_marker_reader_writer_ownership_to_dict",
+    "cache_pre_claim_marker_state_carrier_to_dict",
+    "cache_pre_claim_marker_clear_observer_boundary_to_dict",
+    "cache_pre_claim_marker_immutability_boundary_to_dict",
+    "cache_pre_claim_marker_payload_shape_exactness_to_dict",
+    "cache_pre_claim_marker_encoding_carrier_exactness_to_dict",
+    "cache_pre_claim_marker_storage_locality_exactness_to_dict",
+    "cache_pre_claim_marker_locality_access_exactness_to_dict",
+    "cache_pre_claim_marker_locality_isolation_exactness_to_dict",
+    "cache_pre_claim_marker_locality_lifetime_coupling_to_dict",
+    "cache_pre_claim_marker_reclaim_reset_exactness_to_dict",
+    "cache_pre_claim_admission_carrier_construction_to_dict",
+    "cache_pre_claim_admission_carrier_field_exactness_to_dict",
+    "cache_pre_claim_admission_carrier_encoding_exactness_to_dict",
+    "cache_pre_claim_admission_carrier_locality_exactness_to_dict",
+    "cache_pre_claim_admission_carrier_reclaim_reset_exactness_to_dict",
+    "cache_pre_claim_admission_carrier_branch_reselection_to_dict",
     "cache_turboquant_preconditions_gap_to_dict",
     "dominant_gap_reselection_to_dict",
     "cache_closure_rung_to_dict",

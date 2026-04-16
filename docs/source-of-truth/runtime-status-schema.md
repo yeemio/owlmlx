@@ -186,6 +186,72 @@ replacement-grade stability alignment without claiming parity:
   - direct runtime-owned answer for the exact ingress and dependency blockers underneath request aggregation once that mechanism is already selected
 - `owlmlx.cache_pre_gate_cohort_window_feasibility`
   - direct runtime-owned answer for whether owlmlx owns any cohort/admission seam before whole-request gate claim on the active path
+- `owlmlx.cache_pre_gate_admission_hook_exactness`
+  - direct runtime-owned answer for whether any bounded hook exists before whole-request gate claim and which post-claim invariants must remain untouched
+- `owlmlx.cache_admission_hook_safety_contract`
+  - direct runtime-owned answer for the exact post-claim invariants and forbidden bypasses any future pre-claim hook must preserve
+- `owlmlx.cache_structural_ingress_seam`
+  - direct runtime-owned answer for whether one bounded pre-gate hook now exists in the live runtime path
+  - this surface may only claim `structural_ingress_seam_introduced`
+  - it must not claim request aggregation, continuous batching, or cache parity
+- `owlmlx.cache_pre_claim_admission_contract`
+  - direct runtime-owned answer for the only allowable future pre-claim seam and the forbidden actions that must stay outside that seam
+- `owlmlx.cache_pre_claim_staging_seam_exactness`
+  - direct runtime-owned answer for which exact metadata/ticket units may be staged pre-claim and which expansions must remain outside that seam
+- `owlmlx.cache_pre_claim_metadata_ticket_ownership`
+  - direct runtime-owned answer for the exact ownership/lifetime boundary of pre-claim ticket reservation and immutable metadata snapshot
+- `owlmlx.cache_pre_claim_inert_state_semantics`
+  - direct runtime-owned answer for which inert cohort/drop semantics may exist before gate claim and which ones must remain unavailable
+- `owlmlx.cache_pre_claim_marker_lifetime`
+  - direct runtime-owned answer for how long inert drop/cancel markers may exist before gate claim and which promotions remain forbidden across that lifetime
+- `owlmlx.cache_pre_claim_marker_visibility`
+  - direct runtime-owned answer for which pre-claim paths may observe/clear inert markers and which visibility expansions remain forbidden
+- `owlmlx.cache_pre_claim_marker_trigger_inputs`
+  - direct runtime-owned answer for which exact pre-claim inputs may clear inert markers and which trigger families remain unavailable before gate claim
+- `owlmlx.cache_pre_claim_marker_reader_writer_ownership`
+  - direct runtime-owned answer for which exact pre-claim paths may author a marker, which may only observe it, and which writer ownership remains unavailable before gate claim
+- `owlmlx.cache_pre_claim_marker_state_carrier`
+  - direct runtime-owned answer for the exact inert carrier that may hold a marker before gate claim and which carrier semantics must remain unavailable until whole-request gate claim
+- `owlmlx.cache_pre_claim_marker_clear_observer_boundary`
+  - direct runtime-owned answer for which exact pre-claim paths may clear the inert marker carrier, which may only observe it, and which clearer ownership remains unavailable before gate claim
+- `owlmlx.cache_pre_claim_marker_immutability_boundary`
+  - direct runtime-owned answer for whether pre-claim marker state may mutate beyond clear-only semantics and which mutation expansions must remain unavailable before gate claim
+- `owlmlx.cache_pre_claim_marker_payload_shape_exactness`
+  - direct runtime-owned answer for whether pre-claim marker state carries any payload fields at all before gate claim or collapses to pure presence/absence only
+- `owlmlx.cache_pre_claim_marker_encoding_carrier_exactness`
+  - direct runtime-owned answer for what exact inert carrier holds the pre-claim presence/absence bit and which identity/handle encodings remain unavailable before gate claim
+- `owlmlx.cache_pre_claim_marker_storage_locality_exactness`
+  - direct runtime-owned answer for where that inert boolean marker slot may live relative to staged metadata/ticket units and which ownership-bearing localities remain unavailable before gate claim
+- `owlmlx.cache_pre_claim_marker_locality_access_exactness`
+  - direct runtime-owned answer for which exact pre-claim paths may reach that adjacent inert slot and which locality-access expansions remain unavailable before gate claim
+- `owlmlx.cache_pre_claim_marker_locality_isolation_exactness`
+  - direct runtime-owned answer for whether that adjacent inert slot is isolated per staged request or whether any shared pending-state locality remains before gate claim
+- `owlmlx.cache_pre_claim_marker_locality_lifetime_coupling`
+  - direct runtime-owned answer for whether that isolated adjacent marker slot is coupled only to its own staged-request lifetime, reclaimed only by same-request pre-claim discard / gate-claim expiry, and kept free of retained ownership before gate claim
+- `owlmlx.cache_pre_claim_marker_reclaim_reset_exactness`
+  - direct runtime-owned answer for whether reclaim returns that adjacent marker slot to a fully inert empty state before any later staged request may reuse that locality
+- `owlmlx.cache_pre_claim_admission_carrier_construction`
+  - direct runtime-owned answer for whether any bounded pre-claim admission carrier may exist and which already-frozen inert units alone may construct it before gate claim
+- `owlmlx.cache_pre_claim_admission_carrier_field_exactness`
+  - direct runtime-owned answer for which exact inert fields may inhabit that bounded pre-claim carrier before gate claim
+- `owlmlx.cache_pre_claim_admission_carrier_encoding_exactness`
+  - direct runtime-owned answer for how those inert fields may be encoded together before gate claim without becoming queue- or execution-bearing
+- `owlmlx.cache_pre_claim_admission_carrier_locality_exactness`
+  - direct runtime-owned answer for where that bounded inert pre-claim record may live before gate claim without becoming queue-, scheduler-, child/stream-, or execution-owned locality
+- `owlmlx.cache_pre_claim_admission_carrier_locality_access_exactness`
+  - direct runtime-owned answer for which exact pre-claim paths may reach that bounded inert pre-claim carrier before gate claim without becoming queue-, scheduler-, backend-, stream-, or execution-bearing access
+- `owlmlx.cache_pre_claim_admission_carrier_locality_isolation_exactness`
+  - direct runtime-owned answer for whether that bounded inert pre-claim carrier remains isolated per staged request before gate claim without becoming shared pending-state locality
+- `owlmlx.cache_pre_claim_admission_carrier_locality_lifetime_coupling`
+  - direct runtime-owned answer for how that isolated bounded inert pre-claim carrier couples to same-request lifetime and reclaim/expiry before gate claim without becoming retained or cross-request lifetime
+- `owlmlx.cache_pre_claim_admission_carrier_reclaim_reset_exactness`
+  - direct runtime-owned answer for what exact empty inert state reclaim resets that bounded pre-claim carrier to before any later staged reuse may occur
+- `owlmlx.cache_pre_claim_admission_carrier_branch_reselection`
+  - direct runtime-owned answer for whether the admission-carrier local exactness chain is complete enough to reselect the next non-carrier cache sub-branch honestly
+- `owlmlx.cache_scheduler_turboquant_branch_reselection`
+  - direct runtime-owned answer for whether scheduler depth or TurboQuant is now the next honest non-carrier cache branch on the current path
+- `owlmlx.cache_continuous_batching_branch_reduction`
+  - direct runtime-owned answer for how the selected scheduler-depth branch narrows next once `continuous_batching` is already selected and request aggregation is the next exact reduction target
 - `owlmlx.cache_turboquant_preconditions_gap`
   - direct runtime-owned answer for the exact TurboQuant safe-activation requirements still missing on the active cache path
 - `owlmlx.dominant_gap_reselection`

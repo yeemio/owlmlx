@@ -41,6 +41,14 @@ def _cache_counter_feasibility(
     )
 
 
+def _structural_ingress(*, seam_rung: str, residual_blocker: str | None):
+    return SimpleNamespace(
+        status="partial",
+        seam_rung=seam_rung,
+        residual_blocker=residual_blocker,
+    )
+
+
 def _governance(*, governance_rung: str, blocked_reason: str | None):
     return SimpleNamespace(
         status="partial",
@@ -502,7 +510,98 @@ def test_customer_runtime_evidence_moves_dominant_gap_to_cache_when_governance_p
     )
     assert (
         cache["contract_surface"]
-        == "owlmlx.cache_pre_gate_cohort_window_feasibility"
+        == "owlmlx.cache_pre_gate_admission_window_seam"
     )
-    assert cache["closure_level"] == "cohort_window_boundary_exact"
-    assert "pre-gate admission-hook work" in payload["summary"]["recommended_next_step"]
+    assert (
+        cache["closure_level"]
+        == "pre_gate_admission_window_seam_exact"
+    )
+    assert (
+        "the active seam is now the missing bounded pre-gate admission hook"
+        in payload["summary"]["recommended_next_step"]
+    )
+
+
+def test_customer_runtime_evidence_only_upgrades_to_structural_ingress_seam(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_host_stable_execution_status",
+        lambda **_: _host(
+            ready=False,
+            status="host_blocked_move_validation",
+            blocked_reason="no verified-safe mlx baseline exists on this host",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_closure_rung",
+        lambda **_: _cache(
+            closure_rung="repeatability_visible",
+            blocked_reason="direct runtime-owned reuse counters are still absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_counter_gap",
+        lambda **_: _cache_counter_gap(
+            counter_gap_rung="counter_gap_exact",
+            residual_blocker="remaining cache gap is now exact",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_counter_feasibility",
+        lambda **_: _cache_counter_feasibility(
+            feasibility_rung="counter_ownership_exact",
+            residual_blocker="cache counter ownership is now exact",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_structural_ingress_seam",
+        lambda **_: _structural_ingress(
+            seam_rung="structural_ingress_seam_introduced",
+            residual_blocker="structural ingress seam exists but request aggregation remains unsupported",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_status",
+        lambda **_: _governance(
+            governance_rung="partial_closure",
+            blocked_reason="pinning and TTL remain absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_controls",
+        lambda **_: _governance_controls(
+            controls_rung="partial_closure",
+            blocked_reason="pinning and TTL remain absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_transition_ledger",
+        lambda **_: _governance_transition_ledger(
+            ledger_rung="partial_closure",
+            blocked_reason="pinning and TTL remain absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_policy_gap",
+        lambda **_: _governance_policy_gap(
+            policy_gap_rung="policy_gap_exact",
+            residual_blocker="remaining governance gap is policy-grade only",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_heavy_weight_runtime_repeatability_status",
+        lambda **_: _heavy(
+            repeatability_rung="local_blocked",
+            blocked_reason="supported host/system image is required",
+        ),
+    )
+
+    payload = customer_runtime_evidence_to_dict(
+        build_customer_runtime_evidence(specimen_path="/tmp/specimen")
+    )
+
+    cache = next(
+        item for item in payload["gap_evidence"] if item["gap_id"] == "cache_scheduler_depth"
+    )
+    assert cache["contract_surface"] == "owlmlx.cache_structural_ingress_seam"
+    assert cache["closure_level"] == "structural_ingress_seam_introduced"
+    assert "structural ingress seam introduced only" in payload["summary"]["recommended_next_step"]

@@ -21,7 +21,7 @@ from owlmlx.model_inventory import (
     inventory_to_dict,
 )
 from owlmlx.runtime_health import InferenceHealth, LoadState, TruthLevel
-from owlmlx.serving import GenerationGate
+from owlmlx.serving import GenerationGate, PreGateAdmissionMetadata
 
 from .backends import RuntimeBackend
 from .types import (
@@ -156,6 +156,23 @@ class RuntimeKernel:
         self._governance_restart_restore_visible = True
         self._governance_recent_window_runs += 1
 
+    def _build_pre_gate_admission_metadata(
+        self,
+        *,
+        request_kind: str,
+        model_id: str | None,
+        stream: bool,
+        prompt: str | None = None,
+        messages: list[ChatTurn] | None = None,
+    ) -> PreGateAdmissionMetadata:
+        return PreGateAdmissionMetadata(
+            request_kind=request_kind,
+            model_id=model_id,
+            stream=stream,
+            prompt_chars=len(prompt or ""),
+            message_count=len(messages or []),
+        )
+
     def _assert_loaded_model(self, target_model: str | None) -> GenerateResult | None:
         if not target_model:
             return GenerateResult(
@@ -190,7 +207,15 @@ class RuntimeKernel:
             assert target_model is not None
             return self.backend.generate(target_model, prompt, **kwargs)
 
-        gated = await self.generation_gate.execute_async(call_backend)
+        gated = await self.generation_gate.execute_async_with_admission(
+            self._build_pre_gate_admission_metadata(
+                request_kind="generate",
+                model_id=target_model,
+                stream=False,
+                prompt=prompt,
+            ),
+            call_backend,
+        )
         result = gated.value
         if not isinstance(result, GenerateResult):
             return GenerateResult(
@@ -235,7 +260,15 @@ class RuntimeKernel:
             assert target_model is not None
             return self.backend.generate_messages(target_model, messages, **kwargs)
 
-        gated = await self.generation_gate.execute_async(call_backend)
+        gated = await self.generation_gate.execute_async_with_admission(
+            self._build_pre_gate_admission_metadata(
+                request_kind="generate_messages",
+                model_id=target_model,
+                stream=False,
+                messages=messages,
+            ),
+            call_backend,
+        )
         result = gated.value
         if not isinstance(result, GenerateResult):
             return GenerateResult(
@@ -288,7 +321,14 @@ class RuntimeKernel:
             )
             return
 
-        async with self.generation_gate.stream_session() as gate_start:
+        async with self.generation_gate.stream_session_with_admission(
+            self._build_pre_gate_admission_metadata(
+                request_kind="generate_stream",
+                model_id=target_model,
+                stream=True,
+                prompt=prompt,
+            )
+        ) as gate_start:
             saw_non_error_event = False
             for event in self.backend.stream_generate(target_model, prompt, **kwargs):
                 if event.event != "error":
@@ -336,7 +376,14 @@ class RuntimeKernel:
             )
             return
 
-        async with self.generation_gate.stream_session() as gate_start:
+        async with self.generation_gate.stream_session_with_admission(
+            self._build_pre_gate_admission_metadata(
+                request_kind="generate_stream_messages",
+                model_id=target_model,
+                stream=True,
+                messages=messages,
+            )
+        ) as gate_start:
             saw_non_error_event = False
             for event in self.backend.stream_generate_messages(target_model, messages, **kwargs):
                 if event.event != "error":

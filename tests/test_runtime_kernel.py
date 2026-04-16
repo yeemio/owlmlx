@@ -265,3 +265,34 @@ def test_status_dict_exposes_governance_observations() -> None:
         "restart_restore_visible": True,
         "explicit_targeting_evidence_visible": True,
     }
+
+
+def test_status_dict_exposes_runtime_owned_pre_gate_admission_hook() -> None:
+    kernel = RuntimeKernel(
+        FakeBackend(default_memory_gb=1.0, generate_delay_s=0.05),
+        profile=_small_profile(),
+    )
+    kernel.load_model("model-a")
+
+    async def observe():
+        first = asyncio.create_task(kernel.generate("one"))
+        await asyncio.sleep(0.01)
+        second = asyncio.create_task(kernel.generate("two"))
+        await asyncio.sleep(0.01)
+        mid = kernel.status_dict()
+        results = await asyncio.gather(first, second)
+        return mid, results
+
+    mid, results = asyncio.run(observe())
+
+    assert all(result.ok for result in results)
+    hook = mid["generation_gate"]["pre_gate_admission"]
+    assert hook["hook_status"] == "present"
+    assert hook["hook_boundary"] == "before_whole_request_gate_claim"
+    assert hook["staged_count"] >= 1
+    assert hook["total_staged"] >= 2
+    assert hook["preserved_post_claim_invariants"] == [
+        "max_concurrent_1_after_gate_claim",
+        "ticketed_fifo_after_gate_claim",
+        "serial_safety_validated_only_after_gate_claim",
+    ]

@@ -1,7 +1,7 @@
 # owlmlx Phase 45: Customer Runtime Evidence Ledger
 
 > Status: authoritative
-> Updated: 2026-04-13
+> Updated: 2026-04-15
 > Scope: runtime-only customer-runtime evidence for replacement-grade alignment
 
 ## 1. Purpose
@@ -201,6 +201,199 @@ The cache gap is now narrower again:
     gate claim
   - a pre-gate cohort window is therefore not locally expressible yet on the
     current path
+- `owlmlx.cache_pre_gate_admission_hook_exactness` now freezes the next ingress
+  blocker more exactly:
+  - no bounded admission hook exists before whole-request gate claim
+  - any future hook must preserve the validated post-claim serial invariants
+- `owlmlx.cache_admission_hook_safety_contract` now freezes those invariants
+  explicitly:
+  - no bypass of whole-request gate claim
+  - no reordering after claim
+  - no post-claim parallel generation
+- `owlmlx.cache_pre_claim_admission_contract` now freezes the next narrower
+  truth:
+  - the only possible future pre-claim seam is bounded metadata/ticket staging
+    before whole-request gate claim
+  - that seam may not claim the gate, start child exchange, start streaming, or
+    execute model work before the first runtime-owned boundary
+  - batching therefore remains pre-claim staging-contract work, not hidden
+    pre-claim execution work
+
+Phase 45 now also has one real structural ingress upgrade:
+
+- `owlmlx.cache_structural_ingress_seam`
+
+That surface upgrades cache truth only to:
+
+- `structural_ingress_seam_introduced`
+
+It still must not claim:
+
+- request aggregation supported
+- continuous batching supported
+- cache parity
+- `owlmlx.cache_pre_claim_marker_state_carrier` now narrows that staging path
+  again:
+  - a marker may live only in one inert write-once/clear-only record before
+    gate claim
+  - that carrier may not become queue slot identity, batch membership, child
+    payload attachment, or stream/execution state
+- `owlmlx.cache_pre_claim_marker_clear_observer_boundary` narrows again:
+  - only explicit pre-claim drop/cancel logic and gate-claim expiry may clear
+    the inert carrier
+  - pre-claim discard may only observe it
+  - scheduler, child/backend, stream, and execution-priority paths remain
+    ineligible as clearers before gate claim
+- `owlmlx.cache_pre_claim_marker_immutability_boundary` narrows again:
+  - before gate claim marker state may change only by clear-only semantics
+  - no pre-claim path may rewrite payload or mutate priority/queue/child/stream
+    execution state through marker state
+- `owlmlx.cache_pre_claim_marker_payload_shape_exactness` narrows again:
+  - before gate claim marker state collapses to pure presence/absence only
+  - no reason-code, priority, queue-metadata, or child/stream/execution
+    payload fields may exist
+- `owlmlx.cache_pre_claim_marker_encoding_carrier_exactness` narrows again:
+  - before gate claim marker presence may live only in one inert boolean slot
+  - that slot may not encode queue identity, ticket identity, child payload,
+    or stream/execution handles
+- `owlmlx.cache_pre_claim_marker_storage_locality_exactness` narrows again:
+  - before gate claim the inert boolean marker slot may live only adjacent to
+    staged metadata and outside ticket identity / immutable metadata payload
+  - it may not occupy queue, scheduler, child, stream, or execution-local
+    storage
+- `owlmlx.cache_pre_claim_marker_locality_access_exactness` narrows again:
+  - before gate claim only explicit pre-claim drop/cancel logic, gate-claim
+    expiry, and pre-claim discard observation may reach the adjacent inert slot
+  - scheduler, child/backend, stream, and execution-priority paths may not
+    access it
+- `owlmlx.cache_pre_claim_marker_locality_isolation_exactness` narrows again:
+  - before gate claim the adjacent inert marker slot is isolated per staged
+    request
+  - no shared pending-state scheduler/backend/stream locality or cross-request
+    marker merge may exist
+- `owlmlx.cache_pre_claim_marker_locality_lifetime_coupling` narrows again:
+  - before gate claim the isolated adjacent marker slot is coupled only to its
+    own staged-request lifetime
+  - reclaim may occur only by same-request pre-claim discard or same-request
+    gate-claim expiry transition
+  - no cross-request slot reuse or retained ownership may emerge from that
+    coupling
+- `owlmlx.cache_pre_claim_marker_reclaim_reset_exactness` narrows again:
+  - reclaim clears the adjacent inert marker slot back to a fully empty inert
+    state
+  - no prior request history or reclaim reason remains visible after reclaim
+  - later staged requests may reuse that locality only after a fully inert
+    reset
+- `owlmlx.cache_pre_claim_admission_carrier_construction` narrows again:
+  - any bounded pre-claim admission carrier may be constructed only from
+    immutable request metadata, observational ticket reservation, and a fully
+    reset inert marker slot
+  - no queue-owned, execution-bearing, child/stream-attached, or
+    scheduler-priority carrier may exist before gate claim
+- `owlmlx.cache_pre_claim_admission_carrier_field_exactness` narrows again:
+  - a bounded pre-claim carrier may hold only immutable request metadata,
+    observational ticket reservation, and a fully reset inert marker presence
+    bit
+  - no queue identity, scheduler priority, batch membership, child/stream
+    attachment, or execution-bearing field may exist before gate claim
+- `owlmlx.cache_pre_claim_admission_carrier_encoding_exactness` narrows again:
+  - immutable request metadata, observational ticket reservation, and a fully
+    reset inert marker presence bit may be encoded only as one bounded inert
+    pre-claim record
+  - no queue identity, scheduler priority, batch membership, child/stream
+    attachment, or execution-bearing encoding may exist before gate claim
+- `owlmlx.cache_pre_claim_admission_carrier_locality_exactness` narrows again:
+  - the bounded inert pre-claim record may live only in single-request staged
+    locality adjacent to metadata/ticket state before gate claim
+  - it may not occupy queue, scheduler, child/stream, or execution-owned
+    locality before claim
+- `owlmlx.cache_pre_claim_admission_carrier_locality_access_exactness` narrows again:
+  - only staged metadata snapshot building, observational ticket reservation,
+    same-request pre-claim drop/cancel reset, and same-request pre-claim
+    discard observation may reach the bounded inert pre-claim carrier before
+    claim
+  - queue/cohort scheduler, child/backend payload, stream-handle, and
+    execution-entitlement paths may not access it
+- `owlmlx.cache_pre_claim_admission_carrier_locality_isolation_exactness` narrows again:
+  - the bounded inert pre-claim carrier remains isolated per staged request
+    before claim
+  - no shared scheduler/backend/stream pending-state carrier locality or
+    cross-request carrier merge may exist
+- `owlmlx.cache_pre_claim_admission_carrier_locality_lifetime_coupling` narrows again:
+  - the bounded inert pre-claim carrier is coupled only to its own staged-
+    request lifetime before claim
+  - it may be reclaimed only by same-request pre-claim discard or gate-claim
+    expiry transition
+  - it may not survive into cross-request reuse or retained scheduler/backend/
+    stream lifetime
+- `owlmlx.cache_pre_claim_admission_carrier_reclaim_reset_exactness` narrows again:
+  - reclaim resets that bounded inert pre-claim carrier back to a fully empty
+    inert state before any later reuse
+  - no prior request history or execution-bearing residue remains visible after
+    reclaim
+  - later staged requests may reuse adjacent locality only after that clean
+    empty reset
+- `owlmlx.cache_pre_claim_admission_carrier_branch_reselection` narrows again:
+  - the admission-carrier exactness chain is complete on the current path
+  - no narrower residual carrier subgap remains open
+  - the next cache sub-branch therefore moves back to scheduler-vs-TurboQuant
+    reselection
+- `owlmlx.cache_scheduler_turboquant_branch_reselection` narrows again:
+  - scheduler depth is the selected next branch on the current path
+  - the selected scheduler sub-branch remains `continuous_batching`
+  - TurboQuant stays exact-but-secondary on the same path
+- `owlmlx.cache_continuous_batching_branch_reduction` narrows again:
+  - scheduler depth remains the selected cache branch on the current path
+  - `continuous_batching` remains the selected scheduler sub-branch
+  - `request_aggregation_window` is now the next exact reduction target
+  - `shared_prefill_batch_step` and `interleaved_decode_scheduler` stay secondary
+- `owlmlx.cache_request_aggregation_window_reentry` narrows again:
+  - `request_aggregation_window` has re-entered as the active cache subchain
+  - `shared_prefill_batch_step` and `interleaved_decode_scheduler` stay secondary
+  - TurboQuant stays exact-but-secondary
+- `owlmlx.cache_pre_claim_staging_seam_exactness` now freezes the seam itself:
+  - only immutable request metadata plus ticket reservation may be staged
+    before gate claim
+  - gate ownership transfer, child payload assembly, stream-handle allocation,
+    and model state/prefill all remain outside the seam
+  - batching is now narrowed further into metadata/ticket ownership work, not
+    generic staging narrative
+- `owlmlx.cache_pre_claim_metadata_ticket_ownership` now freezes that ownership
+  boundary:
+  - ticket reservation is observational-only and grants no execution rights
+    before gate claim
+  - immutable request metadata remains read-only before gate claim
+  - neither staged unit may promote into child, stream, or model-execution
+    state before the first runtime-owned boundary
+- `owlmlx.cache_pre_claim_inert_state_semantics` now freezes the inert state
+  itself:
+  - the only allowed inert semantics before gate claim are drop/cancel markers
+  - owlmlx still owns no cohort membership before gate claim
+  - inert state still may not acquire execution priority or prefill-batch
+    membership before the first runtime-owned boundary
+- `owlmlx.cache_pre_claim_marker_lifetime` now freezes marker lifetime:
+  - an inert drop/cancel marker may exist only until explicit pre-claim discard
+    or whole-request gate claim
+  - marker lifetime may not create queue ownership
+  - marker lifetime may not transfer execution entitlement into post-claim
+    state
+- `owlmlx.cache_pre_claim_marker_visibility` now freezes marker visibility:
+  - an inert marker may be observed only by explicit pre-claim discard logic or
+    gate-claim expiry logic
+  - marker visibility may not leak into scheduler selection, child dispatch,
+    stream handling, or execution-priority paths before gate claim
+- `owlmlx.cache_pre_claim_marker_trigger_inputs` now freezes trigger inputs:
+  - an inert marker may be cleared only by explicit pre-claim drop/cancel
+    signals or gate-claim expiry
+  - scheduler pressure, child/backend events, stream events, and
+    execution-priority signals remain unavailable as pre-claim trigger inputs
+- `owlmlx.cache_pre_claim_marker_reader_writer_ownership` now freezes reader
+  versus writer ownership:
+  - only explicit pre-claim drop/cancel logic and gate-claim expiry may author
+    a marker
+  - pre-claim discard may only observe it
+  - scheduler, child/backend, stream, and execution-priority paths remain
+    ineligible for writer ownership before gate claim
 - `shared_prefill_batch_step` and `interleaved_decode_scheduler` remain
   explicit but secondary behind aggregate admission
 
@@ -251,3 +444,22 @@ It only claims:
 - once `continuous_batching` is the selected branch, the runtime can freeze
   whether it is merely absent or structurally blocked through
   `owlmlx.cache_continuous_batching_feasibility`
+- once the bounded post-claim safety contract is exact, the runtime can also
+  freeze the only allowable pre-claim contract surface through
+  `owlmlx.cache_pre_claim_admission_contract`
+- once that contract is exact, the runtime can freeze the seam itself through
+  `owlmlx.cache_pre_claim_staging_seam_exactness`
+- once the seam itself is exact, the runtime can freeze ownership/lifetime
+  boundaries for those staged units through
+  `owlmlx.cache_pre_claim_metadata_ticket_ownership`
+- once those ownership boundaries are exact, the runtime can freeze inert
+  cohort/drop semantics through `owlmlx.cache_pre_claim_inert_state_semantics`
+- once inert semantics are exact, the runtime can freeze exact marker lifetime
+  and expiry boundaries through `owlmlx.cache_pre_claim_marker_lifetime`
+- once marker lifetime is exact, the runtime can freeze exact marker
+  visibility/discard-trigger semantics through
+  `owlmlx.cache_pre_claim_marker_visibility`
+- once marker visibility is exact, the runtime can freeze exact discard-trigger
+  inputs through `owlmlx.cache_pre_claim_marker_trigger_inputs`
+- once trigger inputs are exact, the runtime can freeze exact reader/writer
+  ownership through `owlmlx.cache_pre_claim_marker_reader_writer_ownership`

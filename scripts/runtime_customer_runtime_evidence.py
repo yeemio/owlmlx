@@ -12,8 +12,11 @@ from owlmlx import (
     RuntimeKernel,
     build_cache_counter_gap,
     build_cache_counter_feasibility,
+    build_cache_pre_claim_staging_seam_exactness,
+    build_cache_pre_gate_admission_window_seam,
     build_cache_scheduler_turboquant_split,
     build_cache_closure_rung,
+    build_cache_structural_ingress_seam,
     build_customer_runtime_evidence,
     build_multi_model_governance_controls,
     build_multi_model_governance_policy_gap,
@@ -23,6 +26,9 @@ from owlmlx import (
 )
 from owlmlx.cache_runtime_observation_harness import (
     run_cache_runtime_observation_harness,
+)
+from owlmlx.cache_pre_gate_admission_hook_harness import (
+    run_pre_gate_admission_hook_harness,
 )
 from owlmlx.memory_budget import MachineMemoryProfile
 
@@ -77,6 +83,7 @@ def main() -> int:
     if not args.skip_governance_harness:
         governance_bundle = _run_governance_harness()
     cache_bundle = run_cache_runtime_observation_harness()
+    structural_ingress_harness = run_pre_gate_admission_hook_harness()
     cache_counter_gap = build_cache_counter_gap(
         closure=cache_bundle.closure,
         backend_observations=cache_bundle.backend_observations,
@@ -98,6 +105,11 @@ def main() -> int:
                 counter_feasibility=cache_counter_feasibility,
                 scheduler=cache_bundle.closure.scheduler,
                 turboquant=cache_bundle.turboquant,
+            ),
+            cache_structural_ingress_seam=build_cache_structural_ingress_seam(
+                pre_gate_admission_window_seam=build_cache_pre_gate_admission_window_seam(),
+                pre_claim_staging_seam_exactness=build_cache_pre_claim_staging_seam_exactness(),
+                hook_harness=structural_ingress_harness,
             ),
             multi_model_governance=(
                 governance_bundle["status"] if governance_bundle is not None else None
@@ -121,6 +133,15 @@ def main() -> int:
         )
     )
     payload["cache_harness"] = cache_bundle.backend_observations
+    payload["structural_ingress_harness"] = {
+        "runtime_owned_hook_present": structural_ingress_harness.runtime_owned_hook_present,
+        "hook_boundary": structural_ingress_harness.hook_boundary,
+        "hook_mode": structural_ingress_harness.hook_mode,
+        "observed_midflight_staged_count": structural_ingress_harness.observed_midflight_staged_count,
+        "observed_total_staged": structural_ingress_harness.observed_total_staged,
+        "observed_total_claimed": structural_ingress_harness.observed_total_claimed,
+        "observed_total_discarded": structural_ingress_harness.observed_total_discarded,
+    }
     if governance_bundle is not None:
         payload["governance_harness"] = governance_bundle["observations"]
     print(json.dumps(payload, indent=2, sort_keys=True))

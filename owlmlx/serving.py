@@ -22,6 +22,7 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any, AsyncIterator, Callable, TypeVar
 
 T = TypeVar("T")
@@ -38,6 +39,35 @@ class GenerationResult:
     wait_time_s: float
     execution_time_s: float
     was_queued: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PreGateAdmissionMetadata:
+    """Immutable metadata allowed to exist before whole-request gate claim."""
+
+    request_kind: str
+    model_id: str | None
+    stream: bool
+    prompt_chars: int
+    message_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class PreGateAdmissionReservation:
+    """Bounded pre-gate admission reservation.
+
+    This reservation is inert by design. It exists only before whole-request
+    gate claim and carries no execution rights.
+    """
+
+    reservation_ticket: int
+    metadata: PreGateAdmissionMetadata
+    staged_at_s: float
+
+
+@dataclass(slots=True)
+class _PreGateAdmissionState:
+    reservation: PreGateAdmissionReservation
 
 
 class GenerationGate:
@@ -65,6 +95,7 @@ class GenerationGate:
         self._active = False
         self._next_ticket = 0
         self._serving_ticket = 0
+        self._next_pre_gate_ticket = 0
         self._waiters = 0
         self._total_served = 0
         self._total_queued = 0
@@ -72,6 +103,57 @@ class GenerationGate:
         self._total_exec_s = 0.0
         self._longest_wait_s = 0.0
         self._longest_exec_s = 0.0
+        self._pre_gate_capacity = 32
+        self._pre_gate_staged: dict[int, _PreGateAdmissionState] = {}
+        self._pre_gate_total_staged = 0
+        self._pre_gate_total_claimed = 0
+        self._pre_gate_total_discarded = 0
+        self._pre_gate_peak_staged = 0
+
+    def stage_admission(
+        self,
+        metadata: PreGateAdmissionMetadata,
+    ) -> PreGateAdmissionReservation:
+        """Reserve a bounded inert pre-gate admission slot.
+
+        This is the only new pre-claim structure introduced by the runtime:
+        immutable request metadata plus observational ticket reservation before
+        whole-request gate claim.
+        """
+
+        with self._condition:
+            while len(self._pre_gate_staged) >= self._pre_gate_capacity:
+                self._condition.wait()
+            reservation = PreGateAdmissionReservation(
+                reservation_ticket=self._next_pre_gate_ticket,
+                metadata=metadata,
+                staged_at_s=round(time.monotonic(), 4),
+            )
+            self._next_pre_gate_ticket += 1
+            self._pre_gate_staged[reservation.reservation_ticket] = _PreGateAdmissionState(
+                reservation=reservation
+            )
+            self._pre_gate_total_staged += 1
+            self._pre_gate_peak_staged = max(
+                self._pre_gate_peak_staged,
+                len(self._pre_gate_staged),
+            )
+            self._condition.notify_all()
+        return reservation
+
+    def _claim_admission(self, reservation_ticket: int) -> None:
+        with self._condition:
+            state = self._pre_gate_staged.pop(reservation_ticket, None)
+            if state is not None:
+                self._pre_gate_total_claimed += 1
+                self._condition.notify_all()
+
+    def discard_admission(self, reservation_ticket: int) -> None:
+        with self._condition:
+            state = self._pre_gate_staged.pop(reservation_ticket, None)
+            if state is not None:
+                self._pre_gate_total_discarded += 1
+                self._condition.notify_all()
 
     def _begin_turn(self) -> tuple[bool, float, float]:
         """Claim the next FIFO execution slot and return queue metadata."""
@@ -140,6 +222,47 @@ class GenerationGate:
             was_queued=was_queued,
         )
 
+    def execute_with_admission(
+        self,
+        metadata: PreGateAdmissionMetadata,
+        fn: Callable[..., T],
+        *args: Any,
+        **kwargs: Any,
+    ) -> GenerationResult:
+        """Execute under the gate after bounded pre-gate admission staging."""
+
+        reservation = self.stage_admission(metadata)
+        claimed = False
+        began_turn = False
+        was_queued = False
+        wait_time = 0.0
+        exec_start: float | None = None
+        served = False
+        try:
+            was_queued, wait_time, exec_start = self._begin_turn()
+            began_turn = True
+            self._claim_admission(reservation.reservation_ticket)
+            claimed = True
+            result = fn(*args, **kwargs)
+            served = True
+        finally:
+            if not claimed:
+                self.discard_admission(reservation.reservation_ticket)
+            exec_time = 0.0
+            if began_turn and exec_start is not None:
+                exec_time = self._finish_turn(
+                    exec_start=exec_start,
+                    wait_time=wait_time,
+                    served=served,
+                )
+
+        return GenerationResult(
+            value=result,
+            wait_time_s=round(wait_time, 4),
+            execution_time_s=round(exec_time, 4),
+            was_queued=was_queued,
+        )
+
     async def execute_async(
         self, fn: Callable[..., T], *args: Any, **kwargs: Any
     ) -> GenerationResult:
@@ -160,6 +283,19 @@ class GenerationGate:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.execute, fn, *args, **kwargs)
 
+    async def execute_async_with_admission(
+        self,
+        metadata: PreGateAdmissionMetadata,
+        fn: Callable[..., T],
+        *args: Any,
+        **kwargs: Any,
+    ) -> GenerationResult:
+        """Async executor path with bounded pre-gate admission staging."""
+
+        loop = asyncio.get_running_loop()
+        runner = partial(self.execute_with_admission, metadata, fn, *args, **kwargs)
+        return await loop.run_in_executor(None, runner)
+
     @asynccontextmanager
     async def stream_session(self) -> AsyncIterator[GenerationResult]:
         """Hold GenerationGate for the full lifetime of a streaming response."""
@@ -177,6 +313,43 @@ class GenerationGate:
             )
         finally:
             self._finish_turn(exec_start=exec_start, wait_time=wait_time, served=True)
+
+    @asynccontextmanager
+    async def stream_session_with_admission(
+        self,
+        metadata: PreGateAdmissionMetadata,
+    ) -> AsyncIterator[GenerationResult]:
+        """Hold GenerationGate after bounded pre-gate admission staging."""
+
+        loop = asyncio.get_running_loop()
+        reservation = await loop.run_in_executor(None, self.stage_admission, metadata)
+        claimed = False
+        began_turn = False
+        was_queued = False
+        wait_time = 0.0
+        exec_start: float | None = None
+        try:
+            was_queued, wait_time, exec_start = await loop.run_in_executor(
+                None, self._begin_turn
+            )
+            began_turn = True
+            await loop.run_in_executor(
+                None, self._claim_admission, reservation.reservation_ticket
+            )
+            claimed = True
+            yield GenerationResult(
+                value=None,
+                wait_time_s=round(wait_time, 4),
+                execution_time_s=0.0,
+                was_queued=was_queued,
+            )
+        finally:
+            if not claimed:
+                await loop.run_in_executor(
+                    None, self.discard_admission, reservation.reservation_ticket
+                )
+            if began_turn and exec_start is not None:
+                self._finish_turn(exec_start=exec_start, wait_time=wait_time, served=True)
 
     @property
     def is_active(self) -> bool:
@@ -204,6 +377,34 @@ class GenerationGate:
                 "total_exec_s": round(self._total_exec_s, 3),
                 "longest_wait_s": round(self._longest_wait_s, 3),
                 "longest_exec_s": round(self._longest_exec_s, 3),
+                "pre_gate_admission": {
+                    "hook_status": "present",
+                    "hook_boundary": "before_whole_request_gate_claim",
+                    "hook_mode": "bounded_runtime_owned_staging",
+                    "capacity": self._pre_gate_capacity,
+                    "staged_count": len(self._pre_gate_staged),
+                    "peak_staged_count": self._pre_gate_peak_staged,
+                    "total_staged": self._pre_gate_total_staged,
+                    "total_claimed": self._pre_gate_total_claimed,
+                    "total_discarded": self._pre_gate_total_discarded,
+                    "staging_units": [
+                        "immutable_request_metadata_snapshot",
+                        "ticket_reservation_without_gate_claim",
+                        "pre_claim_bounded_admission_bookkeeping",
+                    ],
+                    "preserved_post_claim_invariants": [
+                        "max_concurrent_1_after_gate_claim",
+                        "ticketed_fifo_after_gate_claim",
+                        "serial_safety_validated_only_after_gate_claim",
+                    ],
+                    "forbidden_expansions": [
+                        "no_bypass_of_whole_request_gate_claim",
+                        "no_post_claim_reordering",
+                        "no_post_claim_parallel_generation",
+                        "no_child_exchange_from_pre_claim_hook",
+                        "no_stream_rewrite_from_pre_claim_hook",
+                    ],
+                },
             }
 
     def reset_counters(self) -> None:
@@ -215,3 +416,7 @@ class GenerationGate:
             self._total_exec_s = 0.0
             self._longest_wait_s = 0.0
             self._longest_exec_s = 0.0
+            self._pre_gate_total_staged = 0
+            self._pre_gate_total_claimed = 0
+            self._pre_gate_total_discarded = 0
+            self._pre_gate_peak_staged = len(self._pre_gate_staged)
