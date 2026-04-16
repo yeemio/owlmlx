@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import asdict
+from time import monotonic
 from typing import Any
 
 from owlmlx.abort_recovery import AbortRecoveryTracker
@@ -28,10 +29,13 @@ from .types import (
     ChatTurn,
     GenerateResult,
     LoadResult,
+    PinResult,
     RestartResult,
     RuntimeErrorCode,
     RuntimeStatus,
     StreamEvent,
+    TTLPolicyResult,
+    TTLSweepResult,
     UnloadResult,
 )
 
@@ -52,17 +56,27 @@ class RuntimeKernel:
         profile: MachineMemoryProfile | None = None,
         generation_gate: GenerationGate | None = None,
         abort_recovery: AbortRecoveryTracker | None = None,
+        clock: Callable[[], float] | None = None,
     ) -> None:
         self.backend = backend
         self.profile = profile if profile is not None else default_machine_profile()
         self.generation_gate = generation_gate if generation_gate is not None else GenerationGate()
         self.abort_recovery = abort_recovery if abort_recovery is not None else AbortRecoveryTracker()
+        self._clock = clock if clock is not None else monotonic
         self._active_model_id: str | None = None
+        self._pinned_model_ids: set[str] = set()
+        self._ttl_seconds_by_model_id: dict[str, float] = {}
+        self._ttl_last_touch_s: dict[str, float] = {}
+        self._eviction_history: list[dict[str, Any]] = []
         self._governance_transition_count = 0
         self._governance_recent_window_runs = 0
         self._governance_active_reassignment_visible = False
         self._governance_restart_restore_visible = False
         self._governance_explicit_targeting_evidence_visible = False
+        self._governance_pinning_events_visible = False
+        self._governance_ttl_events_visible = False
+        self._governance_ttl_expiry_visible = False
+        self._governance_eviction_history_visible = False
 
     @property
     def active_model_id(self) -> str | None:
@@ -121,6 +135,7 @@ class RuntimeKernel:
         if result.ok:
             previous_active = self._active_model_id
             self._active_model_id = model_id
+            self._touch_model_activity(model_id)
             self._record_governance_transition(
                 previous_active=previous_active,
                 new_active=self._active_model_id,
@@ -129,6 +144,48 @@ class RuntimeKernel:
 
     def _resolve_target_model(self, model_id: str | None) -> str | None:
         return model_id or self._active_model_id
+
+    def _now_s(self) -> float:
+        return float(self._clock())
+
+    def _loaded_model_ids(self) -> set[str]:
+        return {model.model_id for model in self.backend.status().loaded_models}
+
+    def _touch_model_activity(self, model_id: str | None) -> None:
+        if model_id is None:
+            return
+        if model_id in self._loaded_model_ids():
+            self._ttl_last_touch_s[model_id] = self._now_s()
+
+    def _ttl_expired_model_ids(self, *, now_s: float | None = None) -> tuple[str, ...]:
+        current = self._now_s() if now_s is None else float(now_s)
+        expired: list[str] = []
+        for model_id, ttl_seconds in self._ttl_seconds_by_model_id.items():
+            if model_id not in self._loaded_model_ids():
+                continue
+            last_touch = self._ttl_last_touch_s.get(model_id)
+            if last_touch is None:
+                continue
+            if current - last_touch >= ttl_seconds:
+                expired.append(model_id)
+        return tuple(sorted(expired))
+
+    def _record_eviction_history(
+        self,
+        *,
+        model_id: str,
+        event: str,
+    ) -> None:
+        self._eviction_history.append(
+            {
+                "sequence": len(self._eviction_history) + 1,
+                "model_id": model_id,
+                "event": event,
+                "source": "ttl_policy",
+                "recorded_at_s": round(self._now_s(), 6),
+            }
+        )
+        self._governance_eviction_history_visible = True
 
     def _record_governance_transition(
         self,
@@ -227,6 +284,7 @@ class RuntimeKernel:
             )
         if result.ok:
             self._record_governance_explicit_targeting(model_id)
+            self._touch_model_activity(target_model)
         return GenerateResult(
             ok=result.ok,
             message=result.message,
@@ -280,6 +338,7 @@ class RuntimeKernel:
             )
         if result.ok:
             self._record_governance_explicit_targeting(model_id)
+            self._touch_model_activity(target_model)
         return GenerateResult(
             ok=result.ok,
             message=result.message,
@@ -349,6 +408,7 @@ class RuntimeKernel:
                 )
             if saw_non_error_event:
                 self._record_governance_explicit_targeting(model_id)
+                self._touch_model_activity(target_model)
 
     async def generate_stream_messages(
         self,
@@ -404,9 +464,19 @@ class RuntimeKernel:
                 )
             if saw_non_error_event:
                 self._record_governance_explicit_targeting(model_id)
+                self._touch_model_activity(target_model)
 
     def unload_model(self, model_id: str) -> UnloadResult:
         """Unload a model through the backend and clear active model if needed."""
+
+        if model_id in self._pinned_model_ids:
+            return UnloadResult(
+                ok=False,
+                message=f"model is pinned and cannot be unloaded: {model_id}",
+                error_code=RuntimeErrorCode.model_pinned,
+                model_id=model_id,
+                freed_gb=0.0,
+            )
 
         previous_active = self._active_model_id
         result = self.backend.unload(model_id)
@@ -414,11 +484,66 @@ class RuntimeKernel:
             remaining = self.backend.status().loaded_models
             self._active_model_id = remaining[-1].model_id if remaining else None
         if result.ok:
+            self._pinned_model_ids.discard(model_id)
+            self._ttl_seconds_by_model_id.pop(model_id, None)
+            self._ttl_last_touch_s.pop(model_id, None)
+        if result.ok:
             self._record_governance_transition(
                 previous_active=previous_active,
                 new_active=self._active_model_id,
             )
         return result
+
+    def pin_model(self, model_id: str) -> PinResult:
+        """Pin a loaded model against unload on the runtime-owned path."""
+
+        if model_id not in {m.model_id for m in self.backend.status().loaded_models}:
+            return PinResult(
+                ok=False,
+                message=f"model not loaded: {model_id}",
+                error_code=RuntimeErrorCode.model_not_loaded,
+                model_id=model_id,
+                pinned=False,
+            )
+        already_pinned = model_id in self._pinned_model_ids
+        self._pinned_model_ids.add(model_id)
+        self._governance_pinning_events_visible = True
+        return PinResult(
+            ok=True,
+            message=(
+                f"model already pinned: {model_id}"
+                if already_pinned
+                else f"pinned {model_id}"
+            ),
+            model_id=model_id,
+            pinned=True,
+            detail={
+                "already_pinned": already_pinned,
+                "pinned_model_ids": sorted(self._pinned_model_ids),
+            },
+        )
+
+    def unpin_model(self, model_id: str) -> PinResult:
+        """Remove runtime-owned pin protection from a loaded model."""
+
+        if model_id not in self._pinned_model_ids:
+            return PinResult(
+                ok=False,
+                message=f"model is not pinned: {model_id}",
+                error_code=RuntimeErrorCode.invalid_request,
+                model_id=model_id,
+                pinned=False,
+                detail={"pinned_model_ids": sorted(self._pinned_model_ids)},
+            )
+        self._pinned_model_ids.remove(model_id)
+        self._governance_pinning_events_visible = True
+        return PinResult(
+            ok=True,
+            message=f"unpinned {model_id}",
+            model_id=model_id,
+            pinned=False,
+            detail={"pinned_model_ids": sorted(self._pinned_model_ids)},
+        )
 
     def restart_model(self, model_id: str) -> RestartResult:
         """Restart a loaded model using the existing runtime registration."""
@@ -465,9 +590,10 @@ class RuntimeKernel:
                     "unload": asdict(unloaded),
                     "load": asdict(reloaded),
                 },
-        )
+            )
         if was_active:
             self._active_model_id = model_id
+        self._touch_model_activity(model_id)
         self._record_governance_transition(
             previous_active=previous_active,
             new_active=self._active_model_id,
@@ -486,6 +612,100 @@ class RuntimeKernel:
                 "unload": asdict(unloaded),
                 "load": asdict(reloaded),
             },
+        )
+
+    def set_model_ttl(self, model_id: str, ttl_seconds: float) -> TTLPolicyResult:
+        """Attach a runtime-owned TTL policy to a loaded model."""
+
+        if model_id not in self._loaded_model_ids():
+            return TTLPolicyResult(
+                ok=False,
+                message=f"model not loaded: {model_id}",
+                error_code=RuntimeErrorCode.model_not_loaded,
+                model_id=model_id,
+                ttl_enabled=False,
+            )
+        normalized_ttl = float(ttl_seconds)
+        if normalized_ttl <= 0:
+            return TTLPolicyResult(
+                ok=False,
+                message=f"ttl_seconds must be > 0: {ttl_seconds}",
+                error_code=RuntimeErrorCode.invalid_request,
+                model_id=model_id,
+                ttl_enabled=False,
+            )
+        self._ttl_seconds_by_model_id[model_id] = normalized_ttl
+        self._touch_model_activity(model_id)
+        self._governance_ttl_events_visible = True
+        return TTLPolicyResult(
+            ok=True,
+            message=f"ttl policy set for {model_id}",
+            model_id=model_id,
+            ttl_enabled=True,
+            ttl_seconds=normalized_ttl,
+            detail={
+                "ttl_model_ids": sorted(self._ttl_seconds_by_model_id),
+                "ttl_policy_mode": "kernel_explicit_sweep",
+            },
+        )
+
+    def clear_model_ttl(self, model_id: str) -> TTLPolicyResult:
+        """Clear a runtime-owned TTL policy from a loaded model."""
+
+        previous_ttl = self._ttl_seconds_by_model_id.pop(model_id, None)
+        if previous_ttl is None:
+            return TTLPolicyResult(
+                ok=False,
+                message=f"ttl policy not set: {model_id}",
+                error_code=RuntimeErrorCode.invalid_request,
+                model_id=model_id,
+                ttl_enabled=False,
+                detail={"ttl_model_ids": sorted(self._ttl_seconds_by_model_id)},
+            )
+        self._governance_ttl_events_visible = True
+        return TTLPolicyResult(
+            ok=True,
+            message=f"ttl policy cleared for {model_id}",
+            model_id=model_id,
+            ttl_enabled=False,
+            ttl_seconds=previous_ttl,
+            detail={
+                "ttl_model_ids": sorted(self._ttl_seconds_by_model_id),
+                "ttl_policy_mode": "kernel_explicit_sweep",
+            },
+        )
+
+    def sweep_expired_models(self, *, now_s: float | None = None) -> TTLSweepResult:
+        """Unload expired, unpinned models under the runtime-owned TTL policy."""
+
+        expired_model_ids = list(self._ttl_expired_model_ids(now_s=now_s))
+        unloaded_model_ids: list[str] = []
+        skipped_pinned_model_ids: list[str] = []
+        for model_id in expired_model_ids:
+            if model_id in self._pinned_model_ids:
+                skipped_pinned_model_ids.append(model_id)
+                self._record_eviction_history(
+                    model_id=model_id,
+                    event="ttl_expiry_blocked_by_pinning",
+                )
+                continue
+            result = self.unload_model(model_id)
+            if result.ok:
+                unloaded_model_ids.append(model_id)
+                self._record_eviction_history(
+                    model_id=model_id,
+                    event="ttl_expired_unloaded",
+                )
+        if expired_model_ids:
+            self._governance_ttl_expiry_visible = True
+        return TTLSweepResult(
+            ok=True,
+            message="ttl sweep completed",
+            scanned_model_count=len(self._loaded_model_ids()),
+            expired_model_ids=tuple(expired_model_ids),
+            unloaded_model_ids=tuple(unloaded_model_ids),
+            skipped_pinned_model_ids=tuple(skipped_pinned_model_ids),
+            detail={"ttl_policy_mode": "kernel_explicit_sweep"},
         )
 
     def status(self) -> RuntimeStatus:
@@ -557,6 +777,29 @@ class RuntimeKernel:
             "explicit_targeting_evidence_visible": (
                 self._governance_explicit_targeting_evidence_visible
             ),
+            "pinning_events_visible": self._governance_pinning_events_visible,
+            "ttl_events_visible": self._governance_ttl_events_visible,
+            "ttl_expiry_visible": self._governance_ttl_expiry_visible,
+            "eviction_history_events_visible": self._governance_eviction_history_visible,
+        }
+        expired_model_ids = list(self._ttl_expired_model_ids())
+        expired_pinned_model_ids = [
+            model_id for model_id in expired_model_ids if model_id in self._pinned_model_ids
+        ]
+        governance_policy = {
+            "pinning_supported": True,
+            "ttl_supported": True,
+            "eviction_history_visible": bool(self._eviction_history),
+            "backend_ttl_visible": False,
+            "ttl_policy_mode": "kernel_explicit_sweep",
+            "pinned_model_ids": sorted(self._pinned_model_ids),
+            "pinned_model_count": len(self._pinned_model_ids),
+            "ttl_model_ids": sorted(self._ttl_seconds_by_model_id),
+            "ttl_policy_count": len(self._ttl_seconds_by_model_id),
+            "ttl_expired_model_ids": expired_model_ids,
+            "ttl_expired_pinned_model_ids": expired_pinned_model_ids,
+            "eviction_history_count": len(self._eviction_history),
+            "recent_eviction_history": list(self._eviction_history[-8:]),
         }
         return {
             "contract": {
@@ -572,6 +815,7 @@ class RuntimeKernel:
                 "diagnostic_sections": [
                     "backend.detail",
                     "governance_observations",
+                    "governance_policy",
                     "generation_gate",
                 ],
             },
@@ -597,6 +841,7 @@ class RuntimeKernel:
                 ),
             },
             "governance_observations": governance_observations,
+            "governance_policy": governance_policy,
             "generation_gate": status.generation_gate,
             "active_model_id": status.active_model_id,
         }

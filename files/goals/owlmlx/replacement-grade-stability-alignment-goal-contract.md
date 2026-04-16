@@ -1,7 +1,7 @@
 # owlmlx Goal Contract: Supported-Host Runtime Substrate Closure
 
 > Status: active goal contract
-> Updated: 2026-04-15
+> Updated: 2026-04-16
 
 ## Goal ID
 
@@ -15,134 +15,105 @@ without inflating platform-level replacement claims.
 ## Success Definition
 
 This goal succeeds only when `owlmlx` can honestly be described as a runtime
-substrate with one supported-host execution baseline, stable runtime-owned
-contracts, and enough runtime depth that upper layers do not need to guess,
-compensate, or redefine runtime truth.
-
-At minimum, that requires:
+substrate with:
 
 1. one verified supported-host execution baseline for local serving
-2. owned cache / scheduler depth that moves beyond narrative/status-only truth
+2. owned cache / scheduler depth that moves beyond status-only truth
 3. owned multi-model lifecycle governance beyond minimal load/unload semantics
-4. repeated heavy-weight runtime proof on a supported host, not just specimen
-   staging contracts
-5. customer-runtime evidence strong enough to move beyond "early formal
-   runtime"
-
-This goal still uses `oMLX` / `vMLX` as reference systems for stability class,
-but day-to-day work should optimize for substrate closure, not for broad
-platform-replacement storytelling.
+4. repeated heavy-weight runtime proof on a supported host
+5. customer-runtime evidence strong enough to move beyond `early_formal_runtime`
 
 ## Blocked Definition
 
 The goal is blocked only if:
 
-- no supported host or system image is available for runtime-baseline
+- no supported host or system image is currently available for baseline
   establishment and that is the exact blocker, or
-- the current runtime truth is too thin to select the next dominant gap
-  honestly
+- current runtime truth is too thin to select the next dominant gap honestly
+
+## Current Mainline Freeze
+
+Phase 45 mainline is now frozen at the supported-host return checkpoint.
+
+Current blocker:
+
+- no provided/usable supported host or system image is available for
+  supported-host baseline establishment
+
+Until that changes:
+
+- no further local rounds are authorized
+- cache remains frozen at `structural_ingress_seam_introduced`
+- governance fallback remains closed at `policy_gap_closed`
+
+The only legal restart condition is:
+
+- a real supported host / system image is provided or authorized
+
+When that condition is satisfied, reentry must start from:
+
+- `files/execution-prompts/owlmlx/phase-45-supported-host-reentry-baseline-establishment.md`
 
 ## Hard Rules
 
 1. Work only inside `owlmlx`.
-2. Treat `oMLX` / `vMLX` as reference class, not as feature-clone scope.
-3. Do not let specimen-specific work or current blocked-host forensics redefine
-   the top-level goal once the blocker is already exact.
-4. Do not claim customer readiness or platform replacement from `owlmlx`
-   progress alone.
-5. Do not treat control-plane, UI, or operator workflow work from shell repos
-   as `owlmlx` closure.
-6. Prefer supported-host baseline establishment and runtime contract depth over
-   adding new runtime surface area.
-
-## Out of Scope
-
-- desktop UI or dashboard work
-- product-shell replacement storytelling
-- control-plane operability work that belongs in `owlops`
-- MiniMax quantization or optimization as a top-level goal
-- modality expansion for its own sake
-- replacement verdict inflation
+2. Treat `oMLX` / `vMLX` as reference class, not feature-clone scope.
+3. Do not let specimen work or blocked-host forensics redefine the top-level goal.
+4. Do not claim customer readiness or platform replacement from `owlmlx` alone.
+5. Do not widen the frozen cache branch without fresh authorization.
 
 ## Current Truth
 
-- `owlmlx` already has a real executable runtime kernel and migration seams.
-- `owlmlx` already has structured blocker truth, specimen gates, and
-  host-forensics contracts.
-- `owlmlx` already exposes runtime-owned status, evidence, and dominant-gap
-  surfaces that upper layers can consume honestly.
-- `owlmlx` is **not** yet at `oMLX` / `vMLX` stability class.
-- the current host MLX execution remains blocked at the import layer.
-- the current honest posture is still closer to an early formal runtime than a
-  supported runtime substrate.
+- `owlmlx` already has a real runtime kernel and migration seams.
+- `owlmlx` already exposes runtime-owned status, evidence, and dominant-gap truth.
+- `owlmlx` is still below `oMLX` / `vMLX` stability class.
+- the current host remains blocked for deeper MLX runtime validation.
+- the honest label remains `early_formal_runtime`.
+- Phase 45 mainline is frozen until a supported host / system image is actually provided.
 
 ## Active Workstreams
 
 1. `supported_host_baseline_establishment`
-   - resolve the exact external blocker by moving runtime validation onto one
-     supported host/system image
-2. `cache_scheduler_depth`
-3. `multi_model_lifecycle_governance`
+2. `multi_model_lifecycle_governance`
+3. `cache_scheduler_depth`
 4. `heavy_weight_runtime_repeatability`
 5. `customer_runtime_evidence`
 
 ## Current Priority Order
 
-### Priority 1: Supported-Host Baseline Establishment
+### Priority 1: `supported_host_baseline_establishment`
 
-This is the gating program priority.
-
-Reason:
-
-- the current host is already frozen as unsuitable for deeper replacement-grade
-  validation
-- without one supported host/image, `owlmlx` cannot honestly graduate from
-  exact blocker reporting into supported runtime substrate claims
-- continuing to spend the mainline on the blocked host would blur runtime
-  closure with environment forensics
-
-### Priority 2: `cache_scheduler_depth`
-
-This remains the current locally reducible dominant gap.
+This remains the gating program priority.
 
 Reason:
 
-- `multi_model_lifecycle_governance` now has a runtime-owned status surface,
-  governance-controls surface, governance-transition ledger, active-kernel
-  governance observations, and a governance policy-gap freeze
-- its remaining absent controls are now frozen more narrowly as policy-grade
-  gaps (`pinning`, `TTL`, `eviction-history governance`) rather than the next
-  dominant observation/integration gap
-- `host_stable_execution` remains exact but externally constrained on this host
-- `heavy_weight_runtime_repeatability` still has a frozen exact external
-  blocker: a supported host/system image is required for repeated heavy-weight
-  proof
-- `customer_runtime_evidence` can now move its dominant next gap away from
-  governance once the policy gap is exact
-- `cache_scheduler_depth` remains the clearest remaining locally reducible gap:
-  its counter ownership is now exact on the active path
-  (`reuse_counter` visible; `residency_counter` / `eviction_counter`
-  not-runtime-owned here), so the remaining locally reducible cache work is
-  an exact scheduler implementation backlog on top of a serial ticketed FIFO floor,
-  plus an exact TurboQuant preconditions branch that still lacks safe-activation requirements
- - within that scheduler backlog, the next exact implementation branch is now
-   `continuous_batching`; `multi_worker_scheduler_depth` remains secondary
-   until the concurrency boundary is revalidated honestly
- - that selected branch is now narrowed further: continuous batching is not
-   just absent on the active path, it is exact-feasibility-blocked until one
-   request-aggregation or interleaved scheduling mechanism exists
- - that continuous-batching blocker is now narrowed again: the first exact
-   local mechanism subgap is `request_aggregation_window`;
-   `shared_prefill_batch_step` and `interleaved_decode_scheduler` remain
-   secondary behind aggregate admission
- - that request-aggregation mechanism is now narrowed again: the missing piece
-   is a pre-gate admission window before whole-request session claim;
-   aggregated child dispatch and stream release remain downstream
-   dependencies
- - that ingress blocker is now narrowed again: no runtime-owned cohort window
-   exists before gate claim, because owlmlx only owns queueing after
-   whole-request gate entry and the validated serial safety boundary still
-   begins there
- - `owlmlx.dominant_gap_reselection` now freezes that cache choice directly,
-   so the loop no longer needs to infer it from narrative comparison once
-   governance and heavy-weight truth are already exact
+- the current host is already frozen as unsuitable for deeper replacement-grade validation
+- without one supported host/system image, `owlmlx` cannot graduate from exact blocker reporting into supported runtime substrate claims
+- this branch cannot legally restart until a real supported host / system image is actually provided
+
+### Priority 2: `multi_model_lifecycle_governance`
+
+This local fallback branch is now policy-closed on the current host and is not
+authorized for further local rounds.
+
+Reason:
+
+- the supported-host branch is exact-blocked locally for now
+- the cache branch is intentionally frozen at `structural_ingress_seam_introduced`
+- widening cache further would exceed the currently authorized boundary
+- pinning now exists as a real runtime-owned control
+- TTL policy now exists as a real runtime-owned control
+- eviction-history governance now also exists as a real runtime-owned control
+- no further local policy-grade governance control remains to land on this host
+- this branch is now exhausted until supported-host baseline establishment resumes
+
+### Priority 3: `cache_scheduler_depth`
+
+This is a frozen secondary branch on the current host and is not authorized for
+further widening.
+
+Reason:
+
+- one bounded structural ingress seam now exists
+- the next cache widening step would enter broader cohort/admission/batching work
+- that is out of scope until a fresh coordinator choice reopens the branch

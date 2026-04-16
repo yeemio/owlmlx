@@ -42,6 +42,7 @@ def build_multi_model_governance_controls(
     raw = dict(runtime_status or {})
     inventory = raw.get("inventory", {})
     active_model_id = raw.get("active_model_id")
+    governance_policy = raw.get("governance_policy", {})
     resident_model_count = int(inventory.get("model_count", 0))
     restart = raw.get("restart", {})
     observations = raw.get("governance_observations", {})
@@ -92,6 +93,35 @@ def build_multi_model_governance_controls(
             "freeze remaining absent controls and shift the next locally reducible gap away from governance surface work"
         )
 
+    pinning_supported = bool(governance_policy.get("pinning_supported", False))
+    ttl_supported = bool(governance_policy.get("ttl_supported", False))
+    eviction_history_visible = bool(
+        governance_policy.get("eviction_history_visible", False)
+    )
+    backend_ttl_visible = bool(governance_policy.get("backend_ttl_visible", False))
+
+    if pinning_supported and not ttl_supported and not eviction_history_visible:
+        blocked_reason = (
+            "owlmlx now owns runtime pinning, but TTL policy and eviction-history governance remain absent"
+        )
+        recommended_next_step = (
+            "continue governance policy controls with TTL policy or eviction-history governance instead of widening cache work"
+        )
+    elif pinning_supported and ttl_supported and not eviction_history_visible:
+        blocked_reason = (
+            "owlmlx now owns runtime pinning and TTL policy, but eviction-history governance remains absent"
+        )
+        recommended_next_step = (
+            "continue the governance fallback branch with eviction-history governance instead of reopening cache widening"
+        )
+    elif pinning_supported and ttl_supported and eviction_history_visible:
+        blocked_reason = (
+            "governance policy controls now exist locally; remaining closure is no longer policy-grade on this host"
+        )
+        recommended_next_step = (
+            "return attention to supported-host baseline establishment instead of widening cache or inventing more local governance policy debt"
+        )
+
     return MultiModelGovernanceControls(
         resident_model_count=resident_model_count,
         active_model_id=str(active_model_id) if active_model_id is not None else None,
@@ -107,10 +137,10 @@ def build_multi_model_governance_controls(
             "restartable_models" in restart and "restart_exhausted_models" in restart
         ),
         unload_surface_visible=True,
-        pinning_supported=False,
-        ttl_supported=False,
-        eviction_history_visible=False,
-        backend_ttl_visible=False,
+        pinning_supported=pinning_supported,
+        ttl_supported=ttl_supported,
+        eviction_history_visible=eviction_history_visible,
+        backend_ttl_visible=backend_ttl_visible,
         transition_history_visible=transition_history_visible,
         active_reassignment_visible=active_reassignment_visible,
         restart_restore_visible=restart_restore_visible,

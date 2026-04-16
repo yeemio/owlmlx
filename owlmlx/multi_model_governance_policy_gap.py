@@ -87,6 +87,25 @@ def build_multi_model_governance_policy_gap(
         recommended_next_step = (
             "either implement one of the absent lifecycle controls or move the dominant gap to the next locally reducible stability gap"
         )
+        if not absent_policy_controls and present_policy_controls:
+            policy_gap_rung = "policy_gap_closed"
+            residual_blocker = None
+            recommended_next_step = (
+                "governance fallback policy controls are now locally closed; return to supported-host baseline establishment or the next non-policy runtime blocker"
+            )
+        if present_policy_controls and absent_policy_controls:
+            policy_gap_rung = "policy_gap_reduced"
+            residual_blocker = (
+                "governance policy controls have started to land, but remaining absent controls are still policy-grade only: "
+                + ", ".join(absent_policy_controls)
+            )
+            recommended_next_step = (
+                "continue the governance fallback branch until the remaining policy controls shrink further"
+            )
+            if absent_policy_controls == ["eviction_history_governance"]:
+                recommended_next_step = (
+                    "continue the governance fallback branch with eviction-history governance; pinning and TTL policy now exist"
+                )
 
     return MultiModelGovernancePolicyGap(
         controls=governance_controls,

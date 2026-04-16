@@ -73,11 +73,19 @@ def _governance_transition_ledger(*, ledger_rung: str, blocked_reason: str | Non
     )
 
 
-def _governance_policy_gap(*, policy_gap_rung: str, residual_blocker: str | None):
+def _governance_policy_gap(
+    *,
+    policy_gap_rung: str,
+    residual_blocker: str | None,
+    absent_policy_controls: tuple[str, ...] = (),
+    present_policy_controls: tuple[str, ...] = (),
+):
     return SimpleNamespace(
         status="partial",
         policy_gap_rung=policy_gap_rung,
         residual_blocker=residual_blocker,
+        absent_policy_controls=absent_policy_controls,
+        present_policy_controls=present_policy_controls,
     )
 
 
@@ -251,6 +259,204 @@ def test_customer_runtime_evidence_can_mark_runtime_evidence_expanding(monkeypat
 
     assert payload["summary"]["evidence_label"] == "runtime_evidence_expanding"
     assert payload["summary"]["externally_blocked_gaps"] == []
+
+
+def test_customer_runtime_evidence_switches_to_governance_on_policy_fallback(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_host_stable_execution_status",
+        lambda **_: _host(
+            ready=False,
+            status="host_blocked_move_validation",
+            blocked_reason="no verified-safe mlx baseline exists on this host",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_closure_rung",
+        lambda **_: _cache(
+            closure_rung="partial_closure",
+            blocked_reason="serial scheduler still below reference-grade parity",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_counter_gap",
+        lambda **_: _cache_counter_gap(
+            counter_gap_rung="counter_gap_exact",
+            residual_blocker="scheduler backlog remains open",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_counter_feasibility",
+        lambda **_: _cache_counter_feasibility(
+            feasibility_rung="counter_ownership_exact",
+            residual_blocker="scheduler depth / TurboQuant remain open",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_status",
+        lambda **_: _governance(
+            governance_rung="partial_closure",
+            blocked_reason="TTL policy and eviction-history governance remain absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_controls",
+        lambda **_: _governance_controls(
+            controls_rung="partial_closure",
+            blocked_reason="TTL policy and eviction-history governance remain absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_transition_ledger",
+        lambda **_: _governance_transition_ledger(
+            ledger_rung="partial_closure",
+            blocked_reason="TTL policy and eviction-history governance remain absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_policy_gap",
+        lambda **_: _governance_policy_gap(
+            policy_gap_rung="policy_gap_reduced",
+            residual_blocker="TTL policy and eviction-history governance remain absent",
+            absent_policy_controls=("ttl_policy", "eviction_history_governance"),
+            present_policy_controls=("pinning",),
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_heavy_weight_runtime_repeatability_status",
+        lambda **_: _heavy(
+            repeatability_rung="local_blocked",
+            blocked_reason="supported host/system image is required",
+        ),
+    )
+
+    payload = customer_runtime_evidence_to_dict(
+        build_customer_runtime_evidence(specimen_path="/tmp/specimen")
+    )
+
+    assert payload["next_step"]["dominant_next_gap"] == "multi_model_lifecycle_governance"
+    assert payload["summary"]["recommended_next_step"] == (
+        "treat governance as the active fallback branch on this host: runtime pinning now exists, so continue with TTL policy or eviction-history governance instead of reopening cache widening"
+    )
+
+
+def test_customer_runtime_evidence_recommends_eviction_after_ttl_lands(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_host_stable_execution_status",
+        lambda **_: _host(
+            ready=False,
+            status="host_blocked_move_validation",
+            blocked_reason="no verified-safe mlx baseline exists on this host",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_status",
+        lambda **_: _governance(
+            governance_rung="partial_closure",
+            blocked_reason="eviction-history governance remains absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_controls",
+        lambda **_: _governance_controls(
+            controls_rung="partial_closure",
+            blocked_reason="eviction-history governance remains absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_transition_ledger",
+        lambda **_: _governance_transition_ledger(
+            ledger_rung="partial_closure",
+            blocked_reason="eviction-history governance remains absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_policy_gap",
+        lambda **_: _governance_policy_gap(
+            policy_gap_rung="policy_gap_reduced",
+            residual_blocker="eviction-history governance remains absent",
+            absent_policy_controls=("eviction_history_governance",),
+            present_policy_controls=("pinning", "ttl_policy"),
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_heavy_weight_runtime_repeatability_status",
+        lambda **_: _heavy(
+            repeatability_rung="local_blocked",
+            blocked_reason="supported host/system image is required",
+        ),
+    )
+
+    payload = customer_runtime_evidence_to_dict(
+        build_customer_runtime_evidence(specimen_path="/tmp/specimen")
+    )
+
+    assert payload["next_step"]["dominant_next_gap"] == "multi_model_lifecycle_governance"
+    assert payload["summary"]["recommended_next_step"] == (
+        "treat governance as the active fallback branch on this host: runtime pinning and TTL policy now exist, so continue with eviction-history governance instead of reopening cache widening"
+    )
+
+
+def test_customer_runtime_evidence_returns_to_supported_host_after_governance_policy_closes(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_host_stable_execution_status",
+        lambda **_: _host(
+            ready=False,
+            status="host_blocked_move_validation",
+            blocked_reason="no verified-safe mlx baseline exists on this host",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_status",
+        lambda **_: _governance(
+            governance_rung="partial_closure",
+            blocked_reason="governance policy controls now exist locally",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_controls",
+        lambda **_: _governance_controls(
+            controls_rung="partial_closure",
+            blocked_reason="governance policy controls now exist locally",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_transition_ledger",
+        lambda **_: _governance_transition_ledger(
+            ledger_rung="partial_closure",
+            blocked_reason="governance policy controls now exist locally",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_policy_gap",
+        lambda **_: _governance_policy_gap(
+            policy_gap_rung="policy_gap_closed",
+            residual_blocker=None,
+            absent_policy_controls=(),
+            present_policy_controls=(
+                "pinning",
+                "ttl_policy",
+                "eviction_history_governance",
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_heavy_weight_runtime_repeatability_status",
+        lambda **_: _heavy(
+            repeatability_rung="local_blocked",
+            blocked_reason="supported host/system image is required",
+        ),
+    )
+
+    payload = customer_runtime_evidence_to_dict(
+        build_customer_runtime_evidence(specimen_path="/tmp/specimen")
+    )
+
+    assert payload["next_step"]["dominant_next_gap"] == "host_stable_execution"
+    assert payload["summary"]["recommended_next_step"] == (
+        "local governance fallback is now exhausted on this host; return to supported-host baseline establishment and do not reopen cache widening without fresh authorization"
+    )
 
 
 def test_customer_runtime_evidence_can_mark_approaching_reference_grade(monkeypatch) -> None:

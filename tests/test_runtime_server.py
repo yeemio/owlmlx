@@ -710,10 +710,14 @@ def test_runtime_status_returns_full_kernel_snapshot() -> None:
     assert payload["contract"]["diagnostic_sections"] == [
         "backend.detail",
         "governance_observations",
+        "governance_policy",
         "generation_gate",
     ]
     assert payload["governance_observations"]["transition_count"] == 1
     assert payload["governance_observations"]["active_reassignment_visible"] is False
+    assert payload["governance_policy"]["pinning_supported"] is True
+    assert payload["governance_policy"]["ttl_supported"] is True
+    assert payload["governance_policy"]["ttl_policy_mode"] == "kernel_explicit_sweep"
 
 
 def test_runtime_restart_endpoint_restarts_loaded_model() -> None:

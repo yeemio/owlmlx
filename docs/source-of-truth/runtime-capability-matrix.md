@@ -1,7 +1,7 @@
 # owlmlx Runtime Capability Matrix
 
 > Status: authoritative
-> Updated: 2026-04-13
+> Updated: 2026-04-16
 
 Capability labels:
 
@@ -149,7 +149,10 @@ Capability labels:
 | Multi-model governance status | supported | Phase 45 adds `owlmlx.multi_model_governance_status`, exposing live resident-model count, active/default semantics, recoverability visibility, and absent controls such as pinning/TTL/eviction history |
 | Multi-model governance controls | supported | Phase 45 adds `owlmlx.multi_model_governance_controls`, separating present controls from absent ones and making active-reassignment / explicit-targeting / restart-restore evidence runtime-owned via `runtime.status.governance_observations` when present |
 | Multi-model governance transition ledger | supported | Phase 45 adds `owlmlx.multi_model_governance_transition_ledger`, freezing recent governance transitions and repeated transition evidence without inflating absent lifecycle controls into fake policy support; the current source is the active kernel's `governance_observations` when available |
-| Multi-model governance policy gap | supported | Phase 45 adds `owlmlx.multi_model_governance_policy_gap`, freezing whether the remaining governance blocker is still observation-grade or has narrowed to policy-grade absent controls such as pinning, TTL, and eviction-history governance |
+| Multi-model governance policy gap | supported | Phase 45 adds `owlmlx.multi_model_governance_policy_gap`, freezing whether the remaining governance blocker is still observation-grade, still policy-grade exact, or now locally policy-closed on this host |
+| Multi-model pinning control | supported | Phase 45 adds `owlmlx.multi_model_pinning_control`; `RuntimeKernel` owns `pin_model()` / `unpin_model()`, pinned unload is blocked on the runtime-owned path, and pin state survives restart |
+| Multi-model TTL policy control | supported | Phase 45 now adds `owlmlx.multi_model_ttl_policy_control`; `RuntimeKernel` owns `set_model_ttl()` / `clear_model_ttl()` / `sweep_expired_models()`, TTL activity touches are runtime-owned, expired pinned models remain blocked, and unpinned expired models can be explicitly swept |
+| Multi-model eviction-history governance | supported | Phase 45 adds `owlmlx.multi_model_eviction_history_governance`; runtime-owned eviction history now records both TTL unload and pinned-expiry skip events, closing the local governance fallback policy branch on this host |
 | Heavy-weight repeatability status | supported | Phase 45 adds `owlmlx.heavy_weight_runtime_repeatability`, combining host stability, first-smoke locality, and supported-host repeatability proof into one exact blocker-aware status |
 | Customer runtime evidence ledger | supported | Phase 45 adds `owlmlx.customer_runtime_evidence`, summarizing which replacement-grade gaps now have runtime-owned contracts, runnable verification, exact external blockers, and the next locally reducible dominant gap |
 | Control-plane downgrade-path hardening | supported | Runtime-10 makes `healthz` a liveness-only fallback; it no longer fabricates `openai_chat` protocol when richer runtime truth is absent |

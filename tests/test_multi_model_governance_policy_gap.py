@@ -36,7 +36,7 @@ def test_multi_model_governance_policy_gap_defaults_to_observation_gap_open() ->
     ]
 
 
-def test_multi_model_governance_policy_gap_marks_policy_gap_exact() -> None:
+def test_multi_model_governance_policy_gap_marks_policy_gap_reduced_when_runtime_supports_pinning() -> None:
     kernel = RuntimeKernel(FakeBackend(default_memory_gb=1.0), profile=_profile())
     kernel.load_model("model-a")
     kernel.load_model("model-b")
@@ -58,13 +58,141 @@ def test_multi_model_governance_policy_gap_marks_policy_gap_exact() -> None:
         )
     )
 
-    assert payload["summary"]["policy_gap_rung"] == "policy_gap_exact"
+    assert payload["summary"]["policy_gap_rung"] == "policy_gap_reduced"
     assert payload["observed_runtime_behavior"]["observed_runtime_behavior_frozen"] is True
+    assert payload["policy_controls"]["present_policy_controls"] == [
+        "pinning",
+        "ttl_policy",
+    ]
     assert payload["policy_controls"]["absent_policy_controls"] == [
+        "eviction_history_governance",
+    ]
+
+
+def test_multi_model_governance_policy_gap_marks_policy_gap_reduced_after_pinning() -> None:
+    kernel = RuntimeKernel(FakeBackend(default_memory_gb=1.0), profile=_profile())
+    kernel.load_model("model-a")
+    kernel.load_model("model-b")
+    kernel.pin_model("model-a")
+    explicit = asyncio.run(kernel.generate("hello-explicit", model_id="model-a"))
+    unload = kernel.unload_model("model-b")
+    restart = kernel.restart_model("model-a")
+
+    assert explicit.ok is True
+    assert unload.ok is True
+    assert restart.ok is True
+
+    runtime_status = kernel.status_dict()
+    payload = multi_model_governance_policy_gap_to_dict(
+        build_multi_model_governance_policy_gap(
+            controls=build_multi_model_governance_controls(runtime_status),
+            transition_ledger=build_multi_model_governance_transition_ledger(
+                runtime_status
+            ),
+        )
+    )
+
+    assert payload["summary"]["policy_gap_rung"] == "policy_gap_reduced"
+    assert payload["policy_controls"]["present_policy_controls"] == [
+        "pinning",
+        "ttl_policy",
+    ]
+    assert payload["policy_controls"]["absent_policy_controls"] == [
+        "eviction_history_governance",
+    ]
+
+
+def test_multi_model_governance_policy_gap_reduces_to_eviction_only_after_ttl() -> None:
+    state = {"now": 100.0}
+
+    def clock() -> float:
+        return float(state["now"])
+
+    kernel = RuntimeKernel(
+        FakeBackend(default_memory_gb=1.0),
+        profile=_profile(),
+        clock=clock,
+    )
+    kernel.load_model("model-a")
+    kernel.load_model("model-b")
+    kernel.load_model("model-c")
+    kernel.pin_model("model-a")
+    kernel.set_model_ttl("model-a", 30.0)
+    kernel.set_model_ttl("model-b", 30.0)
+    explicit = asyncio.run(kernel.generate("hello-explicit", model_id="model-a"))
+    unload = kernel.unload_model("model-c")
+    restart = kernel.restart_model("model-b")
+
+    assert explicit.ok is True
+    assert unload.ok is True
+    assert restart.ok is True
+
+    runtime_status = kernel.status_dict()
+    payload = multi_model_governance_policy_gap_to_dict(
+        build_multi_model_governance_policy_gap(
+            controls=build_multi_model_governance_controls(runtime_status),
+            transition_ledger=build_multi_model_governance_transition_ledger(
+                runtime_status
+            ),
+        )
+    )
+
+    assert payload["summary"]["policy_gap_rung"] == "policy_gap_reduced"
+    assert payload["policy_controls"]["present_policy_controls"] == [
+        "pinning",
+        "ttl_policy",
+    ]
+    assert payload["policy_controls"]["absent_policy_controls"] == [
+        "eviction_history_governance",
+    ]
+
+
+def test_multi_model_governance_policy_gap_closes_after_eviction_history_governance() -> None:
+    state = {"now": 100.0}
+
+    def clock() -> float:
+        return float(state["now"])
+
+    kernel = RuntimeKernel(
+        FakeBackend(default_memory_gb=1.0),
+        profile=_profile(),
+        clock=clock,
+    )
+    kernel.load_model("model-a")
+    kernel.load_model("model-b")
+    kernel.load_model("model-c")
+    kernel.pin_model("model-a")
+    kernel.set_model_ttl("model-a", 30.0)
+    kernel.set_model_ttl("model-b", 30.0)
+    explicit = asyncio.run(kernel.generate("hello-explicit", model_id="model-a"))
+    unload = kernel.unload_model("model-c")
+    state["now"] = 140.0
+    sweep = kernel.sweep_expired_models()
+    restart = kernel.restart_model("model-a")
+
+    assert explicit.ok is True
+    assert unload.ok is True
+    assert sweep.ok is True
+    assert restart.ok is True
+
+    runtime_status = kernel.status_dict()
+    payload = multi_model_governance_policy_gap_to_dict(
+        build_multi_model_governance_policy_gap(
+            controls=build_multi_model_governance_controls(runtime_status),
+            transition_ledger=build_multi_model_governance_transition_ledger(
+                runtime_status
+            ),
+        )
+    )
+
+    assert payload["summary"]["policy_gap_rung"] == "policy_gap_closed"
+    assert payload["summary"]["residual_blocker"] is None
+    assert payload["policy_controls"]["present_policy_controls"] == [
         "pinning",
         "ttl_policy",
         "eviction_history_governance",
     ]
+    assert payload["policy_controls"]["absent_policy_controls"] == []
 
 
 def test_multi_model_governance_policy_gap_module_has_no_platform_dependency() -> None:

@@ -17,6 +17,10 @@ class MultiModelGovernanceStatus:
     loaded_model_ids: tuple[str, ...]
     restartable_models: tuple[str, ...]
     restart_exhausted_models: tuple[str, ...]
+    pinning_supported: bool
+    ttl_supported: bool
+    eviction_history_visible: bool
+    backend_ttl_visible: bool
     status: str
     governance_rung: str
     blocked_reason: str | None
@@ -31,6 +35,7 @@ def build_multi_model_governance_status(
     raw = dict(runtime_status or {})
     inventory = dict(raw.get("inventory", {}))
     budget = dict(raw.get("budget", {}))
+    governance_policy = dict(raw.get("governance_policy", {}))
     entries = inventory.get("entries", [])
     loaded_model_ids = tuple(
         str(entry.get("model_id"))
@@ -86,6 +91,35 @@ def build_multi_model_governance_status(
             "freeze the remaining absent controls and move the dominant gap to heavy-weight runtime repeatability"
         )
 
+    pinning_supported = bool(governance_policy.get("pinning_supported", False))
+    ttl_supported = bool(governance_policy.get("ttl_supported", False))
+    eviction_history_visible = bool(
+        governance_policy.get("eviction_history_visible", False)
+    )
+    backend_ttl_visible = bool(governance_policy.get("backend_ttl_visible", False))
+
+    if pinning_supported and not ttl_supported and not eviction_history_visible:
+        blocked_reason = (
+            "owlmlx now owns runtime pinning, but TTL policy and eviction-history governance still remain absent"
+        )
+        recommended_next_step = (
+            "continue governance policy controls locally instead of reopening cache widening"
+        )
+    elif pinning_supported and ttl_supported and not eviction_history_visible:
+        blocked_reason = (
+            "owlmlx now owns runtime pinning and TTL policy, but eviction-history governance still remains absent"
+        )
+        recommended_next_step = (
+            "continue governance policy controls locally with eviction-history governance instead of reopening cache widening"
+        )
+    elif pinning_supported and ttl_supported and eviction_history_visible:
+        blocked_reason = (
+            "governance policy controls now exist locally; remaining closure is no longer policy-grade on this host"
+        )
+        recommended_next_step = (
+            "return the dominant branch to supported-host baseline establishment instead of widening cache or inventing new local governance policy debt"
+        )
+
     return MultiModelGovernanceStatus(
         inventory=inventory,
         budget=budget,
@@ -94,6 +128,10 @@ def build_multi_model_governance_status(
         loaded_model_ids=loaded_model_ids,
         restartable_models=restartable_models,
         restart_exhausted_models=restart_exhausted_models,
+        pinning_supported=pinning_supported,
+        ttl_supported=ttl_supported,
+        eviction_history_visible=eviction_history_visible,
+        backend_ttl_visible=backend_ttl_visible,
         status="partial",
         governance_rung=governance_rung,
         blocked_reason=blocked_reason,
@@ -150,10 +188,10 @@ def multi_model_governance_status_to_dict(
             "explicit_unload_required": True,
         },
         "governance_controls": {
-            "pinning_supported": False,
-            "ttl_supported": False,
-            "eviction_history_visible": False,
-            "backend_ttl_visible": False,
+            "pinning_supported": status.pinning_supported,
+            "ttl_supported": status.ttl_supported,
+            "eviction_history_visible": status.eviction_history_visible,
+            "backend_ttl_visible": status.backend_ttl_visible,
             "model_runtime_supports_visible": True,
         },
         "recoverability": {

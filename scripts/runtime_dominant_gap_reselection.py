@@ -38,14 +38,29 @@ def _profile() -> MachineMemoryProfile:
 
 
 def _governance_policy_gap():
-    kernel = RuntimeKernel(FakeBackend(default_memory_gb=1.0), profile=_profile())
+    state = {"now": 100.0}
+
+    def clock() -> float:
+        return float(state["now"])
+
+    kernel = RuntimeKernel(
+        FakeBackend(default_memory_gb=1.0),
+        profile=_profile(),
+        clock=clock,
+    )
     kernel.load_model("model-a")
     kernel.load_model("model-b")
+    kernel.load_model("model-c")
+    kernel.pin_model("model-a")
+    kernel.set_model_ttl("model-a", 30.0)
+    kernel.set_model_ttl("model-b", 30.0)
 
     import asyncio
 
     asyncio.run(kernel.generate("hello-explicit", model_id="model-a"))
-    kernel.unload_model("model-b")
+    kernel.unload_model("model-c")
+    state["now"] = 140.0
+    kernel.sweep_expired_models()
     kernel.restart_model("model-a")
     runtime_status = kernel.status_dict()
     controls = build_multi_model_governance_controls(runtime_status)

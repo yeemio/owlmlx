@@ -344,6 +344,8 @@ _VERIFICATION_ASSETS: dict[str, dict[str, list[str]]] = {
             "tests/test_multi_model_governance_controls.py",
             "tests/test_multi_model_governance_transition_ledger.py",
             "tests/test_multi_model_governance_policy_gap.py",
+            "tests/test_multi_model_ttl_policy_control.py",
+            "tests/test_multi_model_eviction_history_governance.py",
             "tests/test_runtime_kernel.py",
         ],
         "scripts": [
@@ -351,6 +353,8 @@ _VERIFICATION_ASSETS: dict[str, dict[str, list[str]]] = {
             "scripts/runtime_multi_model_governance_controls.py",
             "scripts/runtime_multi_model_governance_transition_ledger.py",
             "scripts/runtime_multi_model_governance_policy_gap.py",
+            "scripts/runtime_multi_model_ttl_policy_control.py",
+            "scripts/runtime_multi_model_eviction_history_governance.py",
         ],
     },
     "heavy_weight_runtime_repeatability": {
@@ -1661,6 +1665,28 @@ def build_customer_runtime_evidence(
         recommended_next_step = (
             "promote repeated heavy-weight validation and stronger long-run runtime proof before changing the customer-facing posture"
         )
+    elif (
+        dominant_next_gap == "multi_model_lifecycle_governance"
+        and governance_policy_gap.policy_gap_rung == "policy_gap_reduced"
+    ):
+        if governance_policy_gap.absent_policy_controls == ("eviction_history_governance",):
+            recommended_next_step = (
+                "treat governance as the active fallback branch on this host: runtime pinning and TTL policy now exist, so continue with eviction-history governance instead of reopening cache widening"
+            )
+        else:
+            recommended_next_step = (
+                "treat governance as the active fallback branch on this host: runtime pinning now exists, so continue with TTL policy or eviction-history governance instead of reopening cache widening"
+            )
+    elif (
+        dominant_next_gap == "host_stable_execution"
+        and governance_policy_gap.policy_gap_rung == "policy_gap_closed"
+    ):
+        blocked_reason = (
+            "runtime-owned evidence has expanded and local governance fallback policy controls are now closed, but owlmlx still remains below reference-grade stability because supported-host heavy-weight proof is still externally blocked and cache remains frozen at a structural seam"
+        )
+        recommended_next_step = (
+            "local governance fallback is now exhausted on this host; return to supported-host baseline establishment and do not reopen cache widening without fresh authorization"
+        )
     elif dominant_next_gap == "cache_scheduler_depth":
         if (
             cache_counter_feasibility_status.feasibility_rung
@@ -1937,7 +1963,11 @@ def customer_runtime_evidence_to_dict(
     governance_surface = _CONTRACT_SURFACES["multi_model_lifecycle_governance_controls"]
     governance_closure_level = ledger.multi_model_governance_controls.controls_rung
     governance_blocked_reason = ledger.multi_model_governance_controls.blocked_reason
-    if ledger.multi_model_governance_policy_gap.policy_gap_rung == "policy_gap_exact":
+    if ledger.multi_model_governance_policy_gap.policy_gap_rung in {
+        "policy_gap_exact",
+        "policy_gap_reduced",
+        "policy_gap_closed",
+    }:
         governance_surface = _CONTRACT_SURFACES[
             "multi_model_lifecycle_governance_policy_gap"
         ]

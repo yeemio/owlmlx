@@ -273,6 +273,21 @@ from ..multi_model_governance_policy_gap import (
     build_multi_model_governance_policy_gap,
     multi_model_governance_policy_gap_to_dict,
 )
+from ..multi_model_pinning_control import (
+    MultiModelPinningControl,
+    build_multi_model_pinning_control,
+    multi_model_pinning_control_to_dict,
+)
+from ..multi_model_ttl_policy_control import (
+    MultiModelTTLPolicyControl,
+    build_multi_model_ttl_policy_control,
+    multi_model_ttl_policy_control_to_dict,
+)
+from ..multi_model_eviction_history_governance import (
+    MultiModelEvictionHistoryGovernance,
+    build_multi_model_eviction_history_governance,
+    multi_model_eviction_history_governance_to_dict,
+)
 from ..heavy_weight_repeatability_status import (
     HeavyWeightRuntimeRepeatabilityStatus,
     build_heavy_weight_runtime_repeatability_status,
@@ -497,6 +512,9 @@ __all__ = [
     "build_multi_model_governance_controls",
     "build_multi_model_governance_transition_ledger",
     "build_multi_model_governance_policy_gap",
+    "build_multi_model_pinning_control",
+    "build_multi_model_ttl_policy_control",
+    "build_multi_model_eviction_history_governance",
     "build_mlx_host_forensics_report",
     "build_large_weight_specimen_gate",
     "build_large_weight_first_smoke_decision",
@@ -573,6 +591,9 @@ __all__ = [
     "multi_model_governance_controls_to_dict",
     "multi_model_governance_transition_ledger_to_dict",
     "multi_model_governance_policy_gap_to_dict",
+    "multi_model_pinning_control_to_dict",
+    "multi_model_ttl_policy_control_to_dict",
+    "multi_model_eviction_history_governance_to_dict",
     "select_mlx_environment",
     "selection_to_dict",
     "specimen_gate_to_dict",

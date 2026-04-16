@@ -59,6 +59,78 @@ def test_multi_model_governance_controls_mark_partial_closure() -> None:
     assert payload["transition_evidence"]["restart_restore_visible"] is True
 
 
+def test_multi_model_governance_controls_reflect_runtime_pinning_support() -> None:
+    kernel = RuntimeKernel(FakeBackend(default_memory_gb=1.0), profile=_profile())
+    kernel.load_model("model-a")
+    kernel.pin_model("model-a")
+
+    payload = multi_model_governance_controls_to_dict(
+        build_multi_model_governance_controls(kernel.status_dict())
+    )
+
+    assert payload["control_presence"]["pinning_supported"] is True
+    assert payload["control_presence"]["ttl_supported"] is True
+    assert payload["summary"]["blocked_reason"] == (
+        "owlmlx now owns runtime pinning and TTL policy, but eviction-history governance remains absent"
+    )
+
+
+def test_multi_model_governance_controls_reflect_runtime_ttl_support() -> None:
+    state = {"now": 100.0}
+
+    def clock() -> float:
+        return float(state["now"])
+
+    kernel = RuntimeKernel(
+        FakeBackend(default_memory_gb=1.0),
+        profile=_profile(),
+        clock=clock,
+    )
+    kernel.load_model("model-a")
+    kernel.load_model("model-b")
+    kernel.pin_model("model-a")
+    kernel.set_model_ttl("model-a", 30.0)
+    kernel.set_model_ttl("model-b", 30.0)
+
+    payload = multi_model_governance_controls_to_dict(
+        build_multi_model_governance_controls(kernel.status_dict())
+    )
+
+    assert payload["control_presence"]["ttl_supported"] is True
+    assert payload["summary"]["blocked_reason"] == (
+        "owlmlx now owns runtime pinning and TTL policy, but eviction-history governance remains absent"
+    )
+
+
+def test_multi_model_governance_controls_reflect_eviction_history_closure() -> None:
+    state = {"now": 100.0}
+
+    def clock() -> float:
+        return float(state["now"])
+
+    kernel = RuntimeKernel(
+        FakeBackend(default_memory_gb=1.0),
+        profile=_profile(),
+        clock=clock,
+    )
+    kernel.load_model("model-a")
+    kernel.load_model("model-b")
+    kernel.pin_model("model-a")
+    kernel.set_model_ttl("model-a", 30.0)
+    kernel.set_model_ttl("model-b", 30.0)
+    state["now"] = 140.0
+    kernel.sweep_expired_models()
+
+    payload = multi_model_governance_controls_to_dict(
+        build_multi_model_governance_controls(kernel.status_dict())
+    )
+
+    assert payload["control_presence"]["eviction_history_visible"] is True
+    assert payload["summary"]["blocked_reason"] == (
+        "governance policy controls now exist locally; remaining closure is no longer policy-grade on this host"
+    )
+
+
 def test_multi_model_governance_controls_module_has_no_platform_dependency() -> None:
     source = Path(__file__).parents[1].joinpath(
         "owlmlx", "multi_model_governance_controls.py"

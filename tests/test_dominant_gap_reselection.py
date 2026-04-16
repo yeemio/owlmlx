@@ -45,6 +45,34 @@ def _governance_policy_exact() -> MultiModelGovernancePolicyGap:
     )
 
 
+def _governance_policy_reduced() -> MultiModelGovernancePolicyGap:
+    return MultiModelGovernancePolicyGap(
+        controls=object(),
+        transition_ledger=object(),
+        status="partial",
+        policy_gap_rung="policy_gap_reduced",
+        residual_blocker="ttl_policy, eviction_history_governance",
+        recommended_next_step="continue governance fallback branch",
+        observed_runtime_behavior_frozen=True,
+        absent_policy_controls=("ttl_policy", "eviction_history_governance"),
+        present_policy_controls=("pinning",),
+    )
+
+
+def _governance_policy_closed() -> MultiModelGovernancePolicyGap:
+    return MultiModelGovernancePolicyGap(
+        controls=object(),
+        transition_ledger=object(),
+        status="partial",
+        policy_gap_rung="policy_gap_closed",
+        residual_blocker=None,
+        recommended_next_step="return to supported-host baseline establishment",
+        observed_runtime_behavior_frozen=True,
+        absent_policy_controls=(),
+        present_policy_controls=("pinning", "ttl_policy", "eviction_history_governance"),
+    )
+
+
 def test_dominant_gap_reselection_keeps_cache_when_cache_backlog_is_exact() -> None:
     backend_status = {
         "detail": {
@@ -86,6 +114,90 @@ def test_dominant_gap_reselection_keeps_cache_when_cache_backlog_is_exact() -> N
 
     assert payload["summary"]["decision_rung"] == "reselection_exact"
     assert payload["summary"]["selected_gap"] == "cache_scheduler_depth"
+
+
+def test_dominant_gap_reselection_switches_to_governance_when_policy_gap_is_reduced() -> None:
+    backend_status = {
+        "detail": {
+            "cache_runtime_observations": {
+                "persistent_child_reuse_visible": True,
+                "reuse_counter": 1,
+                "cache_counter_visibility": {
+                    "residency": False,
+                    "reuse": True,
+                    "eviction": False,
+                },
+            }
+        }
+    }
+    repeatability = build_cache_repeatability_evidence([], backend_status=backend_status)
+    closure = build_cache_closure_rung(repeatability=repeatability)
+    counter_gap = build_cache_counter_gap(
+        closure=closure,
+        backend_observations=backend_status["detail"]["cache_runtime_observations"],
+    )
+    counter_feasibility = build_cache_counter_feasibility(counter_gap=counter_gap)
+    split = build_cache_scheduler_turboquant_split(
+        counter_feasibility=counter_feasibility,
+        scheduler=closure.scheduler,
+        turboquant=closure.turboquant,
+    )
+    floor_gap = build_cache_scheduler_floor_gap(split=split)
+    backlog = build_cache_scheduler_implementation_backlog(floor_gap=floor_gap)
+    turboquant_gap = build_cache_turboquant_preconditions_gap(readiness=closure.turboquant)
+
+    payload = dominant_gap_reselection_to_dict(
+        build_dominant_gap_reselection(
+            cache_scheduler_backlog=backlog,
+            cache_turboquant_preconditions=turboquant_gap,
+            governance_policy_gap=_governance_policy_reduced(),
+            heavy_weight_repeatability=_heavy_local_blocked(),
+        )
+    )
+
+    assert payload["summary"]["selected_gap"] == "multi_model_lifecycle_governance"
+
+
+def test_dominant_gap_reselection_returns_to_host_when_policy_gap_is_closed() -> None:
+    backend_status = {
+        "detail": {
+            "cache_runtime_observations": {
+                "persistent_child_reuse_visible": True,
+                "reuse_counter": 1,
+                "cache_counter_visibility": {
+                    "residency": False,
+                    "reuse": True,
+                    "eviction": False,
+                },
+            }
+        }
+    }
+    repeatability = build_cache_repeatability_evidence([], backend_status=backend_status)
+    closure = build_cache_closure_rung(repeatability=repeatability)
+    counter_gap = build_cache_counter_gap(
+        closure=closure,
+        backend_observations=backend_status["detail"]["cache_runtime_observations"],
+    )
+    counter_feasibility = build_cache_counter_feasibility(counter_gap=counter_gap)
+    split = build_cache_scheduler_turboquant_split(
+        counter_feasibility=counter_feasibility,
+        scheduler=closure.scheduler,
+        turboquant=closure.turboquant,
+    )
+    floor_gap = build_cache_scheduler_floor_gap(split=split)
+    backlog = build_cache_scheduler_implementation_backlog(floor_gap=floor_gap)
+    turboquant_gap = build_cache_turboquant_preconditions_gap(readiness=closure.turboquant)
+
+    payload = dominant_gap_reselection_to_dict(
+        build_dominant_gap_reselection(
+            cache_scheduler_backlog=backlog,
+            cache_turboquant_preconditions=turboquant_gap,
+            governance_policy_gap=_governance_policy_closed(),
+            heavy_weight_repeatability=_heavy_local_blocked(),
+        )
+    )
+
+    assert payload["summary"]["selected_gap"] == "host_stable_execution"
 
 
 def test_dominant_gap_reselection_module_has_no_platform_dependency() -> None:

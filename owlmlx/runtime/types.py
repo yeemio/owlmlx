@@ -35,6 +35,7 @@ class RuntimeErrorCode(str, Enum):
     memory_budget_exceeded = "memory_budget_exceeded"
     backend_error = "backend_error"
     invalid_request = "invalid_request"
+    model_pinned = "model_pinned"
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +126,33 @@ class RestartResult(RuntimeOperationResult):
     restarted_model: LoadedModelInfo | None = None
     stage: str | None = None
     retryable: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PinResult(RuntimeOperationResult):
+    """Result of pinning or unpinning a loaded model."""
+
+    model_id: str | None = None
+    pinned: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TTLPolicyResult(RuntimeOperationResult):
+    """Result of configuring or clearing a model TTL policy."""
+
+    model_id: str | None = None
+    ttl_enabled: bool | None = None
+    ttl_seconds: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TTLSweepResult(RuntimeOperationResult):
+    """Result of explicitly sweeping expired TTL-controlled models."""
+
+    scanned_model_count: int = 0
+    expired_model_ids: tuple[str, ...] = ()
+    unloaded_model_ids: tuple[str, ...] = ()
+    skipped_pinned_model_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

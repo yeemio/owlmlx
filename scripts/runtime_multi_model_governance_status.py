@@ -43,17 +43,35 @@ def main() -> int:
 
     harness = None
     if args.run_harness:
+        state = {"now": 100.0}
+
+        def clock() -> float:
+            return float(state["now"])
+
+        kernel = RuntimeKernel(
+            FakeBackend(default_memory_gb=1.0),
+            profile=_profile(),
+            clock=clock,
+        )
         kernel.load_model("model-a")
         kernel.load_model("model-b")
+        kernel.load_model("model-c")
+        kernel.pin_model("model-a")
+        kernel.set_model_ttl("model-a", 30.0)
+        kernel.set_model_ttl("model-b", 30.0)
         active_generation = asyncio.run(kernel.generate("hello-active"))
         explicit_generation = asyncio.run(kernel.generate("hello-explicit", model_id="model-a"))
         restart = kernel.restart_model("model-b")
-        unload = kernel.unload_model("model-a")
+        unload = kernel.unload_model("model-c")
+        state["now"] = 140.0
+        ttl_sweep = kernel.sweep_expired_models()
         harness = {
             "active_generation_model_id": active_generation.model_id,
             "explicit_generation_model_id": explicit_generation.model_id,
             "restart_stage": restart.stage,
             "unload_ok": unload.ok,
+            "ttl_unloaded_model_ids": list(ttl_sweep.unloaded_model_ids),
+            "ttl_skipped_pinned_model_ids": list(ttl_sweep.skipped_pinned_model_ids),
         }
 
     payload = multi_model_governance_status_to_dict(

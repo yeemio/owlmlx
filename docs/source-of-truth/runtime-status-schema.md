@@ -1,7 +1,7 @@
 # owlmlx Runtime Status Schema
 
 > Status: authoritative
-> Updated: 2026-04-13
+> Updated: 2026-04-16
 
 ## 1. Purpose
 
@@ -99,6 +99,7 @@ From Stabilization-1 onward, `/v1/runtime/status` is split into:
 - diagnostic sections:
   - `backend.detail`
   - `governance_observations`
+  - `governance_policy`
   - `generation_gate`
 
 The stable sections are intended for long-lived `owlcoda` / `owlops` consumption.
@@ -216,6 +217,10 @@ replacement-grade stability alignment without claiming parity:
   - direct runtime-owned answer for which exact pre-claim paths may clear the inert marker carrier, which may only observe it, and which clearer ownership remains unavailable before gate claim
 - `owlmlx.cache_pre_claim_marker_immutability_boundary`
   - direct runtime-owned answer for whether pre-claim marker state may mutate beyond clear-only semantics and which mutation expansions must remain unavailable before gate claim
+- `owlmlx.multi_model_ttl_policy_control`
+  - direct runtime-owned answer for whether TTL policy exists on the runtime-owned path, whether explicit expiry sweep is visible, and whether pinned expiry remains blocked without inflating eviction-history governance
+- `owlmlx.multi_model_eviction_history_governance`
+  - direct runtime-owned answer for whether eviction history is visible on the runtime-owned path and whether both TTL unload and pinned-expiry skip events are frozen strongly enough to close the local policy branch
 - `owlmlx.cache_pre_claim_marker_payload_shape_exactness`
   - direct runtime-owned answer for whether pre-claim marker state carries any payload fields at all before gate claim or collapses to pure presence/absence only
 - `owlmlx.cache_pre_claim_marker_encoding_carrier_exactness`
@@ -258,6 +263,10 @@ replacement-grade stability alignment without claiming parity:
   - direct runtime-owned answer for which locally reducible gap should be worked next once cache, governance, and heavy-weight branches are already frozen strongly enough to compare honestly
 - `owlmlx.multi_model_governance_status`
   - direct runtime-owned answer for current multi-model lifecycle governance depth
+- `owlmlx.multi_model_pinning_control`
+  - direct runtime-owned answer for whether pinning now exists as a real local
+    governance control, whether pinned unload is blocked, and whether restart
+    retains pin state
 - `owlmlx.multi_model_governance_controls`
   - direct runtime-owned answer for which governance controls are present today and what repeated transition evidence exists without inventing absent controls
 - `owlmlx.multi_model_governance_transition_ledger`

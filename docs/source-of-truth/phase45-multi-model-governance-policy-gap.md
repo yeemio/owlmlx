@@ -1,7 +1,7 @@
 # owlmlx Phase 45: Multi-Model Governance Policy Gap
 
 > Status: authoritative
-> Updated: 2026-04-13
+> Updated: 2026-04-16
 > Scope: runtime-only residual policy-gap truth for multi-model governance
 
 ## 1. Purpose
@@ -42,6 +42,8 @@ Current `summary.policy_gap_rung` values:
 
 - `observation_gap_open`
 - `policy_gap_exact`
+- `policy_gap_reduced`
+- `policy_gap_closed`
 
 Interpretation:
 
@@ -50,14 +52,23 @@ Interpretation:
 - `policy_gap_exact`
   - runtime behavior is already frozen strongly enough
   - the remaining governance blocker is policy-grade only
+- `policy_gap_reduced`
+  - runtime behavior is already frozen strongly enough
+  - at least one policy-grade control now exists
+  - the remaining governance blocker is the smaller absent-control set
+- `policy_gap_closed`
+  - runtime behavior is already frozen strongly enough
+  - the local policy-grade control set is now complete on this host
+  - the next honest step is no longer another local policy round
 
 ## 4. Current Honest Result
 
-The current honest result is still:
+The current honest result is now:
 
 - `summary.status = "partial"`
+- `summary.policy_gap_rung = "policy_gap_closed"`
 
-because `owlmlx` still does not own:
+because `owlmlx` now owns:
 
 - pinning
 - TTL policy
@@ -81,12 +92,11 @@ Now `owlmlx` owns that answer directly.
 
 It does not claim:
 
-- pinning now exists
-- TTL policy now exists
-- eviction-history governance now exists
 - governance parity with `oMLX` / `vMLX`
 
 It only claims:
 
 - `owlmlx` can now freeze the remaining governance blocker as policy-grade
-- customer/runtime ledgers can stop treating governance as an observation-visibility gap once this rung reaches `policy_gap_exact`
+- `owlmlx` can now freeze the local policy branch as closed on this host
+- customer/runtime ledgers can now stop treating governance as the active local
+  fallback branch and return dominance to supported-host baseline establishment

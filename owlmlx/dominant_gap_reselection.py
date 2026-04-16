@@ -115,7 +115,17 @@ def build_dominant_gap_reselection(
         "cache_scheduler_depth remains the next locally reducible dominant gap because scheduler implementation backlog is exact, TurboQuant is exact-but-secondary, governance is already narrowed to a policy-grade gap, and heavy-weight repeatability is still externally blocked"
     )
 
-    if governance_gap.policy_gap_rung != "policy_gap_exact":
+    if governance_gap.policy_gap_rung == "policy_gap_closed":
+        selected_gap = "host_stable_execution"
+        rationale = (
+            "supported-host baseline establishment re-assumes dominance because the local governance fallback branch is now policy-closed while cache remains intentionally frozen at the structural ingress seam"
+        )
+    elif governance_gap.policy_gap_rung == "policy_gap_reduced":
+        selected_gap = "multi_model_lifecycle_governance"
+        rationale = (
+            "multi_model_lifecycle_governance becomes the active fallback branch because supported-host baseline establishment is exact-blocked locally and governance policy controls have started to land but are not yet closed"
+        )
+    elif governance_gap.policy_gap_rung != "policy_gap_exact":
         selected_gap = "multi_model_lifecycle_governance"
         rationale = (
             "multi_model_lifecycle_governance remains dominant because governance has not yet narrowed to a policy-grade exact gap"

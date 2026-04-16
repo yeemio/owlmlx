@@ -1,7 +1,7 @@
 # owlmlx Phase 45: Customer Runtime Evidence Ledger
 
 > Status: authoritative
-> Updated: 2026-04-15
+> Updated: 2026-04-16
 > Scope: runtime-only customer-runtime evidence for replacement-grade alignment
 
 ## 1. Purpose
@@ -107,6 +107,31 @@ The operator entry also refreshes governance evidence against a narrow
 governance harness so the customer ledger does not lag behind the stronger
 runtime-owned transition ledger when that truth is already available locally.
 
+After the cache branch was frozen at
+`structural_ingress_seam_introduced`, the ledger now also supports the
+governance fallback posture:
+
+- if supported-host baseline establishment is exact-blocked locally
+- and governance policy controls have started to land
+- the ledger may move `dominant_next_gap` back to
+  `multi_model_lifecycle_governance`
+  without pretending the host blocker disappeared or cache parity improved
+
+That fallback posture is now narrower again:
+
+- runtime pinning exists
+- runtime TTL policy exists
+- explicit TTL expiry sweep exists
+- runtime eviction-history governance now also exists
+
+That means the local governance fallback branch is now policy-closed on this
+host:
+
+- governance may remain below reference-grade parity
+- but the next honest step is no longer another local policy-control round
+- the next honest step is to return to supported-host baseline establishment
+  while keeping cache frozen at `structural_ingress_seam_introduced`
+
 The ledger now also consumes `owlmlx.dominant_gap_reselection` so
 `dominant_next_gap` is no longer inferred ad hoc once:
 
@@ -115,9 +140,10 @@ The ledger now also consumes `owlmlx.dominant_gap_reselection` so
 - TurboQuant is already preconditions exact
 - heavy-weight repeatability is already externally blocked
 
-Once the governance policy gap is exact, the customer ledger can stop treating
-governance as the dominant observation gap and move the dominant next gap to
-cache/scheduler depth while keeping the governance residual blocker explicit.
+Once the governance policy gap closes locally, the customer ledger can stop
+treating governance as the active local fallback branch and return the dominant
+next gap to `host_stable_execution` while keeping cache frozen at
+`structural_ingress_seam_introduced`.
 
 The operator entry now also refreshes cache closure against the active runtime
 observation harness instead of leaving cache stuck at the old default
@@ -411,8 +437,8 @@ With that refresh in place, the remaining governance blocker should now be read
 more narrowly:
 
 - not missing transition visibility
-- but still-missing lifecycle policy controls such as pinning, TTL, and
-  eviction-history governance
+- not missing local policy controls on this host
+- but still below reference-grade multi-model governance parity overall
 
 ## 7. What This Does Not Claim
 
@@ -427,6 +453,9 @@ It only claims:
 - `owlmlx` now owns a customer-runtime evidence ledger
 - the governance gap can absorb stronger transition-ledger truth without
   hiding absent lifecycle controls
+- once the local policy branch closes, the ledger can return
+  `dominant_next_gap` to `host_stable_execution` without pretending the host
+  blocker disappeared
 - the cache gap can now absorb stronger active-runtime evidence without
   pretending runtime-owned counters already exist
 - the cache gap can also freeze when counter ownership itself is already exact,
