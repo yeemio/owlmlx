@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
+import asyncio
+from collections.abc import AsyncIterator, Callable, Iterable
 from dataclasses import asdict
 from time import monotonic
-from typing import Any
+from typing import Any, Mapping
 
 from owlmlx.abort_recovery import AbortRecoveryTracker
 from owlmlx.memory_budget import (
@@ -22,7 +23,11 @@ from owlmlx.model_inventory import (
     inventory_to_dict,
 )
 from owlmlx.runtime_health import InferenceHealth, LoadState, TruthLevel
-from owlmlx.serving import GenerationGate, PreGateAdmissionMetadata
+from owlmlx.serving import (
+    GenerationGate,
+    GenerationResult as GateResult,
+    PreGateAdmissionMetadata,
+)
 
 from .backends import RuntimeBackend
 from .types import (
@@ -175,13 +180,14 @@ class RuntimeKernel:
         *,
         model_id: str,
         event: str,
+        source: str = "ttl_policy",
     ) -> None:
         self._eviction_history.append(
             {
                 "sequence": len(self._eviction_history) + 1,
                 "model_id": model_id,
                 "event": event,
-                "source": "ttl_policy",
+                "source": source,
                 "recorded_at_s": round(self._now_s(), 6),
             }
         )
@@ -260,19 +266,52 @@ class RuntimeKernel:
         if invalid is not None:
             return invalid
 
+        cohort_generate = getattr(self.backend, "generate_cohort", None)
+
         def call_backend() -> GenerateResult:
             assert target_model is not None
             return self.backend.generate(target_model, prompt, **kwargs)
 
-        gated = await self.generation_gate.execute_async_with_admission(
-            self._build_pre_gate_admission_metadata(
-                request_kind="generate",
-                model_id=target_model,
-                stream=False,
-                prompt=prompt,
-            ),
-            call_backend,
+        metadata = self._build_pre_gate_admission_metadata(
+            request_kind="generate",
+            model_id=target_model,
+            stream=False,
+            prompt=prompt,
         )
+        if callable(cohort_generate):
+            def call_single(payload: object) -> GenerateResult:
+                assert target_model is not None
+                return self.backend.generate(target_model, str(payload), **kwargs)
+
+            def call_cohort(payloads: tuple[object, ...]) -> tuple[GenerateResult, ...]:
+                assert target_model is not None
+                batch = cohort_generate(
+                    target_model,
+                    [str(item) for item in payloads],
+                    **kwargs,
+                )
+                if batch.ok:
+                    return tuple(batch.results)
+                shared_error = GenerateResult(
+                    ok=False,
+                    message=batch.message,
+                    error_code=batch.error_code or RuntimeErrorCode.backend_error,
+                    model_id=target_model,
+                    detail=dict(batch.detail),
+                )
+                return tuple(shared_error for _ in payloads)
+
+            gated = await self.generation_gate.execute_async_cohort_with_admission(
+                metadata,
+                prompt,
+                call_single,
+                call_cohort,
+            )
+        else:
+            gated = await self.generation_gate.execute_async_with_admission(
+                metadata,
+                call_backend,
+            )
         result = gated.value
         if not isinstance(result, GenerateResult):
             return GenerateResult(
@@ -354,6 +393,78 @@ class RuntimeKernel:
             was_queued=gated.was_queued,
         )
 
+    async def _stream_with_background_producer(
+        self,
+        *,
+        metadata: PreGateAdmissionMetadata,
+        producer: Callable[[], Iterable[StreamEvent]],
+        on_success: Callable[[], None],
+    ) -> AsyncIterator[StreamEvent]:
+        """Run a stream producer under gate claim while draining to the consumer outside it."""
+
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[tuple[str, object | None]] = asyncio.Queue()
+
+        def emit(kind: str, payload: object | None = None) -> None:
+            loop.call_soon_threadsafe(queue.put_nowait, (kind, payload))
+
+        def run_producer() -> None:
+            with self.generation_gate.stream_session_with_admission_sync(metadata) as gate_start:
+                emit("start", gate_start)
+                try:
+                    for event in producer():
+                        emit("event", event)
+                except BaseException as exc:  # pragma: no cover - defensive runtime bridge
+                    emit("error", exc)
+            emit("done")
+
+        producer_future = loop.run_in_executor(None, run_producer)
+        gate_start: GateResult | None = None
+        saw_non_error_event = False
+
+        try:
+            while True:
+                kind, payload = await queue.get()
+                if kind == "start":
+                    if not isinstance(payload, GateResult):
+                        raise RuntimeError("stream gate start payload is invalid")
+                    gate_start = payload
+                    continue
+                if kind == "event":
+                    if gate_start is None:
+                        raise RuntimeError("stream gate start missing before first event")
+                    if not isinstance(payload, StreamEvent):
+                        raise RuntimeError("stream event payload is invalid")
+                    if payload.event != "error":
+                        saw_non_error_event = True
+                    yield StreamEvent(
+                        event=payload.event,
+                        model_id=payload.model_id,
+                        text=payload.text,
+                        error_code=payload.error_code,
+                        finish_reason=payload.finish_reason,
+                        sequence=payload.sequence,
+                        prompt_tokens=payload.prompt_tokens,
+                        completion_tokens=payload.completion_tokens,
+                        wait_time_s=gate_start.wait_time_s,
+                        execution_time_s=payload.execution_time_s,
+                        was_queued=gate_start.was_queued,
+                        detail=payload.detail,
+                    )
+                    continue
+                if kind == "error":
+                    if isinstance(payload, BaseException):
+                        raise payload
+                    raise RuntimeError("stream producer failed with an invalid exception payload")
+                if kind == "done":
+                    break
+                raise RuntimeError(f"unexpected stream queue item: {kind}")
+        finally:
+            await producer_future
+
+        if saw_non_error_event:
+            on_success()
+
     async def generate_stream(
         self,
         prompt: str,
@@ -380,35 +491,23 @@ class RuntimeKernel:
             )
             return
 
-        async with self.generation_gate.stream_session_with_admission(
-            self._build_pre_gate_admission_metadata(
-                request_kind="generate_stream",
-                model_id=target_model,
-                stream=True,
-                prompt=prompt,
-            )
-        ) as gate_start:
-            saw_non_error_event = False
-            for event in self.backend.stream_generate(target_model, prompt, **kwargs):
-                if event.event != "error":
-                    saw_non_error_event = True
-                yield StreamEvent(
-                    event=event.event,
-                    model_id=event.model_id,
-                    text=event.text,
-                    error_code=event.error_code,
-                    finish_reason=event.finish_reason,
-                    sequence=event.sequence,
-                    prompt_tokens=event.prompt_tokens,
-                    completion_tokens=event.completion_tokens,
-                    wait_time_s=gate_start.wait_time_s,
-                    execution_time_s=event.execution_time_s,
-                    was_queued=gate_start.was_queued,
-                    detail=event.detail,
-                )
-            if saw_non_error_event:
-                self._record_governance_explicit_targeting(model_id)
-                self._touch_model_activity(target_model)
+        metadata = self._build_pre_gate_admission_metadata(
+            request_kind="generate_stream",
+            model_id=target_model,
+            stream=True,
+            prompt=prompt,
+        )
+
+        def mark_success() -> None:
+            self._record_governance_explicit_targeting(model_id)
+            self._touch_model_activity(target_model)
+
+        async for event in self._stream_with_background_producer(
+            metadata=metadata,
+            producer=lambda: self.backend.stream_generate(target_model, prompt, **kwargs),
+            on_success=mark_success,
+        ):
+            yield event
 
     async def generate_stream_messages(
         self,
@@ -436,35 +535,27 @@ class RuntimeKernel:
             )
             return
 
-        async with self.generation_gate.stream_session_with_admission(
-            self._build_pre_gate_admission_metadata(
-                request_kind="generate_stream_messages",
-                model_id=target_model,
-                stream=True,
-                messages=messages,
-            )
-        ) as gate_start:
-            saw_non_error_event = False
-            for event in self.backend.stream_generate_messages(target_model, messages, **kwargs):
-                if event.event != "error":
-                    saw_non_error_event = True
-                yield StreamEvent(
-                    event=event.event,
-                    model_id=event.model_id,
-                    text=event.text,
-                    error_code=event.error_code,
-                    finish_reason=event.finish_reason,
-                    sequence=event.sequence,
-                    prompt_tokens=event.prompt_tokens,
-                    completion_tokens=event.completion_tokens,
-                    wait_time_s=gate_start.wait_time_s,
-                    execution_time_s=event.execution_time_s,
-                    was_queued=gate_start.was_queued,
-                    detail=event.detail,
-                )
-            if saw_non_error_event:
-                self._record_governance_explicit_targeting(model_id)
-                self._touch_model_activity(target_model)
+        metadata = self._build_pre_gate_admission_metadata(
+            request_kind="generate_stream_messages",
+            model_id=target_model,
+            stream=True,
+            messages=messages,
+        )
+
+        def mark_success() -> None:
+            self._record_governance_explicit_targeting(model_id)
+            self._touch_model_activity(target_model)
+
+        async for event in self._stream_with_background_producer(
+            metadata=metadata,
+            producer=lambda: self.backend.stream_generate_messages(
+                target_model,
+                messages,
+                **kwargs,
+            ),
+            on_success=mark_success,
+        ):
+            yield event
 
     def unload_model(self, model_id: str) -> UnloadResult:
         """Unload a model through the backend and clear active model if needed."""
@@ -493,6 +584,130 @@ class RuntimeKernel:
                 new_active=self._active_model_id,
             )
         return result
+
+    def execute_memory_pressure_eviction(
+        self,
+        *,
+        abort_recovery_snapshot: Mapping[str, Any] | None = None,
+        protect_active: bool = True,
+    ) -> dict[str, Any]:
+        """Build the memory-pressure eviction policy and execute it if `evict`.
+
+        Refuses to execute unless the policy decision is `evict`. On execution,
+        unloads the selected victim through `unload_model`, records a
+        runtime-owned eviction-history event with source
+        `memory_pressure_policy`, and returns a structured result with the
+        decision snapshot, victim, unload result, residency after-state, and
+        the recorded eviction-history event.
+        """
+
+        from owlmlx.memory_pressure_eviction_policy import (
+            build_memory_pressure_eviction_policy,
+            memory_pressure_eviction_policy_to_dict,
+        )
+
+        snapshot = abort_recovery_snapshot
+        if snapshot is None:
+            snapshot = self.abort_recovery.snapshot()
+
+        policy = build_memory_pressure_eviction_policy(
+            runtime_status=self.status_dict(),
+            abort_recovery_snapshot=snapshot,
+            protect_active=protect_active,
+        )
+        policy_payload = memory_pressure_eviction_policy_to_dict(policy)
+
+        if policy.decision != "evict":
+            return {
+                "ok": False,
+                "executed": False,
+                "decision": policy.decision,
+                "reason_code": "execution_refused_unless_decision_is_evict",
+                "reason_message": (
+                    "Memory-pressure eviction execution refused because the "
+                    f"policy decision is {policy.decision!r}, not 'evict'."
+                ),
+                "decision_snapshot": policy_payload,
+                "selected_victim": None,
+                "unload_result": None,
+                "residency_after": None,
+                "eviction_history_event": None,
+            }
+
+        assert policy.selected_victim is not None
+        victim = dict(policy.selected_victim)
+        victim_id = str(victim["model_id"])
+        unload_result = self.unload_model(victim_id)
+        unload_payload: dict[str, Any] = {
+            "ok": unload_result.ok,
+            "message": unload_result.message,
+            "model_id": unload_result.model_id,
+            "freed_gb": unload_result.freed_gb,
+            "error_code": (
+                unload_result.error_code.value
+                if unload_result.error_code is not None
+                else None
+            ),
+        }
+
+        if not unload_result.ok:
+            return {
+                "ok": False,
+                "executed": False,
+                "decision": policy.decision,
+                "reason_code": "unload_failed_during_eviction",
+                "reason_message": (
+                    "Memory-pressure eviction selected a victim but the "
+                    "underlying unload failed; eviction did not occur."
+                ),
+                "decision_snapshot": policy_payload,
+                "selected_victim": victim,
+                "unload_result": unload_payload,
+                "residency_after": None,
+                "eviction_history_event": None,
+            }
+
+        self._record_eviction_history(
+            model_id=victim_id,
+            event="memory_pressure_evicted",
+            source="memory_pressure_policy",
+        )
+        recorded_event = dict(self._eviction_history[-1])
+
+        new_status = self.status_dict()
+        residency_after = {
+            "active_model_id": new_status.get("active_model_id"),
+            "loaded_model_ids": [
+                str(model.get("model_id"))
+                for model in (new_status.get("backend") or {}).get(
+                    "detail", {}
+                ).get("loaded_models_summary", [])
+                if isinstance(model, Mapping) and model.get("model_id")
+            ]
+            or [
+                str(entry.model_id)
+                for entry in self.backend.status().loaded_models
+            ],
+            "evicted_model_id": victim_id,
+            "victim_still_resident": victim_id
+            in {
+                str(entry.model_id)
+                for entry in self.backend.status().loaded_models
+            },
+        }
+
+        return {
+            "ok": True,
+            "executed": True,
+            "decision": policy.decision,
+            "reason_code": policy.reason_code,
+            "reason_message": policy.reason_message,
+            "decision_snapshot": policy_payload,
+            "selected_victim": victim,
+            "unload_result": unload_payload,
+            "residency_after": residency_after,
+            "eviction_history_event": recorded_event,
+        }
 
     def pin_model(self, model_id: str) -> PinResult:
         """Pin a loaded model against unload on the runtime-owned path."""

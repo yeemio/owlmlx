@@ -113,6 +113,57 @@ def test_generate_stream_after_load_uses_active_model() -> None:
     assert kernel.status_dict()["generation_gate"]["total_served"] == 1
 
 
+def test_generate_stream_releases_gate_before_first_consumer_completes() -> None:
+    kernel = RuntimeKernel(FakeBackend(default_memory_gb=1.0), profile=_small_profile())
+    kernel.load_model("fake-a")
+
+    async def observe():
+        first_has_started = asyncio.Event()
+        first_may_finish = asyncio.Event()
+        first_consumer_completed = asyncio.Event()
+        second_has_started = asyncio.Event()
+        first_events: list[str] = []
+        second_events: list[str] = []
+
+        async def consume_first() -> None:
+            stream = kernel.generate_stream("alpha beta", max_tokens=8)
+            first_event = await anext(stream)
+            first_events.append(first_event.event)
+            first_has_started.set()
+            await first_may_finish.wait()
+            async for event in stream:
+                first_events.append(event.event)
+            first_consumer_completed.set()
+
+        async def consume_second() -> None:
+            async for event in kernel.generate_stream("gamma delta", max_tokens=8):
+                second_events.append(event.event)
+                if not second_has_started.is_set():
+                    second_has_started.set()
+
+        first_task = asyncio.create_task(consume_first())
+        await first_has_started.wait()
+        await asyncio.sleep(0.05)
+        second_task = asyncio.create_task(consume_second())
+        await asyncio.wait_for(second_has_started.wait(), timeout=0.2)
+        mid = kernel.status_dict()
+        second_started_early = not first_consumer_completed.is_set()
+        first_may_finish.set()
+        await asyncio.gather(first_task, second_task)
+        return second_started_early, mid, first_events, second_events
+
+    second_started_early, mid, first_events, second_events = asyncio.run(observe())
+
+    assert second_started_early is True
+    assert mid["generation_gate"]["max_concurrent"] == 1
+    assert mid["generation_gate"]["queue_policy"] == "ticketed_fifo"
+    assert first_events[0] == "token"
+    assert first_events[-1] == "done"
+    assert second_events[0] == "token"
+    assert second_events[-1] == "done"
+    assert kernel.status_dict()["generation_gate"]["total_served"] == 2
+
+
 def test_unload_model_clears_active_model() -> None:
     kernel = RuntimeKernel(FakeBackend(), profile=_small_profile())
     kernel.load_model("fake-a")
@@ -330,6 +381,35 @@ def test_concurrent_generations_are_serialized_by_gate() -> None:
     assert first.was_queued is True or second.was_queued is True
 
 
+def test_concurrent_generations_handoff_cohort_into_aggregated_child_exchange() -> None:
+    kernel = RuntimeKernel(
+        FakeBackend(default_memory_gb=1.0, generate_delay_s=0.05),
+        profile=_small_profile(),
+    )
+    kernel.load_model("fake-a")
+
+    async def run_pair():
+        return await asyncio.gather(
+            kernel.generate("one"),
+            kernel.generate("two"),
+        )
+
+    first, second = asyncio.run(run_pair())
+
+    assert first.ok is True
+    assert second.ok is True
+    status = kernel.status_dict()
+    observations = status["backend"]["detail"]["cache_runtime_observations"]
+    assert observations["child_exchange_mode"] == "aggregated_non_stream_child_exchange_visible"
+    assert observations["aggregated_child_exchange_visible"] is True
+    assert observations["aggregated_child_exchange_batch_count"] == 1
+    assert observations["aggregated_child_exchange_request_count"] == 2
+    assert observations["max_aggregated_child_batch_size"] == 2
+    assert status["generation_gate"]["max_concurrent"] == 1
+    assert status["generation_gate"]["queue_discipline"] == "serial"
+    assert status["generation_gate"]["total_served"] == 2
+
+
 def test_status_dict_exposes_governance_observations() -> None:
     kernel = RuntimeKernel(FakeBackend(default_memory_gb=1.0), profile=_small_profile())
 
@@ -387,10 +467,84 @@ def test_status_dict_exposes_runtime_owned_pre_gate_admission_hook() -> None:
     hook = mid["generation_gate"]["pre_gate_admission"]
     assert hook["hook_status"] == "present"
     assert hook["hook_boundary"] == "before_whole_request_gate_claim"
-    assert hook["staged_count"] >= 1
+    assert hook["hook_mode"] == "bounded_runtime_owned_cohort_window"
+    assert hook["peak_cohort_size"] >= 2
     assert hook["total_staged"] >= 2
+    assert (
+        hook["cohort_count"] >= 1
+        or hook["cohort_handoff_status"] in {
+            "active_to_aggregated_child_exchange",
+            "visible",
+        }
+    )
+    if hook["cohort_count"] == 0:
+        assert hook["last_handoff_request_count"] >= 2
+        assert hook["total_handoffs"] >= 1
     assert hook["preserved_post_claim_invariants"] == [
         "max_concurrent_1_after_gate_claim",
         "ticketed_fifo_after_gate_claim",
         "serial_safety_validated_only_after_gate_claim",
     ]
+
+
+def test_repeated_concurrent_generations_show_aggregated_dispatch_under_repeated_load() -> None:
+    kernel = RuntimeKernel(
+        FakeBackend(default_memory_gb=1.0, generate_delay_s=0.05),
+        profile=_small_profile(),
+    )
+    kernel.load_model("fake-a")
+
+    iterations = 3
+
+    async def run_pair(round_id: int):
+        return await asyncio.gather(
+            kernel.generate(f"round-{round_id}-one"),
+            kernel.generate(f"round-{round_id}-two"),
+        )
+
+    for round_id in range(iterations):
+        first, second = asyncio.run(run_pair(round_id))
+        assert first.ok is True
+        assert second.ok is True
+
+        status = kernel.status_dict()
+        observations = status["backend"]["detail"]["cache_runtime_observations"]
+        assert (
+            observations["child_exchange_mode"]
+            == "aggregated_non_stream_child_exchange_visible"
+        )
+        assert observations["aggregated_child_exchange_visible"] is True
+        assert observations["aggregated_child_exchange_batch_count"] == round_id + 1
+        assert observations["aggregated_child_exchange_request_count"] == (round_id + 1) * 2
+        assert observations["max_aggregated_child_batch_size"] == 2
+
+        gate = status["generation_gate"]
+        assert gate["max_concurrent"] == 1
+        assert gate["queue_discipline"] == "serial"
+        assert gate["total_served"] == (round_id + 1) * 2
+
+        hook = gate["pre_gate_admission"]
+        assert hook["hook_status"] == "present"
+        assert hook["hook_boundary"] == "before_whole_request_gate_claim"
+        assert hook["hook_mode"] == "bounded_runtime_owned_cohort_window"
+        assert hook["total_handoffs"] >= round_id + 1
+        assert hook["last_handoff_request_count"] >= 2
+        assert hook["preserved_post_claim_invariants"] == [
+            "max_concurrent_1_after_gate_claim",
+            "ticketed_fifo_after_gate_claim",
+            "serial_safety_validated_only_after_gate_claim",
+        ]
+
+    final_status = kernel.status_dict()
+    final_observations = final_status["backend"]["detail"]["cache_runtime_observations"]
+    assert final_observations["aggregated_child_exchange_batch_count"] == iterations
+    assert final_observations["aggregated_child_exchange_request_count"] == iterations * 2
+    assert final_observations["max_aggregated_child_batch_size"] == 2
+
+    final_gate = final_status["generation_gate"]
+    assert final_gate["total_served"] == iterations * 2
+    final_hook = final_gate["pre_gate_admission"]
+    assert final_hook["total_handoffs"] >= iterations
+    assert final_hook["total_staged"] >= iterations * 2
+    assert final_hook["total_claimed"] >= iterations * 2
+    assert final_hook["total_discarded"] == 0

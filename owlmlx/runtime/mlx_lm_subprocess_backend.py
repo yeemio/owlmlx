@@ -17,13 +17,14 @@ import sys
 import threading
 import time
 from collections import deque
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
 from .types import (
     BackendStatus,
     ChatTurn,
+    GenerateCohortResult,
     GenerateResult,
     LoadResult,
     LoadedModelInfo,
@@ -52,9 +53,13 @@ class _ChildSession:
     model: LoadedModelInfo
     stderr_lines: deque[str] = field(default_factory=lambda: deque(maxlen=200))
     generation_count: int = 0
+    aggregated_dispatch_count: int = 0
+    aggregated_dispatch_request_count: int = 0
+    max_aggregated_dispatch_batch_size: int = 0
     last_payload: dict[str, Any] | None = None
     last_error: str | None = None
     stderr_thread: threading.Thread | None = None
+    stream_stdout_lock: threading.Lock = field(default_factory=threading.Lock)
 
     @property
     def pid(self) -> int | None:
@@ -73,6 +78,490 @@ def _drain_stderr(pipe: Any, buffer: deque[str]) -> None:
                 buffer.append(text)
     except Exception:
         return
+
+
+_STREAM_TERMINAL_RECORD_PREFIXES = (
+    '{"ok": true, "action": "stream_done"',
+    '{"ok":true,"action":"stream_done"',
+    '{"ok": true, "action": "stream_message_done"',
+    '{"ok":true,"action":"stream_message_done"',
+    '{"ok": false',
+    '{"ok":false',
+)
+
+_STREAM_TERMINAL_RECORD_ACTION_DISCRIMINANTS = (
+    '{"ok": true, "action": "stream_d',
+    '{"ok":true,"action":"stream_d',
+    '{"ok": true, "action": "stream_message_d',
+    '{"ok":true,"action":"stream_message_d',
+    '{"ok": false',
+    '{"ok":false',
+)
+
+_STREAM_TERMINAL_NOTICE_PREFIXES = (
+    '{"ok": true, "action": "stream_terminal_notice"',
+    '{"ok":true,"action":"stream_terminal_notice"',
+    '{"ok": true, "terminal_notice": true, "action": "stream_terminal_notice"',
+    '{"ok":true,"terminal_notice":true,"action":"stream_terminal_notice"',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_BOUNDARIES = (
+    '{"ok": true, "runtime_owned_terminal_boundary": true, "action": "stream_runtime_owned_terminal_boundary"',
+    '{"ok":true,"runtime_owned_terminal_boundary":true,"action":"stream_runtime_owned_terminal_boundary"',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_BOUNDARY_PREFIXES = (
+    '{"ok": true, "runtime_owned_terminal_boundary"',
+    '{"ok":true,"runtime_owned_terminal_boundary"',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_BOUNDARY_STEMS = (
+    '{"ok": true, "runtime_owned_terminal_b',
+    '{"ok":true,"runtime_owned_terminal_b',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_LEADING_DISCRIMINATORS = (
+    '{"ok": true, "runtime_owned_terminal_leading_discriminator": true, "action": "stream_runtime_owned_terminal_leading_discriminator"',
+    '{"ok":true,"runtime_owned_terminal_leading_discriminator":true,"action":"stream_runtime_owned_terminal_leading_discriminator"',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_LEADING_DISCRIMINATOR_PREFIXES = (
+    '{"ok": true, "runtime_owned_terminal_leading_discriminator"',
+    '{"ok":true,"runtime_owned_terminal_leading_discriminator"',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_LEADING_DISCRIMINATOR_STEMS = (
+    '{"ok": true, "runtime_owned_terminal_leading_d',
+    '{"ok":true,"runtime_owned_terminal_leading_d',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_LEADING_DISCRIMINATOR_DISCRIMINANTS = (
+    '{"ok": true, "runtime_owned_terminal_leading_',
+    '{"ok":true,"runtime_owned_terminal_leading_',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_DISCRIMINATORS = (
+    '{"ok": true, "runtime_owned_terminal_notice_discriminator": true, "action": "stream_runtime_owned_terminal_notice_discriminator"',
+    '{"ok":true,"runtime_owned_terminal_notice_discriminator":true,"action":"stream_runtime_owned_terminal_notice_discriminator"',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_DISCRIMINATOR_PREFIXES = (
+    '{"ok": true, "runtime_owned_terminal_notice_discriminator"',
+    '{"ok":true,"runtime_owned_terminal_notice_discriminator"',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_DISCRIMINATOR_STEMS = (
+    '{"ok": true, "runtime_owned_terminal_notice_d',
+    '{"ok":true,"runtime_owned_terminal_notice_d',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_DISCRIMINATOR_DISCRIMINANTS = (
+    '{"ok": true, "runtime_owned_terminal_notice_',
+    '{"ok":true,"runtime_owned_terminal_notice_',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKERS = (
+    '{"ok": true, "terminal_notice_lead": true',
+    '{"ok":true,"terminal_notice_lead":true',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_PREFIXES = (
+    '{"ok": true, "terminal_notice_lead"',
+    '{"ok":true,"terminal_notice_lead"',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_STEMS = (
+    '{"ok": true, "terminal_notice_l',
+    '{"ok":true,"terminal_notice_l',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_DISCRIMINANTS = (
+    '{"ok": true, "terminal_notice_',
+    '{"ok":true,"terminal_notice_',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_PREFIXES = (
+    '{"ok": true, "terminal_notice_lead": true, "action": "stream_terminal_notice_lead"',
+    '{"ok":true,"terminal_notice_lead":true,"action":"stream_terminal_notice_lead"',
+    '{"ok": true, "action": "stream_terminal_notice_lead"',
+    '{"ok":true,"action":"stream_terminal_notice_lead"',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_PREFIX_BOUNDARIES = (
+    '{"ok": true, "terminal_notice_lead": true, "action": "stream_terminal_notice_lead',
+    '{"ok":true,"terminal_notice_lead":true,"action":"stream_terminal_notice_lead',
+    '{"ok": true, "action": "stream_terminal_notice_lead',
+    '{"ok":true,"action":"stream_terminal_notice_lead',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_STEMS = (
+    '{"ok": true, "terminal_notice_lead": true, "action": "stream_terminal_notice_l',
+    '{"ok":true,"terminal_notice_lead":true,"action":"stream_terminal_notice_l',
+    '{"ok": true, "action": "stream_terminal_notice_l',
+    '{"ok":true,"action":"stream_terminal_notice_l',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_DISCRIMINANTS = (
+    '{"ok": true, "terminal_notice_lead": true, "action": "stream_terminal_notice_',
+    '{"ok":true,"terminal_notice_lead":true,"action":"stream_terminal_notice_',
+    '{"ok": true, "action": "stream_terminal_notice_',
+    '{"ok":true,"action":"stream_terminal_notice_',
+)
+
+_STREAM_TERMINAL_NOTICE_MARKERS = (
+    '{"ok": true, "terminal_notice": true',
+    '{"ok":true,"terminal_notice":true',
+)
+
+_STREAM_TERMINAL_NOTICE_MARKER_PREFIXES = (
+    '{"ok": true, "terminal_notice"',
+    '{"ok":true,"terminal_notice"',
+)
+
+_STREAM_TERMINAL_NOTICE_MARKER_KEY_LEADS = (
+    '{"ok": true, "t',
+    '{"ok":true,"t',
+)
+
+_STREAM_TERMINAL_NOTICE_MARKER_DISCRIMINANTS = (
+    '{"ok": true, "terminal_',
+    '{"ok":true,"terminal_',
+)
+
+_STREAM_TERMINAL_NOTICE_MARKER_STEMS = (
+    '{"ok": true, "terminal_n',
+    '{"ok":true,"terminal_n',
+)
+
+_STREAM_TERMINAL_NOTICE_ACTION_DISCRIMINANTS = (
+    '{"ok": true, "action": "stream_terminal_n',
+    '{"ok":true,"action":"stream_terminal_n',
+    '{"ok": true, "terminal_notice": true, "action": "stream_terminal_n',
+    '{"ok":true,"terminal_notice":true,"action":"stream_terminal_n',
+)
+
+_STREAM_TERMINAL_NOTICE_ACTION_STEMS = (
+    '{"ok": true, "action": "stream_t',
+    '{"ok":true,"action":"stream_t',
+    '{"ok": true, "terminal_notice": true, "action": "stream_t',
+    '{"ok":true,"terminal_notice":true,"action":"stream_t',
+)
+
+
+def _is_terminal_stream_record(text: str) -> bool:
+    """Return whether a stream transport record is terminal before payload decode."""
+
+    return text.startswith(_STREAM_TERMINAL_RECORD_PREFIXES)
+
+
+def _has_terminal_stream_record_action_discriminant(buffer: str) -> bool:
+    """Return whether a partial buffer already proves the terminal action family."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_RECORD_ACTION_DISCRIMINANTS
+    )
+
+
+def _has_terminal_stream_record_prefix(buffer: str) -> bool:
+    """Return whether a partial transport buffer already proves a terminal record."""
+
+    return any(buffer.startswith(prefix) for prefix in _STREAM_TERMINAL_RECORD_PREFIXES)
+
+
+def _is_terminal_notice_record(text: str) -> bool:
+    """Return whether a transport record is an internal terminal notice."""
+
+    return text.startswith(_STREAM_TERMINAL_NOTICE_PREFIXES)
+
+
+def _is_terminal_notice_leading_discriminator_record(text: str) -> bool:
+    """Return whether a transport record is the runtime-owned leading discriminator."""
+
+    return text.startswith(_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_PREFIXES)
+
+
+def _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_record(
+    text: str,
+) -> bool:
+    """Return whether a transport record is the earlier runtime-owned discriminator."""
+
+    return text.startswith(
+        _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_DISCRIMINATORS
+    )
+
+
+def _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_record(
+    text: str,
+) -> bool:
+    """Return whether a transport record is the earlier runtime-owned boundary."""
+
+    return text.startswith(
+        _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_BOUNDARIES
+    )
+
+
+def _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_record(
+    text: str,
+) -> bool:
+    """Return whether a transport record is the earlier runtime-owned leading discriminator."""
+
+    return text.startswith(
+        _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_LEADING_DISCRIMINATORS
+    )
+
+
+def _has_terminal_notice_prefix(buffer: str) -> bool:
+    """Return whether a partial buffer already proves a terminal notice record."""
+
+    return any(buffer.startswith(prefix) for prefix in _STREAM_TERMINAL_NOTICE_PREFIXES)
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already proves the earlier runtime-owned leading discriminator."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_LEADING_DISCRIMINATORS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already proves the earlier runtime-owned boundary."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_BOUNDARIES
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already reaches the earlier runtime-owned boundary prefix."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_BOUNDARY_PREFIXES
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already reaches the earlier runtime-owned boundary stem."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_BOUNDARY_STEMS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already reaches the earlier runtime-owned leading-discriminator prefix."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_LEADING_DISCRIMINATOR_PREFIXES
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already reaches the earlier runtime-owned leading-discriminator stem."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_LEADING_DISCRIMINATOR_STEMS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already reaches the earlier runtime-owned leading-discriminator discriminant."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_LEADING_DISCRIMINATOR_DISCRIMINANTS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already proves the earlier runtime-owned discriminator."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_DISCRIMINATORS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already reaches the earlier runtime-owned discriminator prefix."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_DISCRIMINATOR_PREFIXES
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already reaches the earlier runtime-owned discriminator stem."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_DISCRIMINATOR_STEMS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already reaches the earlier runtime-owned discriminator discriminant."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_DISCRIMINATOR_DISCRIMINANTS
+    )
+
+
+def _has_terminal_notice_leading_discriminator(buffer: str) -> bool:
+    """Return whether a partial buffer already proves the leading-discriminator record."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_PREFIXES
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker(buffer: str) -> bool:
+    """Return whether a partial buffer already proves the leading-discriminator marker."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKERS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_prefix(buffer: str) -> bool:
+    """Return whether a partial buffer already reaches the leading-discriminator marker prefix."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_PREFIXES
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_stem(buffer: str) -> bool:
+    """Return whether a partial buffer already reaches the leading-discriminator marker stem."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_STEMS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_discriminant(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer already reaches the leading-discriminator marker discriminant."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_DISCRIMINANTS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_prefix(buffer: str) -> bool:
+    """Return whether a partial buffer already reaches the leading-discriminator prefix."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_PREFIX_BOUNDARIES
+    )
+
+
+def _has_terminal_notice_leading_discriminator_stem(buffer: str) -> bool:
+    """Return whether a partial buffer already reaches the leading-discriminator stem."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_STEMS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_discriminant(buffer: str) -> bool:
+    """Return whether a partial buffer already reaches the leading-discriminator discriminant."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_DISCRIMINANTS
+    )
+
+
+def _has_terminal_notice_action_discriminant(buffer: str) -> bool:
+    """Return whether a partial buffer already proves the terminal-notice action family."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_ACTION_DISCRIMINANTS
+    )
+
+
+def _has_terminal_notice_action_stem(buffer: str) -> bool:
+    """Return whether a partial buffer already reaches the first unique notice-action stem."""
+
+    return any(buffer.startswith(prefix) for prefix in _STREAM_TERMINAL_NOTICE_ACTION_STEMS)
+
+
+def _has_terminal_notice_marker(buffer: str) -> bool:
+    """Return whether a partial buffer already proves the explicit notice marker field."""
+
+    return any(buffer.startswith(prefix) for prefix in _STREAM_TERMINAL_NOTICE_MARKERS)
+
+
+def _has_terminal_notice_marker_prefix(buffer: str) -> bool:
+    """Return whether a partial buffer already proves the terminal-notice marker key."""
+
+    return any(
+        buffer.startswith(prefix) for prefix in _STREAM_TERMINAL_NOTICE_MARKER_PREFIXES
+    )
+
+
+def _has_terminal_notice_marker_key_lead(buffer: str) -> bool:
+    """Return whether a partial buffer already reaches the first marker-key lead."""
+
+    return any(
+        buffer.startswith(prefix) for prefix in _STREAM_TERMINAL_NOTICE_MARKER_KEY_LEADS
+    )
+
+
+def _has_terminal_notice_marker_discriminant(buffer: str) -> bool:
+    """Return whether a partial buffer already proves the marker-key family lead-in."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_MARKER_DISCRIMINANTS
+    )
+
+
+def _has_terminal_notice_marker_stem(buffer: str) -> bool:
+    """Return whether a partial buffer already proves the terminal-notice marker family."""
+
+    return any(buffer.startswith(prefix) for prefix in _STREAM_TERMINAL_NOTICE_MARKER_STEMS)
 
 
 class MlxLmSubprocessBackend:
@@ -106,6 +595,626 @@ class MlxLmSubprocessBackend:
         self._last_error: str | None = None
         self._last_result: MlxLmSubprocessResult | None = None
         self._io_lock = threading.Lock()
+        self._stream_debug_after_request_write: (
+            Callable[[dict[str, Any]], None] | None
+        ) = None
+        self._stream_debug_before_terminal_action_discriminant: (
+            Callable[[dict[str, Any]], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_prefix_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_discriminant_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_stem_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_prefix_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_discriminant_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_stem_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_prefix_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_marker_key_lead_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_marker_discriminant_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_marker_stem_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_marker_prefix_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_marker_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_action_stem: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_action_discriminant: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_capture: (
+            Callable[[dict[str, Any]], None] | None
+        ) = None
+        self._stream_debug_before_terminal_record_prefix_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_record_capture: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_payload_capture: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_payload_commit: (
+            Callable[[dict[str, Any]], None] | None
+        ) = None
+
+    def _read_stream_transport_line(
+        self,
+        stdout: Any,
+        *,
+        release_serial_boundary: Callable[[], None] | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_discriminant_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_stem_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_prefix_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_discriminant_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_stem_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_prefix_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_detection: Callable[[str], None]
+        | None = None,
+        before_terminal_notice_marker_key_lead_detection: Callable[[str], None] | None = None,
+        before_terminal_notice_marker_discriminant_detection: Callable[[str], None] | None = None,
+        before_terminal_notice_marker_stem_detection: Callable[[str], None] | None = None,
+        before_terminal_notice_marker_prefix_detection: Callable[[str], None] | None = None,
+        before_terminal_notice_marker_detection: Callable[[str], None] | None = None,
+        before_terminal_notice_action_stem: Callable[[str], None] | None = None,
+        before_terminal_notice_action_discriminant: Callable[[str], None] | None = None,
+        before_terminal_notice_prefix_detection: Callable[[str], None] | None = None,
+        before_terminal_record_prefix_detection: Callable[[str], None] | None = None,
+        before_terminal_record_capture: Callable[[str], None] | None = None,
+    ) -> tuple[str, bool]:
+        """Read one stream transport line and optionally release the serial boundary early."""
+
+        raw_chars: list[str] = []
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detected = False
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detected = False
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detected = False
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detected = False
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detected = False
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detected = False
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detected = False
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detected = False
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detected = False
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detected = False
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detected = False
+        terminal_notice_leading_discriminator_marker_discriminant_detected = False
+        terminal_notice_leading_discriminator_marker_stem_detected = False
+        terminal_notice_leading_discriminator_marker_prefix_detected = False
+        terminal_notice_leading_discriminator_marker_detected = False
+        terminal_notice_leading_discriminator_discriminant_detected = False
+        terminal_notice_leading_discriminator_stem_detected = False
+        terminal_notice_leading_discriminator_prefix_detected = False
+        terminal_notice_leading_discriminator_detected = False
+        terminal_notice_marker_key_lead_detected = False
+        terminal_action_discriminant_detected = False
+        terminal_notice_marker_discriminant_detected = False
+        terminal_notice_marker_stem_detected = False
+        terminal_notice_marker_prefix_detected = False
+        terminal_notice_marker_detected = False
+        terminal_notice_action_stem_detected = False
+        terminal_notice_action_discriminant_detected = False
+        terminal_notice_prefix_detected = False
+        terminal_prefix_detected = False
+        while True:
+            ch = stdout.read(1)
+            if not ch:
+                raise ValueError("child process produced no output")
+            if ch == "\n":
+                return "".join(raw_chars).strip(), terminal_prefix_detected
+            raw_chars.append(ch)
+            if terminal_prefix_detected:
+                continue
+            buffer = "".join(raw_chars)
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection = None
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection = None
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection = None
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection = None
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection = None
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection = None
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection = None
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection = None
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection = None
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection = None
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection = None
+            if not terminal_notice_leading_discriminator_marker_discriminant_detected and (
+                _has_terminal_notice_leading_discriminator_marker_discriminant(buffer)
+            ):
+                terminal_notice_leading_discriminator_marker_discriminant_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_discriminant_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_discriminant_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_discriminant_detection = None
+            if not terminal_notice_leading_discriminator_marker_stem_detected and (
+                _has_terminal_notice_leading_discriminator_marker_stem(buffer)
+            ):
+                terminal_notice_leading_discriminator_marker_stem_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_stem_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_stem_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_stem_detection = None
+            if not terminal_notice_leading_discriminator_marker_prefix_detected and (
+                _has_terminal_notice_leading_discriminator_marker_prefix(buffer)
+            ):
+                terminal_notice_leading_discriminator_marker_prefix_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_prefix_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_prefix_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_prefix_detection = None
+            if not terminal_notice_leading_discriminator_marker_detected and (
+                _has_terminal_notice_leading_discriminator_marker(buffer)
+            ):
+                terminal_notice_leading_discriminator_marker_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_notice_leading_discriminator_marker_detection is not None:
+                    before_terminal_notice_leading_discriminator_marker_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_detection = None
+            if not terminal_notice_leading_discriminator_discriminant_detected and (
+                _has_terminal_notice_leading_discriminator_discriminant(buffer)
+            ):
+                terminal_notice_leading_discriminator_discriminant_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_discriminant_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_discriminant_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_discriminant_detection = None
+            if not terminal_notice_leading_discriminator_stem_detected and (
+                _has_terminal_notice_leading_discriminator_stem(buffer)
+            ):
+                terminal_notice_leading_discriminator_stem_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_notice_leading_discriminator_stem_detection is not None:
+                    before_terminal_notice_leading_discriminator_stem_detection(buffer)
+                    before_terminal_notice_leading_discriminator_stem_detection = None
+            if not terminal_notice_leading_discriminator_prefix_detected and (
+                _has_terminal_notice_leading_discriminator_prefix(buffer)
+            ):
+                terminal_notice_leading_discriminator_prefix_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_prefix_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_prefix_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_prefix_detection = None
+            if not terminal_notice_leading_discriminator_detected and (
+                _has_terminal_notice_leading_discriminator(buffer)
+            ):
+                terminal_notice_leading_discriminator_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_notice_leading_discriminator_detection is not None:
+                    before_terminal_notice_leading_discriminator_detection(buffer)
+                    before_terminal_notice_leading_discriminator_detection = None
+            if not terminal_notice_marker_key_lead_detected and (
+                _has_terminal_notice_marker_key_lead(buffer)
+            ):
+                terminal_notice_marker_key_lead_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_notice_marker_key_lead_detection is not None:
+                    before_terminal_notice_marker_key_lead_detection(buffer)
+                    before_terminal_notice_marker_key_lead_detection = None
+            if not terminal_notice_marker_discriminant_detected and (
+                _has_terminal_notice_marker_discriminant(buffer)
+            ):
+                terminal_notice_marker_discriminant_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_notice_marker_discriminant_detection is not None:
+                    before_terminal_notice_marker_discriminant_detection(buffer)
+                    before_terminal_notice_marker_discriminant_detection = None
+            if not terminal_notice_marker_stem_detected and _has_terminal_notice_marker_stem(
+                buffer
+            ):
+                terminal_notice_marker_stem_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_notice_marker_stem_detection is not None:
+                    before_terminal_notice_marker_stem_detection(buffer)
+                    before_terminal_notice_marker_stem_detection = None
+            if not terminal_notice_marker_prefix_detected and _has_terminal_notice_marker_prefix(
+                buffer
+            ):
+                terminal_notice_marker_prefix_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_notice_marker_prefix_detection is not None:
+                    before_terminal_notice_marker_prefix_detection(buffer)
+                    before_terminal_notice_marker_prefix_detection = None
+            if not terminal_notice_marker_detected and _has_terminal_notice_marker(buffer):
+                terminal_notice_marker_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_notice_marker_detection is not None:
+                    before_terminal_notice_marker_detection(buffer)
+                    before_terminal_notice_marker_detection = None
+            if not terminal_notice_action_stem_detected and _has_terminal_notice_action_stem(
+                buffer
+            ):
+                terminal_notice_action_stem_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_notice_action_stem is not None:
+                    before_terminal_notice_action_stem(buffer)
+                    before_terminal_notice_action_stem = None
+            if not terminal_notice_action_discriminant_detected and (
+                _has_terminal_notice_action_discriminant(buffer)
+            ):
+                terminal_notice_action_discriminant_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_notice_action_discriminant is not None:
+                    before_terminal_notice_action_discriminant(buffer)
+                    before_terminal_notice_action_discriminant = None
+            if not terminal_notice_prefix_detected and _has_terminal_notice_prefix(buffer):
+                terminal_notice_prefix_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_notice_prefix_detection is not None:
+                    before_terminal_notice_prefix_detection(buffer)
+                    before_terminal_notice_prefix_detection = None
+            if not terminal_action_discriminant_detected and (
+                _has_terminal_stream_record_action_discriminant(buffer)
+            ):
+                terminal_action_discriminant_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if before_terminal_record_prefix_detection is not None:
+                    before_terminal_record_prefix_detection(buffer)
+                    before_terminal_record_prefix_detection = None
+            if _has_terminal_stream_record_prefix(buffer):
+                terminal_prefix_detected = True
+                if before_terminal_record_capture is not None:
+                    before_terminal_record_capture(buffer)
+                    before_terminal_record_capture = None
 
     def load(self, model_id: str, *, memory_gb: float | None = None) -> LoadResult:
         if model_id in self._registrations:
@@ -280,35 +1389,206 @@ class MlxLmSubprocessBackend:
         messages: queue.Queue[tuple[str, dict[str, Any] | None]] = queue.Queue()
 
         def worker() -> None:
+            gate_lock_held = False
+            stdout_lock_held = False
+
+            def release_gate_lock() -> None:
+                nonlocal gate_lock_held
+                if gate_lock_held:
+                    self._io_lock.release()
+                    gate_lock_held = False
+
             try:
-                with self._io_lock:
+                terminal_payload: dict[str, Any] | None = None
+                terminal_record: str | None = None
+                self._io_lock.acquire()
+                gate_lock_held = True
+                try:
                     if proc.stdin is None:
                         raise ValueError("child stdin pipe is unavailable")
                     if proc.stdout is None:
                         raise ValueError("child stdout pipe is unavailable")
                     proc.stdin.write(json.dumps(request) + "\n")
                     proc.stdin.flush()
+                    write_hook = self._stream_debug_after_request_write
+                    if write_hook is not None:
+                        write_hook(request)
+                    session.stream_stdout_lock.acquire()
+                    stdout_lock_held = True
                     while True:
-                        discarded: list[str] = []
-                        while True:
-                            line = proc.stdout.readline()
-                            if not line:
-                                raise ValueError("child process produced no output")
-                            text = line.strip()
-                            if not text:
-                                continue
-                            try:
-                                payload = json.loads(text)
-                                if isinstance(payload, dict):
-                                    break
-                            except Exception:
-                                discarded.append(text)
-                        messages.put(("payload", payload))
-                        if payload.get("event") == "done" or not payload.get("ok"):
+                        text, terminal_prefix_detected = self._read_stream_transport_line(
+                            proc.stdout,
+                            release_serial_boundary=(
+                                release_gate_lock if gate_lock_held else None
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_discriminant_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_discriminant_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_stem_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_stem_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_prefix_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_prefix_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_discriminant_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_discriminant_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_stem_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_stem_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_prefix_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_prefix_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_detection
+                            ),
+                            before_terminal_notice_marker_key_lead_detection=(
+                                self._stream_debug_before_terminal_notice_marker_key_lead_detection
+                            ),
+                            before_terminal_notice_marker_discriminant_detection=(
+                                self._stream_debug_before_terminal_notice_marker_discriminant_detection
+                            ),
+                            before_terminal_notice_marker_stem_detection=(
+                                self._stream_debug_before_terminal_notice_marker_stem_detection
+                            ),
+                            before_terminal_notice_marker_prefix_detection=(
+                                self._stream_debug_before_terminal_notice_marker_prefix_detection
+                            ),
+                            before_terminal_notice_marker_detection=(
+                                self._stream_debug_before_terminal_notice_marker_detection
+                            ),
+                            before_terminal_notice_action_stem=(
+                                self._stream_debug_before_terminal_notice_action_stem
+                            ),
+                            before_terminal_notice_action_discriminant=(
+                                self._stream_debug_before_terminal_notice_action_discriminant
+                            ),
+                            before_terminal_notice_prefix_detection=(
+                                self._stream_debug_before_terminal_notice_prefix_detection
+                            ),
+                            before_terminal_record_prefix_detection=(
+                                self._stream_debug_before_terminal_record_prefix_detection
+                            ),
+                            before_terminal_record_capture=(
+                                self._stream_debug_before_terminal_record_capture
+                            ),
+                        )
+                        if not text:
+                            continue
+                        if _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_record(
+                            text
+                        ):
+                            if gate_lock_held:
+                                release_gate_lock()
+                            continue
+                        if _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_record(
+                            text
+                        ):
+                            if gate_lock_held:
+                                release_gate_lock()
+                            continue
+                        if _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_record(
+                            text
+                        ):
+                            if gate_lock_held:
+                                release_gate_lock()
+                            continue
+                        if _is_terminal_notice_leading_discriminator_record(text):
+                            if gate_lock_held:
+                                release_gate_lock()
+                            continue
+                        if _is_terminal_notice_record(text):
+                            if gate_lock_held:
+                                release_gate_lock()
+                            notice_payload = json.loads(text)
+                            if not isinstance(notice_payload, dict):
+                                raise ValueError(
+                                    "terminal notice stream record did not decode to an object"
+                                )
+                            notice_capture_hook = (
+                                self._stream_debug_before_terminal_notice_capture
+                            )
+                            if notice_capture_hook is not None:
+                                notice_capture_hook(notice_payload)
+                            notice_hook = (
+                                self._stream_debug_before_terminal_action_discriminant
+                            )
+                            if notice_hook is not None:
+                                notice_hook(notice_payload)
+                            continue
+                        if _is_terminal_stream_record(text):
+                            terminal_record = text
                             break
+                        payload = json.loads(text)
+                        if not isinstance(payload, dict):
+                            raise ValueError("stream transport record did not decode to an object")
+                        if payload.get("event") == "done" or not payload.get("ok"):
+                            terminal_payload = payload
+                            break
+                        messages.put(("payload", payload))
+                finally:
+                    if gate_lock_held:
+                        self._io_lock.release()
+                        gate_lock_held = False
+                if terminal_record is not None:
+                    if stdout_lock_held:
+                        session.stream_stdout_lock.release()
+                        stdout_lock_held = False
+                    capture_hook = self._stream_debug_before_terminal_payload_capture
+                    if capture_hook is not None:
+                        capture_hook(terminal_record)
+                    decoded_payload = json.loads(terminal_record)
+                    if not isinstance(decoded_payload, dict):
+                        raise ValueError("terminal stream record did not decode to an object")
+                    terminal_payload = decoded_payload
+                if terminal_payload is not None:
+                    debug_hook = self._stream_debug_before_terminal_payload_commit
+                    if debug_hook is not None:
+                        debug_hook(terminal_payload)
+                    messages.put(("payload", terminal_payload))
             except Exception as exc:
                 messages.put(("error", {"ok": False, "error": str(exc)}))
             finally:
+                if gate_lock_held:
+                    self._io_lock.release()
+                if stdout_lock_held:
+                    session.stream_stdout_lock.release()
                 messages.put(("end", None))
 
         threading.Thread(target=worker, daemon=True).start()
@@ -598,6 +1878,163 @@ class MlxLmSubprocessBackend:
             },
         )
 
+    def generate_cohort(
+        self,
+        model_id: str,
+        prompts: list[str],
+        **kwargs: object,
+    ) -> GenerateCohortResult:
+        """Dispatch multiple non-stream generate requests in one child exchange."""
+
+        if not prompts:
+            return GenerateCohortResult(
+                ok=False,
+                message="at least one prompt is required",
+                error_code=RuntimeErrorCode.invalid_request,
+                model_id=model_id,
+            )
+
+        session, error = self._ensure_session(model_id, reason_prefix="generate cohort")
+        if error is not None:
+            return GenerateCohortResult(
+                ok=False,
+                message=error.message,
+                error_code=error.error_code,
+                model_id=model_id,
+                results=(),
+                detail=error.detail,
+            )
+        assert session is not None
+
+        request_payload = {
+            "action": "generate_batch",
+            "model_id": model_id,
+            "requests": [
+                {
+                    "prompt": prompt,
+                    "params": dict(kwargs),
+                }
+                for prompt in prompts
+            ],
+        }
+        result = self._exchange(session, request_payload)
+        self._last_result = result
+        if not result.ok:
+            backend_error = str(result.payload.get("error") or result.stderr or result.returncode)
+            self._last_error = backend_error
+            session.last_error = backend_error
+            if session.proc.poll() is not None:
+                self._drop_dead_session(model_id, session)
+            return GenerateCohortResult(
+                ok=False,
+                message=f"mlx-lm subprocess cohort generate failed: {backend_error}",
+                error_code=RuntimeErrorCode.backend_error,
+                model_id=model_id,
+                results=(),
+                detail={
+                    "returncode": result.returncode,
+                    "stdout": result.stdout[-2000:],
+                    "stderr": result.stderr[-2000:],
+                    "payload": result.payload,
+                },
+            )
+
+        payload_results = result.payload.get("results")
+        if not isinstance(payload_results, list):
+            payload_results = []
+        generated: list[GenerateResult] = []
+        item_errors: list[dict[str, Any]] = []
+        for index, item in enumerate(payload_results):
+            payload_item = item if isinstance(item, dict) else {}
+            item_ok = bool(payload_item.get("ok", True))
+            item_error = (
+                RuntimeErrorCode.backend_error if not item_ok else None
+            )
+            generated.append(
+                GenerateResult(
+                    ok=item_ok,
+                    message=str(
+                        payload_item.get("message")
+                        or ("generated" if item_ok else "child batch item failed")
+                    ),
+                    error_code=item_error,
+                    model_id=model_id,
+                    text=str(payload_item.get("text", "")),
+                    finish_reason=(
+                        None
+                        if payload_item.get("finish_reason") is None
+                        else str(payload_item.get("finish_reason"))
+                    ),
+                    prompt_tokens=(
+                        None
+                        if payload_item.get("prompt_tokens") is None
+                        else int(payload_item.get("prompt_tokens"))
+                    ),
+                    completion_tokens=(
+                        None
+                        if payload_item.get("completion_tokens") is None
+                        else int(payload_item.get("completion_tokens"))
+                    ),
+                    detail={"batch_index": index},
+                )
+            )
+            if not item_ok:
+                item_errors.append(
+                    {
+                        "batch_index": index,
+                        "error": str(payload_item.get("error") or "child batch item failed"),
+                    }
+                )
+
+        overall_ok = result.ok and not item_errors and len(generated) == len(prompts)
+        if overall_ok:
+            session.generation_count += 1
+            session.aggregated_dispatch_count += 1
+            session.aggregated_dispatch_request_count += len(generated)
+            session.max_aggregated_dispatch_batch_size = max(
+                session.max_aggregated_dispatch_batch_size,
+                len(generated),
+            )
+            session.last_payload = result.payload
+            session.last_error = None
+            self._last_error = None
+            return GenerateCohortResult(
+                ok=True,
+                message="generated cohort through one child exchange",
+                model_id=model_id,
+                results=tuple(generated),
+                detail={
+                    "returncode": result.returncode,
+                    "pid": result.payload.get("pid"),
+                    "batch_size": int(result.payload.get("batch_size", len(generated)) or 0),
+                    "generation_count": result.payload.get("generation_count"),
+                    "child_exchange_mode": "aggregated_non_stream_child_exchange_visible",
+                    "exchange_count": 1,
+                },
+            )
+
+        backend_error = (
+            str(result.payload.get("error") or "child batch item failure")
+            if result.ok
+            else str(result.payload.get("error") or result.stderr or result.returncode)
+        )
+        self._last_error = backend_error
+        session.last_error = backend_error
+        return GenerateCohortResult(
+            ok=False,
+            message=f"mlx-lm subprocess cohort generate failed: {backend_error}",
+            error_code=RuntimeErrorCode.backend_error,
+            model_id=model_id,
+            results=tuple(generated),
+            detail={
+                "returncode": result.returncode,
+                "stdout": result.stdout[-2000:],
+                "stderr": result.stderr[-2000:],
+                "payload": result.payload,
+                "item_errors": item_errors,
+            },
+        )
+
     def stream_generate(
         self,
         model_id: str,
@@ -860,6 +2297,9 @@ class MlxLmSubprocessBackend:
                 "alive": session.proc.poll() is None,
                 "generation_count": session.generation_count,
                 "restart_count": self._restart_counts.get(model_id, 0),
+                "aggregated_dispatch_count": session.aggregated_dispatch_count,
+                "aggregated_dispatch_request_count": session.aggregated_dispatch_request_count,
+                "max_aggregated_dispatch_batch_size": session.max_aggregated_dispatch_batch_size,
             }
             for model_id, session in self._sessions.items()
         }
@@ -871,6 +2311,21 @@ class MlxLmSubprocessBackend:
         reuse_counter = sum(
             max(int(child.get("generation_count", 0)) - 1, 0)
             for child in children.values()
+        )
+        aggregated_dispatch_batch_count = sum(
+            int(child.get("aggregated_dispatch_count", 0))
+            for child in children.values()
+        )
+        aggregated_dispatch_request_count = sum(
+            int(child.get("aggregated_dispatch_request_count", 0))
+            for child in children.values()
+        )
+        max_aggregated_dispatch_batch_size = max(
+            (
+                int(child.get("max_aggregated_dispatch_batch_size", 0))
+                for child in children.values()
+            ),
+            default=0,
         )
         return BackendStatus(
             backend_name=self.name,
@@ -895,6 +2350,17 @@ class MlxLmSubprocessBackend:
                     ),
                     "reuse_counter": reuse_counter,
                     "repeated_generation_models": repeated_generation_models,
+                    "child_exchange_mode": (
+                        "aggregated_non_stream_child_exchange_visible"
+                        if aggregated_dispatch_request_count > 0
+                        else "single_request_per_child_exchange"
+                    ),
+                    "aggregated_child_exchange_visible": aggregated_dispatch_request_count > 0,
+                    "aggregated_child_exchange_batch_count": aggregated_dispatch_batch_count,
+                    "aggregated_child_exchange_request_count": (
+                        aggregated_dispatch_request_count
+                    ),
+                    "max_aggregated_child_batch_size": max_aggregated_dispatch_batch_size,
                     "cache_counter_visibility": {
                         "residency": False,
                         "reuse": reuse_counter > 0,

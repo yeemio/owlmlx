@@ -136,6 +136,56 @@ def main() -> int:
                 )
                 continue
 
+            if action == "generate_batch":
+                if not current_model_id or model is None or tokenizer is None:
+                    _emit({"ok": False, "error": "no model loaded"})
+                    continue
+                if model_id and str(model_id) != current_model_id:
+                    _emit(
+                        {
+                            "ok": False,
+                            "error": (
+                                f"loaded model is {current_model_id}, "
+                                f"not {model_id}"
+                            ),
+                        }
+                    )
+                    continue
+
+                import mlx_lm  # noqa: PLC0415
+
+                requests = list(request.get("requests") or [])
+                results: list[dict[str, Any]] = []
+                with redirect_stdout(sys.stderr):
+                    for item in requests:
+                        payload = item if isinstance(item, dict) else {}
+                        text = mlx_lm.generate(
+                            model,
+                            tokenizer,
+                            prompt=str(payload.get("prompt", "")),
+                            **dict(payload.get("params") or {}),
+                        )
+                        results.append(
+                            {
+                                "ok": True,
+                                "text": str(text),
+                                "finish_reason": "stop",
+                            }
+                        )
+                generation_count += 1
+                _emit(
+                    {
+                        "ok": True,
+                        "action": "generate_batch",
+                        "model_id": current_model_id,
+                        "results": results,
+                        "batch_size": len(results),
+                        "pid": os.getpid(),
+                        "generation_count": generation_count,
+                    }
+                )
+                continue
+
             if action == "generate_messages":
                 if not current_model_id or model is None or tokenizer is None:
                     _emit({"ok": False, "error": "no model loaded"})
@@ -231,6 +281,61 @@ def main() -> int:
                 _emit(
                     {
                         "ok": True,
+                        "runtime_owned_terminal_boundary": True,
+                        "action": "stream_runtime_owned_terminal_boundary",
+                        "terminal_action": "stream_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
+                        "runtime_owned_terminal_leading_discriminator": True,
+                        "action": "stream_runtime_owned_terminal_leading_discriminator",
+                        "terminal_action": "stream_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
+                        "runtime_owned_terminal_notice_discriminator": True,
+                        "action": "stream_runtime_owned_terminal_notice_discriminator",
+                        "terminal_action": "stream_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
+                        "terminal_notice_lead": True,
+                        "action": "stream_terminal_notice_lead",
+                        "terminal_action": "stream_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
+                        "terminal_notice": True,
+                        "action": "stream_terminal_notice",
+                        "terminal_action": "stream_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
                         "action": "stream_done",
                         "event": "done",
                         "model_id": current_model_id,
@@ -298,6 +403,66 @@ def main() -> int:
                             }
                         )
                 generation_count += 1
+                _emit(
+                    {
+                        "ok": True,
+                        "runtime_owned_terminal_boundary": True,
+                        "action": "stream_runtime_owned_terminal_boundary",
+                        "terminal_action": "stream_message_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                        "message_count": len(messages),
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
+                        "runtime_owned_terminal_leading_discriminator": True,
+                        "action": "stream_runtime_owned_terminal_leading_discriminator",
+                        "terminal_action": "stream_message_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                        "message_count": len(messages),
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
+                        "runtime_owned_terminal_notice_discriminator": True,
+                        "action": "stream_runtime_owned_terminal_notice_discriminator",
+                        "terminal_action": "stream_message_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                        "message_count": len(messages),
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
+                        "terminal_notice_lead": True,
+                        "action": "stream_terminal_notice_lead",
+                        "terminal_action": "stream_message_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                        "message_count": len(messages),
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
+                        "terminal_notice": True,
+                        "action": "stream_terminal_notice",
+                        "terminal_action": "stream_message_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                        "message_count": len(messages),
+                    }
+                )
                 _emit(
                     {
                         "ok": True,

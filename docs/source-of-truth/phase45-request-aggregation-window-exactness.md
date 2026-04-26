@@ -1,7 +1,7 @@
 # owlmlx Phase 45: Request Aggregation Window Exactness
 
 > Status: authoritative
-> Updated: 2026-04-15
+> Updated: 2026-04-16
 > Scope: runtime-only scheduler ingress exactness on the active path
 
 ## 1. Purpose
@@ -37,42 +37,48 @@ The current exact result is:
 
 - `exactness_rung = aggregation_window_blocker_exact`
 
-The ingress blocker is now narrowed to:
+The ingress truth is now:
 
-- `ingress_window_status = missing_pre_gate_admission_window`
-- `admission_boundary_status = generation_gate_claims_session_before_cohort_formation`
+- `ingress_window_status = bounded_pre_gate_admission_window_present`
+- `admission_boundary_status = cohort_forms_before_generation_gate_claim`
 
 The remaining dependencies are explicit:
 
-- `child_dependency_status = single_request_per_child_exchange_blocks_aggregated_dispatch`
+- `child_dependency_status = cohort_handed_off_to_aggregated_child_exchange_visible`
 - `stream_dependency_status = stream_session_holds_gate_until_completion`
 
 ## 4. What This Changes
 
 Before this round, `owlmlx` could only say:
 
-- `request_aggregation_window` is the first exact missing mechanism
+- `request_aggregation_window` was still ingress-blocked by a missing pre-gate
+  window
 
 Now `owlmlx` can say more precisely:
 
-- the missing part is not generic ingress logic
-- the missing part is a pre-gate cohorting window before whole-request session
-  claim
-- even if that existed, aggregated child dispatch and stream release are still
-  downstream dependencies
+- a bounded runtime-owned pre-gate admission window now forms cohorts before
+  whole-request gate claim
+- child exchange itself now supports one non-stream aggregated dispatch step
+- the non-stream main serving path now hands that bounded cohort into one
+  aggregated child exchange
+- ingress is no longer the active blocker underneath `request_aggregation_window`
+- the remaining blocker is now stream-session hold on that same path
 
 ## 5. What This Does Not Claim
 
 It does not claim:
 
-- a request-aggregation window already exists
-- child exchange already supports aggregated dispatch
 - streaming already supports interleaved cohort progress
+- continuous batching is established
 
-It only freezes the blocker at a more exact ingress/dependency boundary.
+It only freezes the blocker at a more exact post-ingress dependency boundary.
 
 ## 6. Next Closure Step
 
-The next exact local round should decide whether pre-gate cohort formation can
-become a runtime-owned mechanism on the active path without violating the
-validated serial safety boundary.
+The next exact local round is no longer another ingress-window or
+child-exchange-capability round.
+
+The next coordinator choice is whether to reduce the remaining downstream
+dependency chain starting from:
+
+- `stream_session_holds_gate_until_completion`

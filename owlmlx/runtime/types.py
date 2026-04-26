@@ -85,6 +85,14 @@ class GenerateResult(RuntimeOperationResult):
 
 
 @dataclass(frozen=True, slots=True)
+class GenerateCohortResult(RuntimeOperationResult):
+    """Result of a cohort generation call."""
+
+    model_id: str | None = None
+    results: tuple[GenerateResult, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class StreamEvent:
     """A single event emitted during streaming generation."""
 

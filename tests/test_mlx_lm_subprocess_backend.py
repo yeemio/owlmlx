@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import threading
 from pathlib import Path
 
 from owlmlx.runtime import MlxLmSubprocessBackend, RuntimeErrorCode, RuntimeKernel
@@ -46,19 +47,27 @@ def _write_runner(
                     "        print(json.dumps({'ok': True, 'action': 'load', 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
                     "    elif action == 'generate':",
                     *generate_body.splitlines(),
+                    "    elif action == 'generate_batch':",
+                    "        requests = list(req.get('requests', []))",
+                    "        count += 1",
+                    "        results = [",
+                    "            {'ok': True, 'text': item.get('prompt', '') + ' :: child', 'finish_reason': 'stop'}",
+                    "            for item in requests",
+                    "        ]",
+                    "        print(json.dumps({'ok': True, 'action': 'generate_batch', 'results': results, 'batch_size': len(results), 'pid': os.getpid(), 'generation_count': count}), flush=True)",
                     "    elif action == 'generate_messages':",
                     "        count += 1",
                     "        text = ' | '.join(f\"{m['role']}:{m['content']}\" for m in req.get('messages', []))",
                     "        print(json.dumps({'ok': True, 'action': 'generate_messages', 'text': text + ' :: child', 'pid': os.getpid(), 'generation_count': count, 'message_count': len(req.get('messages', []))}), flush=True)",
                     "    elif action == 'stream_generate':",
                     "        count += 1",
-                    "        print(json.dumps({'ok': True, 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
-                    "        print(json.dumps({'ok': True, 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                    "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                    "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
                     "    elif action == 'stream_generate_messages':",
                     "        count += 1",
                     "        text = ' | '.join(f\"{m['role']}:{m['content']}\" for m in req.get('messages', []))",
-                    "        print(json.dumps({'ok': True, 'event': 'token', 'text': text, 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming', 'message_count': len(req.get('messages', []))}), flush=True)",
-                    "        print(json.dumps({'ok': True, 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop', 'message_count': len(req.get('messages', []))}), flush=True)",
+                    "        print(json.dumps({'ok': True, 'action': 'stream_message_event', 'event': 'token', 'text': text, 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming', 'message_count': len(req.get('messages', []))}), flush=True)",
+                    "        print(json.dumps({'ok': True, 'action': 'stream_message_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop', 'message_count': len(req.get('messages', []))}), flush=True)",
                     "    elif action == 'ping':",
                     "        print(json.dumps({'ok': True, 'action': 'ping', 'model_id': loaded, 'pid': os.getpid(), 'generation_count': count}), flush=True)",
                     "    elif action in ('shutdown', 'unload'):",
@@ -154,6 +163,3543 @@ def test_subprocess_backend_stream_generate_reuses_same_child(tmp_path: Path) ->
     backend.unload("model-a")
 
 
+def test_subprocess_backend_releases_stream_lock_before_terminal_payload_capture(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "delayed_stream_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_payload_capture_hook_entered = threading.Event()
+    allow_first_terminal_payload_capture = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_token_seen = threading.Event()
+    hook_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_payload_capture(_: str) -> None:
+        nonlocal hook_count
+        with hook_lock:
+            hook_count += 1
+            should_block = hook_count == 1
+        if should_block:
+            first_terminal_payload_capture_hook_entered.set()
+            if not allow_first_terminal_payload_capture.wait(timeout=2.0):
+                raise RuntimeError("timed out waiting to release terminal payload capture")
+
+    backend._stream_debug_before_terminal_payload_capture = (
+        before_terminal_payload_capture
+    )
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_token_seen.wait(timeout=0.05) is False
+    assert first_terminal_payload_capture_hook_entered.wait(timeout=0.6) is True
+    assert second_token_seen.wait(timeout=0.3) is True
+    assert allow_first_terminal_payload_capture.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_payload_capture.set()
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_notice_discriminator': True, 'action': 'stream_runtime_owned_terminal_notice_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_discriminant_hook_entered = threading.Event()
+    allow_first_discriminant = threading.Event()
+    first_stem_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    discriminant_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_discriminant_detection(_: str) -> None:
+        nonlocal discriminant_hook_count
+        with hook_lock:
+            discriminant_hook_count += 1
+            should_block = discriminant_hook_count == 1
+        if should_block:
+            first_discriminant_hook_entered.set()
+            if not allow_first_discriminant.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned discriminator discriminant"
+                )
+
+    def before_stem_detection(_: str) -> None:
+        first_stem_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection = (
+        before_discriminant_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection = (
+        before_stem_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_discriminant_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_stem_hook_entered.is_set() is False
+    assert allow_first_discriminant.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_discriminant.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_leading_discriminator': True, 'action': 'stream_runtime_owned_terminal_leading_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_notice_discriminator': True, 'action': 'stream_runtime_owned_terminal_notice_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_leading_discriminator_hook_entered = threading.Event()
+    allow_first_leading_discriminator = threading.Event()
+    first_discriminator_discriminant_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    leading_discriminator_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_leading_discriminator_detection(_: str) -> None:
+        nonlocal leading_discriminator_hook_count
+        with hook_lock:
+            leading_discriminator_hook_count += 1
+            should_block = leading_discriminator_hook_count == 1
+        if should_block:
+            first_leading_discriminator_hook_entered.set()
+            if not allow_first_leading_discriminator.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned leading discriminator"
+                )
+
+    def before_discriminator_discriminant_detection(_: str) -> None:
+        first_discriminator_discriminant_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection = (
+        before_leading_discriminator_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection = (
+        before_discriminator_discriminant_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_leading_discriminator_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_discriminator_discriminant_hook_entered.is_set() is False
+    assert allow_first_leading_discriminator.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_leading_discriminator.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_leading_discriminator': True, 'action': 'stream_runtime_owned_terminal_leading_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_notice_discriminator': True, 'action': 'stream_runtime_owned_terminal_notice_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_prefix_hook_entered = threading.Event()
+    allow_first_prefix = threading.Event()
+    first_detection_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    prefix_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_prefix_detection(_: str) -> None:
+        nonlocal prefix_hook_count
+        with hook_lock:
+            prefix_hook_count += 1
+            should_block = prefix_hook_count == 1
+        if should_block:
+            first_prefix_hook_entered.set()
+            if not allow_first_prefix.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned leading discriminator prefix"
+                )
+
+    def before_detection(_: str) -> None:
+        first_detection_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection = (
+        before_prefix_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection = (
+        before_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_prefix_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_detection_hook_entered.is_set() is False
+    assert allow_first_prefix.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_prefix.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_leading_discriminator': True, 'action': 'stream_runtime_owned_terminal_leading_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_notice_discriminator': True, 'action': 'stream_runtime_owned_terminal_notice_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_stem_hook_entered = threading.Event()
+    allow_first_stem = threading.Event()
+    first_prefix_hook_entered = threading.Event()
+    allow_first_prefix = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    stem_hook_count = 0
+    prefix_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_stem_detection(_: str) -> None:
+        nonlocal stem_hook_count
+        with hook_lock:
+            stem_hook_count += 1
+            should_block = stem_hook_count == 1
+        if should_block:
+            first_stem_hook_entered.set()
+            if not allow_first_stem.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned leading discriminator stem"
+                )
+
+    def before_prefix_detection(_: str) -> None:
+        nonlocal prefix_hook_count
+        with hook_lock:
+            prefix_hook_count += 1
+            should_block = prefix_hook_count == 1
+        if should_block:
+            first_prefix_hook_entered.set()
+            if not allow_first_prefix.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned boundary prefix from stem test"
+                )
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection = (
+        before_stem_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection = (
+        before_prefix_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_stem_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_prefix_hook_entered.is_set() is False
+    assert allow_first_stem.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_prefix.set()
+    allow_first_stem.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_leading_discriminator': True, 'action': 'stream_runtime_owned_terminal_leading_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_notice_discriminator': True, 'action': 'stream_runtime_owned_terminal_notice_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_discriminant_hook_entered = threading.Event()
+    allow_first_discriminant = threading.Event()
+    first_stem_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    discriminant_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_discriminant_detection(_: str) -> None:
+        nonlocal discriminant_hook_count
+        with hook_lock:
+            discriminant_hook_count += 1
+            should_block = discriminant_hook_count == 1
+        if should_block:
+            first_discriminant_hook_entered.set()
+            if not allow_first_discriminant.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned leading discriminator discriminant"
+                )
+
+    def before_stem_detection(_: str) -> None:
+        first_stem_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection = (
+        before_discriminant_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection = (
+        before_stem_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_discriminant_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_stem_hook_entered.is_set() is False
+    assert allow_first_discriminant.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_discriminant.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_record_capture(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "delayed_stream_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_record_capture_hook_entered = threading.Event()
+    allow_first_terminal_record_capture = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    record_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_record_capture(_: str) -> None:
+        nonlocal record_hook_count
+        with hook_lock:
+            record_hook_count += 1
+            should_block = record_hook_count == 1
+        if should_block:
+            first_terminal_record_capture_hook_entered.set()
+            if not allow_first_terminal_record_capture.wait(timeout=2.0):
+                raise RuntimeError("timed out waiting to release terminal record capture")
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_record_capture = (
+        before_terminal_record_capture
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_terminal_record_capture_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert allow_first_terminal_record_capture.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_record_capture.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_record_prefix_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "delayed_stream_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_record_prefix_hook_entered = threading.Event()
+    allow_first_terminal_record_prefix = threading.Event()
+    first_terminal_record_capture_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    prefix_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_record_prefix_detection(_: str) -> None:
+        nonlocal prefix_hook_count
+        with hook_lock:
+            prefix_hook_count += 1
+            should_block = prefix_hook_count == 1
+        if should_block:
+            first_terminal_record_prefix_hook_entered.set()
+            if not allow_first_terminal_record_prefix.wait(timeout=2.0):
+                raise RuntimeError("timed out waiting to release terminal record prefix")
+
+    def before_terminal_record_capture(_: str) -> None:
+        first_terminal_record_capture_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_record_prefix_detection = (
+        before_terminal_record_prefix_detection
+    )
+    backend._stream_debug_before_terminal_record_capture = (
+        before_terminal_record_capture
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_terminal_record_prefix_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_record_capture_hook_entered.is_set() is False
+    assert allow_first_terminal_record_prefix.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_record_prefix.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_action_discriminant_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "delayed_stream_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_action_discriminant_hook_entered = threading.Event()
+    allow_first_terminal_action_discriminant = threading.Event()
+    first_terminal_record_prefix_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    action_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_action_discriminant(_: dict[str, object]) -> None:
+        nonlocal action_hook_count
+        with hook_lock:
+            action_hook_count += 1
+            should_block = action_hook_count == 1
+        if should_block:
+            first_terminal_action_discriminant_hook_entered.set()
+            if not allow_first_terminal_action_discriminant.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release terminal action discriminant"
+                )
+
+    def before_terminal_record_prefix_detection(_: str) -> None:
+        first_terminal_record_prefix_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_action_discriminant = (
+        before_terminal_action_discriminant
+    )
+    backend._stream_debug_before_terminal_record_prefix_detection = (
+        before_terminal_record_prefix_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_terminal_action_discriminant_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_record_prefix_hook_entered.is_set() is False
+    assert allow_first_terminal_action_discriminant.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_action_discriminant.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_capture(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "delayed_stream_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_prefix_hook_entered = threading.Event()
+    allow_first_terminal_notice_prefix = threading.Event()
+    first_terminal_notice_capture_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    notice_prefix_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_prefix_detection(_: str) -> None:
+        nonlocal notice_prefix_hook_count
+        with hook_lock:
+            notice_prefix_hook_count += 1
+            should_block = notice_prefix_hook_count == 1
+        if should_block:
+            first_terminal_notice_prefix_hook_entered.set()
+            if not allow_first_terminal_notice_prefix.wait(timeout=2.0):
+                raise RuntimeError("timed out waiting to release terminal notice prefix")
+
+    def before_terminal_notice_capture(_: dict[str, object]) -> None:
+        first_terminal_notice_capture_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_prefix_detection = (
+        before_terminal_notice_prefix_detection
+    )
+    backend._stream_debug_before_terminal_notice_capture = (
+        before_terminal_notice_capture
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_terminal_notice_prefix_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_capture_hook_entered.is_set() is False
+    assert allow_first_terminal_notice_prefix.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_prefix.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_prefix_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "delayed_stream_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_action_discriminant_hook_entered = threading.Event()
+    allow_first_terminal_notice_action_discriminant = threading.Event()
+    first_terminal_notice_prefix_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    notice_action_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_action_discriminant(_: str) -> None:
+        nonlocal notice_action_hook_count
+        with hook_lock:
+            notice_action_hook_count += 1
+            should_block = notice_action_hook_count == 1
+        if should_block:
+            first_terminal_notice_action_discriminant_hook_entered.set()
+            if not allow_first_terminal_notice_action_discriminant.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice action discriminant"
+                )
+
+    def before_terminal_notice_prefix_detection(_: str) -> None:
+        first_terminal_notice_prefix_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_action_discriminant = (
+        before_terminal_notice_action_discriminant
+    )
+    backend._stream_debug_before_terminal_notice_prefix_detection = (
+        before_terminal_notice_prefix_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_terminal_notice_action_discriminant_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_prefix_hook_entered.is_set() is False
+    assert allow_first_terminal_notice_action_discriminant.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_action_discriminant.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_action_discriminant_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "delayed_stream_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_action_stem_hook_entered = threading.Event()
+    allow_first_terminal_notice_action_stem = threading.Event()
+    first_terminal_notice_action_discriminant_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    notice_stem_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_action_stem(_: str) -> None:
+        nonlocal notice_stem_hook_count
+        with hook_lock:
+            notice_stem_hook_count += 1
+            should_block = notice_stem_hook_count == 1
+        if should_block:
+            first_terminal_notice_action_stem_hook_entered.set()
+            if not allow_first_terminal_notice_action_stem.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice action stem"
+                )
+
+    def before_terminal_notice_action_discriminant(_: str) -> None:
+        first_terminal_notice_action_discriminant_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_action_stem = (
+        before_terminal_notice_action_stem
+    )
+    backend._stream_debug_before_terminal_notice_action_discriminant = (
+        before_terminal_notice_action_discriminant
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_terminal_notice_action_stem_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_action_discriminant_hook_entered.is_set() is False
+    assert allow_first_terminal_notice_action_stem.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_action_stem.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_action_stem_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "delayed_stream_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_marker_hook_entered = threading.Event()
+    allow_first_terminal_notice_marker = threading.Event()
+    first_terminal_notice_action_stem_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    notice_marker_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_marker_detection(_: str) -> None:
+        nonlocal notice_marker_hook_count
+        with hook_lock:
+            notice_marker_hook_count += 1
+            should_block = notice_marker_hook_count == 1
+        if should_block:
+            first_terminal_notice_marker_hook_entered.set()
+            if not allow_first_terminal_notice_marker.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice marker"
+                )
+
+    def before_terminal_notice_action_stem(_: str) -> None:
+        first_terminal_notice_action_stem_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_marker_detection = (
+        before_terminal_notice_marker_detection
+    )
+    backend._stream_debug_before_terminal_notice_action_stem = (
+        before_terminal_notice_action_stem
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_terminal_notice_marker_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_action_stem_hook_entered.is_set() is False
+    assert allow_first_terminal_notice_marker.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_marker.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_marker_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "delayed_stream_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_marker_prefix_hook_entered = threading.Event()
+    allow_first_terminal_notice_marker_prefix = threading.Event()
+    first_terminal_notice_marker_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    notice_marker_prefix_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_marker_prefix_detection(_: str) -> None:
+        nonlocal notice_marker_prefix_hook_count
+        with hook_lock:
+            notice_marker_prefix_hook_count += 1
+            should_block = notice_marker_prefix_hook_count == 1
+        if should_block:
+            first_terminal_notice_marker_prefix_hook_entered.set()
+            if not allow_first_terminal_notice_marker_prefix.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice marker prefix"
+                )
+
+    def before_terminal_notice_marker_detection(_: str) -> None:
+        first_terminal_notice_marker_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_marker_prefix_detection = (
+        before_terminal_notice_marker_prefix_detection
+    )
+    backend._stream_debug_before_terminal_notice_marker_detection = (
+        before_terminal_notice_marker_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_terminal_notice_marker_prefix_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_marker_hook_entered.is_set() is False
+    assert allow_first_terminal_notice_marker_prefix.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_marker_prefix.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_marker_prefix_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "terminal_notice_marker_prefix_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_marker_stem_hook_entered = threading.Event()
+    allow_first_terminal_notice_marker_stem = threading.Event()
+    first_terminal_notice_marker_prefix_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    notice_marker_stem_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_marker_stem_detection(_: str) -> None:
+        nonlocal notice_marker_stem_hook_count
+        with hook_lock:
+            notice_marker_stem_hook_count += 1
+            should_block = notice_marker_stem_hook_count == 1
+        if should_block:
+            first_terminal_notice_marker_stem_hook_entered.set()
+            if not allow_first_terminal_notice_marker_stem.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice marker stem"
+                )
+
+    def before_terminal_notice_marker_prefix_detection(_: str) -> None:
+        first_terminal_notice_marker_prefix_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_marker_stem_detection = (
+        before_terminal_notice_marker_stem_detection
+    )
+    backend._stream_debug_before_terminal_notice_marker_prefix_detection = (
+        before_terminal_notice_marker_prefix_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_terminal_notice_marker_stem_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_marker_prefix_hook_entered.is_set() is False
+    assert allow_first_terminal_notice_marker_stem.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_marker_stem.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_marker_stem_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "terminal_notice_marker_stem_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_marker_discriminant_hook_entered = threading.Event()
+    allow_first_terminal_notice_marker_discriminant = threading.Event()
+    first_terminal_notice_marker_stem_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    notice_marker_discriminant_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_marker_discriminant_detection(_: str) -> None:
+        nonlocal notice_marker_discriminant_hook_count
+        with hook_lock:
+            notice_marker_discriminant_hook_count += 1
+            should_block = notice_marker_discriminant_hook_count == 1
+        if should_block:
+            first_terminal_notice_marker_discriminant_hook_entered.set()
+            if not allow_first_terminal_notice_marker_discriminant.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice marker discriminant"
+                )
+
+    def before_terminal_notice_marker_stem_detection(_: str) -> None:
+        first_terminal_notice_marker_stem_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_marker_discriminant_detection = (
+        before_terminal_notice_marker_discriminant_detection
+    )
+    backend._stream_debug_before_terminal_notice_marker_stem_detection = (
+        before_terminal_notice_marker_stem_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert (
+        first_terminal_notice_marker_discriminant_hook_entered.wait(timeout=0.6)
+        is True
+    )
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_marker_stem_hook_entered.is_set() is False
+    assert allow_first_terminal_notice_marker_discriminant.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_marker_discriminant.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_marker_discriminant_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "terminal_notice_marker_discriminant_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_marker_key_lead_hook_entered = threading.Event()
+    allow_first_terminal_notice_marker_key_lead = threading.Event()
+    first_terminal_notice_marker_discriminant_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    notice_marker_key_lead_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_marker_key_lead_detection(_: str) -> None:
+        nonlocal notice_marker_key_lead_hook_count
+        with hook_lock:
+            notice_marker_key_lead_hook_count += 1
+            should_block = notice_marker_key_lead_hook_count == 1
+        if should_block:
+            first_terminal_notice_marker_key_lead_hook_entered.set()
+            if not allow_first_terminal_notice_marker_key_lead.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice marker key lead"
+                )
+
+    def before_terminal_notice_marker_discriminant_detection(_: str) -> None:
+        first_terminal_notice_marker_discriminant_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_marker_key_lead_detection = (
+        before_terminal_notice_marker_key_lead_detection
+    )
+    backend._stream_debug_before_terminal_notice_marker_discriminant_detection = (
+        before_terminal_notice_marker_discriminant_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_terminal_notice_marker_key_lead_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_marker_discriminant_hook_entered.is_set() is False
+    assert allow_first_terminal_notice_marker_key_lead.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_marker_key_lead.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_marker_key_lead_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_marker_key_lead_hook_entered = threading.Event()
+    allow_first_terminal_notice_marker_key_lead = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    notice_marker_key_lead_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_marker_key_lead_detection(_: str) -> None:
+        nonlocal notice_marker_key_lead_hook_count
+        with hook_lock:
+            notice_marker_key_lead_hook_count += 1
+            should_block = notice_marker_key_lead_hook_count == 1
+        if should_block:
+            first_terminal_notice_marker_key_lead_hook_entered.set()
+            if not allow_first_terminal_notice_marker_key_lead.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice marker key lead"
+                )
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_marker_key_lead_detection = (
+        before_terminal_notice_marker_key_lead_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_terminal_notice_marker_key_lead_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert allow_first_terminal_notice_marker_key_lead.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_marker_key_lead.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_terminal_notice_lead', 'terminal_notice_lead': True, 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_leading_discriminator_hook_entered = threading.Event()
+    allow_first_terminal_notice_leading_discriminator = threading.Event()
+    first_terminal_notice_marker_key_lead_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    leading_discriminator_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_leading_discriminator_detection(_: str) -> None:
+        nonlocal leading_discriminator_hook_count
+        with hook_lock:
+            leading_discriminator_hook_count += 1
+            should_block = leading_discriminator_hook_count == 1
+        if should_block:
+            first_terminal_notice_leading_discriminator_hook_entered.set()
+            if not allow_first_terminal_notice_leading_discriminator.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice leading discriminator"
+                )
+
+    def before_terminal_notice_marker_key_lead_detection(_: str) -> None:
+        first_terminal_notice_marker_key_lead_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_detection = (
+        before_terminal_notice_leading_discriminator_detection
+    )
+    backend._stream_debug_before_terminal_notice_marker_key_lead_detection = (
+        before_terminal_notice_marker_key_lead_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert (
+        first_terminal_notice_leading_discriminator_hook_entered.wait(timeout=0.6)
+        is True
+    )
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_marker_key_lead_hook_entered.is_set() is False
+    assert allow_first_terminal_notice_leading_discriminator.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_leading_discriminator.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_prefix_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_terminal_notice_lead', 'terminal_notice_lead': True, 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_leading_discriminator_prefix_hook_entered = (
+        threading.Event()
+    )
+    allow_first_terminal_notice_leading_discriminator_prefix = threading.Event()
+    first_terminal_notice_leading_discriminator_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    leading_discriminator_prefix_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_leading_discriminator_prefix_detection(_: str) -> None:
+        nonlocal leading_discriminator_prefix_hook_count
+        with hook_lock:
+            leading_discriminator_prefix_hook_count += 1
+            should_block = leading_discriminator_prefix_hook_count == 1
+        if should_block:
+            first_terminal_notice_leading_discriminator_prefix_hook_entered.set()
+            if not allow_first_terminal_notice_leading_discriminator_prefix.wait(
+                timeout=2.0
+            ):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice leading discriminator prefix"
+                )
+
+    def before_terminal_notice_leading_discriminator_detection(_: str) -> None:
+        first_terminal_notice_leading_discriminator_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_prefix_detection = (
+        before_terminal_notice_leading_discriminator_prefix_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_detection = (
+        before_terminal_notice_leading_discriminator_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert (
+        first_terminal_notice_leading_discriminator_prefix_hook_entered.wait(
+            timeout=0.6
+        )
+        is True
+    )
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_leading_discriminator_hook_entered.is_set() is False
+    assert allow_first_terminal_notice_leading_discriminator_prefix.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_leading_discriminator_prefix.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_stem_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_terminal_notice_lead', 'terminal_notice_lead': True, 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_leading_discriminator_stem_hook_entered = (
+        threading.Event()
+    )
+    allow_first_terminal_notice_leading_discriminator_stem = threading.Event()
+    first_terminal_notice_leading_discriminator_prefix_hook_entered = (
+        threading.Event()
+    )
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    leading_discriminator_stem_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_leading_discriminator_stem_detection(_: str) -> None:
+        nonlocal leading_discriminator_stem_hook_count
+        with hook_lock:
+            leading_discriminator_stem_hook_count += 1
+            should_block = leading_discriminator_stem_hook_count == 1
+        if should_block:
+            first_terminal_notice_leading_discriminator_stem_hook_entered.set()
+            if not allow_first_terminal_notice_leading_discriminator_stem.wait(
+                timeout=2.0
+            ):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice leading discriminator stem"
+                )
+
+    def before_terminal_notice_leading_discriminator_prefix_detection(
+        _: str,
+    ) -> None:
+        first_terminal_notice_leading_discriminator_prefix_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_stem_detection = (
+        before_terminal_notice_leading_discriminator_stem_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_prefix_detection = (
+        before_terminal_notice_leading_discriminator_prefix_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert (
+        first_terminal_notice_leading_discriminator_stem_hook_entered.wait(
+            timeout=0.6
+        )
+        is True
+    )
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_leading_discriminator_prefix_hook_entered.is_set() is False
+    assert allow_first_terminal_notice_leading_discriminator_stem.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_leading_discriminator_stem.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_discriminant_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_terminal_notice_lead', 'terminal_notice_lead': True, 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_leading_discriminator_discriminant_hook_entered = (
+        threading.Event()
+    )
+    allow_first_terminal_notice_leading_discriminator_discriminant = (
+        threading.Event()
+    )
+    first_terminal_notice_leading_discriminator_stem_hook_entered = (
+        threading.Event()
+    )
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    leading_discriminator_discriminant_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_leading_discriminator_discriminant_detection(
+        _: str,
+    ) -> None:
+        nonlocal leading_discriminator_discriminant_hook_count
+        with hook_lock:
+            leading_discriminator_discriminant_hook_count += 1
+            should_block = leading_discriminator_discriminant_hook_count == 1
+        if should_block:
+            first_terminal_notice_leading_discriminator_discriminant_hook_entered.set()
+            if not allow_first_terminal_notice_leading_discriminator_discriminant.wait(
+                timeout=2.0
+            ):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice leading discriminator discriminant"
+                )
+
+    def before_terminal_notice_leading_discriminator_stem_detection(
+        _: str,
+    ) -> None:
+        first_terminal_notice_leading_discriminator_stem_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_discriminant_detection = (
+        before_terminal_notice_leading_discriminator_discriminant_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_stem_detection = (
+        before_terminal_notice_leading_discriminator_stem_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert (
+        first_terminal_notice_leading_discriminator_discriminant_hook_entered.wait(
+            timeout=0.6
+        )
+        is True
+    )
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_leading_discriminator_stem_hook_entered.is_set() is False
+    assert (
+        allow_first_terminal_notice_leading_discriminator_discriminant.is_set()
+        is False
+    )
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_leading_discriminator_discriminant.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_leading_discriminator_marker_hook_entered = (
+        threading.Event()
+    )
+    allow_first_terminal_notice_leading_discriminator_marker = threading.Event()
+    first_terminal_notice_leading_discriminator_discriminant_hook_entered = (
+        threading.Event()
+    )
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    leading_discriminator_marker_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_leading_discriminator_marker_detection(_: str) -> None:
+        nonlocal leading_discriminator_marker_hook_count
+        with hook_lock:
+            leading_discriminator_marker_hook_count += 1
+            should_block = leading_discriminator_marker_hook_count == 1
+        if should_block:
+            first_terminal_notice_leading_discriminator_marker_hook_entered.set()
+            if not allow_first_terminal_notice_leading_discriminator_marker.wait(
+                timeout=2.0
+            ):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice leading discriminator marker"
+                )
+
+    def before_terminal_notice_leading_discriminator_discriminant_detection(
+        _: str,
+    ) -> None:
+        first_terminal_notice_leading_discriminator_discriminant_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_detection = (
+        before_terminal_notice_leading_discriminator_marker_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_discriminant_detection = (
+        before_terminal_notice_leading_discriminator_discriminant_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert (
+        first_terminal_notice_leading_discriminator_marker_hook_entered.wait(
+            timeout=0.6
+        )
+        is True
+    )
+    assert second_request_written.wait(timeout=0.3) is True
+    assert (
+        first_terminal_notice_leading_discriminator_discriminant_hook_entered.is_set()
+        is False
+    )
+    assert allow_first_terminal_notice_leading_discriminator_marker.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_leading_discriminator_marker.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_prefix_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_leading_discriminator_marker_prefix_hook_entered = (
+        threading.Event()
+    )
+    allow_first_terminal_notice_leading_discriminator_marker_prefix = (
+        threading.Event()
+    )
+    first_terminal_notice_leading_discriminator_marker_hook_entered = (
+        threading.Event()
+    )
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    leading_discriminator_marker_prefix_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_leading_discriminator_marker_prefix_detection(
+        _: str,
+    ) -> None:
+        nonlocal leading_discriminator_marker_prefix_hook_count
+        with hook_lock:
+            leading_discriminator_marker_prefix_hook_count += 1
+            should_block = leading_discriminator_marker_prefix_hook_count == 1
+        if should_block:
+            first_terminal_notice_leading_discriminator_marker_prefix_hook_entered.set()
+            if not allow_first_terminal_notice_leading_discriminator_marker_prefix.wait(
+                timeout=2.0
+            ):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice leading discriminator marker prefix"
+                )
+
+    def before_terminal_notice_leading_discriminator_marker_detection(
+        _: str,
+    ) -> None:
+        first_terminal_notice_leading_discriminator_marker_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_prefix_detection = (
+        before_terminal_notice_leading_discriminator_marker_prefix_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_detection = (
+        before_terminal_notice_leading_discriminator_marker_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert (
+        first_terminal_notice_leading_discriminator_marker_prefix_hook_entered.wait(
+            timeout=0.6
+        )
+        is True
+    )
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_terminal_notice_leading_discriminator_marker_hook_entered.is_set() is False
+    assert (
+        allow_first_terminal_notice_leading_discriminator_marker_prefix.is_set()
+        is False
+    )
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_leading_discriminator_marker_prefix.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_stem_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_leading_discriminator_marker_stem_hook_entered = (
+        threading.Event()
+    )
+    allow_first_terminal_notice_leading_discriminator_marker_stem = (
+        threading.Event()
+    )
+    first_terminal_notice_leading_discriminator_marker_prefix_hook_entered = (
+        threading.Event()
+    )
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    leading_discriminator_marker_stem_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_leading_discriminator_marker_stem_detection(
+        _: str,
+    ) -> None:
+        nonlocal leading_discriminator_marker_stem_hook_count
+        with hook_lock:
+            leading_discriminator_marker_stem_hook_count += 1
+            should_block = leading_discriminator_marker_stem_hook_count == 1
+        if should_block:
+            first_terminal_notice_leading_discriminator_marker_stem_hook_entered.set()
+            if not allow_first_terminal_notice_leading_discriminator_marker_stem.wait(
+                timeout=2.0
+            ):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice leading discriminator marker stem"
+                )
+
+    def before_terminal_notice_leading_discriminator_marker_prefix_detection(
+        _: str,
+    ) -> None:
+        first_terminal_notice_leading_discriminator_marker_prefix_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_stem_detection = (
+        before_terminal_notice_leading_discriminator_marker_stem_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_prefix_detection = (
+        before_terminal_notice_leading_discriminator_marker_prefix_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert (
+        first_terminal_notice_leading_discriminator_marker_stem_hook_entered.wait(
+            timeout=0.6
+        )
+        is True
+    )
+    assert second_request_written.wait(timeout=0.3) is True
+    assert (
+        first_terminal_notice_leading_discriminator_marker_prefix_hook_entered.is_set()
+        is False
+    )
+    assert allow_first_terminal_notice_leading_discriminator_marker_stem.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_leading_discriminator_marker_stem.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_discriminant_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_terminal_notice_leading_discriminator_marker_discriminant_hook_entered = (
+        threading.Event()
+    )
+    allow_first_terminal_notice_leading_discriminator_marker_discriminant = (
+        threading.Event()
+    )
+    first_terminal_notice_leading_discriminator_marker_stem_hook_entered = (
+        threading.Event()
+    )
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    leading_discriminator_marker_discriminant_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_terminal_notice_leading_discriminator_marker_discriminant_detection(
+        _: str,
+    ) -> None:
+        nonlocal leading_discriminator_marker_discriminant_hook_count
+        with hook_lock:
+            leading_discriminator_marker_discriminant_hook_count += 1
+            should_block = leading_discriminator_marker_discriminant_hook_count == 1
+        if should_block:
+            first_terminal_notice_leading_discriminator_marker_discriminant_hook_entered.set()
+            if not allow_first_terminal_notice_leading_discriminator_marker_discriminant.wait(
+                timeout=2.0
+            ):
+                raise RuntimeError(
+                    "timed out waiting to release terminal notice leading discriminator marker discriminant"
+                )
+
+    def before_terminal_notice_leading_discriminator_marker_stem_detection(
+        _: str,
+    ) -> None:
+        first_terminal_notice_leading_discriminator_marker_stem_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_discriminant_detection = (
+        before_terminal_notice_leading_discriminator_marker_discriminant_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_stem_detection = (
+        before_terminal_notice_leading_discriminator_marker_stem_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert (
+        first_terminal_notice_leading_discriminator_marker_discriminant_hook_entered.wait(
+            timeout=0.6
+        )
+        is True
+    )
+    assert second_request_written.wait(timeout=0.3) is True
+    assert (
+        first_terminal_notice_leading_discriminator_marker_stem_hook_entered.is_set()
+        is False
+    )
+    assert (
+        allow_first_terminal_notice_leading_discriminator_marker_discriminant.is_set()
+        is False
+    )
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_terminal_notice_leading_discriminator_marker_discriminant.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_notice_discriminator': True, 'action': 'stream_runtime_owned_terminal_notice_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_earlier_runtime_owned_discriminator_hook_entered = threading.Event()
+    allow_first_earlier_runtime_owned_discriminator = threading.Event()
+    first_terminal_notice_leading_discriminator_marker_discriminant_hook_entered = (
+        threading.Event()
+    )
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    earlier_runtime_owned_discriminator_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_earlier_runtime_owned_discriminator_detection(_: str) -> None:
+        nonlocal earlier_runtime_owned_discriminator_hook_count
+        with hook_lock:
+            earlier_runtime_owned_discriminator_hook_count += 1
+            should_block = earlier_runtime_owned_discriminator_hook_count == 1
+        if should_block:
+            first_earlier_runtime_owned_discriminator_hook_entered.set()
+            if not allow_first_earlier_runtime_owned_discriminator.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned discriminator"
+                )
+
+    def before_terminal_notice_leading_discriminator_marker_discriminant_detection(
+        _: str,
+    ) -> None:
+        first_terminal_notice_leading_discriminator_marker_discriminant_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection = (
+        before_earlier_runtime_owned_discriminator_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_discriminant_detection = (
+        before_terminal_notice_leading_discriminator_marker_discriminant_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_earlier_runtime_owned_discriminator_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert (
+        first_terminal_notice_leading_discriminator_marker_discriminant_hook_entered.is_set()
+        is False
+    )
+    assert allow_first_earlier_runtime_owned_discriminator.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_earlier_runtime_owned_discriminator.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_notice_discriminator': True, 'action': 'stream_runtime_owned_terminal_notice_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_prefix_hook_entered = threading.Event()
+    allow_first_prefix = threading.Event()
+    first_earlier_runtime_owned_discriminator_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    prefix_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_prefix_detection(_: str) -> None:
+        nonlocal prefix_hook_count
+        with hook_lock:
+            prefix_hook_count += 1
+            should_block = prefix_hook_count == 1
+        if should_block:
+            first_prefix_hook_entered.set()
+            if not allow_first_prefix.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned discriminator prefix"
+                )
+
+    def before_earlier_runtime_owned_discriminator_detection(_: str) -> None:
+        first_earlier_runtime_owned_discriminator_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection = (
+        before_prefix_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection = (
+        before_earlier_runtime_owned_discriminator_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_prefix_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert (
+        first_earlier_runtime_owned_discriminator_hook_entered.is_set() is False
+    )
+    assert allow_first_prefix.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_prefix.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_notice_discriminator': True, 'action': 'stream_runtime_owned_terminal_notice_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_stem_hook_entered = threading.Event()
+    allow_first_stem = threading.Event()
+    first_prefix_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    second_request_written_before_first_terminal_event_consumed = False
+    stem_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_stem_detection(_: str) -> None:
+        nonlocal stem_hook_count
+        with hook_lock:
+            stem_hook_count += 1
+            should_block = stem_hook_count == 1
+        if should_block:
+            first_stem_hook_entered.set()
+            if not allow_first_stem.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned discriminator stem"
+                )
+
+    def before_prefix_detection(_: str) -> None:
+        first_prefix_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        nonlocal second_request_written_before_first_terminal_event_consumed
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written_before_first_terminal_event_consumed = (
+                not first_terminal_event_consumed.is_set()
+            )
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection = (
+        before_stem_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection = (
+        before_prefix_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_stem_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_prefix_hook_entered.is_set() is False
+    assert allow_first_stem.is_set() is False
+    assert second_request_written_before_first_terminal_event_consumed is True
+    allow_first_stem.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
 def test_subprocess_backend_generate_messages_reuses_same_child(tmp_path: Path) -> None:
     runner = _write_runner(tmp_path)
     backend = MlxLmSubprocessBackend(
@@ -171,6 +3717,40 @@ def test_subprocess_backend_generate_messages_reuses_same_child(tmp_path: Path) 
     assert result.ok is True
     assert result.text == "system:be terse | user:hello :: child"
     assert result.detail["message_count"] == 2
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_generate_cohort_uses_single_child_exchange(tmp_path: Path) -> None:
+    runner = _write_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    result = backend.generate_cohort("model-a", ["hello", "again"], max_tokens=4)
+
+    assert result.ok is True
+    assert [item.text for item in result.results] == [
+        "hello :: child",
+        "again :: child",
+    ]
+    assert result.detail["batch_size"] == 2
+    assert result.detail["exchange_count"] == 1
+    status = backend.status()
+    assert (
+        status.detail["cache_runtime_observations"]["child_exchange_mode"]
+        == "aggregated_non_stream_child_exchange_visible"
+    )
+    assert (
+        status.detail["cache_runtime_observations"]["aggregated_child_exchange_batch_count"]
+        == 1
+    )
+    assert (
+        status.detail["cache_runtime_observations"]["aggregated_child_exchange_request_count"]
+        == 2
+    )
+    assert status.detail["cache_runtime_observations"]["max_aggregated_child_batch_size"] == 2
     backend.unload("model-a")
 
 
@@ -422,3 +4002,366 @@ def test_subprocess_backend_survives_repeated_restart_generate_unload_cycles(tmp
     status = backend.status()
     assert status.loaded_models == ()
     assert status.detail["children"] == {}
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_boundary': True, 'action': 'stream_runtime_owned_terminal_boundary', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_leading_discriminator': True, 'action': 'stream_runtime_owned_terminal_leading_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_notice_discriminator': True, 'action': 'stream_runtime_owned_terminal_notice_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_boundary_hook_entered = threading.Event()
+    allow_first_boundary = threading.Event()
+    first_leading_discriminator_discriminant_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    boundary_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_boundary_detection(_: str) -> None:
+        nonlocal boundary_hook_count
+        with hook_lock:
+            boundary_hook_count += 1
+            should_block = boundary_hook_count == 1
+        if should_block:
+            first_boundary_hook_entered.set()
+            if not allow_first_boundary.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned boundary"
+                )
+
+    def before_leading_discriminator_discriminant_detection(_: str) -> None:
+        first_leading_discriminator_discriminant_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection = (
+        before_boundary_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection = (
+        before_leading_discriminator_discriminant_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_boundary_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_leading_discriminator_discriminant_hook_entered.is_set() is False
+    assert allow_first_boundary.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_boundary.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_boundary': True, 'action': 'stream_runtime_owned_terminal_boundary', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_leading_discriminator': True, 'action': 'stream_runtime_owned_terminal_leading_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_notice_discriminator': True, 'action': 'stream_runtime_owned_terminal_notice_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_prefix_hook_entered = threading.Event()
+    allow_first_prefix = threading.Event()
+    first_boundary_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    prefix_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_prefix_detection(_: str) -> None:
+        nonlocal prefix_hook_count
+        with hook_lock:
+            prefix_hook_count += 1
+            should_block = prefix_hook_count == 1
+        if should_block:
+            first_prefix_hook_entered.set()
+            if not allow_first_prefix.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned boundary prefix"
+                )
+
+    def before_boundary_detection(_: str) -> None:
+        first_boundary_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection = (
+        before_prefix_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection = (
+        before_boundary_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_prefix_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_boundary_hook_entered.is_set() is False
+    assert allow_first_prefix.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_prefix.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys, time",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        time.sleep(0.18)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_boundary': True, 'action': 'stream_runtime_owned_terminal_boundary', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_leading_discriminator': True, 'action': 'stream_runtime_owned_terminal_leading_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'runtime_owned_terminal_notice_discriminator': True, 'action': 'stream_runtime_owned_terminal_notice_discriminator', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice_lead': True, 'action': 'stream_terminal_notice_lead', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    loaded = backend.load("model-a", memory_gb=2.0)
+    assert loaded.ok is True
+
+    first_token_seen = threading.Event()
+    first_stem_hook_entered = threading.Event()
+    allow_first_stem = threading.Event()
+    first_prefix_hook_entered = threading.Event()
+    first_terminal_event_consumed = threading.Event()
+    second_request_written = threading.Event()
+    second_token_seen = threading.Event()
+    stem_hook_count = 0
+    request_write_count = 0
+    hook_lock = threading.Lock()
+    first_events: list[str] = []
+    second_events: list[str] = []
+
+    def before_stem_detection(_: str) -> None:
+        nonlocal stem_hook_count
+        with hook_lock:
+            stem_hook_count += 1
+            should_block = stem_hook_count == 1
+        if should_block:
+            first_stem_hook_entered.set()
+            if not allow_first_stem.wait(timeout=2.0):
+                raise RuntimeError(
+                    "timed out waiting to release earlier runtime-owned boundary stem"
+                )
+
+    def before_prefix_detection(_: str) -> None:
+        first_prefix_hook_entered.set()
+
+    def after_request_write(request: dict[str, object]) -> None:
+        nonlocal request_write_count
+        if str(request.get("action") or "") != "stream_generate":
+            return
+        with hook_lock:
+            request_write_count += 1
+            is_second_request = request_write_count == 2
+        if is_second_request:
+            second_request_written.set()
+
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection = (
+        before_stem_detection
+    )
+    backend._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection = (
+        before_prefix_detection
+    )
+    backend._stream_debug_after_request_write = after_request_write
+
+    def run_first() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            first_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+            if event.event == "done":
+                first_terminal_event_consumed.set()
+
+    def run_second() -> None:
+        for event in backend.stream_generate("model-a", "again", max_tokens=4):
+            second_events.append(event.event)
+            if event.event == "token":
+                second_token_seen.set()
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    second_thread.start()
+    assert second_request_written.wait(timeout=0.05) is False
+    assert first_stem_hook_entered.wait(timeout=0.6) is True
+    assert second_request_written.wait(timeout=0.3) is True
+    assert first_prefix_hook_entered.is_set() is False
+    assert allow_first_stem.is_set() is False
+    assert first_terminal_event_consumed.is_set() is False
+    allow_first_stem.set()
+    assert second_token_seen.wait(timeout=2.0) is True
+    first_thread.join(timeout=2.0)
+    second_thread.join(timeout=2.0)
+
+    assert first_events == ["token", "done"]
+    assert second_events == ["token", "done"]
+    backend.unload("model-a")

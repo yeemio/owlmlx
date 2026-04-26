@@ -44,6 +44,20 @@ from .cache_request_aggregation_active_seam import (
     CacheRequestAggregationActiveSeam,
     build_cache_request_aggregation_active_seam,
 )
+from .cache_cohort_to_child_exchange_handoff_exactness import (
+    CacheCohortToChildExchangeHandoffExactness,
+    build_cache_cohort_to_child_exchange_handoff_exactness,
+)
+from .cache_child_exchange_aggregated_dispatch_exactness import (
+    CacheChildExchangeAggregatedDispatchExactness,
+    build_cache_child_exchange_aggregated_dispatch_exactness,
+)
+from .cache_child_exchange_aggregated_dispatch_harness import (
+    CacheChildExchangeAggregatedDispatchHarnessResult,
+)
+from .cache_cohort_to_child_exchange_handoff_harness import (
+    CacheCohortToChildExchangeHandoffHarnessResult,
+)
 from .cache_pre_gate_admission_window_seam import (
     CachePreGateAdmissionWindowSeam,
     build_cache_pre_gate_admission_window_seam,
@@ -72,6 +86,7 @@ from .cache_pre_gate_admission_hook_exactness import (
     CachePreGateAdmissionHookExactness,
     build_cache_pre_gate_admission_hook_exactness,
 )
+from .cache_pre_gate_admission_hook_harness import PreGateAdmissionHookHarnessResult
 from .cache_admission_hook_safety_contract import (
     CacheAdmissionHookSafetyContract,
     build_cache_admission_hook_safety_contract,
@@ -447,6 +462,9 @@ class CustomerRuntimeEvidenceLedger:
     cache_continuous_batching_branch_reduction: CacheContinuousBatchingBranchReduction
     cache_request_aggregation_window_reentry: CacheRequestAggregationWindowReentry
     cache_request_aggregation_active_seam: CacheRequestAggregationActiveSeam
+    cache_child_exchange_aggregated_dispatch_exactness: (
+        CacheChildExchangeAggregatedDispatchExactness
+    )
     cache_pre_gate_admission_window_seam: CachePreGateAdmissionWindowSeam
     cache_structural_ingress_seam: CacheStructuralIngressSeam
     cache_continuous_batching_feasibility: CacheContinuousBatchingFeasibility
@@ -659,12 +677,18 @@ def _coerce_cache_request_aggregation_active_seam(
     *,
     cache_request_aggregation_window_reentry: CacheRequestAggregationWindowReentry,
     cache_request_aggregation_window_exactness: CacheRequestAggregationWindowExactness,
+    cache_child_exchange_aggregated_dispatch_exactness: CacheChildExchangeAggregatedDispatchExactness,
+    cache_cohort_to_child_exchange_handoff_exactness: (
+        CacheCohortToChildExchangeHandoffExactness
+    ),
 ) -> CacheRequestAggregationActiveSeam:
     if isinstance(value, CacheRequestAggregationActiveSeam):
         return value
     return build_cache_request_aggregation_active_seam(
         request_aggregation_window_reentry=cache_request_aggregation_window_reentry,
         request_aggregation_window_exactness=cache_request_aggregation_window_exactness,
+        child_exchange_exactness=cache_child_exchange_aggregated_dispatch_exactness,
+        cohort_handoff_exactness=cache_cohort_to_child_exchange_handoff_exactness,
     )
 
 
@@ -712,11 +736,53 @@ def _coerce_cache_request_aggregation_window_exactness(
     value: CacheRequestAggregationWindowExactness | None,
     *,
     cache_batching_mechanism_subgap: CacheBatchingMechanismSubgap,
+    cache_pre_gate_admission_hook_harness: PreGateAdmissionHookHarnessResult | None,
+    cache_child_exchange_aggregated_dispatch_harness: (
+        CacheChildExchangeAggregatedDispatchHarnessResult | None
+    ),
+    cache_cohort_to_child_exchange_handoff_harness: (
+        CacheCohortToChildExchangeHandoffHarnessResult | None
+    ),
 ) -> CacheRequestAggregationWindowExactness:
     if isinstance(value, CacheRequestAggregationWindowExactness):
         return value
     return build_cache_request_aggregation_window_exactness(
-        mechanism_subgap=cache_batching_mechanism_subgap
+        mechanism_subgap=cache_batching_mechanism_subgap,
+        hook_harness=cache_pre_gate_admission_hook_harness,
+        child_exchange_harness=cache_child_exchange_aggregated_dispatch_harness,
+        handoff_harness=cache_cohort_to_child_exchange_handoff_harness,
+    )
+
+
+def _coerce_cache_child_exchange_aggregated_dispatch_exactness(
+    value: CacheChildExchangeAggregatedDispatchExactness | None,
+    *,
+    cache_request_aggregation_window_exactness: CacheRequestAggregationWindowExactness,
+    cache_child_exchange_aggregated_dispatch_harness: (
+        CacheChildExchangeAggregatedDispatchHarnessResult | None
+    ),
+) -> CacheChildExchangeAggregatedDispatchExactness:
+    if isinstance(value, CacheChildExchangeAggregatedDispatchExactness):
+        return value
+    return build_cache_child_exchange_aggregated_dispatch_exactness(
+        request_aggregation_window_exactness=cache_request_aggregation_window_exactness,
+        child_exchange_harness=cache_child_exchange_aggregated_dispatch_harness,
+    )
+
+
+def _coerce_cache_cohort_to_child_exchange_handoff_exactness(
+    value: CacheCohortToChildExchangeHandoffExactness | None,
+    *,
+    cache_child_exchange_aggregated_dispatch_exactness: CacheChildExchangeAggregatedDispatchExactness,
+    cache_cohort_to_child_exchange_handoff_harness: (
+        CacheCohortToChildExchangeHandoffHarnessResult | None
+    ),
+) -> CacheCohortToChildExchangeHandoffExactness:
+    if isinstance(value, CacheCohortToChildExchangeHandoffExactness):
+        return value
+    return build_cache_cohort_to_child_exchange_handoff_exactness(
+        child_exchange_exactness=cache_child_exchange_aggregated_dispatch_exactness,
+        handoff_harness=cache_cohort_to_child_exchange_handoff_harness,
     )
 
 
@@ -724,11 +790,13 @@ def _coerce_cache_pre_gate_cohort_window_feasibility(
     value: CachePreGateCohortWindowFeasibility | None,
     *,
     cache_request_aggregation_window_exactness: CacheRequestAggregationWindowExactness,
+    cache_pre_gate_admission_hook_harness: PreGateAdmissionHookHarnessResult | None,
 ) -> CachePreGateCohortWindowFeasibility:
     if isinstance(value, CachePreGateCohortWindowFeasibility):
         return value
     return build_cache_pre_gate_cohort_window_feasibility(
-        aggregation_exactness=cache_request_aggregation_window_exactness
+        aggregation_exactness=cache_request_aggregation_window_exactness,
+        hook_harness=cache_pre_gate_admission_hook_harness,
     )
 
 
@@ -736,11 +804,13 @@ def _coerce_cache_pre_gate_admission_hook_exactness(
     value: CachePreGateAdmissionHookExactness | None,
     *,
     cache_pre_gate_cohort_window_feasibility: CachePreGateCohortWindowFeasibility,
+    cache_pre_gate_admission_hook_harness: PreGateAdmissionHookHarnessResult | None,
 ) -> CachePreGateAdmissionHookExactness:
     if isinstance(value, CachePreGateAdmissionHookExactness):
         return value
     return build_cache_pre_gate_admission_hook_exactness(
-        cohort_window_feasibility=cache_pre_gate_cohort_window_feasibility
+        cohort_window_feasibility=cache_pre_gate_cohort_window_feasibility,
+        hook_harness=cache_pre_gate_admission_hook_harness,
     )
 
 
@@ -797,12 +867,14 @@ def _coerce_cache_pre_claim_inert_state_semantics(
     *,
     cache_pre_claim_metadata_ticket_ownership: CachePreClaimMetadataTicketOwnership,
     cache_pre_gate_cohort_window_feasibility: CachePreGateCohortWindowFeasibility,
+    cache_pre_gate_admission_hook_harness: PreGateAdmissionHookHarnessResult | None,
 ) -> CachePreClaimInertStateSemantics:
     if isinstance(value, CachePreClaimInertStateSemantics):
         return value
     return build_cache_pre_claim_inert_state_semantics(
         metadata_ticket_ownership=cache_pre_claim_metadata_ticket_ownership,
         cohort_window_feasibility=cache_pre_gate_cohort_window_feasibility,
+        hook_harness=cache_pre_gate_admission_hook_harness,
     )
 
 
@@ -1184,6 +1256,9 @@ def _coerce_heavy_weight(
     value: HeavyWeightRuntimeRepeatabilityStatus | None,
     *,
     specimen_path: str | None,
+    boundary_required_memory_gb: float | None,
+    boundary_entry_visible: bool,
+    boundary_entry_reason: str | None,
     include_known_candidates: bool,
     timeout_s: float,
     quarantine_path: Path | None,
@@ -1198,6 +1273,9 @@ def _coerce_heavy_weight(
         )
     return build_heavy_weight_runtime_repeatability_status(
         specimen_path=specimen_path,
+        boundary_required_memory_gb=boundary_required_memory_gb,
+        boundary_entry_visible=boundary_entry_visible,
+        boundary_entry_reason=boundary_entry_reason,
         include_known_candidates=include_known_candidates,
         timeout_s=timeout_s,
         quarantine_path=quarantine_path,
@@ -1232,6 +1310,9 @@ def _gap_entry(
 def build_customer_runtime_evidence(
     *,
     specimen_path: str | None = None,
+    heavy_weight_boundary_memory_gb: float | None = None,
+    heavy_weight_boundary_entered: bool = False,
+    heavy_weight_boundary_entry_reason: str | None = None,
     host_stability: HostStableExecutionStatus | None = None,
     cache_closure: CacheClosureRung | None = None,
     cache_counter_gap: CacheCounterGap | None = None,
@@ -1244,11 +1325,21 @@ def build_customer_runtime_evidence(
     cache_continuous_batching_branch_reduction: CacheContinuousBatchingBranchReduction | None = None,
     cache_request_aggregation_window_reentry: CacheRequestAggregationWindowReentry | None = None,
     cache_request_aggregation_active_seam: CacheRequestAggregationActiveSeam | None = None,
+    cache_child_exchange_aggregated_dispatch_exactness: (
+        CacheChildExchangeAggregatedDispatchExactness | None
+    ) = None,
     cache_pre_gate_admission_window_seam: CachePreGateAdmissionWindowSeam | None = None,
     cache_structural_ingress_seam: CacheStructuralIngressSeam | None = None,
     cache_continuous_batching_feasibility: CacheContinuousBatchingFeasibility | None = None,
     cache_batching_mechanism_subgap: CacheBatchingMechanismSubgap | None = None,
     cache_request_aggregation_window_exactness: CacheRequestAggregationWindowExactness | None = None,
+    cache_pre_gate_admission_hook_harness: PreGateAdmissionHookHarnessResult | None = None,
+    cache_child_exchange_aggregated_dispatch_harness: (
+        CacheChildExchangeAggregatedDispatchHarnessResult | None
+    ) = None,
+    cache_cohort_to_child_exchange_handoff_harness: (
+        CacheCohortToChildExchangeHandoffHarnessResult | None
+    ) = None,
     cache_pre_gate_cohort_window_feasibility: CachePreGateCohortWindowFeasibility | None = None,
     cache_pre_gate_admission_hook_exactness: CachePreGateAdmissionHookExactness | None = None,
     cache_admission_hook_safety_contract: CacheAdmissionHookSafetyContract | None = None,
@@ -1293,6 +1384,11 @@ def build_customer_runtime_evidence(
     crash_limit: int = 5,
 ) -> CustomerRuntimeEvidenceLedger:
     """Build the runtime-owned customer evidence ledger."""
+
+    if heavy_weight_repeatability is None and specimen_path is None:
+        raise ValueError(
+            "specimen_path is required when heavy_weight_repeatability is not provided"
+        )
 
     host_status = _coerce_host_status(
         host_stability,
@@ -1344,18 +1440,37 @@ def build_customer_runtime_evidence(
         _coerce_cache_request_aggregation_window_exactness(
             cache_request_aggregation_window_exactness,
             cache_batching_mechanism_subgap=cache_batching_mechanism_subgap_status,
+            cache_pre_gate_admission_hook_harness=cache_pre_gate_admission_hook_harness,
+            cache_child_exchange_aggregated_dispatch_harness=cache_child_exchange_aggregated_dispatch_harness,
+            cache_cohort_to_child_exchange_handoff_harness=cache_cohort_to_child_exchange_handoff_harness,
+        )
+    )
+    cache_child_exchange_aggregated_dispatch_exactness_status = (
+        _coerce_cache_child_exchange_aggregated_dispatch_exactness(
+            cache_child_exchange_aggregated_dispatch_exactness,
+            cache_request_aggregation_window_exactness=cache_request_aggregation_window_exactness_status,
+            cache_child_exchange_aggregated_dispatch_harness=cache_child_exchange_aggregated_dispatch_harness,
+        )
+    )
+    cache_cohort_to_child_exchange_handoff_exactness_status = (
+        _coerce_cache_cohort_to_child_exchange_handoff_exactness(
+            None,
+            cache_child_exchange_aggregated_dispatch_exactness=cache_child_exchange_aggregated_dispatch_exactness_status,
+            cache_cohort_to_child_exchange_handoff_harness=cache_cohort_to_child_exchange_handoff_harness,
         )
     )
     cache_pre_gate_cohort_window_feasibility_status = (
         _coerce_cache_pre_gate_cohort_window_feasibility(
             cache_pre_gate_cohort_window_feasibility,
             cache_request_aggregation_window_exactness=cache_request_aggregation_window_exactness_status,
+            cache_pre_gate_admission_hook_harness=cache_pre_gate_admission_hook_harness,
         )
     )
     cache_pre_gate_admission_hook_exactness_status = (
         _coerce_cache_pre_gate_admission_hook_exactness(
             cache_pre_gate_admission_hook_exactness,
             cache_pre_gate_cohort_window_feasibility=cache_pre_gate_cohort_window_feasibility_status,
+            cache_pre_gate_admission_hook_harness=cache_pre_gate_admission_hook_harness,
         )
     )
     cache_admission_hook_safety_contract_status = (
@@ -1387,6 +1502,7 @@ def build_customer_runtime_evidence(
             cache_pre_claim_inert_state_semantics,
             cache_pre_claim_metadata_ticket_ownership=cache_pre_claim_metadata_ticket_ownership_status,
             cache_pre_gate_cohort_window_feasibility=cache_pre_gate_cohort_window_feasibility_status,
+            cache_pre_gate_admission_hook_harness=cache_pre_gate_admission_hook_harness,
         )
     )
     cache_pre_claim_marker_lifetime_status = _coerce_cache_pre_claim_marker_lifetime(
@@ -1554,6 +1670,8 @@ def build_customer_runtime_evidence(
             cache_request_aggregation_active_seam,
             cache_request_aggregation_window_reentry=cache_request_aggregation_window_reentry_status,
             cache_request_aggregation_window_exactness=cache_request_aggregation_window_exactness_status,
+            cache_child_exchange_aggregated_dispatch_exactness=cache_child_exchange_aggregated_dispatch_exactness_status,
+            cache_cohort_to_child_exchange_handoff_exactness=cache_cohort_to_child_exchange_handoff_exactness_status,
         )
     )
     cache_pre_gate_admission_window_seam_status = (
@@ -1581,6 +1699,9 @@ def build_customer_runtime_evidence(
     heavy_weight_status = _coerce_heavy_weight(
         heavy_weight_repeatability,
         specimen_path=specimen_path,
+        boundary_required_memory_gb=heavy_weight_boundary_memory_gb,
+        boundary_entry_visible=heavy_weight_boundary_entered,
+        boundary_entry_reason=heavy_weight_boundary_entry_reason,
         include_known_candidates=include_known_candidates,
         timeout_s=timeout_s,
         quarantine_path=quarantine_path,
@@ -1678,15 +1799,57 @@ def build_customer_runtime_evidence(
                 "treat governance as the active fallback branch on this host: runtime pinning now exists, so continue with TTL policy or eviction-history governance instead of reopening cache widening"
             )
     elif (
+        heavy_weight_status.repeatability_rung == "supported_host_repeatability_visible"
+        and dominant_next_gap != "cache_scheduler_depth"
+    ):
+        blocked_reason = (
+            "runtime-owned evidence has expanded and supported-host repeated heavy-weight proof is now visible on the selected path, but owlmlx still remains below reference-grade stability because cache depth remains frozen at a structural seam and governance still remains below reference-grade parity"
+        )
+        recommended_next_step = (
+            "freeze supported-host repeated heavy-weight proof exact and take a fresh coordinator checkpoint before reopening cache/governance"
+        )
+    elif (
         dominant_next_gap == "host_stable_execution"
         and governance_policy_gap.policy_gap_rung == "policy_gap_closed"
     ):
-        blocked_reason = (
-            "runtime-owned evidence has expanded and local governance fallback policy controls are now closed, but owlmlx still remains below reference-grade stability because supported-host heavy-weight proof is still externally blocked and cache remains frozen at a structural seam"
-        )
-        recommended_next_step = (
-            "local governance fallback is now exhausted on this host; return to supported-host baseline establishment and do not reopen cache widening without fresh authorization"
-        )
+        if (
+            host_status.ready
+            and heavy_weight_status.repeatability_rung
+            == "budget_fit_heavy_boundary_entered"
+        ):
+            blocked_reason = (
+                "runtime-owned evidence has expanded and one budget-fit heavy boundary has been entered on the current host, but owlmlx still remains below reference-grade stability because repeated heavy-weight proof is not yet authorized and cache remains frozen at a structural seam"
+            )
+            recommended_next_step = (
+                "one budget-fit heavy boundary is now entered on this host; stop here and require coordinator authorization before repeated heavy-weight validation"
+            )
+        elif (
+            host_status.ready
+            and heavy_weight_status.repeatability_rung == "host_ready_not_repeated"
+        ):
+            blocked_reason = (
+                "runtime-owned evidence has expanded and the current host has cleared one heavier boundary entry on the selected specimen path, but owlmlx still remains below reference-grade stability because repeated heavy-weight proof and cache depth remain open"
+            )
+            recommended_next_step = (
+                "current host is now host_ready_not_repeated on the selected heavy boundary; stop here and require coordinator authorization before any repeated heavy-weight validation"
+            )
+        elif (
+            host_status.ready
+            and heavy_weight_status.repeatability_rung == "local_preconditions_incomplete"
+        ):
+            blocked_reason = (
+                "runtime-owned evidence has expanded and the current host still keeps its supported candidate baseline, but the selected heavy-weight boundary remains preconditions-blocked even though cache stays frozen at a structural seam"
+            )
+            recommended_next_step = (
+                "freeze the selected heavy-weight boundary blocker exact on this host and do not reopen cache widening or governance micro-rounds"
+            )
+        else:
+            blocked_reason = (
+                "runtime-owned evidence has expanded and local governance fallback policy controls are now closed, but owlmlx still remains below reference-grade stability because supported-host heavy-weight proof is still externally blocked and cache remains frozen at a structural seam"
+            )
+            recommended_next_step = (
+                "local governance fallback is now exhausted on this host; return to supported-host baseline establishment and do not reopen cache widening without fresh authorization"
+            )
     elif dominant_next_gap == "cache_scheduler_depth":
         if (
             cache_counter_feasibility_status.feasibility_rung
@@ -1697,26 +1860,312 @@ def build_customer_runtime_evidence(
                 == "implementation_gap_exact"
             ):
                 if (
-                    cache_structural_ingress_seam_status.seam_rung
-                    == "structural_ingress_seam_introduced"
-                ):
-                    recommended_next_step = (
-                        "treat cache as structural ingress seam introduced only; the bounded pre-gate hook now exists before whole-request gate claim, but request aggregation, continuous batching, child parallelism, stream-path rewrites, and cache parity remain out of scope for this round, while the governance policy gap and supported-host blocker remain exact"
-                    )
-                elif (
                     cache_pre_gate_admission_window_seam_status.seam_rung
                     == "pre_gate_admission_window_seam_exact"
                 ):
-                    recommended_next_step = (
-                        "treat cache as pre-gate admission-window seam work on this path; request aggregation remains the active cache subchain, the active seam is now the missing bounded pre-gate admission hook before whole-request gate claim, child exchange and stream hold stay secondary, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
-                    )
+                    if (
+                        cache_pre_gate_admission_window_seam_status.selected_seam_status
+                        == "bounded_hook_present_but_no_request_aggregation_window"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-structural pre-gate admission-window work on this path; request aggregation remains the active cache subchain, the bounded pre-gate hook now exists before whole-request gate claim, but it remains inert and still does not form a request-aggregation window, while child exchange and stream hold stay secondary, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    else:
+                        recommended_next_step = (
+                            "treat cache as pre-gate admission-window seam work on this path; request aggregation remains the active cache subchain, the active seam is now the missing bounded pre-gate admission hook before whole-request gate claim, child exchange and stream hold stay secondary, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                        )
                 elif (
                     cache_request_aggregation_active_seam_status.seam_rung
                     == "aggregation_active_seam_exact"
                 ):
-                    recommended_next_step = (
-                        "treat cache as request-aggregation active-seam work on this path; request_aggregation_window remains the active cache subchain, the active seam is now the missing pre-gate admission window before whole-request gate claim, child exchange and stream hold stay secondary, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
-                    )
+                    if (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-runtime-owned earlier terminal-notice boundary stem freeze work on this path; owlmlx now owns a new runtime-owned boundary-stem boundary ahead of the fuller earlier-runtime-owned-boundary prefix on the current internal record and a second backend stream request can already enter the live backend exchange before child stdout reaches that fuller prefix boundary, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary stem detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-runtime-owned earlier terminal-notice boundary prefix freeze work on this path; owlmlx now owns a new runtime-owned boundary-prefix boundary ahead of full earlier-runtime-owned-boundary detection on the current internal record and a second backend stream request can already enter the live backend exchange before child stdout reaches full earlier-runtime-owned-boundary detection, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary prefix detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-runtime-owned earlier terminal-notice boundary introduction work on this path; owlmlx now owns one new earlier runtime-owned boundary record ahead of the newer runtime-owned leading-discriminator record and a second backend stream request can already enter the live backend exchange before child stdout reaches earlier-runtime-owned-leading-discriminator discriminant detection, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-runtime-owned earlier terminal-notice leading-discriminator discriminant first-unique-boundary freeze work on this path; owlmlx now owns an earlier runtime-owned leading-discriminator discriminant boundary ahead of the fuller earlier-runtime-owned-leading-discriminator stem on the current internal record and a second backend stream request can already enter the live backend exchange before child stdout reaches that fuller stem boundary, but the literal prefix before runtime_owned_terminal_leading_ is not yet an honest runtime-owned transport boundary, so the remaining exact blocker still sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-leading-discriminator discriminant detection inside the live backend exchange as the first honest unique boundary on that newer runtime-owned record, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-runtime-owned earlier terminal-notice leading-discriminator stem freeze work on this path; owlmlx now owns an earlier runtime-owned leading-discriminator stem boundary ahead of the fuller earlier-runtime-owned-leading-discriminator prefix on the current internal record and a second backend stream request can already enter the live backend exchange before child stdout reaches that fuller prefix boundary, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-leading-discriminator stem detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-runtime-owned earlier terminal-notice leading-discriminator prefix freeze work on this path; owlmlx now owns a new runtime-owned leading-discriminator-prefix boundary ahead of full earlier-runtime-owned-leading-discriminator detection on the current internal record and a second backend stream request can already enter the live backend exchange before child stdout reaches full earlier-runtime-owned-leading-discriminator detection, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-leading-discriminator prefix detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-runtime-owned earlier terminal-notice leading-discriminator introduction work on this path; owlmlx now owns one new earlier runtime-owned leading-discriminator record ahead of the newer runtime-owned discriminator record and a second backend stream request can already enter the live backend exchange before child stdout reaches earlier-runtime-owned discriminator discriminant detection, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-leading-discriminator detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-runtime-owned earlier terminal-notice discriminator stem freeze work on this path; owlmlx now owns an earlier runtime-owned discriminator stem boundary ahead of the fuller earlier-runtime-owned-discriminator prefix on the current internal record and a second backend stream request can already enter the live backend exchange before child stdout reaches that fuller prefix boundary, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-discriminator stem detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-runtime-owned earlier terminal-notice discriminator prefix freeze work on this path; owlmlx now owns a new runtime-owned discriminator-prefix boundary ahead of full earlier-runtime-owned-discriminator detection on the current internal record and a second backend stream request can already enter the live backend exchange before child stdout reaches full earlier-runtime-owned-discriminator detection, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-discriminator prefix detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-runtime-owned earlier terminal-notice discriminator introduction work on this path; owlmlx now owns a new runtime-owned discriminator record ahead of the current marker-first terminal_notice_lead record and a second backend stream request can already enter the live backend exchange before child stdout reaches current runtime-owned leading-discriminator marker-discriminant detection, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-discriminator detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_dependency"
+                    ):
+                        if (
+                            cache_request_aggregation_active_seam_status.residual_blocker
+                            and "first honest unique boundary"
+                            in cache_request_aggregation_active_seam_status.residual_blocker
+                        ):
+                            recommended_next_step = (
+                                "treat cache as post-runtime-owned earlier terminal-notice discriminator first-unique-boundary work on this path; owlmlx now owns a newer earlier runtime-owned discriminator record ahead of the current marker-first record and a second backend stream request can already enter the live backend exchange before child stdout reaches the fuller earlier-runtime-owned-discriminator stem on that newer record, but the remaining exact blocker still sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-discriminator discriminant detection because that boundary is already the first honest unique boundary on the newer runtime-owned record, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                            )
+                        else:
+                            recommended_next_step = (
+                                "treat cache as post-runtime-owned earlier terminal-notice discriminator discriminant freeze work on this path; owlmlx now owns an earlier runtime-owned discriminator discriminant boundary ahead of the fuller earlier-runtime-owned-discriminator stem on the current internal record and a second backend stream request can already enter the live backend exchange before child stdout reaches that fuller stem boundary, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-discriminator discriminant detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                            )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_discriminant_dependency"
+                    ):
+                        if (
+                            cache_request_aggregation_active_seam_status.residual_blocker
+                            and "first honest unique boundary"
+                            in cache_request_aggregation_active_seam_status.residual_blocker
+                        ):
+                            recommended_next_step = (
+                                "treat cache as post-terminal-notice-leading-discriminator-marker-stem first-unique-boundary work on this path; owlmlx now owns a runtime-owned marker-first terminal_notice_lead record ahead of the older terminal_notice record and a second backend stream request can already enter the live backend exchange before child stdout reaches the fuller internal terminal_notice_l marker-stem, but the remaining exact blocker still sits at backend-terminal notice leading-discriminator marker-discriminant detection because that boundary is already the first honest unique boundary on the current runtime-owned record, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                            )
+                        else:
+                            recommended_next_step = (
+                                "treat cache as post-terminal-notice-leading-discriminator-marker-stem freeze work on this path; owlmlx now owns a runtime-owned terminal_notice_l marker-stem ahead of the fuller internal terminal_notice_lead marker key and a second backend stream request can already enter the live backend exchange before child stdout reaches that internal terminal_notice_l marker-stem, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker-discriminant detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                            )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_stem_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-leading-discriminator-marker-prefix freeze work on this path; owlmlx now owns a runtime-owned terminal_notice_lead marker-prefix ahead of the full internal marker and a second backend stream request can already enter the live backend exchange before child stdout reaches that internal terminal_notice_lead marker-prefix, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker-stem detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_prefix_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-leading-discriminator-marker freeze work on this path; owlmlx now owns a runtime-owned terminal_notice_lead marker ahead of the older leading-discriminator discriminant and a second backend stream request can already enter the live backend exchange before child stdout reaches that internal terminal_notice_lead marker, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker-prefix detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-leading-discriminator-discriminant freeze work on this path; owlmlx now owns a runtime-owned terminal_notice_lead marker earlier than the leading-discriminator action discriminant on the same runtime-owned record and a second backend stream request can already enter the live backend exchange before child stdout reaches that internal leading-discriminator discriminant, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_discriminant_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-leading-discriminator-stem freeze work on this path; owlmlx now owns a runtime-owned terminal-notice leading discriminator ahead of the old marker-key lead and a second backend stream request can already enter the live backend exchange before child stdout reaches that internal leading-discriminator stem, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator discriminant detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_stem_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-leading-discriminator-prefix freeze work on this path; owlmlx now owns a runtime-owned terminal-notice leading discriminator ahead of the old marker-key lead and a second backend stream request can already enter the live backend exchange before child stdout reaches that internal leading-discriminator prefix, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator stem detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_prefix_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-leading-discriminator freeze work on this path; owlmlx now owns a runtime-owned terminal-notice leading discriminator ahead of the old marker-key lead and a second backend stream request can already enter the live backend exchange before child stdout fully matches that internal leading-discriminator action, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator prefix detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-marker-key-lead freeze work on this path; owlmlx now owns a runtime-owned terminal-notice leading discriminator ahead of the old marker-key lead and a second backend stream request can already enter the live backend exchange before child stdout reaches that old boundary, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_marker_key_lead_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-marker-discriminant stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream request can already enter the live backend exchange before child stdout reaches the first terminal-notice marker discriminant, but the remaining exact blocker still sits at backend-terminal notice-marker-key lead detection inside the live backend exchange because that first key lead is the earliest unique terminal-notice marker boundary after the ok field and the earlier opening quote of that key still collides with ordinary ok-true stream records on this path, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_marker_discriminant_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-marker-stem stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream request can already enter the live backend exchange before child stdout reaches the first terminal-notice marker stem, but the remaining exact blocker still sits at backend-terminal notice-marker-discriminant detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_marker_stem_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-marker-prefix stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream request can already enter the live backend exchange before child stdout reaches the first terminal-notice marker key itself, but the remaining exact blocker still sits at backend-terminal notice-marker-stem detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_marker_prefix_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-marker stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream request can already enter the live backend exchange before child stdout reaches the first terminal-notice marker, but the remaining exact blocker still sits at backend-terminal notice-marker-prefix detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_marker_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-action-stem stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream request can already enter the live backend exchange before child stdout reaches the first terminal-notice action stem, but the remaining exact blocker still sits at backend-terminal notice-marker detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_action_stem_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-action-discriminant stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream request can already enter the live backend exchange before child stdout reaches the first terminal-notice action discriminant, but the remaining exact blocker still sits at backend-terminal notice-action-stem detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_action_discriminant_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-prefix stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream request can already enter the live backend exchange before child stdout fully matches the first terminal-notice prefix, but the remaining exact blocker still sits at backend-terminal notice-action-discriminant detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_prefix_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-notice-capture stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream request can already enter the live backend exchange before the first terminal-notice record is fully captured, but the remaining exact blocker still sits at backend-terminal-notice prefix detection on child stdout inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_capture_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-action-discriminant stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream request can already enter the live backend exchange before the first terminal done payload reaches its action discriminant on child stdout, but the remaining exact blocker still sits at backend-terminal notice capture inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_action_discriminant_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-record-prefix stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream request can already enter the live backend exchange before the first stream fully matches its terminal-record prefix on child stdout, but the remaining exact blocker still sits at backend-terminal action discriminant detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_record_prefix_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-record-capture stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream request can already enter the live backend exchange before the first terminal record is fully captured, but the remaining exact blocker still sits at backend-terminal-record prefix detection on child stdout inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_record_capture_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-payload-capture stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream can already start before the first terminal payload is decoded and captured, but the remaining exact blocker still sits at backend-terminal-record capture on child stdout inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_payload_capture_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-payload-commit stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream can already start before the first terminal payload is committed to the first stream queue, but the remaining exact blocker still sits at backend-terminal-payload capture under the subprocess I/O lock inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_payload_commit_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-terminal-event stream work on this path; stream gate release is already decoupled from outer consumer drain and a second backend stream can already start before the first iterator consumer receives its terminal event, but the remaining exact blocker still sits at backend-terminal-payload commit inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_stream_terminal_event_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-backend-iterator stream work on this path; stream gate release is already decoupled from outer consumer drain and the remaining exact blocker now sits at backend-terminal-event commitment, where a second stream still cannot enter the live backend exchange before the first stream reaches its terminal event, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "stream_backend_iterator_completion_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-session stream-hold work on this path; non-stream handoff remains earned, stream gate release is now decoupled from outer consumer completion, but the claimed gate still spans the backend stream iterator until completion, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "stream_session_holds_gate_until_completion"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-non-stream-handoff stream-path work on this path; a bounded pre-gate cohort now reaches one aggregated non-stream child exchange while post-claim serial safety remains intact, but stream sessions still hold the gate for a full session, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "cohort_to_child_exchange_handoff_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-child-exchange handoff work on this path; a bounded pre-gate admission window now forms cohorts before whole-request gate claim and one non-stream child exchange can already carry multiple requests, but the main serving path still does not hand off that bounded cohort into the aggregated child exchange, stream hold stays secondary, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "child_exchange_aggregated_dispatch_dependency"
+                    ):
+                        recommended_next_step = (
+                            "treat cache as post-window request-aggregation dependency work on this path; a bounded pre-gate admission window now forms cohorts before whole-request gate claim, child exchange is the next active dependency because aggregated dispatch is still blocked there, stream hold stays secondary, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host checkpoint remain exact"
+                        )
+                    else:
+                        recommended_next_step = (
+                            "treat cache as request-aggregation active-seam work on this path; request_aggregation_window remains the active cache subchain, the active seam is now the missing pre-gate admission window before whole-request gate claim, child exchange and stream hold stay secondary, TurboQuant remains exact-but-secondary, and the governance policy gap and supported-host blocker remain exact"
+                        )
                 elif (
                     cache_request_aggregation_window_reentry_status.reentry_rung
                     == "aggregation_reentry_exact"
@@ -1737,6 +2186,13 @@ def build_customer_runtime_evidence(
                 ):
                     recommended_next_step = (
                         "treat cache as scheduler-depth work on this path; the carrier-local exactness chain is complete, scheduler depth is reselected as the next honest cache branch, TurboQuant stays exact-but-secondary, post-claim max_concurrent=1 and ticketed FIFO remain unchanged, the child protocol and stream path still assume one request at a time, multi-worker depth stays secondary pending concurrency revalidation, and the governance policy gap and supported-host blocker remain exact"
+                    )
+                elif (
+                    cache_structural_ingress_seam_status.seam_rung
+                    == "structural_ingress_seam_introduced"
+                ):
+                    recommended_next_step = (
+                        "treat cache as structural ingress seam introduced only; the bounded pre-gate hook now exists before whole-request gate claim, but request aggregation, continuous batching, child parallelism, stream-path rewrites, and cache parity remain out of scope for this round, while the governance policy gap and supported-host blocker remain exact"
                     )
                 elif (
                     cache_pre_claim_admission_carrier_branch_reselection_status.reselection_rung
@@ -1902,6 +2358,7 @@ def build_customer_runtime_evidence(
         cache_continuous_batching_branch_reduction=cache_continuous_batching_branch_reduction_status,
         cache_request_aggregation_window_reentry=cache_request_aggregation_window_reentry_status,
         cache_request_aggregation_active_seam=cache_request_aggregation_active_seam_status,
+        cache_child_exchange_aggregated_dispatch_exactness=cache_child_exchange_aggregated_dispatch_exactness_status,
         cache_pre_gate_admission_window_seam=cache_pre_gate_admission_window_seam_status,
         cache_structural_ingress_seam=cache_structural_ingress_seam_status,
         cache_continuous_batching_feasibility=cache_continuous_batching_feasibility_status,
@@ -2418,6 +2875,15 @@ def customer_runtime_evidence_to_dict(
             ledger.cache_pre_claim_admission_carrier_branch_reselection.residual_blocker
         )
     if (
+        ledger.cache_structural_ingress_seam.seam_rung
+        == "structural_ingress_seam_introduced"
+    ):
+        cache_surface = _CONTRACT_SURFACES[
+            "cache_scheduler_depth_structural_ingress_seam"
+        ]
+        cache_closure_level = ledger.cache_structural_ingress_seam.seam_rung
+        cache_blocked_reason = ledger.cache_structural_ingress_seam.residual_blocker
+    if (
         ledger.cache_scheduler_turboquant_branch_reselection.reselection_rung
         == "scheduler_turboquant_branch_exact"
     ):
@@ -2482,15 +2948,6 @@ def customer_runtime_evidence_to_dict(
         cache_blocked_reason = (
             ledger.cache_pre_gate_admission_window_seam.residual_blocker
         )
-    if (
-        ledger.cache_structural_ingress_seam.seam_rung
-        == "structural_ingress_seam_introduced"
-    ):
-        cache_surface = _CONTRACT_SURFACES[
-            "cache_scheduler_depth_structural_ingress_seam"
-        ]
-        cache_closure_level = ledger.cache_structural_ingress_seam.seam_rung
-        cache_blocked_reason = ledger.cache_structural_ingress_seam.residual_blocker
 
     gap_evidence = [
         _gap_entry(

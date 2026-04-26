@@ -1,7 +1,7 @@
 # owlmlx Runtime Capability Matrix
 
 > Status: authoritative
-> Updated: 2026-04-16
+> Updated: 2026-04-25
 
 Capability labels:
 
@@ -36,6 +36,9 @@ Capability labels:
 | Cache truth contract | supported | `owlmlx/cache_truth.py` — cache profile labels, flag schema, restart-required derivation, and TurboQuant cache-safety rules with 22 tests; **platform consumes** via `distilled_cache_substrate.py` and `primary_line_status.py` |
 | Fully self-owned implementation stack | partial | Eleven truth modules plus Runtime-3 executable kernel exist; persistent child MLX sessions and streamed kernel serving are real, but production serving, eviction/reclaim, and platform migration remain open |
 | Queue-based generation gate (owlmlx-owned) | supported | `owlmlx/serving.py` — GenerationGate class with 11 tests; enforces validated concurrency boundary |
+| Single-host orchestration status surface | supported | `owlmlx/orchestration_status.py` plus `GET /v1/runtime/orchestration-status` now freeze one runtime-owned layer-assessment contract for admission / generation gate / stream hold / model residency / memory pressure / recovery without inflating the weaker layers past `partial` or `insufficient_signal` |
+| Single-host recovery supervisor contract | supported | `owlmlx/recovery_supervisor_contract.py` plus `GET /v1/runtime/recovery-supervisor-contract` now freeze recovery barrier classification from backend health, restart exhaustion, and abort-recovery substrate state without claiming an automatic recovery loop or pressure eviction policy |
+| Request context-length truth for admission | supported | `owlmlx/request_context_length_truth.py` plus `GET /v1/runtime/request-context-length-truth` classify explicit context-token truth as `high_context`, `non_high_context`, or `unknown` for admission support without claiming tokenizer parity or generation enforcement |
 | Formal adoption model (reuse open-source, own truth layer) | supported | Adoption rule frozen in product-definition section 6 |
 | Extraction discipline with wave ordering | supported | Discipline rules frozen in extraction-inventory section 3 |
 | Autonomous loop discipline for self-iteration | supported | Loop discipline frozen in autonomous-loop-discipline.md |
@@ -110,9 +113,11 @@ Capability labels:
 | Cache scheduler branch selection | supported | Phase 45 adds `owlmlx.cache_scheduler_branch_selection`, freezing `continuous_batching` as the next locally reducible scheduler branch while `multi_worker_scheduler_depth` stays secondary until concurrency safety is revalidated |
 | Cache continuous-batching feasibility | supported | Phase 45 adds `owlmlx.cache_continuous_batching_feasibility`, freezing continuous batching as exact-feasibility-blocked on the active path until request aggregation or interleaved scheduling exists |
 | Cache batching mechanism subgap | supported | Phase 45 adds `owlmlx.cache_batching_mechanism_subgap`, freezing `request_aggregation_window` as the next exact local mechanism while shared prefill and decode interleaving stay secondary |
-| Cache request-aggregation exactness | supported | Phase 45 adds `owlmlx.cache_request_aggregation_window_exactness`, freezing the next ingress blocker as missing pre-gate cohort admission ahead of whole-request session claim |
-| Cache pre-gate cohort-window feasibility | supported | Phase 45 adds `owlmlx.cache_pre_gate_cohort_window_feasibility`, freezing that no runtime-owned cohort/admission seam exists before `GenerationGate` claim on the active path |
-| Cache pre-gate admission-hook exactness | supported | Phase 45 adds `owlmlx.cache_pre_gate_admission_hook_exactness`, freezing that no bounded hook exists before gate claim and that any future hook must preserve post-claim serial invariants |
+| Cache request-aggregation exactness | supported | Phase 45 adds `owlmlx.cache_request_aggregation_window_exactness`; current live truth is now post-ingress: a bounded pre-gate cohort window forms before whole-request gate claim, one non-stream child exchange can already carry multiple requests, and the remaining blocker is cohort-to-child handoff while stream hold stays secondary |
+| Cache pre-gate cohort-window feasibility | supported | Phase 45 adds `owlmlx.cache_pre_gate_cohort_window_feasibility`, and current live truth now freezes that a bounded runtime-owned cohort/admission seam exists before `GenerationGate` claim on the active path |
+| Cache pre-gate admission-hook exactness | supported | Phase 45 adds `owlmlx.cache_pre_gate_admission_hook_exactness`; current live truth now freezes that the bounded hook has widened into a real pre-claim cohort window while post-claim serial invariants remain frozen |
+| Cache request-aggregation active seam | supported | Phase 45 adds `owlmlx.cache_request_aggregation_active_seam`; current live seam is now `cohort_to_child_exchange_handoff_dependency` after ingress and child-exchange capability have both narrowed |
+| Cache child-exchange aggregated-dispatch exactness | supported | Phase 45 adds `owlmlx.cache_child_exchange_aggregated_dispatch_exactness`, freezing that one non-stream child exchange can already carry multiple requests while the main serving path still lacks cohort-to-child handoff |
 | Cache admission-hook safety contract | supported | Phase 45 adds `owlmlx.cache_admission_hook_safety_contract`, freezing the exact post-claim invariants and forbidden bypasses any future pre-claim hook must preserve |
 | Bounded pre-gate admission structural ingress seam | experimental | Phase 45 now introduces a real bounded pre-gate hook in `owlmlx/serving.py`; it stages only immutable metadata, ticket reservation, and pre-claim bookkeeping before gate claim and does not imply batching parity |
 | Cache pre-claim admission contract | supported | Phase 45 adds `owlmlx.cache_pre_claim_admission_contract`, freezing that the only allowable future pre-claim seam is bounded metadata/ticket staging before whole-request gate claim, with no gate claim, child exchange, stream start, or model execution allowed there |
@@ -156,6 +161,7 @@ Capability labels:
 | Heavy-weight repeatability status | supported | Phase 45 adds `owlmlx.heavy_weight_runtime_repeatability`, combining host stability, first-smoke locality, and supported-host repeatability proof into one exact blocker-aware status |
 | Customer runtime evidence ledger | supported | Phase 45 adds `owlmlx.customer_runtime_evidence`, summarizing which replacement-grade gaps now have runtime-owned contracts, runnable verification, exact external blockers, and the next locally reducible dominant gap |
 | Control-plane downgrade-path hardening | supported | Runtime-10 makes `healthz` a liveness-only fallback; it no longer fabricates `openai_chat` protocol when richer runtime truth is absent |
+| Runtime model visibility contract | supported | `owlmlx/runtime_model_visibility.py` now freezes owlmlx-owned rule `runtime_gate_required_before_visible`: `GET /v1/openai/models` is the formal visibility list, `GET /v1/runtime/model-visibility` is the diagnostic contract surface, and `GET /v1/models` remains loaded inventory with an embedded `visibility_contract` block; the gate is owlmlx registry plus `$MODELS_ROOT/{model-id}/config.json` presence rather than router lifecycle curation; see `runtime-model-visibility-contract.md` |
 | Degraded local routing now fails closed | supported | Runtime-11 blocks `localRuntimeProtocol=auto` when only `/healthz` is reachable; it no longer silently falls through to `/v1/chat/completions` for local models |
 | Replacement readiness verdict surface | supported | Runtime-12 promotes replacement readiness into explicit `doctor` output with a blocker list; launch readiness and replacement readiness are now distinct control-plane truths |
 | Old platform production replacement verdict | partial | Runtime-9 now freezes a real verdict: not yet replaceable; prompt-path cutover and first control-plane operability are proven, full parity and production closure are not |

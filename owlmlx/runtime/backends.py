@@ -9,6 +9,7 @@ from typing import Protocol, runtime_checkable
 from .types import (
     BackendStatus,
     ChatTurn,
+    GenerateCohortResult,
     GenerateResult,
     LoadResult,
     LoadedModelInfo,
@@ -61,6 +62,19 @@ class RuntimeBackend(Protocol):
         """Return backend health and loaded model inventory."""
 
 
+@runtime_checkable
+class CohortGenerateBackend(Protocol):
+    """Optional backend capability for one-exchange cohort generation."""
+
+    def generate_cohort(
+        self,
+        model_id: str,
+        prompts: list[str],
+        **kwargs: object,
+    ) -> GenerateCohortResult:
+        """Generate a non-stream cohort through one backend exchange."""
+
+
 def render_chat_messages(messages: list[ChatTurn]) -> str:
     """Fallback chat rendering for backends without tokenizer templating."""
 
@@ -85,6 +99,9 @@ class FakeBackend:
         self.completion_suffix = completion_suffix
         self.generate_delay_s = generate_delay_s
         self._loaded: dict[str, LoadedModelInfo] = {}
+        self._aggregated_dispatch_batch_count = 0
+        self._aggregated_dispatch_request_count = 0
+        self._max_aggregated_dispatch_batch_size = 0
 
     def load(self, model_id: str, *, memory_gb: float | None = None) -> LoadResult:
         if not self.healthy:
@@ -230,6 +247,53 @@ class FakeBackend:
     ) -> GenerateResult:
         return self.generate(model_id, render_chat_messages(messages), **kwargs)
 
+    def generate_cohort(
+        self,
+        model_id: str,
+        prompts: list[str],
+        **kwargs: object,
+    ) -> GenerateCohortResult:
+        if not prompts:
+            return GenerateCohortResult(
+                ok=False,
+                message="at least one prompt is required",
+                error_code=RuntimeErrorCode.invalid_request,
+                model_id=model_id,
+            )
+
+        results = tuple(self.generate(model_id, prompt, **kwargs) for prompt in prompts)
+        if all(result.ok for result in results):
+            self._aggregated_dispatch_batch_count += 1
+            self._aggregated_dispatch_request_count += len(results)
+            self._max_aggregated_dispatch_batch_size = max(
+                self._max_aggregated_dispatch_batch_size,
+                len(results),
+            )
+            return GenerateCohortResult(
+                ok=True,
+                message="generated cohort through one backend exchange",
+                model_id=model_id,
+                results=results,
+                detail={
+                    "batch_size": len(results),
+                    "exchange_count": 1,
+                    "child_exchange_mode": "aggregated_non_stream_child_exchange_visible",
+                },
+            )
+
+        return GenerateCohortResult(
+            ok=False,
+            message="cohort generate failed",
+            error_code=RuntimeErrorCode.backend_error,
+            model_id=model_id,
+            results=results,
+            detail={
+                "batch_size": len(results),
+                "exchange_count": 1,
+                "child_exchange_mode": "aggregated_non_stream_child_exchange_visible",
+            },
+        )
+
     def stream_generate(self, model_id: str, prompt: str, **kwargs: object) -> list[StreamEvent]:
         result = self.generate(model_id, prompt, **kwargs)
         if not result.ok:
@@ -333,5 +397,24 @@ class FakeBackend:
             detail={
                 "model_count": len(self._loaded),
                 "default_memory_gb": self.default_memory_gb,
+                "cache_runtime_observations": {
+                    "child_exchange_mode": (
+                        "aggregated_non_stream_child_exchange_visible"
+                        if self._aggregated_dispatch_request_count > 0
+                        else "single_request_per_child_exchange"
+                    ),
+                    "aggregated_child_exchange_visible": (
+                        self._aggregated_dispatch_request_count > 0
+                    ),
+                    "aggregated_child_exchange_batch_count": (
+                        self._aggregated_dispatch_batch_count
+                    ),
+                    "aggregated_child_exchange_request_count": (
+                        self._aggregated_dispatch_request_count
+                    ),
+                    "max_aggregated_child_batch_size": (
+                        self._max_aggregated_dispatch_batch_size
+                    ),
+                },
             },
         )

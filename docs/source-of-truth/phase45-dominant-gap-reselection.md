@@ -1,7 +1,7 @@
 # owlmlx Phase 45: Dominant-Gap Reselection
 
 > Status: authoritative
-> Updated: 2026-04-16
+> Updated: 2026-04-23
 > Scope: runtime-only dominant-gap reselection after cache and governance exactness freezes
 
 ## 1. Purpose
@@ -42,7 +42,7 @@ Stable sections:
 Current live result is:
 
 - `summary.decision_rung = "reselection_exact"`
-- `summary.selected_gap = "host_stable_execution"`
+- `summary.selected_gap = "cache_scheduler_depth"`
 
 Candidate-gap truth is now frozen as:
 
@@ -52,22 +52,33 @@ Candidate-gap truth is now frozen as:
 - `multi_model_lifecycle_governance`
   - `policy_gap_rung = "policy_gap_closed"`
 - `heavy_weight_runtime_repeatability`
-  - `repeatability_rung = "local_blocked"`
+  - `repeatability_rung = "supported_host_repeatability_visible"`
 
-## 4. Why Supported-Host Baseline Re-Assumes Dominance
+## 4. Why Cache-Scheduler Depth Now Reassumes Dominance
 
-`host_stable_execution` now re-assumes dominance because:
+`cache_scheduler_depth` now reassumes dominance because:
 
-- the supported-host branch remains the real gating program priority
+- supported-host repeated heavy-weight proof is now visible on the current host
 - the local governance fallback branch is now policy-closed
-- cache remains intentionally frozen at `structural_ingress_seam_introduced`
-- heavy-weight repeatability remains externally blocked on this host
-- continuing local cache/governance micro-rounds would no longer reduce the
-  governing blocker inventory honestly
+- cache has now reopened beyond the old structural checkpoint and the active
+  blocker is now post-handoff stream-path work at the
+  backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-stem
+  seam, while fuller earlier-runtime-owned-boundary prefix detection plus
+  fuller earlier-runtime-owned-boundary detection stay preserved as secondary
+  stream truth, current marker-discriminant detection stays frozen as the
+  first honest unique boundary on the current runtime-owned marker-first
+  record and the newer earlier-runtime-owned discriminator discriminant plus
+  the newer earlier-runtime-owned leading-discriminator discriminant stay
+  frozen as the first honest unique boundaries on their newer runtime-owned
+  records
+- continuing host-branch debate would no longer reduce the governing blocker
+  inventory honestly
+- the next narrower local blocker is now scheduler/cache depth, not supported-
+  host proof visibility
 
-That means the loop should return to supported-host baseline establishment or
-stop for a coordinator decision, not continue widening local cache/governance
-work.
+That means the loop should keep host truth frozen exact, move the active cache
+surface beyond `structural_ingress_seam_introduced`, and still stop before any
+parity or readiness inflation.
 
 ## 5. What This Does Not Claim
 
@@ -81,5 +92,5 @@ It only claims:
 
 - the next locally reducible dominant gap has been reselected exactly
 - the loop no longer needs to infer the next branch from narrative comparison
-- local fallback branch closure can move dominance back to the externally gated
-  supported-host branch without inflating runtime maturity
+- local fallback branch closure plus visible repeated heavy-weight proof move
+  the dominant gap back onto `cache_scheduler_depth`

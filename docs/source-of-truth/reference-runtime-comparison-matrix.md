@@ -1,0 +1,237 @@
+# owlmlx Reference Runtime Comparison Matrix
+
+> Status: authoritative
+> Updated: 2026-04-16
+> Scope: honest runtime-only comparison between `owlmlx` and the current local reference runtimes `oMLX` / `vMLX`
+
+## 1. Purpose
+
+This document exists to answer one narrow question honestly:
+
+**Relative to `oMLX` and `vMLX`, where is `owlmlx` already close, where is it still behind, and which parts are intentionally not owned by each system?**
+
+It is **not** a parity claim.
+
+It is a truth document for:
+
+- relative runtime maturity
+- adoption/borrowing direction
+- intentionally absent or shell-hosted capability
+- mutual learning without identity collapse
+
+## 2. Comparison Inputs
+
+This matrix is based on four inputs:
+
+1. `owlmlx` current authoritative truth:
+   - `replacement-grade-stability-gaps.md`
+   - `phase45-customer-runtime-evidence-ledger.md`
+   - `phase45-dominant-gap-reselection.md`
+2. `owlmlx` product/adoption boundary:
+   - `product-definition.md`
+   - `master-outline.md`
+3. local probe verification:
+   - `/Users/yeemio/AI/gitrep/runtime-probes/2026-04-16-mlx-omlx-vmlx-baseline-investigation.md`
+4. current `oMLX` / `vMLX` public repo surfaces:
+   - `/Users/yeemio/AI/gitrep/runtime-probes/omlx-probe/README.md`
+   - `/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/README.md`
+
+## 3. Current Honest Top-Level Verdict
+
+### owlmlx
+
+Current honest label remains:
+
+- `early_formal_runtime`
+- `below reference-grade stability`
+
+### Relative to oMLX
+
+`owlmlx` is no longer a toy relative to `oMLX`.
+
+Current honest posture:
+
+- **one tier behind in runtime maturity**
+- closest gaps now concentrate in:
+  - host-stable execution confidence
+  - heavy-weight repeatability
+  - deeper cache/scheduler closure
+
+### Relative to vMLX
+
+`owlmlx` is materially closer on substrate identity than before, but still
+clearly behind `vMLX` on engine depth and broader serving maturity.
+
+Current honest posture:
+
+- **one to two tiers behind**
+- biggest deficits concentrate in:
+  - scheduler / batching depth
+  - broader cache path maturity
+  - packaging / runtime-product operationalization
+
+## 4. Runtime Comparison Matrix
+
+Legend:
+
+- `ahead` = stronger in this dimension right now
+- `close` = in the same tier or one small gap away
+- `behind` = meaningfully weaker
+- `not-owned` = intentionally outside current project boundary
+- `unknown` = not enough current evidence
+
+| Dimension | owlmlx | oMLX | vMLX | Honest read |
+|---|---|---|---|---|
+| Runtime identity / owned truth | runtime-owned identity, contracts, evidence, goal discipline | mature runtime/product, but not centered on runtime-owned truth ledgers | mature engine/product, but not centered on runtime-owned truth ledgers | `owlmlx` is **ahead** on truth discipline |
+| Fresh MLX baseline | current re-validation shows fresh baseline can work locally | fresh clone/venv works | fresh clone/venv works | currently **close**, not a major gap |
+| Core local serving path | real runtime kernel exists | mature multi-model local serving | mature multi-model serving engine | `owlmlx` still **behind** |
+| OpenAI-compatible serving | yes | yes | yes | **close** |
+| Anthropic-compatible serving/messages | yes | not the primary public identity | yes in product messaging | `owlmlx` is **close** |
+| Cache evidence / truth surfaces | strong runtime-owned truth and exactness docs | mature practical cache behavior | mature practical cache behavior | `owlmlx` is **ahead on truth**, **behind on runtime closure** |
+| Continuous batching / deeper scheduler work | frozen at structural ingress seam only | present publicly as continuous batching | present publicly as continuous batching and broader engine controls | `owlmlx` is **behind**, especially vs `vMLX` |
+| Multi-model lifecycle governance | policy branch locally closed, but still below reference-grade residency parity | mature multi-model serving/ops behavior | mature runtime engine posture with broad feature surface | `owlmlx` is **behind** |
+| Heavy-weight repeatability | not yet restored to reference-grade confidence | stronger historical proof on local platform | stronger engine-oriented confidence signals | `owlmlx` is **behind** |
+| Packaging / app distribution | not-owned by runtime repo | app + Homebrew + CLI + admin shell | app/panel + PyPI/uv/pipx + engine CLI | `owlmlx` intentionally **not-owned** |
+| Operator/admin surface | not-owned by runtime repo | built-in admin/dashboard surfaces | engine + panel/desktop workflow | `owlmlx` intentionally **not-owned** |
+| Installation ergonomics | runtime repo only | strong end-user install story | strong end-user install story | `owlmlx` intentionally **not-owned** |
+| Broad model-family productization | selective runtime substrate focus | broad productized family surface | very broad model-family surface | `owlmlx` is **behind** by choice |
+| Runtime evidence honesty | strong | weaker as an explicit repo-level contract discipline | weaker as an explicit repo-level contract discipline | `owlmlx` is **ahead** |
+
+## 5. “Deleted / Not-Owned” Comparison
+
+The user asked for the comparison to include “各自删除的部分”.
+
+For truth purposes, the useful version of that is:
+
+- what each system **intentionally does not own**
+- what each system currently leaves to another layer
+- what should **not** be misread as a missing feature when it is actually a boundary choice
+
+### 5.0 Side-by-side deletion / non-ownership matrix
+
+| System | Explicitly deleted / not owned / not first-class | Why it matters |
+|---|---|---|
+| `owlmlx` | desktop shell, packaged app distribution, operator/admin UI, end-user installer ergonomics, control-plane product shell | prevents runtime repo from collapsing back into product-shell monolith |
+| `oMLX` | not observed as first-class runtime-owned evidence ledgers, dominant-gap reselection truth, hard shell/runtime repo split | shows `oMLX` is optimized around practical runtime productization rather than truth-ledger formalism |
+| `vMLX` | not observed as first-class runtime-owned evidence ledgers, dominant-gap reselection truth, hard shell/runtime split as primary identity | shows `vMLX` is optimized around engine breadth, packaging, and productized serving rather than runtime-truth formalism |
+
+This table is intentionally asymmetric:
+
+- `owlmlx` lists what is **deliberately removed from scope**
+- `oMLX` / `vMLX` list what is **not currently observed as first-class repo identity**
+
+That asymmetry is honest, because the systems are solving different primary
+problems.
+
+### 5.1 owlmlx - intentionally not owned
+
+`owlmlx` intentionally does **not** own:
+
+- desktop shell
+- packaged macOS app distribution
+- admin dashboard / operator UI
+- end-user onboarding and installer ergonomics
+- control-plane product shell
+
+Those are above the runtime and belong to shell/operator layers such as
+`owlops`, not to `owlmlx` itself.
+
+This is a **boundary choice**, not a runtime defect.
+
+### 5.2 oMLX - not observed as first-class runtime-owned truth
+
+In the current public repo/product surface, `oMLX` is very strong on runtime
+productization, but the following are **not observed as first-class owned truth
+layers in the way `owlmlx` models them**:
+
+- replacement-grade gap ledgers
+- runtime-owned customer evidence ledgers
+- dominant-gap reselection as a machine-readable surface
+- shell/runtime separation as a hard repository boundary
+
+This is **not a criticism**. It simply means `oMLX` optimizes for a different
+center of gravity:
+
+- practical serving product
+- admin/product shell
+- operational UX
+
+rather than truth-ledger formalism.
+
+### 5.3 vMLX - not observed as first-class truth-ledger runtime
+
+In the current public repo/product surface, `vMLX` is very strong on serving
+engine breadth and packaging ergonomics, but the following are **not observed as
+the repo’s first-class identity layer** in the way `owlmlx` models them:
+
+- replacement-grade runtime evidence ledgers
+- exact dominant-gap reselection truth
+- shell/runtime truth separation as the primary architectural story
+
+Again, this is **not a defect report**. It reflects a different priority:
+
+- engine/product capability breadth
+- packaging and operator usability
+- broad model-family support
+
+## 6. Mutual Learning Matrix
+
+This section exists so the comparison becomes useful rather than tribal.
+
+| Learn from | Worth borrowing / studying | Should not be blindly copied |
+|---|---|---|
+| oMLX | tiered KV cache, practical multi-model operations, app/admin ergonomics, local service distribution | runtime identity, shell coupling, product-shell assumptions |
+| vMLX | packaging patterns, install ergonomics, broader engine flag surface, distributed/engine posture, benchmark/product messaging | product identity, engine breadth claims before truth closure, shell/engine blending |
+| owlmlx | runtime-owned truth, evidence discipline, governance semantics, explicit capability honesty, shell/runtime separation | over-freezing, narrative over-precision when fresh re-validation has not been rerun |
+
+## 7. What This Means Operationally
+
+### 7.1 What owlmlx should stop saying
+
+`owlmlx` should **not** say:
+
+- “we are far behind because our MLX baseline cannot even start”
+- “we are basically at parity with oMLX”
+- “we are basically at parity with vMLX”
+
+All three are now too crude.
+
+### 7.2 What owlmlx should say instead
+
+More accurate statements are:
+
+- `owlmlx` is now a real runtime, not a toy.
+- Relative to `oMLX`, it is in the same broad arena but still one tier behind in replacement-grade runtime maturity.
+- Relative to `vMLX`, it is closer on substrate than before, but still behind on broader engine/scheduler/productized serving depth.
+- `owlmlx` is ahead on runtime-owned truth and evidence discipline.
+- `owlmlx` intentionally does not own desktop shell, packaging, and operator UI.
+
+## 8. Current Strategic Read
+
+As of 2026-04-16:
+
+- the old “current dev host baseline is definitely blocked” story has been weakened by re-validation
+- this improves `owlmlx`'s relative position somewhat
+- but it does **not** close the real remaining gaps:
+  - host-stable execution confidence
+  - heavy-weight repeatability
+  - deeper cache/scheduler closure
+
+So the honest strategic read is:
+
+- **closer than before**
+- **not close enough to claim replacement**
+- **better than a toy**
+- **still below reference-grade stability**
+
+## 9. Update Rule
+
+This document should be updated only when one of these changes:
+
+1. `owlmlx` upgrades or downgrades its honest label
+2. `owlmlx` materially re-enters or loses host-stable execution
+3. one of the major comparison dimensions changes:
+   - heavy-weight repeatability
+   - scheduler/cache depth
+   - shell/runtime boundary
+4. public `oMLX` or `vMLX` reference surfaces materially change

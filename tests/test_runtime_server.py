@@ -4,6 +4,7 @@ import json
 
 from fastapi.testclient import TestClient
 
+from owlmlx.context_concurrency import HIGH_CONTEXT_THRESHOLD_TOKENS
 from owlmlx.memory_budget import MachineMemoryProfile
 from owlmlx.runtime import FakeBackend, RuntimeKernel
 from owlmlx.runtime.server import create_app
@@ -643,8 +644,16 @@ def test_anthropic_messages_with_tool_result_can_extract_exact_reply() -> None:
     assert payload["content"][0]["text"] == "runtime10-tool-ok"
 
 
-def test_openai_models_lists_loaded_models() -> None:
-    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+def test_openai_models_lists_visibility_ready_models(tmp_path) -> None:
+    (tmp_path / "visible-a").mkdir()
+    (tmp_path / "visible-a" / "config.json").write_text("{}")
+    client = TestClient(
+        create_app(
+            RuntimeKernel(FakeBackend(), profile=_profile()),
+            visibility_models_root=str(tmp_path),
+            visibility_registry=[{"model_id": "visible-a"}],
+        )
+    )
     client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
 
     response = client.get("/v1/openai/models")
@@ -653,7 +662,7 @@ def test_openai_models_lists_loaded_models() -> None:
     assert "x-request-id" in response.headers
     payload = response.json()
     assert payload["object"] == "list"
-    assert payload["data"][0]["id"] == "fake-a"
+    assert payload["data"][0]["id"] == "visible-a"
 
 
 def test_load_requires_model_id_validation() -> None:
@@ -718,6 +727,85 @@ def test_runtime_status_returns_full_kernel_snapshot() -> None:
     assert payload["governance_policy"]["pinning_supported"] is True
     assert payload["governance_policy"]["ttl_supported"] is True
     assert payload["governance_policy"]["ttl_policy_mode"] == "kernel_explicit_sweep"
+
+
+def test_runtime_orchestration_status_returns_contract_surface() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.get("/v1/runtime/orchestration-status")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["contract"]["surface"] == "owlmlx.orchestration_status"
+    assert payload["contract"]["version"] == "v1"
+    assert payload["summary"]["status"] == "partial"
+    assert payload["summary"]["bottleneck_layer"] == "unknown"
+    assert payload["layer_assessment"]["generation_gate"]["classification_status"] == "supported"
+    assert payload["layer_assessment"]["memory_pressure"]["classification_status"] == "partial"
+    assert payload["child_surfaces"]["admission"]["surface"] == "owlmlx.scheduler_admission_contract"
+    assert payload["child_surfaces"]["model_residency"]["surface"] == "owlmlx.model_residency_policy"
+    assert payload["child_surfaces"]["memory_pressure"]["surface"] == "owlmlx.memory_pressure_contract"
+    assert payload["child_surfaces"]["recovery_supervisor"]["surface"] == "owlmlx.recovery_supervisor_contract"
+    assert payload["scheduler"]["queue_policy"] == "ticketed_fifo"
+    assert payload["scheduler"]["request_context_length"]["classification"] == "unknown"
+    assert payload["residency"]["resident_model_count"] == 1
+    assert payload["pressure"]["pressure_classification"] == "within_budget"
+    assert payload["recovery"]["recovery_state"] == "clean"
+    assert payload["recovery"]["restartable_model_count"] == 0
+
+
+def test_runtime_recovery_supervisor_contract_returns_contract_surface() -> None:
+    runtime = RuntimeKernel(FakeBackend(), profile=_profile())
+    client = TestClient(create_app(runtime))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.get("/v1/runtime/recovery-supervisor-contract")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["contract"]["surface"] == "owlmlx.recovery_supervisor_contract"
+    assert payload["summary"]["recovery_state"] == "clean"
+    assert payload["summary"]["barrier_decision"] == "no_recovery_barrier"
+    assert payload["barrier"]["hard_recovery_barrier"] is False
+
+
+def test_runtime_request_context_length_truth_returns_contract_surface() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+
+    response = client.get(
+        "/v1/runtime/request-context-length-truth",
+        params={"context_tokens": HIGH_CONTEXT_THRESHOLD_TOKENS + 1},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["contract"]["surface"] == "owlmlx.request_context_length_truth"
+    assert payload["summary"]["classification"] == "high_context"
+    assert payload["source"]["tokenizer_invoked"] is False
+
+
+def test_runtime_recovery_supervisor_contract_exposes_contaminated_barrier() -> None:
+    runtime = RuntimeKernel(FakeBackend(), profile=_profile())
+    runtime.abort_recovery.record_abort(
+        context_tokens=60000,
+        error_type="stream_error",
+        now=1000.0,
+    )
+    runtime.abort_recovery.apply_probe_result(
+        passed=False,
+        reason="scheduler loop",
+        now=1005.0,
+    )
+    client = TestClient(create_app(runtime))
+
+    response = client.get("/v1/runtime/recovery-supervisor-contract")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["recovery_state"] == "contaminated"
+    assert payload["barrier"]["hard_recovery_barrier"] is True
+    assert payload["request_impact"]["generation_admissible"] is False
 
 
 def test_runtime_restart_endpoint_restarts_loaded_model() -> None:

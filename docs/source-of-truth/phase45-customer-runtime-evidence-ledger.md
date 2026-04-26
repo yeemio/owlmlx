@@ -1,7 +1,7 @@
 # owlmlx Phase 45: Customer Runtime Evidence Ledger
 
 > Status: authoritative
-> Updated: 2026-04-16
+> Updated: 2026-04-23
 > Scope: runtime-only customer-runtime evidence for replacement-grade alignment
 
 ## 1. Purpose
@@ -80,11 +80,68 @@ Interpretation:
 The current honest result remains:
 
 - `summary.evidence_label = "early_formal_runtime"`
+- `next_step.dominant_next_gap = "cache_scheduler_depth"`
+- `next_step.exact_external_blocker = null`
 
 because `owlmlx` still has:
 
-- an exact host-level external blocker for supported heavy-weight proof
-- deeper governance/cache closure still below reference-grade parity
+- cache now pointed at `aggregation_active_seam_exact`
+- exact active cache blocker:
+  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection`
+- governance still below reference-grade residency parity even though the local
+  policy branch is closed
+- heavy-weight repeatability now sits at
+  `supported_host_repeatability_visible`
+- a current host that now has a supported candidate baseline and two successful
+  repeat runs on the selected budget-fit heavier path on
+  `/Users/yeemio/AI/Agent/models/gemma-4-31B-it`
+- repeated heavy-weight proof is now visible on that selected path
+- the newly visible bounded pre-gate request-aggregation window still remains
+  below broader request-aggregation closure
+- one non-stream child exchange can now already carry multiple requests
+- the non-stream main serving path now also hands that bounded cohort into one
+  aggregated child exchange
+- stream gate release is now decoupled from outer consumer completion
+- the active stream seam is now narrowed beyond iterator completion,
+  terminal-event delivery, terminal-payload commit, and terminal-payload
+  capture and terminal-record capture and terminal-record prefix detection and
+  terminal-action discriminant detection and full terminal-notice capture and
+  full terminal-notice prefix detection and terminal-notice
+  action-discriminant detection and terminal-notice action-stem detection and
+  terminal-notice marker detection and terminal-notice marker-prefix
+  detection and terminal-notice marker-stem detection and terminal-notice
+  marker-discriminant detection and terminal-notice marker-key-lead detection
+  and full terminal-notice leading-discriminator detection and runtime-owned
+  leading-discriminator prefix detection and runtime-owned
+  leading-discriminator stem detection and onto backend terminal-notice
+  leading-discriminator discriminant detection and onto backend terminal-
+  notice leading-discriminator marker-prefix detection and onto backend
+  terminal-notice leading-discriminator marker-stem detection and now onto
+  backend terminal-notice leading-discriminator marker-discriminant detection,
+  which remains frozen as the first honest unique boundary on the current
+  runtime-owned marker-first record, and now onto one new earlier
+  runtime-owned terminal-notice discriminator record ahead of that current
+  marker-discriminant seam, with the fuller earlier-runtime-owned
+  discriminator prefix and stem boundaries now already passed and the
+  newer discriminator discriminant now already frozen as the first honest
+  unique boundary on that newer runtime-owned record, and now onto one new
+  earlier runtime-owned leading-discriminator record ahead of that newer
+  discriminator record, where full leading-discriminator detection and prefix
+  and stem boundaries are now already passed, the literal prefix before
+  `runtime_owned_terminal_leading_` is not yet an honest runtime-owned
+  transport boundary, and now onto one new earlier runtime-owned boundary
+  record ahead of that newer leading-discriminator record, where a second
+  backend stream request can now be written once child stdout reaches that
+  new runtime-owned boundary stem and before child stdout reaches fuller
+  earlier-runtime-owned-boundary prefix detection on that same internal
+  record, where the literal prefix before `runtime_owned_terminal_b` is not
+  yet an honest runtime-owned transport boundary, so the remaining exact
+  blocker now stays at the earlier-runtime-owned-boundary-stem boundary as the
+  first honest unique boundary on that newer runtime-owned boundary record
+  while the fuller boundary-prefix detection plus fuller boundary detection
+  stay preserved as secondary truth and the newer leading-discriminator
+  discriminant stays frozen as the first honest unique boundary on that newer
+  runtime-owned record
 
 ## 6. What This Changes
 
@@ -108,16 +165,11 @@ governance harness so the customer ledger does not lag behind the stronger
 runtime-owned transition ledger when that truth is already available locally.
 
 After the cache branch was frozen at
-`structural_ingress_seam_introduced`, the ledger now also supports the
-governance fallback posture:
+`structural_ingress_seam_introduced`, the ledger supported a governance
+fallback posture while supported-host baseline establishment was still
+exact-blocked locally.
 
-- if supported-host baseline establishment is exact-blocked locally
-- and governance policy controls have started to land
-- the ledger may move `dominant_next_gap` back to
-  `multi_model_lifecycle_governance`
-  without pretending the host blocker disappeared or cache parity improved
-
-That fallback posture is now narrower again:
+That fallback posture is now closed more honestly:
 
 - runtime pinning exists
 - runtime TTL policy exists
@@ -128,22 +180,33 @@ That means the local governance fallback branch is now policy-closed on this
 host:
 
 - governance may remain below reference-grade parity
-- but the next honest step is no longer another local policy-control round
-- the next honest step is to return to supported-host baseline establishment
-  while keeping cache frozen at `structural_ingress_seam_introduced`
+- `host_stable_execution` is no longer exact-blocked locally
+- `next_step.exact_external_blocker = null`
+- the current host now has a supported candidate baseline
+- the selected budget-fit heavier path now has supported-host repeated proof
+  visible on this host
+- the old structural checkpoint remains preserved exact
+- cache no longer needs to stop at `structural_ingress_seam_introduced`
+- cache now reopens beyond ingress on the request-aggregation active seam
+- governance must not reopen as another local micro-round
 
 The ledger now also consumes `owlmlx.dominant_gap_reselection` so
 `dominant_next_gap` is no longer inferred ad hoc once:
 
-- governance is already policy-gap exact
+- governance is already policy-gap closed on this host
 - cache scheduler backlog is already implementation-gap exact
 - TurboQuant is already preconditions exact
-- heavy-weight repeatability is already externally blocked
+- heavy-weight repeatability now sits at
+  `supported_host_repeatability_visible`
 
-Once the governance policy gap closes locally, the customer ledger can stop
-treating governance as the active local fallback branch and return the dominant
-next gap to `host_stable_execution` while keeping cache frozen at
-`structural_ingress_seam_introduced`.
+Once supported-host repeated heavy-weight proof becomes visible and cache is
+reauthorized, the customer ledger can move `dominant_next_gap` to
+`cache_scheduler_depth` without pretending:
+
+- request aggregation exists
+- continuous batching exists
+- cache parity improved
+- governance reached reference-grade residency parity
 
 The operator entry now also refreshes cache closure against the active runtime
 observation harness instead of leaving cache stuck at the old default
@@ -221,16 +284,84 @@ The cache gap is now narrower again:
   blocker under that mechanism:
   - no pre-gate admission window exists yet
   - the generation gate still claims the session before cohort formation
-- `owlmlx.cache_pre_gate_cohort_window_feasibility` then freezes the next
-  stronger truth:
-  - owlmlx still does not own any queueing/admission seam before whole-request
-    gate claim
-  - a pre-gate cohort window is therefore not locally expressible yet on the
-    current path
+- `owlmlx.cache_pre_gate_cohort_window_feasibility` now also refreshes
+  honestly:
+  - owlmlx now owns a bounded pre-gate cohort window before whole-request gate
+    claim
+  - serial safety still remains validated only after claim
 - `owlmlx.cache_pre_gate_admission_hook_exactness` now freezes the next ingress
-  blocker more exactly:
-  - no bounded admission hook exists before whole-request gate claim
-  - any future hook must preserve the validated post-claim serial invariants
+  blocker more exactly after the authorized ingress widening:
+  - the bounded admission hook has widened into a real pre-claim cohort window
+  - the post-claim serial invariants remain frozen
+  - any later widening must still preserve those invariants
+- `owlmlx.cache_request_aggregation_active_seam` now becomes the active cache
+  surface:
+  - the selected seam is now
+    `backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_dependency`
+  - the exact blocker is now
+    `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection`
+  - one non-stream child exchange now already carries multiple requests in one
+    exchange
+  - the non-stream main serving path now also hands that bounded cohort into
+    one aggregated child exchange
+  - stream gate release no longer waits for outer consumer completion
+  - a second backend stream can now start before the first iterator consumer
+    receives the first stream's terminal event
+  - a second backend stream can now also start before the first terminal
+    payload is committed to the first stream queue
+  - a second backend stream can now also start before the first terminal
+    payload is decoded and captured
+  - a second backend stream request can now also enter the live backend
+    exchange before the first terminal record is fully captured
+  - a second backend stream request can now also enter the live backend
+    exchange before the first stream fully matches its terminal-record prefix
+    on child stdout
+  - a second backend stream request can now also enter the live backend
+    exchange before the first terminal done payload reaches its action
+    discriminant on child stdout
+  - a second backend stream request can now also enter the live backend
+    exchange before the first terminal-notice record is fully captured
+  - a second backend stream request can now also enter the live backend
+    exchange before child stdout fully matches the first terminal-notice
+    prefix
+  - a second backend stream request can now also enter the live backend
+    exchange before child stdout reaches the first terminal-notice action stem
+  - a second backend stream request can now also enter the live backend
+    exchange before child stdout reaches the first explicit terminal-notice
+    marker field
+  - a second backend stream request can now also enter the live backend
+    exchange before child stdout reaches the first terminal-notice marker key
+  - a second backend stream request can now also enter the live backend
+    exchange before child stdout reaches the first terminal-notice marker stem
+  - a second backend stream request can now also enter the live backend
+    exchange before child stdout reaches the first terminal-notice marker
+    discriminant
+  - owlmlx now also owns one runtime-owned terminal-notice leading-discriminator
+    record ahead of the old marker-key-lead seam
+  - a second backend stream request can now also enter the live backend
+    exchange before child stdout reaches the first terminal-notice marker-key
+    lead on the old notice record
+  - a second backend stream request can now also enter the live backend
+    exchange before child stdout fully matches that runtime-owned
+    leading-discriminator action
+  - a second backend stream request can now also enter the live backend
+    exchange before child stdout reaches that runtime-owned
+    leading-discriminator prefix
+  - a second backend stream request can now also enter the live backend
+    exchange before child stdout reaches that runtime-owned
+    leading-discriminator stem
+  - a second backend stream request can now also enter the live backend
+    exchange before child stdout reaches that runtime-owned
+    leading-discriminator discriminant
+  - owlmlx now also owns one earlier runtime-owned `terminal_notice_lead`
+    marker on that same leading-discriminator record
+  - full leading-discriminator detection and runtime-owned
+    leading-discriminator prefix detection remain preserved secondary truth on
+    that newer record while leading-discriminator stem detection is now the
+    current active blocker
+  - marker-key lead remains preserved as the first unique boundary on the old
+    terminal-notice record
+  - TurboQuant remains secondary
 - `owlmlx.cache_admission_hook_safety_contract` now freezes those invariants
   explicitly:
   - no bypass of whole-request gate claim
@@ -245,11 +376,11 @@ The cache gap is now narrower again:
   - batching therefore remains pre-claim staging-contract work, not hidden
     pre-claim execution work
 
-Phase 45 now also has one real structural ingress upgrade:
+Phase 45 now also preserves one real structural ingress checkpoint:
 
 - `owlmlx.cache_structural_ingress_seam`
 
-That surface upgrades cache truth only to:
+That surface still preserves cache truth at:
 
 - `structural_ingress_seam_introduced`
 
@@ -258,6 +389,10 @@ It still must not claim:
 - request aggregation supported
 - continuous batching supported
 - cache parity
+
+But after the authorized window round, the ledger no longer needs to stop at
+the pre-gate seam either. It can preserve both earlier ingress checkpoints
+while moving the active cache blocker to `owlmlx.cache_request_aggregation_active_seam`.
 - `owlmlx.cache_pre_claim_marker_state_carrier` now narrows that staging path
   again:
   - a marker may live only in one inert write-once/clear-only record before
@@ -451,6 +586,8 @@ It does not claim:
 It only claims:
 
 - `owlmlx` now owns a customer-runtime evidence ledger
+- one budget-fit heavy boundary entry can now appear in the ledger without
+  being misreported as repeated proof
 - the governance gap can absorb stronger transition-ledger truth without
   hiding absent lifecycle controls
 - once the local policy branch closes, the ledger can return
@@ -492,3 +629,41 @@ It only claims:
   inputs through `owlmlx.cache_pre_claim_marker_trigger_inputs`
 - once trigger inputs are exact, the runtime can freeze exact reader/writer
   ownership through `owlmlx.cache_pre_claim_marker_reader_writer_ownership`
+
+## 8. Release-Floor 3.1 Closure Command Evidence
+
+Release floor `3.1 Cache Scheduler Closure Beyond Exactness` closed on
+2026-04-25 (Round C closeout). Evidence recorded here is command-level
+runtime evidence, not a parity or replacement claim. The replacement-grade
+posture remains `early_formal_runtime` and `dominant_next_gap` remains
+`cache_scheduler_depth` (further closure beyond release-floor language is
+still open).
+
+Command evidence captured under the C closeout round:
+
+```text
+$ pytest -q tests/test_cache_pre_gate_admission_window_seam.py
+... 5 passed in 0.08s
+
+$ pytest -q tests/test_runtime_kernel.py -k \
+    "repeated_concurrent_generations_show_aggregated_dispatch_under_repeated_load \
+     or concurrent_generations_handoff_cohort_into_aggregated_child_exchange"
+... 2 passed, 23 deselected in 0.60s
+
+$ pytest -q tests/test_runtime_kernel.py tests/test_serving_pre_gate_admission_hook.py
+... 28 passed in 1.16s
+
+$ pytest -q tests/test_cache_request_aggregation_active_seam.py
+... 15 passed in 0.09s
+
+$ pytest -q tests/test_customer_runtime_evidence.py tests/test_dominant_gap_reselection.py
+... 60 passed in 17.74s
+
+$ git diff --check
+(clean)
+```
+
+The closure is on the non-stream main runtime path only. The stream-branch
+dispatch-level closure remains the active phase45 seam blocker
+(`backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection`)
+preserved as secondary truth.

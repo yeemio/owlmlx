@@ -8,10 +8,52 @@ import uuid
 from dataclasses import asdict
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse
 from starlette.responses import StreamingResponse
+
+from owlmlx.runtime_model_visibility import (
+    RegisteredRuntimeVisibleModel,
+    build_runtime_model_visibility,
+    derive_runtime_model_visibility_contract,
+)
+from owlmlx.nonresident_loadability_lineage import (
+    build_nonresident_loadability_lineage,
+    nonresident_loadability_lineage_to_dict,
+)
+from owlmlx.orchestration_status import (
+    build_orchestration_status,
+    orchestration_status_to_dict,
+)
+from owlmlx.scheduler_admission_contract import (
+    build_scheduler_admission_contract,
+    scheduler_admission_contract_to_dict,
+)
+from owlmlx.model_residency_policy import (
+    build_model_residency_policy,
+    model_residency_policy_to_dict,
+)
+from owlmlx.memory_pressure_contract import (
+    build_memory_pressure_contract,
+    memory_pressure_contract_to_dict,
+)
+from owlmlx.recovery_supervisor_contract import (
+    build_recovery_supervisor_contract,
+    recovery_supervisor_contract_to_dict,
+)
+from owlmlx.nonresident_model_admission_policy import (
+    build_nonresident_model_admission_policy,
+    nonresident_model_admission_policy_to_dict,
+)
+from owlmlx.memory_pressure_eviction_policy import (
+    build_memory_pressure_eviction_policy,
+    memory_pressure_eviction_policy_to_dict,
+)
+from owlmlx.request_context_length_truth import (
+    build_request_context_length_truth,
+    request_context_length_truth_to_dict,
+)
 
 from .backends import FakeBackend, RuntimeBackend
 from .kernel import RuntimeKernel
@@ -106,6 +148,12 @@ class RestartRequest(BaseModel):
     """HTTP request body for runtime restart of a loaded model."""
 
     model_id: str = Field(min_length=1)
+
+
+class MemoryPressureEvictionRequest(BaseModel):
+    """HTTP request body for explicit runtime-owned memory-pressure eviction."""
+
+    protect_active: bool = Field(default=True)
 
 
 def _result_to_dict(result: Any) -> dict[str, Any]:
@@ -318,12 +366,32 @@ def _estimate_input_tokens_from_turns(turns: list[ChatTurn]) -> int:
     return max(1, sum(len(turn.content) for turn in turns) // 4) if turns else 0
 
 
-def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
-    """Create a minimal owlmlx runtime HTTP app."""
+def create_app(
+    kernel: RuntimeKernel | None = None,
+    *,
+    visibility_models_root: str | None = None,
+    visibility_registry: list[Any] | tuple[Any, ...] | None = None,
+    loadability_lineage_records: dict[str, Any] | None = None,
+) -> FastAPI:
+    """Create a minimal owlmlx runtime HTTP app.
+
+    `loadability_lineage_records` is the runtime-owned non-resident
+    loadability lineage registry. It is connected at app construction time and
+    consumed by the nonresident-loadability-lineage and
+    nonresident-model-admission-policy endpoints. It is intentionally not a
+    per-request hint.
+    """
 
     runtime = kernel if kernel is not None else RuntimeKernel(FakeBackend())
     app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime7")
     app.state.kernel = runtime
+    app.state.loadability_lineage_records = (
+        dict(loadability_lineage_records)
+        if loadability_lineage_records is not None
+        else None
+    )
+    app.state.visibility_models_root = visibility_models_root
+    app.state.visibility_registry = visibility_registry
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
@@ -703,19 +771,22 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
     @app.get("/v1/openai/models")
     def openai_models():
         request_id = f"req_{uuid.uuid4().hex}"
-        status = runtime.status_dict()
-        entries = status["inventory"]["entries"]
+        visibility_contract = derive_runtime_model_visibility_contract(
+            runtime.inventory_snapshot(),
+            models_root=visibility_models_root,
+            registry=visibility_registry,
+        )
         return JSONResponse(
             headers={"x-request-id": request_id},
             content={
                 "object": "list",
                 "data": [
                     {
-                        "id": entry["model_id"],
+                        "id": model_id,
                         "object": "model",
                         "owned_by": "owlmlx",
                     }
-                    for entry in entries
+                    for model_id in visibility_contract["visible_model_ids"]
                 ],
             },
         )
@@ -723,6 +794,11 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
     @app.get("/v1/models")
     def models() -> dict[str, Any]:
         status = runtime.status_dict()
+        visibility_contract = derive_runtime_model_visibility_contract(
+            runtime.inventory_snapshot(),
+            models_root=visibility_models_root,
+            registry=visibility_registry,
+        )
         return {
             "active_model_id": status["active_model_id"],
             "inventory": status["inventory"],
@@ -730,11 +806,197 @@ def create_app(kernel: RuntimeKernel | None = None) -> FastAPI:
             "health": status["health"],
             "generation_gate": status["generation_gate"],
             "backend": status["backend"],
+            "visibility_contract": visibility_contract,
         }
+
+    @app.get("/v1/runtime/model-visibility")
+    def runtime_model_visibility() -> dict[str, Any]:
+        return derive_runtime_model_visibility_contract(
+            runtime.inventory_snapshot(),
+            models_root=visibility_models_root,
+            registry=visibility_registry,
+        )
 
     @app.get("/v1/runtime/status")
     def runtime_status() -> dict[str, Any]:
         return runtime.status_dict()
+
+    @app.get("/v1/runtime/orchestration-status")
+    def runtime_orchestration_status() -> dict[str, Any]:
+        return orchestration_status_to_dict(
+            build_orchestration_status(
+                runtime_status=runtime.status_dict(),
+                abort_recovery_snapshot=runtime.abort_recovery.snapshot(),
+            )
+        )
+
+    @app.get("/v1/runtime/scheduler-admission-contract")
+    def runtime_scheduler_admission_contract(
+        request_class: str = "unknown",
+        model_id: str | None = None,
+        context_tokens: int | None = None,
+        request_context_class: str | None = None,
+    ) -> dict[str, Any]:
+        return scheduler_admission_contract_to_dict(
+            build_scheduler_admission_contract(
+                runtime_status=runtime.status_dict(),
+                request_class=request_class,
+                model_id=model_id,
+                abort_recovery_snapshot=runtime.abort_recovery.snapshot(),
+                context_tokens=context_tokens,
+                request_context_class=request_context_class,
+            )
+        )
+
+    @app.get("/v1/runtime/request-context-length-truth")
+    def runtime_request_context_length_truth(
+        context_tokens: int | None = None,
+        request_context_class: str | None = None,
+    ) -> dict[str, Any]:
+        return request_context_length_truth_to_dict(
+            build_request_context_length_truth(
+                context_tokens=context_tokens,
+                request_context_class=request_context_class,
+            )
+        )
+
+    @app.get("/v1/runtime/model-residency-policy")
+    def runtime_model_residency_policy(
+        model_id: str | None = None,
+    ) -> dict[str, Any]:
+        return model_residency_policy_to_dict(
+            build_model_residency_policy(
+                runtime_status=runtime.status_dict(),
+                model_id=model_id,
+            )
+        )
+
+    @app.get("/v1/runtime/memory-pressure-contract")
+    def runtime_memory_pressure_contract() -> dict[str, Any]:
+        return memory_pressure_contract_to_dict(
+            build_memory_pressure_contract(runtime_status=runtime.status_dict())
+        )
+
+    @app.get("/v1/runtime/recovery-supervisor-contract")
+    def runtime_recovery_supervisor_contract() -> dict[str, Any]:
+        return recovery_supervisor_contract_to_dict(
+            build_recovery_supervisor_contract(
+                runtime_status=runtime.status_dict(),
+                abort_recovery_snapshot=runtime.abort_recovery.snapshot(),
+            )
+        )
+
+    def _build_loadability_lineage_for_request(
+        target_model_id: str | None,
+    ):
+        records = app.state.loadability_lineage_records
+        if records is None:
+            return None
+        snapshot = (
+            runtime.inventory.snapshot()
+            if hasattr(runtime, "inventory")
+            and hasattr(runtime.inventory, "snapshot")
+            else None
+        )
+        visibility_gate = build_runtime_model_visibility(
+            snapshot,
+            models_root=app.state.visibility_models_root,
+            registry=app.state.visibility_registry,
+        )
+        return build_nonresident_loadability_lineage(
+            model_id=target_model_id,
+            runtime_visibility_gate=visibility_gate,
+            lineage_records=records,
+        )
+
+    @app.get("/v1/runtime/nonresident-loadability-lineage")
+    def runtime_nonresident_loadability_lineage(
+        model_id: str | None = None,
+    ) -> dict[str, Any]:
+        snapshot = (
+            runtime.inventory.snapshot()
+            if hasattr(runtime, "inventory")
+            and hasattr(runtime.inventory, "snapshot")
+            else None
+        )
+        visibility_gate = build_runtime_model_visibility(
+            snapshot,
+            models_root=app.state.visibility_models_root,
+            registry=app.state.visibility_registry,
+        )
+        return nonresident_loadability_lineage_to_dict(
+            build_nonresident_loadability_lineage(
+                model_id=model_id,
+                runtime_visibility_gate=visibility_gate,
+                lineage_records=app.state.loadability_lineage_records,
+            )
+        )
+
+    @app.get("/v1/runtime/nonresident-model-admission-policy")
+    def runtime_nonresident_model_admission_policy(
+        model_id: str | None = None,
+        request_context_class: str | None = None,
+        known_loadable_model_ids: list[str] | None = Query(default=None),
+    ) -> dict[str, Any]:
+        loadability_lineage = _build_loadability_lineage_for_request(model_id)
+        return nonresident_model_admission_policy_to_dict(
+            build_nonresident_model_admission_policy(
+                runtime_status=runtime.status_dict(),
+                model_id=model_id,
+                known_loadable_model_ids=known_loadable_model_ids,
+                request_context_class=request_context_class,
+                abort_recovery_snapshot=runtime.abort_recovery.snapshot(),
+                loadability_lineage=loadability_lineage,
+            )
+        )
+
+    @app.get("/v1/runtime/memory-pressure-eviction-policy")
+    def runtime_memory_pressure_eviction_policy(
+        protect_active: bool = True,
+    ) -> dict[str, Any]:
+        return memory_pressure_eviction_policy_to_dict(
+            build_memory_pressure_eviction_policy(
+                runtime_status=runtime.status_dict(),
+                abort_recovery_snapshot=runtime.abort_recovery.snapshot(),
+                protect_active=protect_active,
+            )
+        )
+
+    @app.post("/v1/runtime/memory-pressure-eviction")
+    def runtime_memory_pressure_eviction(
+        payload: MemoryPressureEvictionRequest | None = None,
+    ) -> dict[str, Any]:
+        request = payload if payload is not None else MemoryPressureEvictionRequest()
+        result = runtime.execute_memory_pressure_eviction(
+            protect_active=request.protect_active,
+        )
+        records = app.state.loadability_lineage_records
+        victim = result.get("selected_victim") if isinstance(result, dict) else None
+        if (
+            isinstance(result, dict)
+            and result.get("executed")
+            and isinstance(victim, dict)
+            and records is not None
+        ):
+            snapshot = (
+                runtime.inventory.snapshot()
+                if hasattr(runtime, "inventory")
+                and hasattr(runtime.inventory, "snapshot")
+                else None
+            )
+            visibility_gate = build_runtime_model_visibility(
+                snapshot,
+                models_root=app.state.visibility_models_root,
+                registry=app.state.visibility_registry,
+            )
+            result["loadability_lineage_after"] = nonresident_loadability_lineage_to_dict(
+                build_nonresident_loadability_lineage(
+                    model_id=str(victim.get("model_id")),
+                    runtime_visibility_gate=visibility_gate,
+                    lineage_records=records,
+                )
+            )
+        return result
 
     @app.post("/v1/runtime/restart")
     def restart_model(payload: RestartRequest) -> dict[str, Any]:

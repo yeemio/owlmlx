@@ -77,9 +77,10 @@ came from the large-weight path:
 - concurrent requests still pass through `GenerationGate`
 - serialized serving remains the runtime truth
 
-The `was_queued` field is not the authoritative signal for this proof because
-short requests can still record `0.0` wait time at this scale. The authoritative
-signals are:
+The `was_queued` field is not the authoritative signal for this proof. Under
+pre-gate admission it can reflect either joining an already-open cohort window
+or post-claim gate contention, and short requests can still record `0.0` wait
+time at this scale. The authoritative signals are:
 
 - `max_concurrent == 1`
 - `queue_discipline == serial`

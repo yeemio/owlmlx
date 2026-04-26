@@ -1,7 +1,7 @@
 # owlmlx Phase 45: Pre-Gate Cohort Window Feasibility
 
 > Status: authoritative
-> Updated: 2026-04-15
+> Updated: 2026-04-16
 > Scope: runtime-only scheduler ingress exactness on the active path
 
 ## 1. Purpose
@@ -39,8 +39,8 @@ The current exact result is:
 
 The active path truth is now:
 
-- `cohort_window_status = not_runtime_owned_before_gate_entry`
-- `gate_boundary_status = generation_gate_has_no_pre_admission_hook`
+- `cohort_window_status = runtime_owned_bounded_cohort_window_present_before_gate_entry`
+- `gate_boundary_status = bounded_pre_admission_window_precedes_gate_claim`
 - `serial_safety_constraint = serial_safety_validated_only_after_whole_request_gate_claim`
 
 ## 4. What This Changes
@@ -52,26 +52,29 @@ Before this round, `owlmlx` could say:
 
 Now it can say something stronger:
 
-- the current runtime path does not yet expose a runtime-owned seam before
-  `GenerationGate` claims the whole request
-- the validated serial safety boundary is defined after that claim
-- so a cohort window is not just unimplemented; it is not yet locally
-  expressible on this path without first creating a new admission hook/buffer
+- the current runtime path now exposes a bounded runtime-owned cohort window
+  before `GenerationGate` claims the whole request
+- the validated serial safety boundary still remains defined after that claim
+- so the active blocker is no longer local expressibility; it has moved to the
+  downstream request-aggregation dependencies
 
 ## 5. What This Does Not Claim
 
 It does not claim:
 
-- a cohort window already exists
+- aggregated child dispatch exists
+- stream release exists
 - the active serial serving discipline is wrong
-- aggregated child dispatch or interleaved streaming are next
 
-It only freezes the exact ingress boundary that must change first.
+It only freezes that the cohort window is now locally expressible and
+runtime-owned while downstream dependencies remain open.
 
 ## 6. Next Closure Step
 
-The next exact local round should decide whether a bounded pre-gate admission
-hook can be introduced without violating:
+The next exact local round is no longer admission-hook creation.
+
+The next coordinator choice is whether to work the downstream child-exchange
+dependency while preserving:
 
 - `max_concurrent = 1`
 - ticketed FIFO discipline after gate claim

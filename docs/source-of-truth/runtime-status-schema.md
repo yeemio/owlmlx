@@ -317,3 +317,197 @@ status payload:
 This section is diagnostic rather than field-stable policy truth. It exists so
 the governance controls and transition ledger can consume runtime-owned
 observations instead of harness-only synthetic evidence.
+
+## 10. Phase 3A Single-Host Orchestration Assessment Surface
+
+Phase 3A adds one further runtime-owned surface for single-host orchestration
+truth without claiming scheduler parity:
+
+- `owlmlx.orchestration_status`
+  - direct runtime-owned answer for which orchestration layers are currently
+    classifiable from runtime truth
+  - surfaces:
+    - current bottleneck-layer verdict when evidence is sufficient
+    - per-layer `classification_status`
+    - explicit `missing_signals` for pressure / recovery / stream layers that
+      remain weaker than admission / gate truth
+
+This surface sits alongside `/v1/runtime/status`.
+It does not replace the stable status sections.
+
+Its transport surface is:
+
+- `GET /v1/runtime/orchestration-status`
+
+Its stable sections are:
+
+- `summary`
+- `layer_assessment`
+- `scheduler`
+- `stream`
+- `residency`
+- `pressure`
+- `recovery`
+- `child_surfaces`
+- `preserved_invariants`
+- `upstream_truth_sources`
+- `missing_signals`
+
+## 11. Phase 3B Single-Host Scheduler Admission Contract
+
+Phase 3B adds one narrower runtime-owned surface for automatic admission
+decisions before whole-request gate claim:
+
+- `owlmlx.scheduler_admission_contract`
+  - direct runtime-owned answer for whether one request should currently be
+    `accepted`, `deferred`, `rejected`, or left `unknown`
+  - combines:
+    - request-class truth
+    - validated `GenerationGate` floor visibility
+    - bounded pre-claim admission-window visibility
+    - resident target-model truth
+    - hard recovery-barrier truth from `recovery_supervisor_contract`
+    - request context-length truth from `request_context_length_truth`
+    - weaker budget / recovery / stream-hold signals without inflating them into
+      stronger policy closure
+
+This surface sits alongside `/v1/runtime/status` and
+`/v1/runtime/orchestration-status`.
+It does not replace the stable status sections and does not claim a full local
+scheduler.
+
+Its transport surface is:
+
+- `GET /v1/runtime/scheduler-admission-contract`
+
+Its stable sections are:
+
+- `summary`
+- `reason`
+- `request_class_support`
+- `boundary`
+- `signals`
+- `preserved_invariants`
+- `missing_signals`
+
+## 12. Phase 3B.1 Request Context-Length Truth For Admission
+
+Phase 3B.1 adds one narrower runtime-owned support surface for scheduler
+admission:
+
+- `owlmlx.request_context_length_truth`
+  - direct runtime-owned answer for whether a request is known `high_context`,
+    known `non_high_context`, or still `unknown`
+  - uses explicit `context_tokens` plus the already-owned
+    `HIGH_CONTEXT_THRESHOLD_TOKENS`
+  - does not call a tokenizer, estimate tokens from characters, or load a model
+  - allows recovery `probing` to defer only known high-context requests
+
+This surface sits alongside `/v1/runtime/scheduler-admission-contract`.
+It does not replace generation enforcement or full tokenizer accounting.
+
+Its transport surface is:
+
+- `GET /v1/runtime/request-context-length-truth`
+
+Its stable sections are:
+
+- `summary`
+- `classification`
+- `thresholds`
+- `source`
+- `policy_boundaries`
+- `missing_signals`
+
+## 13. Phase 3C Single-Host Model Residency Policy
+
+Phase 3C adds one narrower runtime-owned surface for current model residency
+state classification:
+
+- `owlmlx.model_residency_policy`
+  - direct runtime-owned answer for which loaded models are currently
+    `resident`, `default_active`, `pinned`, `ttl_managed`, or TTL-sweep
+    `evictable`
+  - keeps non-resident target handling at `unknown` until a load-on-demand or
+    defer-to-load policy is explicitly frozen
+  - keeps memory-pressure victim selection out of scope until a separate
+    pressure contract exists
+
+This surface sits alongside `/v1/runtime/status`,
+`/v1/runtime/orchestration-status`, and
+`/v1/runtime/scheduler-admission-contract`.
+
+Its transport surface is:
+
+- `GET /v1/runtime/model-residency-policy`
+
+Its stable sections are:
+
+- `summary`
+- `target_model`
+- `models`
+- `residency_state_support`
+- `policy_boundaries`
+- `signals`
+- `missing_signals`
+
+## 14. Phase 3D Single-Host Memory Pressure Contract
+
+Phase 3D adds one narrower runtime-owned surface for current budget-pressure
+classification:
+
+- `owlmlx.memory_pressure_contract`
+  - direct runtime-owned answer for whether the current budget snapshot is
+    `within_budget`, `near_budget`, `over_budget`, or `unknown`
+  - keeps reclaim, pressure-ranked eviction, and restart-barrier semantics at
+    `insufficient_signal`
+  - may surface TTL-sweep evictable model context from residency truth, but does
+    not treat that as pressure victim selection
+
+This surface sits alongside the admission and residency policy surfaces.
+
+Its transport surface is:
+
+- `GET /v1/runtime/memory-pressure-contract`
+
+Its stable sections are:
+
+- `summary`
+- `reason`
+- `budget`
+- `residency_context`
+- `recovery_context`
+- `policy_boundaries`
+- `classification_support`
+- `missing_signals`
+
+## 15. Phase 3E Single-Host Recovery Supervisor Contract
+
+Phase 3E adds one narrower runtime-owned surface for recovery barrier
+classification:
+
+- `owlmlx.recovery_supervisor_contract`
+  - direct runtime-owned answer for whether backend health, restart exhaustion,
+    or abort-recovery contamination requires a recovery barrier
+  - distinguishes hard all-generation barriers from high-context-only probing
+    deferral
+  - keeps failed reclaim, failed unload, broader worker-pollution detection, and
+    automatic recovery loops at `insufficient_signal`
+
+This surface sits alongside the admission, residency, pressure, and
+orchestration surfaces.
+
+Its transport surface is:
+
+- `GET /v1/runtime/recovery-supervisor-contract`
+
+Its stable sections are:
+
+- `summary`
+- `barrier`
+- `substrate`
+- `restart`
+- `lifecycle`
+- `request_impact`
+- `policy_boundaries`
+- `missing_signals`

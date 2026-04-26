@@ -1,7 +1,7 @@
 # owlmlx Master Outline
 
 > Status: authoritative outline
-> Updated: 2026-04-16
+> Updated: 2026-04-22
 
 ## 1. What `owlmlx` Is
 
@@ -114,19 +114,66 @@ These are runtime-level goals, not temporary integration work.
 69. `phase45-request-aggregation-window-exactness.md`
 70. `phase45-pre-gate-cohort-window-feasibility.md`
 71. `phase45-pre-gate-admission-hook-exactness.md`
-72. `phase45-admission-hook-safety-contract.md`
-73. `phase45-pre-claim-marker-state-carrier.md`
-74. `phase45-pre-claim-marker-clear-observer-boundary.md`
-75. `phase45-pre-claim-marker-immutability-boundary.md`
-76. `phase45-pre-claim-marker-payload-shape-exactness.md`
-77. `phase45-pre-claim-marker-encoding-carrier-exactness.md`
-78. `phase45-pre-claim-marker-storage-locality-exactness.md`
-79. `phase45-pre-claim-marker-locality-access-exactness.md`
-80. `phase45-pre-claim-marker-locality-isolation-exactness.md`
-81. `phase45-cache-structural-ingress-seam.md`
-82. `phase45-multi-model-pinning-control.md`
-83. `phase45-multi-model-ttl-policy-control.md`
-84. `phase45-multi-model-eviction-history-governance.md`
+72. `phase45-cache-pre-gate-admission-window-seam.md`
+73. `phase45-admission-hook-safety-contract.md`
+74. `phase45-pre-claim-marker-state-carrier.md`
+75. `phase45-pre-claim-marker-clear-observer-boundary.md`
+76. `phase45-pre-claim-marker-immutability-boundary.md`
+77. `phase45-pre-claim-marker-payload-shape-exactness.md`
+78. `phase45-pre-claim-marker-encoding-carrier-exactness.md`
+79. `phase45-pre-claim-marker-storage-locality-exactness.md`
+80. `phase45-pre-claim-marker-locality-access-exactness.md`
+81. `phase45-pre-claim-marker-locality-isolation-exactness.md`
+82. `phase45-cache-structural-ingress-seam.md`
+83. `phase45-multi-model-pinning-control.md`
+84. `phase45-multi-model-ttl-policy-control.md`
+85. `phase45-multi-model-eviction-history-governance.md`
+86. `reference-runtime-comparison-matrix.md`
+87. `phase45-current-host-heavy-boundary-budget-blocker.md`
+88. `phase45-request-aggregation-active-seam.md`
+89. `phase45-child-exchange-aggregated-dispatch-exactness.md`
+90. `phase45-cohort-to-child-exchange-handoff-exactness.md`
+91. `phase45-stream-hold-dependency-exactness.md`
+92. `phase45-stream-backend-terminal-event-exactness.md`
+93. `phase45-stream-backend-terminal-payload-commit-exactness.md`
+94. `phase45-stream-backend-terminal-payload-capture-exactness.md`
+95. `phase45-stream-backend-terminal-record-capture-exactness.md`
+96. `phase45-stream-backend-terminal-record-prefix-exactness.md`
+97. `phase45-stream-backend-terminal-action-discriminant-exactness.md`
+98. `phase45-stream-backend-terminal-notice-capture-exactness.md`
+99. `phase45-stream-backend-terminal-notice-prefix-exactness.md`
+100. `phase45-stream-backend-terminal-notice-action-discriminant-exactness.md`
+101. `phase45-stream-backend-terminal-notice-action-stem-exactness.md`
+102. `phase45-stream-backend-terminal-notice-marker-exactness.md`
+103. `phase45-stream-backend-terminal-notice-marker-prefix-exactness.md`
+104. `phase45-stream-backend-terminal-notice-marker-stem-exactness.md`
+105. `phase45-stream-backend-terminal-notice-marker-discriminant-exactness.md`
+106. `phase45-stream-backend-terminal-notice-marker-key-lead-exactness.md`
+107. `phase45-stream-backend-terminal-notice-leading-discriminator-exactness.md`
+108. `phase45-stream-backend-terminal-notice-leading-discriminator-prefix-exactness.md`
+109. `phase45-stream-backend-terminal-notice-leading-discriminator-stem-exactness.md`
+110. `phase45-stream-backend-terminal-notice-leading-discriminator-discriminant-exactness.md`
+111. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-exactness.md`
+112. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-prefix-exactness.md`
+113. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-stem-exactness.md`
+114. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-discriminant-exactness.md`
+115. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-first-unique-boundary-exactness.md`
+116. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-discriminator-exactness.md`
+117. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-discriminator-stem-exactness.md`
+118. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-discriminator-discriminant-exactness.md`
+119. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-discriminator-first-unique-boundary-exactness.md`
+120. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-leading-discriminator-exactness.md`
+121. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-leading-discriminator-prefix-exactness.md`
+122. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-exactness.md`
+123. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-prefix-exactness.md`
+124. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-stem-exactness.md`
+125. `delivery-discipline.md`
+126. `single-host-orchestration-architecture.md`
+127. `release-readiness-backlog.md`
+128. `release-readiness-execution-plan.md`
+129. `comparative-evidence-harness-contract.md`
+130. `comparative-evidence-schema-stub.md`
+131. `release-floor-3-1-cache-scheduler-capability-audit.md`
 
 ## 6. Adoption Model
 
@@ -160,35 +207,132 @@ can trust without inflating replacement claims?**
 
 The current host-level answer is now frozen:
 
-- this host is **not** a candidate for deeper replacement-grade runtime
-  validation
+- this host now has one supported candidate baseline for deeper
+  replacement-grade runtime validation
 
 The current gating program priority is:
 
-- establish one supported-host execution baseline
+- freeze the current post-structural cache blocker exact and hand any further
+  runtime-owned leading-discriminator-marker choice back to coordinator
+  without inflating readiness claims
 
 The current dominant gap is:
 
-- `host_stable_execution`
+- `cache_scheduler_depth`
 
 The current heavy-weight answer is now frozen:
 
 - `owlmlx.heavy_weight_runtime_repeatability` exists
-- current result remains `local_blocked` on this host
-- the exact external blocker is now explicit
+- current result is `supported_host_repeatability_visible` on this host
+- the original Kimi heavy boundary remains frozen exactly at `122.0G > 116.0G`
+- one budget-fit heavy boundary on
+  `/Users/yeemio/AI/Agent/models/gemma-4-31B-it` has entered successfully at
+  `62.0G <= 116.0G`
+- repeated heavy-weight proof is now visible on that selected path via two
+  successful repeat runs under default `~/.owlmlx` truth
 
 The next executable closure round is:
 
-- none on the current local host
-- Phase 45 mainline is frozen at the supported-host return checkpoint
-- supported-host baseline establishment may restart only on a distinct provided
-  host/system image
+- current-host supported candidate baseline is now established
+- supported-host repeated heavy-weight proof is now visible on the selected
+  budget-fit path
+- cache is now the next dominant locally reducible gap
+- governance remains frozen
+- cache has reopened beyond the old structural checkpoint and now waits at the
+  backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-stem seam,
+  while fuller earlier-runtime-owned-boundary prefix detection plus fuller
+  earlier-runtime-owned-boundary detection remain preserved as secondary
+  truth, current marker-discriminant detection remains frozen as the first
+  honest unique boundary on the current runtime-owned marker-first record,
+  the newer earlier-runtime-owned discriminator discriminant and
+  newer earlier-runtime-owned leading-discriminator discriminant remain
+  frozen as the first honest unique boundaries on their newer runtime-owned
+  records, and old marker-key lead stays preserved as secondary truth
 
 The current cache checkpoint result is:
 
-- one bounded pre-gate admission seam now exists before whole-request gate claim
-- it remains a structural runtime experiment only
-- it does not imply request aggregation, continuous batching, or parity
+- one real pre-gate request-aggregation / cohort window is now visible before
+  whole-request gate claim
+- the old structural and pre-gate window checkpoints remain preserved exact
+- one non-stream child exchange now already carries multiple requests in one
+  exchange
+- the active cache truth now points at
+  `owlmlx.cache_request_aggregation_active_seam`
+- the current exact cache blocker is
+  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection`
+- the newer earlier-runtime-owned leading-discriminator discriminant remains
+  frozen as the first honest unique boundary on the newer earlier-runtime-
+  owned leading-discriminator record
+- a second backend stream can already start before the first iterator consumer
+  receives the first stream's terminal event
+- a second backend stream can already start before the first terminal payload
+  is committed to the first stream queue
+- a second backend stream can already start before the first terminal payload
+  is decoded and captured
+- a second backend stream request can already enter the live backend exchange
+  before the first terminal record is fully captured
+- a second backend stream request can already enter the live backend exchange
+  before the first stream fully matches its terminal-record prefix on child
+  stdout
+- a second backend stream request can already enter the live backend exchange
+  before the first terminal done payload reaches its action discriminant on
+  child stdout
+- a second backend stream request can already enter the live backend exchange
+  before the first terminal-notice record is fully captured
+- a second backend stream request can already enter the live backend exchange
+  before child stdout fully matches the first terminal-notice prefix
+- a second backend stream request can already enter the live backend exchange
+  before the first terminal-notice action stem is reached
+- a second backend stream request can already enter the live backend exchange
+  before child stdout reaches the fuller earlier runtime-owned discriminator
+  prefix on the newer discriminator record
+- a second backend stream request can already enter the live backend exchange
+  before the first explicit terminal-notice marker field is reached
+- a second backend stream request can already enter the live backend exchange
+  before the first terminal-notice marker key is fully matched
+- a second backend stream request can already enter the live backend exchange
+  before the first terminal-notice marker stem is reached
+- a second backend stream request can already enter the live backend exchange
+  before the first terminal-notice marker discriminant is reached
+- owlmlx now also owns one runtime-owned terminal-notice leading-discriminator
+  record ahead of the old marker-key-lead seam
+- a second backend stream request can already enter the live backend exchange
+  before the first terminal-notice marker-key lead on the old notice record is
+  reached
+- a second backend stream request can already enter the live backend exchange
+  before child stdout fully matches that runtime-owned leading-discriminator
+  action
+- a second backend stream request can already enter the live backend exchange
+  before child stdout reaches that runtime-owned leading-discriminator prefix
+- a second backend stream request can already enter the live backend exchange
+  before child stdout reaches that runtime-owned leading-discriminator stem
+- a second backend stream request can already enter the live backend exchange
+  before child stdout reaches that runtime-owned leading-discriminator
+  discriminant
+- a second backend stream request can already enter the live backend exchange
+  before child stdout reaches the earlier runtime-owned leading-discriminator
+  stem on that newer leading-discriminator record
+- a second backend stream request can already enter the live backend exchange
+  before child stdout reaches the earlier runtime-owned leading-discriminator
+  discriminant on that newer leading-discriminator record
+- owlmlx now also owns one earlier runtime-owned `terminal_notice_lead` marker
+  on that same leading-discriminator record
+- the current runtime-owned leading-discriminator marker-discriminant boundary
+  remains frozen as the first honest unique boundary on the current
+  marker-first record
+- owlmlx now also owns one new earlier runtime-owned terminal-notice
+  discriminator record ahead of that current marker-discriminant seam
+- owlmlx now also owns one new earlier runtime-owned boundary record ahead of
+  that newer runtime-owned leading-discriminator record
+- a second backend stream request can already enter the live backend exchange
+  once child stdout reaches that new earlier runtime-owned boundary stem and
+  before child stdout reaches fuller earlier-runtime-owned-boundary prefix
+  detection on that same internal record
+- the current exact cache blocker is
+  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection`
+- marker-key lead remains preserved as the first unique boundary on the old
+  terminal-notice record
+- it still does not imply continuous batching, parity, or replacement-ready
 
 The current governance fallback result is:
 
@@ -207,10 +351,13 @@ The current governance fallback result is:
 The current next governance policy question is:
 
 - no longer another local policy-control round on this host
-- governance now waits behind supported-host baseline establishment
+- governance now waits behind stronger baseline validation on the current host
 
 The current restart condition is:
 
-- a real supported host / system image is provided or authorized
-- reentry then starts from
-  `files/execution-prompts/owlmlx/phase-45-supported-host-reentry-baseline-establishment.md`
+- freeze the repeated-proof result in a fresh coordinator checkpoint
+- do not reopen cache/governance without a fresh coordinator choice
+- do not substitute isolated `/tmp` registry truth for the default
+  `~/.owlmlx` registry verdict
+- Phase 45 no longer stops at `budget_fit_heavy_boundary_entered`; it now holds
+  `supported_host_repeatability_visible` on the selected budget-fit path
