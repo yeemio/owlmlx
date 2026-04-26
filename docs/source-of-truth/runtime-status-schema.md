@@ -511,3 +511,31 @@ Its stable sections are:
 - `request_impact`
 - `policy_boundaries`
 - `missing_signals`
+
+## 16. Comparative Evidence Record Surface
+
+A separate runtime-owned HTTP surface exposes the comparative-evidence
+record contract defined by `comparative-evidence-harness-contract.md`
+and `comparative-evidence-schema-stub.md`. It sits alongside
+`/v1/runtime/status` and is not part of the core status payload.
+
+- `GET /v1/runtime/comparative-evidence`
+  - 200: latest validated `comparative_evidence_record` v1
+  - 503: explicit `still_blocked` payload when the ledger is not
+    connected or empty
+- `GET /v1/runtime/comparative-evidence/history`
+  - 200: stable `comparative_evidence_record_history` v1 envelope with
+    `records`, `ledger_status`
+  - 503: explicit `still_blocked` payload when the ledger is not
+    connected or empty
+
+The surface is backed by the runtime-owned JSONL ledger
+`owlmlx.comparative_evidence_ledger.ComparativeEvidenceLedger`. The
+ledger path is connected at `create_app(...)` construction time
+(`comparative_evidence_ledger_path`); `create_fake_app()` honors the
+`OWLMLX_COMPARATIVE_EVIDENCE_LEDGER_PATH` environment variable so live
+proof under a real `uvicorn` factory remains a one-line operator setup.
+
+This surface is not a release-readiness claim. Floor 3.5 of
+`release-readiness-backlog.md` remains open until at least one
+`verdict_grade = "measured"` record exists in the ledger.

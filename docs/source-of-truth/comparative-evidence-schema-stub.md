@@ -180,6 +180,19 @@ Until all three are true, this stub is `surface_open`, and both
 `comparative-evidence-harness-contract.md` §8 and
 `owlops/.../comparison-workspace-contract.md` §7 remain blocked on it.
 
+### 7.1 Authoritative Module (2026-04-26)
+
+`owlmlx/comparative_evidence_schema.py` is the single Python authority
+for the field names, enumerations, required field sets, and banned
+verdict vocabulary listed in section 4. Both
+`owlmlx/comparative_evidence_record.py` and the runtime HTTP routes at
+`/v1/runtime/comparative-evidence` and
+`/v1/runtime/comparative-evidence/history` import from it directly, so
+the schema/wire/contract triple stays in lockstep. Cross-repo consumers
+must continue to read field names off the wire response — they may not
+re-declare these enumerations as the source of truth in operator-app
+code.
+
 ## 8. Restart Condition
 
 This stub is reopened only when:

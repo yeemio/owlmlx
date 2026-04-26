@@ -836,3 +836,130 @@ def test_runtime_restart_endpoint_requires_loaded_model() -> None:
     assert payload["error_code"] == "model_not_loaded"
     assert payload["stage"] == "preflight"
     assert payload["retryable"] is False
+
+
+def test_comparative_evidence_endpoint_still_blocked_when_ledger_not_connected() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+
+    response = client.get("/v1/runtime/comparative-evidence")
+
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["surface"] == "owlmlx.comparative_evidence_record"
+    assert payload["status"] == "still_blocked"
+    assert payload["missing_signal"] == "comparative_evidence_ledger_not_connected"
+
+
+def test_comparative_evidence_history_endpoint_still_blocked_when_ledger_not_connected() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+
+    response = client.get("/v1/runtime/comparative-evidence/history")
+
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["status"] == "still_blocked"
+
+
+def test_comparative_evidence_endpoint_still_blocked_when_ledger_empty(tmp_path) -> None:
+    ledger_path = tmp_path / "comparative-evidence-ledger.jsonl"
+    client = TestClient(
+        create_app(
+            RuntimeKernel(FakeBackend(), profile=_profile()),
+            comparative_evidence_ledger_path=str(ledger_path),
+        )
+    )
+
+    response = client.get("/v1/runtime/comparative-evidence")
+    assert response.status_code == 503
+    assert response.json()["missing_signal"] == "no_comparative_evidence_record_appended"
+
+    history_response = client.get("/v1/runtime/comparative-evidence/history")
+    assert history_response.status_code == 503
+    assert history_response.json()["missing_signal"] == "no_comparative_evidence_record_appended"
+
+
+def test_comparative_evidence_endpoint_returns_real_record_when_ledger_seeded(tmp_path) -> None:
+    from owlmlx.comparative_evidence_ledger import ComparativeEvidenceLedger
+    from owlmlx.comparative_evidence_record import (
+        ComparativeEvidenceMeasurement,
+        ComparativeEvidenceRuntime,
+        build_comparative_evidence_record,
+    )
+
+    ledger_path = tmp_path / "comparative-evidence-ledger.jsonl"
+    ledger = ComparativeEvidenceLedger(ledger_path)
+    ledger.append(
+        build_comparative_evidence_record(
+            recorded_at="2026-04-26T00:00:00Z",
+            evidence_pointer="docs/source-of-truth/comparative-evidence-ledger.md#row-1",
+            host_class="darwin-arm64-test-host",
+            workload_class="single_prompt_short",
+            workload_invariants={
+                "model_id": "qwen3-0.6b",
+                "model_quantization": "q4",
+                "decode_max_tokens": 16,
+                "decode_temperature": 0.0,
+                "prompt_set_hash": "sha256:test",
+                "serving_budget_bytes": 6 * 1024 * 1024 * 1024,
+            },
+            runtimes=(
+                ComparativeEvidenceRuntime(
+                    runtime_id="owlmlx",
+                    runtime_version="0.0.0-runtime7",
+                    measurement=ComparativeEvidenceMeasurement(
+                        throughput_tokens_per_second=0.0,
+                        first_token_latency_ms=0.0,
+                        peak_resident_set_bytes=0,
+                        wall_clock_ms=0.0,
+                        completed_request_count=0,
+                        failure_count=1,
+                        failure_causes=("reference_runtime_unavailable",),
+                    ),
+                ),
+                ComparativeEvidenceRuntime(
+                    runtime_id="omlx",
+                    runtime_version="unavailable",
+                    measurement=ComparativeEvidenceMeasurement(
+                        throughput_tokens_per_second=0.0,
+                        first_token_latency_ms=0.0,
+                        peak_resident_set_bytes=0,
+                        wall_clock_ms=0.0,
+                        completed_request_count=0,
+                        failure_count=1,
+                        failure_causes=("reference_runtime_unavailable",),
+                    ),
+                ),
+            ),
+            verdict_text=(
+                "rejected: reference_runtime_unavailable on host_class=darwin-arm64-test-host, "
+                "workload_class=single_prompt_short"
+            ),
+            verdict_grade="rejected",
+        )
+    )
+
+    client = TestClient(
+        create_app(
+            RuntimeKernel(FakeBackend(), profile=_profile()),
+            comparative_evidence_ledger_path=str(ledger_path),
+        )
+    )
+
+    latest = client.get("/v1/runtime/comparative-evidence")
+    assert latest.status_code == 200
+    body = latest.json()
+    assert body["surface"] == "owlmlx.comparative_evidence_record"
+    assert body["version"] == "v1"
+    assert body["host_class"] == "darwin-arm64-test-host"
+    assert body["workload_class"] == "single_prompt_short"
+    assert body["verdict_grade"] == "rejected"
+    assert body["verdict_text"].startswith("rejected:")
+
+    history = client.get("/v1/runtime/comparative-evidence/history")
+    assert history.status_code == 200
+    history_body = history.json()
+    assert history_body["surface"] == "owlmlx.comparative_evidence_record_history"
+    assert history_body["version"] == "v1"
+    assert history_body["ledger_status"] == "available"
+    assert len(history_body["records"]) == 1
+    assert history_body["records"][0]["host_class"] == "darwin-arm64-test-host"

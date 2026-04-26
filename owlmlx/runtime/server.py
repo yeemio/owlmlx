@@ -50,6 +50,11 @@ from owlmlx.memory_pressure_eviction_policy import (
     build_memory_pressure_eviction_policy,
     memory_pressure_eviction_policy_to_dict,
 )
+from owlmlx.comparative_evidence_ledger import (
+    ComparativeEvidenceLedger,
+    history_envelope as comparative_evidence_history_envelope,
+    still_blocked_payload as comparative_evidence_still_blocked_payload,
+)
 from owlmlx.request_context_length_truth import (
     build_request_context_length_truth,
     request_context_length_truth_to_dict,
@@ -372,6 +377,7 @@ def create_app(
     visibility_models_root: str | None = None,
     visibility_registry: list[Any] | tuple[Any, ...] | None = None,
     loadability_lineage_records: dict[str, Any] | None = None,
+    comparative_evidence_ledger_path: str | None = None,
 ) -> FastAPI:
     """Create a minimal owlmlx runtime HTTP app.
 
@@ -380,6 +386,12 @@ def create_app(
     consumed by the nonresident-loadability-lineage and
     nonresident-model-admission-policy endpoints. It is intentionally not a
     per-request hint.
+
+    `comparative_evidence_ledger_path` is the runtime-owned JSONL ledger that
+    backs `/v1/runtime/comparative-evidence` and
+    `/v1/runtime/comparative-evidence/history`. It is connected at app
+    construction time. When ``None``, both endpoints fail visibly as
+    ``still_blocked``.
     """
 
     runtime = kernel if kernel is not None else RuntimeKernel(FakeBackend())
@@ -392,6 +404,11 @@ def create_app(
     )
     app.state.visibility_models_root = visibility_models_root
     app.state.visibility_registry = visibility_registry
+    app.state.comparative_evidence_ledger = (
+        ComparativeEvidenceLedger(comparative_evidence_ledger_path)
+        if comparative_evidence_ledger_path is not None
+        else None
+    )
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
@@ -998,6 +1015,56 @@ def create_app(
             )
         return result
 
+    @app.get("/v1/runtime/comparative-evidence")
+    def runtime_comparative_evidence() -> JSONResponse:
+        ledger = app.state.comparative_evidence_ledger
+        if ledger is None:
+            return JSONResponse(
+                status_code=503,
+                content=comparative_evidence_still_blocked_payload(
+                    missing_signal="comparative_evidence_ledger_not_connected",
+                    ledger_path=None,
+                ),
+            )
+        latest = ledger.latest()
+        if latest is None:
+            return JSONResponse(
+                status_code=503,
+                content=comparative_evidence_still_blocked_payload(
+                    missing_signal="no_comparative_evidence_record_appended",
+                    ledger_path=str(ledger.path),
+                ),
+            )
+        return JSONResponse(status_code=200, content=latest)
+
+    @app.get("/v1/runtime/comparative-evidence/history")
+    def runtime_comparative_evidence_history() -> JSONResponse:
+        ledger = app.state.comparative_evidence_ledger
+        if ledger is None:
+            return JSONResponse(
+                status_code=503,
+                content=comparative_evidence_still_blocked_payload(
+                    missing_signal="comparative_evidence_ledger_not_connected",
+                    ledger_path=None,
+                ),
+            )
+        records = ledger.history()
+        if not records:
+            return JSONResponse(
+                status_code=503,
+                content=comparative_evidence_still_blocked_payload(
+                    missing_signal="no_comparative_evidence_record_appended",
+                    ledger_path=str(ledger.path),
+                ),
+            )
+        return JSONResponse(
+            status_code=200,
+            content=comparative_evidence_history_envelope(
+                records=records,
+                ledger_status="available",
+            ),
+        )
+
     @app.post("/v1/runtime/restart")
     def restart_model(payload: RestartRequest) -> dict[str, Any]:
         result = runtime.restart_model(payload.model_id)
@@ -1012,9 +1079,21 @@ def create_app(
 
 
 def create_fake_app() -> FastAPI:
-    """Create Runtime-0 app backed by FakeBackend."""
+    """Create Runtime-0 app backed by FakeBackend.
 
-    return create_app(RuntimeKernel(FakeBackend()))
+    Honors ``OWLMLX_COMPARATIVE_EVIDENCE_LEDGER_PATH`` so the live uvicorn
+    factory mode can mount the comparative-evidence surface against an
+    operator-managed ledger without touching ``create_fake_app`` arguments.
+    """
+
+    import os
+
+    return create_app(
+        RuntimeKernel(FakeBackend()),
+        comparative_evidence_ledger_path=os.environ.get(
+            "OWLMLX_COMPARATIVE_EVIDENCE_LEDGER_PATH"
+        ),
+    )
 
 
 def create_app_for_backend(backend: RuntimeBackend) -> FastAPI:

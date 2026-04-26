@@ -185,10 +185,33 @@ true:
   `scripts/runtime_comparative_evidence.py` (or equivalent)
 - at least one record exists in the ledger for at least one
   `(host_class, workload_class)` pair, with `verdict_grade = "measured"`
-- the record is consumable by `owlops` via a stable HTTP surface
+- the record is consumable by upper layers via a stable HTTP surface
 
 Until all four are true, this contract is `surface_open`, and
 `release-readiness-backlog.md` floor 3.5 remains open.
+
+### 8.1 HTTP Surface Sub-Closure (2026-04-26)
+
+The HTTP surface that exposes the record is now mounted and live-curl
+verified through the OwlOps R156 sub-round
+(`owlmlx-comparative-evidence-surface-for-owlops-r156`):
+
+- `GET /v1/runtime/comparative-evidence` returns the latest validated
+  `comparative_evidence_record` v1, or an explicit `still_blocked`
+  payload (HTTP 503) when no record has been appended
+- `GET /v1/runtime/comparative-evidence/history` returns the stable
+  `comparative_evidence_record_history` v1 envelope, or the same
+  `still_blocked` payload when the ledger is empty
+- the runtime-owned ledger backing both endpoints is JSONL, append-only
+  (`owlmlx.comparative_evidence_ledger.ComparativeEvidenceLedger`)
+- `scripts/runtime_comparative_evidence.py` is the operator entry for
+  `append-rejected-record` / `latest` / `history`
+
+This sub-closure does **not** close section 8. The third bullet —
+`verdict_grade = "measured"` — still requires a same-host run with both
+`owlmlx` and at least one of `omlx` / `vmlx` actually invoked. Until
+that exists, only `verdict_grade = "rejected"` (or `"inconclusive"`)
+records can honestly populate the ledger, and floor 3.5 remains open.
 
 ## 9. Restart Condition
 

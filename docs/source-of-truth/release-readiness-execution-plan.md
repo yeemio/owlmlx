@@ -1,7 +1,7 @@
 # owlmlx Release-Readiness Execution Plan
 
 > Status: authoritative
-> Updated: 2026-04-26 (3.2C closeout)
+> Updated: 2026-04-26 (3.2C closeout + OwlOps R156 surface mounted)
 > Scope: execution plan for closing `release-readiness-backlog.md` floors
 
 ## 1. Purpose
@@ -553,24 +553,40 @@ The main schedule risks are:
 
 ## 6. Immediate Next Step
 
-Parked external dependency prompt:
+OwlOps R156 external dependency surface (2026-04-26 closeout):
 
-- OwlOps R156 is blocked on a live upstream `owlmlx` comparative evidence
+- OwlOps R156 was blocked on a live upstream `owlmlx` comparative evidence
   endpoint, not on OwlOps local wiring
-- archived owlmlx-side prompt:
+- owlmlx-side prompt:
   `files/execution-prompts/owlmlx/owlmlx-comparative-evidence-surface-for-owlops-r156.md`
-- do not assign OwlOps until this surface is live-curl verified
-- this does not automatically close release floor `3.5`; measured same-host
-  evidence is still required for floor closure
-- this prompt is not the current release burn-down executor allocation after
-  the 3.2C closeout
+- 2026-04-26 outcome:
+  `owlmlx_release_floor_3_5_owlops_r156_surface_closed`
+  - both `GET /v1/runtime/comparative-evidence` and
+    `GET /v1/runtime/comparative-evidence/history` are mounted, tested,
+    and live-curl verified against a real `uvicorn` process on
+    `127.0.0.1:8056`
+  - the runtime-owned record contract
+    (`owlmlx.comparative_evidence_record` v1), schema authority
+    (`owlmlx.comparative_evidence_schema`), JSONL ledger
+    (`owlmlx.comparative_evidence_ledger`), and operator entry
+    (`scripts/runtime_comparative_evidence.py`) all exist
+  - one real `verdict_grade = "rejected"` record (reason
+    `reference_runtime_unavailable`) was emitted and served by both
+    endpoints; this is honest harness-failure evidence per
+    `comparative-evidence-harness-contract.md` §5.4
+- this does **not** close release floor `3.5`; measured same-host
+  evidence (`verdict_grade = "measured"`) is still required for floor
+  closure per `comparative-evidence-harness-contract.md` §8 third
+  bullet
+- OwlOps R156 may now be unblocked: the live upstream surface exists
+  and is consumable
 
 Floors `3.1` and `3.3` closed on 2026-04-25. Floor `3.2` closed on
 2026-04-26 via the 3.2C independent closeout review
 (`owlmlx_release_floor_3_2C_independent_closeout_closed`). The
 release-readiness burn-down active floor is now
 `3.4 Recovery Policy Closure` per Stage 3 of this plan. The current single
-active executor allocation is:
+active executor allocation after the OwlOps R156 surface round is:
 
 - `files/execution-prompts/owlmlx/owlmlx-release-floor-3-4A0-reclaim-barrier-event.md`
 
