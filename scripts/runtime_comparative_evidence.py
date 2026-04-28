@@ -7,6 +7,12 @@ Subcommands:
   record. Used when reference runtimes (``oMLX`` / ``vMLX``) cannot be
   invoked on the current host. This is real v1 data, not synthetic
   ``measured`` data; it satisfies harness contract section 5.4.
+- ``run-measured-short-prompt``: run two repeat attempts each against
+  ``owlmlx`` and one reference runtime through caller-supplied subprocess
+  argv, collect throughput / first-token latency / peak RSS / wall-clock,
+  write raw artifacts, and append exactly one validated
+  ``comparative_evidence_record`` whose ``verdict_grade`` is one of
+  ``measured`` / ``inconclusive`` / ``rejected`` per the harness contract.
 - ``latest``: print the latest record (or the explicit ``still_blocked``
   payload when no record exists).
 - ``history``: print the full history envelope.
@@ -18,6 +24,7 @@ import argparse
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from owlmlx.comparative_evidence_ledger import (
     ComparativeEvidenceLedger,
@@ -28,6 +35,16 @@ from owlmlx.comparative_evidence_record import (
     ComparativeEvidenceMeasurement,
     ComparativeEvidenceRuntime,
     build_comparative_evidence_record,
+)
+from owlmlx.comparative_evidence_runner import (
+    RuntimeRunnerConfig,
+    WorkloadInputs,
+    aggregate_runtime,
+    aggregate_to_record_runtime,
+    compute_verdict,
+    execute_attempt,
+    load_runner_config_file,
+    write_run_artifacts,
 )
 
 
@@ -100,6 +117,110 @@ def _append_rejected_record(
     return ledger.append(record)
 
 
+def _run_measured_short_prompt(
+    *,
+    ledger: ComparativeEvidenceLedger,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    """Execute the measured short-prompt run and append exactly one record.
+
+    Workflow:
+
+    1. load runner config (owlmlx + reference) from JSON
+    2. run ``--repeats`` attempts per runtime, writing per-attempt artifacts
+    3. aggregate attempts into runtime-level measurements
+    4. compute ``verdict_grade`` per the harness contract
+    5. write manifest.json / commands.json / summary.md
+    6. append one validated v1 record to the ledger
+    7. return the appended record
+    """
+
+    workload = WorkloadInputs(
+        prompt=args.prompt,
+        decode_max_tokens=int(args.decode_max_tokens),
+        decode_temperature=float(args.decode_temperature),
+        model_id=args.model_id,
+        model_path=args.model_path,
+        model_quantization=args.model_quantization,
+        prompt_set_hash=args.prompt_set_hash,
+        serving_budget_bytes=int(args.serving_budget_bytes),
+        workload_class=args.workload_class,
+    )
+    repeats = max(1, int(args.repeats))
+
+    owlmlx_cfg, reference_cfg = load_runner_config_file(args.runner_config)
+
+    evidence_dir = Path(args.evidence_dir)
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+
+    started_at = _now_iso_utc()
+
+    runtime_aggregates = []
+    for cfg in (owlmlx_cfg, reference_cfg):
+        attempts = []
+        for index in range(repeats):
+            attempts.append(
+                execute_attempt(
+                    runtime_config=cfg,
+                    workload=workload,
+                    attempt_index=index + 1,
+                    artifact_dir=evidence_dir,
+                )
+            )
+        runtime_aggregates.append(aggregate_runtime(runtime_config=cfg, attempts=attempts))
+
+    completed_at = _now_iso_utc()
+
+    verdict_grade, verdict_text = compute_verdict(
+        aggregates=runtime_aggregates,
+        expected_repeats=repeats,
+        workload=workload,
+        host_class=args.host_class,
+    )
+
+    evidence_pointer = args.evidence_pointer or str(evidence_dir / "manifest.json")
+
+    runtime_payload = tuple(
+        aggregate_to_record_runtime(agg) for agg in runtime_aggregates
+    )
+
+    record = build_comparative_evidence_record(
+        recorded_at=_now_iso_utc(),
+        evidence_pointer=evidence_pointer,
+        host_class=args.host_class,
+        workload_class=workload.workload_class,
+        workload_invariants={
+            "model_id": workload.model_id,
+            "model_quantization": workload.model_quantization,
+            "decode_max_tokens": workload.decode_max_tokens,
+            "decode_temperature": workload.decode_temperature,
+            "prompt_set_hash": workload.prompt_set_hash,
+            "serving_budget_bytes": workload.serving_budget_bytes,
+        },
+        runtimes=runtime_payload,
+        verdict_text=verdict_text,
+        verdict_grade=verdict_grade,
+    )
+    appended = ledger.append(record)
+
+    write_run_artifacts(
+        artifact_dir=evidence_dir,
+        workload=workload,
+        runtime_configs=(owlmlx_cfg, reference_cfg),
+        aggregates=runtime_aggregates,
+        repeats=repeats,
+        host_class=args.host_class,
+        verdict_grade=verdict_grade,
+        verdict_text=verdict_text,
+        ledger_path=ledger.path,
+        appended_record=appended,
+        started_at=started_at,
+        completed_at=completed_at,
+    )
+
+    return appended
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Operator entry for the comparative-evidence record surface."
@@ -136,6 +257,35 @@ def main() -> int:
     )
     append.add_argument("--runtime-version", default="0.0.0-runtime7")
 
+    measured = sub.add_parser(
+        "run-measured-short-prompt",
+        help=(
+            "Run two repeat short-prompt attempts each against owlmlx and one "
+            "reference runtime, collect raw measurements/artifacts, and append "
+            "one validated comparative_evidence_record (measured / inconclusive / rejected)"
+        ),
+    )
+    measured.add_argument("--evidence-dir", required=True)
+    measured.add_argument("--runner-config", required=True)
+    measured.add_argument("--host-class", required=True)
+    measured.add_argument("--workload-class", default="single_prompt_short")
+    measured.add_argument("--model-id", required=True)
+    measured.add_argument("--model-path", required=True)
+    measured.add_argument("--model-quantization", default="full_precision_unquantized")
+    measured.add_argument("--prompt", required=True)
+    measured.add_argument("--prompt-set-hash", required=True)
+    measured.add_argument("--decode-max-tokens", type=int, default=2)
+    measured.add_argument("--decode-temperature", type=float, default=0.0)
+    measured.add_argument(
+        "--serving-budget-bytes", type=int, default=85899345920
+    )
+    measured.add_argument("--repeats", type=int, default=2)
+    measured.add_argument(
+        "--evidence-pointer",
+        default=None,
+        help="Defaults to the manifest.json path inside --evidence-dir",
+    )
+
     sub.add_parser("latest", help="Print the latest record or still_blocked payload")
     sub.add_parser("history", help="Print the full history envelope")
 
@@ -156,6 +306,11 @@ def main() -> int:
             evidence_pointer=args.evidence_pointer,
             runtime_version=args.runtime_version,
         )
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "run-measured-short-prompt":
+        payload = _run_measured_short_prompt(ledger=ledger, args=args)
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
 

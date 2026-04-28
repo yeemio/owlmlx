@@ -82,6 +82,10 @@ class RuntimeKernel:
         self._governance_ttl_events_visible = False
         self._governance_ttl_expiry_visible = False
         self._governance_eviction_history_visible = False
+        self._reclaim_barrier_events: list[dict[str, Any]] = []
+        self._reclaim_barrier_event_seq: int = 0
+        self._load_failure_events: list[dict[str, Any]] = []
+        self._load_failure_event_seq: int = 0
 
     @property
     def active_model_id(self) -> str | None:
@@ -129,6 +133,12 @@ class RuntimeKernel:
             profile=self.profile,
         )
         if budget.verdict == BudgetVerdict.exceeds:
+            self._record_load_failure_event(
+                model_id=model_id,
+                cause_class="oom_class_failure",
+                error_code=RuntimeErrorCode.memory_budget_exceeded.value,
+                message=budget.message,
+            )
             return LoadResult(
                 ok=False,
                 message=budget.message,
@@ -144,6 +154,25 @@ class RuntimeKernel:
             self._record_governance_transition(
                 previous_active=previous_active,
                 new_active=self._active_model_id,
+            )
+            # Successful same-model load resolves any prior unresolved load
+            # failure event for that model id (auto-resolution rule).
+            self._resolve_matching_load_failure_events(model_id=model_id)
+        elif result.error_code is not RuntimeErrorCode.model_already_loaded:
+            cause_class = (
+                "oom_class_failure"
+                if result.error_code is RuntimeErrorCode.memory_budget_exceeded
+                else "load_failure"
+            )
+            self._record_load_failure_event(
+                model_id=model_id,
+                cause_class=cause_class,
+                error_code=(
+                    result.error_code.value
+                    if result.error_code is not None
+                    else None
+                ),
+                message=result.message,
             )
         return result
 
@@ -174,6 +203,126 @@ class RuntimeKernel:
             if current - last_touch >= ttl_seconds:
                 expired.append(model_id)
         return tuple(sorted(expired))
+
+    def _record_load_failure_event(
+        self,
+        *,
+        model_id: str,
+        cause_class: str,
+        error_code: str | None,
+        message: str,
+    ) -> dict[str, Any]:
+        """Record a runtime-owned load operation boundary failure.
+
+        ``cause_class`` is one of ``oom_class_failure`` / ``load_failure`` /
+        ``unknown``; the termination recovery policy reads this section to
+        classify load-side termination causes without re-deriving them.
+        """
+
+        self._load_failure_event_seq += 1
+        event = {
+            "event_id": self._load_failure_event_seq,
+            "model_id": model_id,
+            "cause_class": cause_class,
+            "stage": "backend_load",
+            "error_code": error_code,
+            "message": message,
+            "recorded_at_s": round(self._now_s(), 6),
+            "resolved": False,
+        }
+        self._load_failure_events.append(event)
+        return event
+
+    def _resolve_matching_load_failure_events(self, *, model_id: str) -> int:
+        resolved = 0
+        for event in self._load_failure_events:
+            if (
+                not event.get("resolved", False)
+                and event.get("model_id") == model_id
+            ):
+                event["resolved"] = True
+                resolved += 1
+        return resolved
+
+    def _resolve_matching_reclaim_barrier_events(
+        self,
+        *,
+        model_id: str,
+        operations: set[str],
+    ) -> int:
+        resolved = 0
+        for event in self._reclaim_barrier_events:
+            if (
+                not event.get("resolved", False)
+                and event.get("model_id") == model_id
+                and event.get("operation") in operations
+            ):
+                event["resolved"] = True
+                resolved += 1
+        return resolved
+
+    def resolve_reclaim_barrier_event(self, event_id: int) -> dict[str, Any]:
+        """Mark a specific reclaim-barrier event resolved.
+
+        This is the explicit operator override path. It records that the
+        barrier is no longer active; it does **not** retry, remediate, or
+        re-execute the underlying operation. Auto-resolution on a successful
+        same-model follow-up operation remains the primary resolution path.
+        """
+
+        for event in self._reclaim_barrier_events:
+            if int(event.get("event_id") or 0) == int(event_id):
+                if event.get("resolved", False):
+                    return {
+                        "ok": True,
+                        "already_resolved": True,
+                        "event": dict(event),
+                    }
+                event["resolved"] = True
+                return {
+                    "ok": True,
+                    "already_resolved": False,
+                    "event": dict(event),
+                }
+        return {
+            "ok": False,
+            "error_code": "reclaim_barrier_event_not_found",
+            "event_id": int(event_id),
+        }
+
+    def _record_reclaim_barrier_event(
+        self,
+        *,
+        model_id: str,
+        operation: str,
+        stage: str,
+        error_code: str | None,
+        message: str,
+        source: str = "runtime_kernel",
+    ) -> dict[str, Any]:
+        """Record a failed-unload / failed-reclaim / restart-unload-stage event.
+
+        Events are recorded at the operation boundary; resolution policy is
+        deferred to a later release-floor 3.4 round. See
+        ``owlmlx.reclaim_barrier_event`` for the contract that consumes the
+        snapshot.
+        """
+
+        self._reclaim_barrier_event_seq += 1
+        event = {
+            "event_id": self._reclaim_barrier_event_seq,
+            "model_id": model_id,
+            "operation": operation,
+            "source": source,
+            "stage": stage,
+            "error_code": error_code,
+            "message": message,
+            "recorded_at_s": round(self._now_s(), 6),
+            "requires_recovery_barrier": True,
+            "resolved": False,
+        }
+        self._reclaim_barrier_events.append(event)
+        return event
 
     def _record_eviction_history(
         self,
@@ -557,8 +706,20 @@ class RuntimeKernel:
         ):
             yield event
 
-    def unload_model(self, model_id: str) -> UnloadResult:
-        """Unload a model through the backend and clear active model if needed."""
+    def unload_model(
+        self,
+        model_id: str,
+        *,
+        _operation: str = "explicit_unload",
+    ) -> UnloadResult:
+        """Unload a model through the backend and clear active model if needed.
+
+        ``_operation`` is an internal hint used to classify a runtime-owned
+        reclaim-barrier event when the backend unload boundary returns a
+        failure result. Public callers should not pass it; ``sweep_expired_models``
+        passes ``"ttl_sweep_reclaim"`` so a TTL sweep cleanup failure is
+        recorded as ``failed_reclaim`` rather than ``failed_unload``.
+        """
 
         if model_id in self._pinned_model_ids:
             return UnloadResult(
@@ -571,6 +732,21 @@ class RuntimeKernel:
 
         previous_active = self._active_model_id
         result = self.backend.unload(model_id)
+        if (
+            not result.ok
+            and result.error_code is not RuntimeErrorCode.model_not_loaded
+        ):
+            self._record_reclaim_barrier_event(
+                model_id=model_id,
+                operation=_operation,
+                stage="backend_unload",
+                error_code=(
+                    result.error_code.value
+                    if result.error_code is not None
+                    else None
+                ),
+                message=result.message,
+            )
         if result.ok and self._active_model_id == model_id:
             remaining = self.backend.status().loaded_models
             self._active_model_id = remaining[-1].model_id if remaining else None
@@ -582,6 +758,13 @@ class RuntimeKernel:
             self._record_governance_transition(
                 previous_active=previous_active,
                 new_active=self._active_model_id,
+            )
+            # Successful follow-up unload resolves any prior unresolved
+            # explicit_unload / ttl_sweep_reclaim event for the same model id
+            # (auto-resolution rule).
+            self._resolve_matching_reclaim_barrier_events(
+                model_id=model_id,
+                operations={"explicit_unload", "ttl_sweep_reclaim"},
             )
         return result
 
@@ -782,6 +965,18 @@ class RuntimeKernel:
         was_active = self._active_model_id == model_id
         unloaded = self.backend.unload(model_id)
         if not unloaded.ok:
+            if unloaded.error_code is not RuntimeErrorCode.model_not_loaded:
+                self._record_reclaim_barrier_event(
+                    model_id=model_id,
+                    operation="restart_unload_stage",
+                    stage="backend_unload",
+                    error_code=(
+                        unloaded.error_code.value
+                        if unloaded.error_code is not None
+                        else None
+                    ),
+                    message=unloaded.message,
+                )
             return RestartResult(
                 ok=False,
                 message=f"restart unload failed: {unloaded.message}",
@@ -815,6 +1010,13 @@ class RuntimeKernel:
         )
         self._record_governance_restart_restore(
             restored_active=was_active and self._active_model_id == model_id
+        )
+        # Successful restart resolves any prior unresolved
+        # restart_unload_stage event for the same model id (auto-resolution
+        # rule).
+        self._resolve_matching_reclaim_barrier_events(
+            model_id=model_id,
+            operations={"restart_unload_stage"},
         )
         return RestartResult(
             ok=True,
@@ -904,7 +1106,7 @@ class RuntimeKernel:
                     event="ttl_expiry_blocked_by_pinning",
                 )
                 continue
-            result = self.unload_model(model_id)
+            result = self.unload_model(model_id, _operation="ttl_sweep_reclaim")
             if result.ok:
                 unloaded_model_ids.append(model_id)
                 self._record_eviction_history(
@@ -1016,6 +1218,26 @@ class RuntimeKernel:
             "eviction_history_count": len(self._eviction_history),
             "recent_eviction_history": list(self._eviction_history[-8:]),
         }
+        unresolved_event_count = sum(
+            1
+            for event in self._reclaim_barrier_events
+            if not event.get("resolved", False)
+        )
+        reclaim_barrier_section = {
+            "events": [dict(event) for event in self._reclaim_barrier_events[-32:]],
+            "total_event_count": len(self._reclaim_barrier_events),
+            "unresolved_event_count": unresolved_event_count,
+        }
+        load_failure_unresolved = sum(
+            1
+            for event in self._load_failure_events
+            if not event.get("resolved", False)
+        )
+        load_failure_section = {
+            "events": [dict(event) for event in self._load_failure_events[-32:]],
+            "total_event_count": len(self._load_failure_events),
+            "unresolved_event_count": load_failure_unresolved,
+        }
         return {
             "contract": {
                 "surface": "owlmlx.runtime.status",
@@ -1032,6 +1254,8 @@ class RuntimeKernel:
                     "governance_observations",
                     "governance_policy",
                     "generation_gate",
+                    "reclaim_barrier",
+                    "load_failure",
                 ],
             },
             "summary": summary,
@@ -1058,5 +1282,7 @@ class RuntimeKernel:
             "governance_observations": governance_observations,
             "governance_policy": governance_policy,
             "generation_gate": status.generation_gate,
+            "reclaim_barrier": reclaim_barrier_section,
+            "load_failure": load_failure_section,
             "active_model_id": status.active_model_id,
         }

@@ -1,0 +1,182 @@
+{
+  "gate": {
+    "contract": {
+      "stable_sections": [
+        "summary",
+        "specimen_path",
+        "mlx_environment"
+      ],
+      "surface": "owlmlx.large_weight_specimen_gate",
+      "version": "stabilization2"
+    },
+    "mlx_environment": {
+      "contract": {
+        "diagnostic_sections": [
+          "probes"
+        ],
+        "stable_sections": [
+          "summary",
+          "selection",
+          "quarantine"
+        ],
+        "surface": "owlmlx.mlx_environment",
+        "version": "stabilization2"
+      },
+      "probes": [
+        {
+          "execution_mode": "default_metal",
+          "label": "omlx-probe-venv",
+          "message": "mlx-lm import probe passed",
+          "python_executable": "/Users/yeemio/AI/gitrep/runtime-probes/omlx-probe/.venv/bin/python",
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "0.31.2",
+          "usable": true
+        },
+        {
+          "execution_mode": "default_metal",
+          "label": "current",
+          "message": "mlx-lm import probe failed with return code 1",
+          "python_executable": "/opt/homebrew/opt/python@3.14/bin/python3.14",
+          "returncode": 1,
+          "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import mlx_lm; print(getattr(mlx_lm, '__version__', 'unknown'))\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'mlx_lm'",
+          "stdout": "",
+          "usable": false
+        },
+        {
+          "execution_mode": "default_metal",
+          "label": "runtime1-mlx",
+          "message": "skipped known unsafe mlx-lm python environment",
+          "python_executable": "/Users/yeemio/AI/gitrep/owlmlx/.runtime1-mlx/bin/python",
+          "returncode": -6,
+          "stderr": "known unsafe MLX environment: import probe aborted during Metal initialization",
+          "stdout": "",
+          "usable": false
+        },
+        {
+          "execution_mode": "default_metal",
+          "label": "runtime2-mlx",
+          "message": "skipped known unsafe mlx-lm python environment",
+          "python_executable": "/Users/yeemio/AI/gitrep/owlmlx/.runtime2-mlx/bin/python",
+          "returncode": -6,
+          "stderr": "known unsafe MLX environment: import probe aborted during Metal initialization",
+          "stdout": "",
+          "usable": false
+        },
+        {
+          "execution_mode": "default_metal",
+          "label": "llm-infra",
+          "message": "skipped known unsafe mlx-lm python environment",
+          "python_executable": "/Users/yeemio/AI/llm-infra/.venv/bin/python",
+          "returncode": -6,
+          "stderr": "known unsafe MLX environment: previous import probe aborted during Metal initialization",
+          "stdout": "",
+          "usable": false
+        },
+        {
+          "execution_mode": "default_metal",
+          "label": "owlmlx-venv",
+          "message": "skipped known unsafe mlx-lm python environment",
+          "python_executable": "/Users/yeemio/AI/gitrep/owlmlx/.venv/bin/python",
+          "returncode": -6,
+          "stderr": "known unsafe MLX environment: previous import probe aborted during Metal initialization",
+          "stdout": "",
+          "usable": false
+        },
+        {
+          "execution_mode": "default_metal",
+          "label": "homebrew-python3",
+          "message": "mlx-lm import probe failed with return code 1",
+          "python_executable": "/opt/homebrew/bin/python3",
+          "returncode": 1,
+          "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import mlx_lm; print(getattr(mlx_lm, '__version__', 'unknown'))\n    ^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'mlx_lm'",
+          "stdout": "",
+          "usable": false
+        }
+      ],
+      "quarantine": {
+        "count": 6
+      },
+      "selection": {
+        "execution_mode": "default_metal",
+        "ok": true,
+        "python_executable": "/Users/yeemio/AI/gitrep/runtime-probes/omlx-probe/.venv/bin/python",
+        "selected_label": "omlx-probe-venv"
+      },
+      "summary": {
+        "blocked_reason": null,
+        "candidate_count": 7,
+        "include_known_candidates": true,
+        "message": "selected mlx environment: omlx-probe-venv (/Users/yeemio/AI/gitrep/runtime-probes/omlx-probe/.venv/bin/python, default_metal)",
+        "preferred_execution_mode": "default_metal",
+        "readiness": "ready"
+      }
+    },
+    "specimen_path": {
+      "aria2_in_progress": false,
+      "blocked_reason": null,
+      "exists": true,
+      "expected_shard_count": 2,
+      "file_count": 26,
+      "has_config_json": true,
+      "has_index_json": true,
+      "kind": "directory",
+      "path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+      "shard_count": 2,
+      "total_size_bytes": 62595062726
+    },
+    "summary": {
+      "blocked_reason": null,
+      "smoke_ready": true
+    }
+  }
+}
+{
+  "load": {
+    "ok": true,
+    "message": "loaded /Users/yeemio/AI/Agent/models/gemma-4-31B-it in persistent child pid=68973",
+    "error_code": null,
+    "detail": {
+      "pid": 68973,
+      "load_time_s": 8.1937
+    },
+    "model": {
+      "model_id": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+      "memory_gb": 80.0,
+      "backend": "mlx-lm-subprocess",
+      "loaded_at": 1777296945.732849
+    }
+  }
+}
+{
+  "generate": {
+    "ok": true,
+    "message": "generated",
+    "error_code": null,
+    "detail": {
+      "returncode": 0,
+      "pid": 68973,
+      "generation_count": 1
+    },
+    "model_id": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+    "text": " OK.",
+    "finish_reason": null,
+    "prompt_tokens": null,
+    "completion_tokens": null,
+    "wait_time_s": 0.0244,
+    "execution_time_s": 3.4456,
+    "was_queued": false
+  }
+}
+{
+  "unload": {
+    "ok": true,
+    "message": "unloaded /Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+    "error_code": null,
+    "detail": {
+      "pid": 68973
+    },
+    "model_id": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+    "freed_gb": 80.0
+  }
+}

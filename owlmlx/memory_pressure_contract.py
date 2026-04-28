@@ -205,6 +205,9 @@ def build_memory_pressure_contract(
             "runtime_owned_pressure_event_visible": False,
             "runtime_owned_pressure_victim_selection": False,
             "runtime_owned_reclaim_barrier": False,
+            "runtime_owned_reclaim_attempt_result_visibility": (
+                "owlmlx.reclaim_barrier_event_records_failed_unload_and_failed_reclaim_at_operation_boundary"
+            ),
             "owned_actions_visible": [
                 "memory_budget_preflight_for_load",
                 "budget_snapshot_for_current_loaded_memory",
@@ -228,11 +231,6 @@ def build_memory_pressure_contract(
                 "reason": "budget utilization is not the same thing as a direct pressure event",
             },
             {
-                "layer": "reclaim",
-                "signal": "runtime_owned_reclaim_attempt_and_result_contract",
-                "reason": "no reclaim action/result signal is currently owned by this contract",
-            },
-            {
                 "layer": "eviction",
                 "signal": "runtime_owned_pressure_ranked_victim_selection",
                 "reason": "TTL sweep evictability is visible, but pressure victim ranking is not frozen",
@@ -240,7 +238,7 @@ def build_memory_pressure_contract(
             {
                 "layer": "recovery",
                 "signal": "runtime_owned_restart_or_isolation_barrier_after_failed_reclaim",
-                "reason": "restart visibility exists, but recovery barrier policy is separate",
+                "reason": "restart visibility exists, but recovery barrier policy is separate; reclaim attempt-result visibility is owned by owlmlx.reclaim_barrier_event",
             },
         ),
     )

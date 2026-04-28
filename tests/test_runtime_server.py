@@ -721,6 +721,8 @@ def test_runtime_status_returns_full_kernel_snapshot() -> None:
         "governance_observations",
         "governance_policy",
         "generation_gate",
+        "reclaim_barrier",
+        "load_failure",
     ]
     assert payload["governance_observations"]["transition_count"] == 1
     assert payload["governance_observations"]["active_reassignment_visible"] is False

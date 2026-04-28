@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import json, urllib.request; payload={"model":"{model_id}","messages":[{"role":"user","content":"{prompt}"}],"max_tokens":int("{max_tokens}"),"temperature":float("{temperature}"),"stream":False}; req=urllib.request.Request("http://127.0.0.1:8061/v1/chat/completions", data=json.dumps(payload).encode(), headers={"Content-Type":"application/json"}); data=json.loads(urllib.request.urlopen(req, timeout=180).read().decode()); print(data["choices"][0]["message"]["content"] or "")
+                                                                                                                              ~~~^^^^^^^^^^^^^^^^
+ValueError: invalid literal for int() with base 10: '{max_tokens}'

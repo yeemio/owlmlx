@@ -71,6 +71,11 @@ Current state vocabulary:
   - one or more models have exhausted runtime-owned restart attempts
 - `backend_unhealthy`
   - backend health is false and generation must fail closed
+- `failed_reclaim_barrier`
+  - one or more unresolved `owlmlx.reclaim_barrier_event` cleanup-boundary
+    events exist (failed unload, failed reclaim, or restart unload stage
+    failure); recovery barrier required until the future four-class
+    recovery policy resolves them
 - `unknown`
   - restart visibility exists but abort recovery truth is absent
 
@@ -81,6 +86,7 @@ The contract may claim a hard recovery barrier only for:
 - `backend_unhealthy`
 - `restart_exhausted`
 - `contaminated`
+- `failed_reclaim_barrier`
 
 It may claim a high-context-only barrier for:
 
@@ -116,7 +122,12 @@ this contract may classify recovery barrier impact.
 It does not claim:
 
 - automatic recovery supervisor loop exists
-- failed reclaim or failed unload barrier events are fully modeled
+- the four-class termination-cause recovery policy is executed
+  automatically; the policy itself is now frozen by
+  `termination-recovery-policy.md`
+  (`retry / quarantine / surface_to_coordinator / drop`) and consumes
+  this contract's hard-recovery barrier as one of its signals, but
+  this contract still does not run any recovery action
 - worker pollution is detected beyond abort-recovery state
 - pressure-ranked eviction exists
 - restart visibility equals recovery closure

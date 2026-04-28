@@ -116,7 +116,12 @@ It does not claim:
 - automatic load-on-demand exists
 - pressure-ranked eviction exists
 - TTL visibility equals full eviction policy closure
-- recovery policy is complete
+- recovery policy is complete (cleanup-boundary failure events are now
+  recorded by `owlmlx.reclaim_barrier_event`, but resolution policy and
+  the four-class termination-cause recovery policy remain future
+  release-floor `3.4` work; pinned TTL-expiry skips remain
+  `ttl_expiry_blocked_by_pinning` in eviction history and are
+  intentionally **not** reclaim-failure barrier events)
 - full local scheduler depth exists
 
 It only claims:

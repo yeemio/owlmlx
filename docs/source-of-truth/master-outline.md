@@ -1,7 +1,7 @@
 # owlmlx Master Outline
 
 > Status: authoritative outline
-> Updated: 2026-04-22
+> Updated: 2026-04-28
 
 ## 1. What `owlmlx` Is
 
@@ -174,6 +174,9 @@ These are runtime-level goals, not temporary integration work.
 129. `comparative-evidence-harness-contract.md`
 130. `comparative-evidence-schema-stub.md`
 131. `release-floor-3-1-cache-scheduler-capability-audit.md`
+132. `reclaim-barrier-event.md`
+133. `termination-recovery-policy.md`
+134. `public-surface.md`
 
 ## 6. Adoption Model
 

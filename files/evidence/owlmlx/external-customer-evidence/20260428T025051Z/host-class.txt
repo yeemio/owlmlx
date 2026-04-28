@@ -1,0 +1,4 @@
+hw.model=Mac17,6
+machine=arm64
+macos=26.4.1
+mem_bytes=137438953472

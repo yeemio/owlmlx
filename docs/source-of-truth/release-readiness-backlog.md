@@ -1,7 +1,7 @@
 # owlmlx Release-Readiness Backlog
 
 > Status: authoritative
-> Updated: 2026-04-25
+> Updated: 2026-04-28
 > Scope: what `owlmlx` must close before any external release claim is honest
 
 ## 1. Purpose
@@ -118,7 +118,10 @@ Without this, multi-model switching cannot honestly be called governed.
 Current state:
 
 - termination-recovery state machine exists
-- the recovery policy itself is documented as incomplete
+- closed 2026-04-27 via the runtime-owned termination recovery policy
+  (`owlmlx.termination_recovery_policy`) plus the cleanup-boundary event
+  surface (`owlmlx.reclaim_barrier_event`); resolution semantics are
+  runtime-owned and exercised in tests
 
 Release-floor requirement:
 
@@ -134,10 +137,13 @@ across restarts they did not cause.
 
 ### 3.5 Comparative Evidence Against Reference Runtimes
 
-Current state per `phase45-customer-runtime-evidence-ledger.md`:
+Current state:
 
 - evidence is internal: Gemma mainline pilot PASS, Kimi heavy-boundary frozen
-- there is zero head-to-head measurement against `oMLX` or `vMLX`
+- closed 2026-04-28 via same-host measured comparative evidence against
+  `omlx` for `workload_class = "single_prompt_short"` on
+  `host_class = "Mac17,6-arm64-macOS-26.4.1-128GB"`; the record is
+  schema-valid, HTTP-consumable, and backed by repeat-run raw artifacts
 
 Release-floor requirement:
 
@@ -155,8 +161,12 @@ Without comparative evidence the replacement claim is rhetoric, not truth.
 
 Current state:
 
-- evidence ledger contains internal validation only
-- `customer_runtime_evidence` remains an open replacement-grade gap
+- evidence ledger now contains one external deployment-boundary record
+- closed 2026-04-28 via OwlOps-boundary external runtime-truth consumer
+  evidence (host_class `Mac17,6-arm64-macOS-26.4.1-128GB`, workload_class
+  `external_runtime_status_probe`, verdict `pass`); see
+  `phase45-customer-runtime-evidence-ledger.md` §9 and the
+  `20260428T025051Z` evidence directory
 
 Release-floor requirement:
 
@@ -172,9 +182,12 @@ Release-floor requirement:
 
 Current state:
 
-- 132+ source-of-truth documents
+- 134+ source-of-truth documents
 - runtime surfaces stable enough to be referenced by upper layers
-- no curated public-facing surface
+- closed 2026-04-28 via the runtime-owned `public-surface.md` freeze plus
+  `tests/test_public_surface_contract.py` validation; the supported HTTP
+  routes, Python modules, operator scripts, and source-of-truth contracts
+  are exactly enumerated, and anything not listed is `internal` by default
 
 Release-floor requirement:
 
@@ -239,10 +252,10 @@ item closes under section 4.2.
 | 3.1 cache scheduler closure | closed (non-stream main path) | 2026-04-25 | `release-floor-3-1-cache-scheduler-capability-audit.md`, `phase45-cache-pre-gate-admission-window-seam.md`, `phase45-request-aggregation-active-seam.md`, `tests/test_runtime_kernel.py::test_repeated_concurrent_generations_show_aggregated_dispatch_under_repeated_load` |
 | 3.2 memory-pressure decision | closed (runtime-owned pressure eviction decision and execution) | 2026-04-26 | `memory-pressure-contract.md`, `memory-pressure-eviction-policy.md`, `model-residency-policy.md`, `nonresident-loadability-lineage.md`, `tests/test_memory_pressure_eviction_policy.py`, `owlmlx-release-floor-3-2A-memory-pressure-eviction-decision-and-execution-handoff.md`, `owlmlx-release-floor-3-2B-memory-pressure-eviction-review-handoff.md`, `owlmlx-release-floor-3-2C-independent-closure-review-and-ledger-decision-handoff.md` |
 | 3.3 residency non-resident path | closed (via runtime-owned loadability lineage) | 2026-04-25 | `nonresident-model-admission-policy.md`, `nonresident-loadability-lineage.md`, `tests/test_nonresident_model_admission_policy.py`, `tests/test_nonresident_loadability_lineage.py`, `owlmlx-release-floor-3-3A2-nonresident-loadability-lineage-handoff.md`, `owlmlx-release-floor-3-3B3-loadability-lineage-closure-review-handoff.md` |
-| 3.4 recovery policy | open | -- | `phase45-pre-claim-inert-state-semantics.md` |
-| 3.5 comparative evidence | open (contract surface) | -- | `comparative-evidence-harness-contract.md`, `reference-runtime-comparison-matrix.md` |
-| 3.6 external customer evidence | open | -- | `phase45-customer-runtime-evidence-ledger.md` |
-| 3.7 public surface | open | -- | (none yet) |
+| 3.4 recovery policy | closed (via runtime-owned termination recovery policy) | 2026-04-27 | `reclaim-barrier-event.md`, `termination-recovery-policy.md`, `recovery-supervisor-contract.md`, `tests/test_reclaim_barrier_event.py`, `tests/test_termination_recovery_policy.py`, `owlmlx-release-floor-3-4A0-reclaim-barrier-event-handoff.md`, `owlmlx-release-floor-3-4A-termination-recovery-policy-handoff.md`, `owlmlx-release-floor-3-4B-termination-recovery-policy-closeout-review-handoff.md` |
+| 3.5 comparative evidence | closed (via same-host measured comparative evidence) | 2026-04-28 | `comparative-evidence-harness-contract.md`, `comparative-evidence-schema-stub.md`, `tests/test_runtime_comparative_evidence_measured_runner.py`, `scripts/runtime_comparative_evidence.py`, `files/evidence/owlmlx/comparative-evidence/20260428T004500Z/live-ledger.jsonl`, `files/evidence/owlmlx/comparative-evidence/20260428T004500Z/run/manifest.json`, `files/evidence/owlmlx/comparative-evidence/20260428T004500Z/http-latest.txt`, `files/evidence/owlmlx/comparative-evidence/20260428T004500Z/http-history.txt`, `owlmlx-release-floor-3-5E-codex-live-measured-run-rerun-handoff.md`, `owlmlx-release-floor-3-5F-comparative-evidence-closeout-review-handoff.md` |
+| 3.6 external customer evidence | closed (via OwlOps-boundary external runtime-truth consumer evidence) | 2026-04-28 | `phase45-customer-runtime-evidence-ledger.md`, `files/evidence/owlmlx/external-customer-evidence/20260428T025051Z/`, `owlmlx-release-floor-3-6A-external-customer-evidence-minimum-record-handoff.md`, `owlmlx-release-floor-3-6B-3-7B-final-closeout-ledger-sync-handoff.md` |
+| 3.7 public surface | closed (via runtime-owned public-surface freeze) | 2026-04-28 | `public-surface.md`, `tests/test_public_surface_contract.py`, `owlmlx-release-floor-3-7A-public-surface-freeze-handoff.md`, `owlmlx-release-floor-3-6B-3-7B-final-closeout-ledger-sync-handoff.md` |
 
 ## 6. Restart Condition
 

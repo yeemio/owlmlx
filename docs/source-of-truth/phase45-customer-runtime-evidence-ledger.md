@@ -1,7 +1,7 @@
 # owlmlx Phase 45: Customer Runtime Evidence Ledger
 
 > Status: authoritative
-> Updated: 2026-04-23
+> Updated: 2026-04-28
 > Scope: runtime-only customer-runtime evidence for replacement-grade alignment
 
 ## 1. Purpose
@@ -667,3 +667,41 @@ The closure is on the non-stream main runtime path only. The stream-branch
 dispatch-level closure remains the active phase45 seam blocker
 (`backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection`)
 preserved as secondary truth.
+
+## 9. Release-Floor 3.6 External Customer Evidence Candidate
+
+Record:
+
+```text
+record_id = owlmlx_release_floor_3_6A_20260428T025051Z
+recorded_at = 2026-04-28T02:51:45Z
+deployment_owner_or_boundary = OwlOps external consumer boundary
+repo_or_host_boundary = /Users/yeemio/AI/gitrep/owlops -> http://127.0.0.1:8065
+host_class = Mac17,6-arm64-macOS-26.4.1-128GB
+workload_class = external_runtime_status_probe
+runtime_surface_used = GET /v1/runtime/status, GET /healthz
+command_or_request = python3 urllib.request probe from /Users/yeemio/AI/gitrep/owlops
+verdict = pass
+external_blocker_or_success = OwlOps-boundary external consumer successfully fetched owlmlx runtime status and health truth over HTTP from outside the owlmlx repository.
+evidence_pointer = files/evidence/owlmlx/external-customer-evidence/20260428T025051Z/
+not_release_claim = true
+```
+
+Evidence files:
+
+```text
+files/evidence/owlmlx/external-customer-evidence/20260428T025051Z/external-run-notes.md
+files/evidence/owlmlx/external-customer-evidence/20260428T025051Z/owlops-external-runtime-status-probe.stdout.json
+files/evidence/owlmlx/external-customer-evidence/20260428T025051Z/owlops-external-runtime-status-probe.stderr.txt
+files/evidence/owlmlx/external-customer-evidence/20260428T025051Z/owlops-external-runtime-status-probe.exit-status
+files/evidence/owlmlx/external-customer-evidence/20260428T025051Z/owlmlx-port-8065-listen-before.txt
+files/evidence/owlmlx/external-customer-evidence/20260428T025051Z/owlmlx-port-8065-listen-after.txt
+files/evidence/owlmlx/external-customer-evidence/20260428T025051Z/host-class.txt
+```
+
+This record is external because the live HTTP request was issued from the
+OwlOps repository boundary, whose adapter and connection validator consume
+`owlmlx` runtime truth surfaces. It is intentionally narrow: it proves external
+runtime-truth consumption, not model inference quality, public-surface freeze,
+release readiness, parity, replacement, production-grade posture, or
+superiority.

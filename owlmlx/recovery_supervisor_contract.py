@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from .reclaim_barrier_event import build_reclaim_barrier_event
+
 
 RECOVERY_SUPERVISOR_CONTRACT_SURFACE = "owlmlx.recovery_supervisor_contract"
 RECOVERY_SUPERVISOR_CONTRACT_VERSION = "v1"
@@ -52,6 +54,8 @@ def _classify_recovery(
     restart_exhausted_models: tuple[str, ...],
     abort_state: str | None,
     recovery_required: bool | None,
+    reclaim_barrier_state: str,
+    reclaim_barrier_unresolved_count: int,
 ) -> tuple[str, str, str, str, str]:
     if backend_healthy is False:
         return (
@@ -68,6 +72,23 @@ def _classify_recovery(
             "high",
             "restart_attempts_exhausted",
             "One or more loaded models have exhausted runtime-owned restart attempts.",
+        )
+    if reclaim_barrier_state in {
+        "failed_unload",
+        "failed_reclaim",
+        "restart_unload_failed",
+    }:
+        return (
+            "failed_reclaim_barrier",
+            "recovery_barrier_required",
+            "high",
+            f"reclaim_barrier_event_unresolved_{reclaim_barrier_state}",
+            (
+                f"Runtime-owned reclaim_barrier_event reports {reclaim_barrier_state} "
+                f"with {reclaim_barrier_unresolved_count} unresolved event(s); "
+                "recovery barrier required until the four-class recovery policy "
+                "resolves them."
+            ),
         )
     if abort_state == "contaminated" or recovery_required is True:
         return (
@@ -122,17 +143,29 @@ def build_recovery_supervisor_contract(
     abort_state_value = abort_snapshot.get("state")
     abort_state = str(abort_state_value) if isinstance(abort_state_value, str) else None
     recovery_required = _bool_or_none(abort_snapshot.get("recovery_required"))
+    reclaim_barrier_contract = build_reclaim_barrier_event(runtime_status=raw_status)
+    reclaim_barrier_state = reclaim_barrier_contract.barrier_state
+    reclaim_barrier_unresolved_count = int(
+        reclaim_barrier_contract.barrier.get("unresolved_event_count", 0)
+    )
 
     state, decision, confidence, reason_code, reason_message = _classify_recovery(
         backend_healthy=backend_healthy,
         restart_exhausted_models=restart_exhausted_models,
         abort_state=abort_state,
         recovery_required=recovery_required,
+        reclaim_barrier_state=reclaim_barrier_state,
+        reclaim_barrier_unresolved_count=reclaim_barrier_unresolved_count,
     )
     hard_barrier = decision in {
         "block_runtime_generation",
         "operator_recovery_required",
         "recovery_barrier_required",
+    }
+    reclaim_barrier_active = reclaim_barrier_state in {
+        "failed_unload",
+        "failed_reclaim",
+        "restart_unload_failed",
     }
     high_context_barrier = decision == "defer_high_context_until_probe"
 
@@ -180,8 +213,17 @@ def build_recovery_supervisor_contract(
             "eviction_history_events_visible": bool(
                 governance.get("eviction_history_events_visible", False)
             ),
-            "classification_status": "partial",
-            "reason_code": "governance_observations_visible_without_reclaim_barrier",
+            "reclaim_barrier_state": reclaim_barrier_state,
+            "reclaim_barrier_unresolved_event_count": reclaim_barrier_unresolved_count,
+            "reclaim_barrier_active": reclaim_barrier_active,
+            "classification_status": (
+                "supported" if reclaim_barrier_state != "unknown" else "partial"
+            ),
+            "reason_code": (
+                f"reclaim_barrier_state_{reclaim_barrier_state}"
+                if reclaim_barrier_state != "unknown"
+                else "reclaim_barrier_section_absent_from_runtime_status"
+            ),
         },
         request_impact={
             "generation_admissible": not hard_barrier,
@@ -214,11 +256,6 @@ def build_recovery_supervisor_contract(
         missing_signals=(
             {
                 "layer": "recovery",
-                "signal": "failed_reclaim_or_failed_unload_barrier_event",
-                "reason": "restart and abort truth exist, but reclaim/unload barrier events are not a stable contract",
-            },
-            {
-                "layer": "recovery",
                 "signal": "worker_pollution_detector_beyond_abort_recovery",
                 "reason": "abort recovery state is owned, but broader worker-pollution detection is not",
             },
@@ -226,6 +263,11 @@ def build_recovery_supervisor_contract(
                 "layer": "recovery",
                 "signal": "automatic_recovery_supervisor_loop",
                 "reason": "this contract classifies barriers but does not run background recovery actions",
+            },
+            {
+                "layer": "recovery",
+                "signal": "frozen_four_class_termination_cause_recovery_policy",
+                "reason": "reclaim_barrier_event records cleanup-boundary failures, but the four-class termination-cause recovery policy and event-resolution rules remain future 3.4 work",
             },
         ),
     )

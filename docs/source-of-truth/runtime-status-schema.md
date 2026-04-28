@@ -539,3 +539,49 @@ proof under a real `uvicorn` factory remains a one-line operator setup.
 This surface is not a release-readiness claim. Floor 3.5 of
 `release-readiness-backlog.md` remains open until at least one
 `verdict_grade = "measured"` record exists in the ledger.
+
+## 17. Reclaim Barrier Event Surface
+
+A separate runtime-owned HTTP surface exposes the cleanup-boundary
+failure event contract defined by `reclaim-barrier-event.md`. It sits
+alongside `/v1/runtime/status` and is not part of the core status
+payload.
+
+- `GET /v1/runtime/reclaim-barrier-event`
+  - 200: read-only `owlmlx.reclaim_barrier_event` v1 contract
+    serialization
+  - the route must not clear events, retry operations, or perform
+    recovery
+
+`/v1/runtime/status` exposes a diagnostic section `reclaim_barrier`
+with:
+
+- `events` — most recent up to 32 events (read-only snapshot)
+- `total_event_count`
+- `unresolved_event_count`
+
+This surface does not advance release floor `3.4` to `closed`. It is the
+cleanup-boundary event-recording sub-round (`3.4A0`) that the future
+four-class termination-cause recovery policy will consume.
+
+## 18. Termination Recovery Policy Surface
+
+A separate runtime-owned HTTP surface exposes the cause-to-action
+recovery policy defined by `termination-recovery-policy.md`. It sits
+alongside `/v1/runtime/status` and the reclaim-barrier-event surface.
+
+- `GET /v1/runtime/termination-recovery-policy`
+  - 200: read-only `owlmlx.termination_recovery_policy` v1 contract
+    serialization
+  - the route must not retry, quarantine, drop, or remediate
+
+`/v1/runtime/status` exposes a diagnostic section `load_failure` with:
+
+- `events` — most recent up to 32 load-failure events
+- `total_event_count`
+- `unresolved_event_count`
+
+Load-failure events are recorded inside `RuntimeKernel.load_model` at
+the operation boundary (excluding `invalid_request` preflight and
+`model_already_loaded` redundant-request paths). Auto-resolution rules
+are documented in `termination-recovery-policy.md` §6.

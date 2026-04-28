@@ -115,6 +115,12 @@ It does not claim:
   `RuntimeKernel.execute_memory_pressure_eviction(...)`; this
   classification contract remains read-only and does not run eviction
   itself
+- a reclaim engine exists — only reclaim-attempt **result visibility**
+  exists, owned by `owlmlx.reclaim_barrier_event`
+  (`reclaim-barrier-event.md`); this contract surfaces that visibility
+  via `policy_boundaries.runtime_owned_reclaim_attempt_result_visibility`
+  but still keeps reclaim engine, pressure-ranked eviction execution,
+  and recovery loops out of scope
 - eviction history equals pressure policy
 - restart visibility equals recovery barrier
 

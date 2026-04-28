@@ -50,6 +50,14 @@ from owlmlx.memory_pressure_eviction_policy import (
     build_memory_pressure_eviction_policy,
     memory_pressure_eviction_policy_to_dict,
 )
+from owlmlx.reclaim_barrier_event import (
+    build_reclaim_barrier_event,
+    reclaim_barrier_event_to_dict,
+)
+from owlmlx.termination_recovery_policy import (
+    build_termination_recovery_policy,
+    termination_recovery_policy_to_dict,
+)
 from owlmlx.comparative_evidence_ledger import (
     ComparativeEvidenceLedger,
     history_envelope as comparative_evidence_history_envelope,
@@ -1014,6 +1022,21 @@ def create_app(
                 )
             )
         return result
+
+    @app.get("/v1/runtime/reclaim-barrier-event")
+    def runtime_reclaim_barrier_event() -> dict[str, Any]:
+        return reclaim_barrier_event_to_dict(
+            build_reclaim_barrier_event(runtime_status=runtime.status_dict())
+        )
+
+    @app.get("/v1/runtime/termination-recovery-policy")
+    def runtime_termination_recovery_policy() -> dict[str, Any]:
+        return termination_recovery_policy_to_dict(
+            build_termination_recovery_policy(
+                runtime_status=runtime.status_dict(),
+                abort_recovery_snapshot=runtime.abort_recovery.snapshot(),
+            )
+        )
 
     @app.get("/v1/runtime/comparative-evidence")
     def runtime_comparative_evidence() -> JSONResponse:

@@ -1,7 +1,7 @@
 # owlmlx Comparative Evidence Harness Contract
 
 > Status: authoritative
-> Updated: 2026-04-25
+> Updated: 2026-04-28
 > Scope: runtime-owned harness contract that produces honest comparative evidence between `owlmlx` and reference runtimes (`oMLX` / `vMLX`)
 
 ## 1. Purpose
@@ -207,11 +207,34 @@ verified through the OwlOps R156 sub-round
 - `scripts/runtime_comparative_evidence.py` is the operator entry for
   `append-rejected-record` / `latest` / `history`
 
-This sub-closure does **not** close section 8. The third bullet —
-`verdict_grade = "measured"` — still requires a same-host run with both
-`owlmlx` and at least one of `omlx` / `vmlx` actually invoked. Until
-that exists, only `verdict_grade = "rejected"` (or `"inconclusive"`)
-records can honestly populate the ledger, and floor 3.5 remains open.
+This sub-closure did **not** close section 8 by itself. At the time, the
+third bullet — `verdict_grade = "measured"` — still required a same-host run
+with both `owlmlx` and at least one of `omlx` / `vmlx` actually invoked.
+
+### 8.2 Measured Record Closure (2026-04-28)
+
+The measured-record requirement is now closed for one
+`(host_class, workload_class)` pair:
+
+- evidence directory:
+  `files/evidence/owlmlx/comparative-evidence/20260428T004500Z/`
+- ledger:
+  `files/evidence/owlmlx/comparative-evidence/20260428T004500Z/live-ledger.jsonl`
+- `verdict_grade = "measured"`
+- `host_class = "Mac17,6-arm64-macOS-26.4.1-128GB"`
+- `workload_class = "single_prompt_short"`
+- runtime list: `owlmlx`, `omlx`
+- both runtimes completed two repeats with `failure_count = 0`
+- the `omlx` RSS measurement includes the external live server PID via
+  `external_pid_file`
+- the `owlmlx` first-token timing uses a `regex:` strategy that matches
+  generated output rather than diagnostic preamble
+- both HTTP routes served the fresh ledger:
+  `/v1/runtime/comparative-evidence` and
+  `/v1/runtime/comparative-evidence/history`
+
+This closes section 8 for the required first measured record. It does not
+claim parity, replacement, production readiness, or superiority.
 
 ## 9. Restart Condition
 

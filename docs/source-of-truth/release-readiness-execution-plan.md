@@ -1,7 +1,7 @@
 # owlmlx Release-Readiness Execution Plan
 
 > Status: authoritative
-> Updated: 2026-04-26 (3.2C closeout + OwlOps R156 surface mounted)
+> Updated: 2026-04-28 (3.6B / 3.7B final closeout closed floors 3.6 and 3.7 in one batch; release-floor count moved from `5 / 7` to `7 / 7`)
 > Scope: execution plan for closing `release-readiness-backlog.md` floors
 
 ## 1. Purpose
@@ -22,7 +22,7 @@ It does not turn execution estimates into readiness claims.
 
 Current floor status:
 
-- `3 / 7` release-floor items are closed:
+- `7 / 7` release-floor items are closed:
   - `3.1` closed 2026-04-25 via the non-stream main runtime path;
     stream-branch dispatch remains the active phase45 seam, preserved as
     secondary truth
@@ -38,14 +38,48 @@ Current floor status:
     closeout review
     `owlmlx_release_floor_3_2C_independent_closeout_closed`
     resolved the 3.2B self-audit caveat
+  - `3.4` closed 2026-04-27 via the runtime-owned termination recovery
+    policy (`owlmlx.termination_recovery_policy`) plus the cleanup-boundary
+    event surface (`owlmlx.reclaim_barrier_event`); 3.4B independent
+    closeout review
+    `owlmlx_release_floor_3_4B_closeout_closed` verified the four required
+    cause classes, the four-action vocabulary, runtime-owned event
+    resolution semantics (final-status look-clean alone never resolves),
+    and the read-only HTTP surfaces
+  - `3.5` closed 2026-04-28 via same-host measured comparative evidence
+    against `omlx` for `workload_class = "single_prompt_short"` on
+    `host_class = "Mac17,6-arm64-macOS-26.4.1-128GB"`; 3.5F independent
+    closeout review
+    `owlmlx_release_floor_3_5F_closeout_closed` verified the fresh measured
+    ledger, HTTP latest/history captures, process-tree / external-PID RSS,
+    token-aware TTFT, artifact trail, and harness-contract section `8`
+  - `3.6` closed 2026-04-28 via OwlOps-boundary external runtime-truth
+    consumer evidence (host_class
+    `Mac17,6-arm64-macOS-26.4.1-128GB`, workload_class
+    `external_runtime_status_probe`, verdict `pass`); the live HTTP probe
+    issued from `/Users/yeemio/AI/gitrep/owlops` fetched both
+    `/v1/runtime/status` and `/healthz` over HTTP at exit-status 0 with
+    empty stderr; 3.6B / 3.7B final closeout
+    `owlmlx_release_floor_3_6B_3_7B_final_closeout_closed` verified the
+    record and ledger
+  - `3.7` closed 2026-04-28 via the runtime-owned `public-surface.md`
+    freeze plus `tests/test_public_surface_contract.py` (12 cases); the
+    supported HTTP routes, Python modules, operator scripts, and
+    source-of-truth contracts are exactly enumerated, anything not listed
+    is `internal` by default, and the schema-level
+    `BANNED_VERDICT_VOCABULARY` enforcement is cross-referenced; 3.6B /
+    3.7B final closeout `owlmlx_release_floor_3_6B_3_7B_final_closeout_closed`
+    verified the freeze
 - `owlmlx` remains `early_formal_runtime, below reference-grade stability`
-- no external release, parity, replacement, or production-grade claim is honest
-- floor `3.4` has read-only pre-flight notes; implementation may now begin
-  through one next prompt at coordinator authorization, since the `3.2`
-  ledger decision is complete
-- OwlOps R156 introduced an external live-upstream blocker: OwlOps local
-  comparison wiring is waiting on `owlmlx` to implement and mount
-  `/v1/runtime/comparative-evidence` plus
+- no external release, parity, replacement, or production-grade claim is honest;
+  closure of all seven release floors does **not** by itself promote
+  `owlmlx` to release-ready, and `release-readiness-backlog.md` §4.3 keeps
+  the banned current-claim list in force
+- with all seven release floors closed, the active interim claim moves
+  from `early formal runtime` and `internal source-of-truth project`
+  toward `technical preview`, governed by `public-surface.md` §2 and §10
+- the comparative-evidence HTTP surface remains available for upper-layer
+  consumers through `/v1/runtime/comparative-evidence` plus
   `/v1/runtime/comparative-evidence/history`
 
 The immediate correction is:
@@ -585,13 +619,579 @@ Floors `3.1` and `3.3` closed on 2026-04-25. Floor `3.2` closed on
 2026-04-26 via the 3.2C independent closeout review
 (`owlmlx_release_floor_3_2C_independent_closeout_closed`). The
 release-readiness burn-down active floor is now
-`3.4 Recovery Policy Closure` per Stage 3 of this plan. The current single
-active executor allocation after the OwlOps R156 surface round is:
+`3.4 Recovery Policy Closure` per Stage 3 of this plan.
+
+3.4A0 closeout (2026-04-26,
+`owlmlx_release_floor_3_4A0_reclaim_barrier_event_introduced`):
 
 - `files/execution-prompts/owlmlx/owlmlx-release-floor-3-4A0-reclaim-barrier-event.md`
+  ran as a single owlmlx executor allocation
+- new contract `owlmlx.reclaim_barrier_event` lives at
+  `owlmlx/reclaim_barrier_event.py`, transport at
+  `GET /v1/runtime/reclaim-barrier-event`, docs at
+  `docs/source-of-truth/reclaim-barrier-event.md`, tests at
+  `tests/test_reclaim_barrier_event.py`
+- `RuntimeKernel` now records cleanup-boundary failure events at the
+  exact operation boundary for explicit unload, TTL sweep reclaim, and
+  restart unload stage; `status_dict()` exposes them as the diagnostic
+  section `reclaim_barrier`
+- `recovery_supervisor_contract` now reports
+  `recovery_state = "failed_reclaim_barrier"` with hard recovery barrier
+  whenever an unresolved event is visible
+- `scheduler_admission_contract` rejects via the existing recovery
+  hard-barrier path (no duplicated lifecycle logic)
+- `orchestration_status` reports
+  `summary.bottleneck_layer = "recovery"` when the barrier is active
+- `memory_pressure_contract` records that reclaim attempt-result
+  visibility now exists, but still keeps reclaim engine, pressure-ranked
+  eviction, and recovery loops out of scope
+- this round does **not** close release floor `3.4`; the four-class
+  termination-cause recovery policy
+  (`retry / quarantine / surface_to_coordinator / drop`) and frozen event
+  resolution semantics remain future 3.4 work
 
-Do not run another executor in parallel. After 3.4A0 returns, re-coordinate
-from its handoff before issuing the next prompt.
+The next active executor allocation after 3.4A0 closeout is the
+follow-on `3.4A` round, which authors the four-class
+termination-cause → action policy on top of the cleanup-boundary event
+truth introduced here. The coordinator should issue exactly one next
+prompt at that time per the single-active-executor rule. Do not run
+another executor in parallel before the 3.4A prompt is authored.
+
+3.4A closeout (2026-04-27,
+`owlmlx_release_floor_3_4A_termination_recovery_policy_candidate_closed_pending_review`):
+
+- `files/execution-prompts/owlmlx/owlmlx-release-floor-3-4A-termination-recovery-policy.md`
+  ran as a single owlmlx executor allocation
+- new contract `owlmlx.termination_recovery_policy` lives at
+  `owlmlx/termination_recovery_policy.py`, transport at
+  `GET /v1/runtime/termination-recovery-policy`, docs at
+  `docs/source-of-truth/termination-recovery-policy.md`, tests at
+  `tests/test_termination_recovery_policy.py`
+- the four required termination cause classes
+  (`load_failure / oom_class_failure / host_forensics_anomaly /
+  graceful_unload_failure`) plus the fail-safe `unknown` map
+  deterministically to one action each:
+  retry / surface_to_coordinator / surface_to_coordinator / quarantine
+  / surface_to_coordinator
+- `drop` remains in the frozen vocabulary but no required cause maps
+  to it in this round; the gap is recorded explicitly in
+  `missing_signals`
+- `RuntimeKernel.load_model` now records a runtime-owned
+  `load_failure` event at the operation boundary (excluding
+  `invalid_request` preflight and `model_already_loaded` redundant
+  paths); budget-preflight failures classify as `oom_class_failure`,
+  backend failures classify as generic `load_failure`
+- event resolution semantics are runtime-owned: successful follow-up
+  `unload_model` / `restart_model` / `load_model` for the same model
+  id auto-resolves matching unresolved events; explicit override path
+  is `RuntimeKernel.resolve_reclaim_barrier_event(event_id)`;
+  final-status look-clean alone never resolves an event
+- recovery / admission / orchestration consumption is unchanged from
+  3.4A0: the `failed_reclaim_barrier` recovery state continues to
+  drive admission rejection and `orchestration_status.bottleneck_layer
+  = "recovery"`
+- this round produced `candidate_closed_pending_review`; coordinator
+  / reviewer must confirm before flipping
+  `release-readiness-backlog.md` section 5 row `3.4` from `open` to
+  `closed (via runtime-owned termination recovery policy)`
+- floor `3.4` row in `release-readiness-backlog.md` is **not** moved
+  by this round
+
+Next active executor allocation (issued 2026-04-27):
+
+- prompt:
+  `files/execution-prompts/owlmlx/owlmlx-release-floor-3-4B-termination-recovery-policy-closeout-review.md`
+- assigned executor: ClaudeCode
+- role: independent closeout reviewer and ledger decision
+- scope: review / verification / truth update only; no new runtime
+  implementation and no floor `3.5` implementation
+- ledger rule: only if 3.4B verifies the combined `3.4A0 + 3.4A`
+  evidence against `release-readiness-backlog.md` section `3.4`, move
+  section-5 row `3.4 recovery policy` from `open` to
+  `closed (via runtime-owned termination recovery policy)`
+
+Parallel live-evidence preparation allocation (issued 2026-04-27):
+
+- coordinator packet:
+  `files/execution-prompts/owlmlx/owlmlx-two-executor-release-readiness-allocation-20260427.md`
+- prompt:
+  `files/execution-prompts/owlmlx/owlmlx-release-floor-3-5A0-codex-live-comparative-evidence-preflight.md`
+- assigned executor: Codex desktop with Computer Use available for terminal,
+  process, port, or screen monitoring
+- role: live same-host comparative-evidence preflight and first honest
+  measured-run attempt
+- scope: no `3.4` ledger edits, no release ledger movement, and no fake
+  `verdict_grade = "measured"`; if a same-host measured record is impossible,
+  return the exact blocker (`reference_runtime_unavailable`,
+  `blocked_missing_weights`, `harness_runner_missing`, or inconclusive live
+  state)
+
+These two lanes may proceed together because ownership is disjoint:
+ClaudeCode owns the `3.4` closeout gate, while Codex owns `3.5` live
+preflight only. After 3.4B confirms closure, the next active floor is
+`3.5 Comparative Evidence` (measured-record sub-round on top of the
+OwlOps R156 surface), then `3.6` and `3.7`.
+
+3.4B closeout (2026-04-27, `owlmlx_release_floor_3_4B_closeout_closed`):
+
+- `files/execution-prompts/owlmlx/owlmlx-release-floor-3-4B-termination-recovery-policy-closeout-review.md`
+  ran as a single independent ClaudeCode reviewer allocation (no second
+  executor lane, no runtime code edits, no `3.5` implementation)
+- the reviewer reproduced the full §11 verification matrix:
+  `tests/test_termination_recovery_policy.py` 25 passed,
+  `tests/test_reclaim_barrier_event.py` 17 passed,
+  `tests/test_recovery_supervisor_contract.py +
+  tests/test_scheduler_admission_contract.py +
+  tests/test_orchestration_status.py` aggregate 28 passed,
+  `tests/test_runtime_kernel.py -k "load or unload or reclaim or
+  restart or recovery"` 17 passed (8 deselected),
+  `tests/test_runtime_server.py -k "termination_recovery or
+  reclaim_barrier or recovery_supervisor or orchestration_status"`
+  3 passed (38 deselected; new HTTP coverage lives inside the two
+  cross-surface test files), full `tests/test_runtime_server.py`
+  41 passed; `py_compile` clean for the six modules; `git diff
+  --check` clean
+- the reviewer answered all 18 §4 closure questions in the affirmative,
+  confirming: one frozen recovery policy per termination cause class;
+  the four required cause classes
+  (`load_failure / oom_class_failure / host_forensics_anomaly /
+  graceful_unload_failure`) plus a fail-safe `unknown`; the action
+  vocabulary is exactly
+  `retry / quarantine / surface_to_coordinator / drop`; each active
+  cause maps deterministically to one next action; `drop` being unused
+  for a required cause is acceptable because it is in the frozen
+  vocabulary and recorded in `missing_signals`; `load_failure` is
+  recorded from the `RuntimeKernel.load_model` operation boundary and
+  is not inferred from `restart_exhausted_models` alone;
+  `oom_class_failure` is distinguished by
+  `error_code = "memory_budget_exceeded"`; `host_forensics_anomaly`
+  surfaces to coordinator/operator without auto-retry or auto-drop;
+  `graceful_unload_failure` consumes unresolved
+  `owlmlx.reclaim_barrier_event` truth; event resolution semantics
+  are runtime-owned and operation-boundary based, with
+  final-status look-clean alone never resolving an event
+  (`test_resolution_does_not_happen_from_final_status_alone`);
+  read-only routes are GET-only; forbidden automations are absent;
+  recovery / admission / orchestration surfaces remain aligned; the
+  round stayed inside `/Users/yeemio/AI/gitrep/owlmlx`; one stale
+  contradiction in §3.4 "Current state" prose was repaired by the
+  reviewer alongside the §5 row flip
+- coordinator action applied 2026-04-27: section 5 row for `3.4`
+  flipped from `open` to
+  `closed (via runtime-owned termination recovery policy)` with
+  references to `reclaim-barrier-event.md`,
+  `termination-recovery-policy.md`,
+  `recovery-supervisor-contract.md`,
+  `tests/test_reclaim_barrier_event.py`,
+  `tests/test_termination_recovery_policy.py`, the 3.4A0 / 3.4A /
+  3.4B handoffs; section 2 floor count moved from `3/7` to `4/7`
+- this closure does **not** imply replacement-grade or release
+  readiness; floors `3.5`, `3.6`, `3.7` remain open
+
+3.5A0 live preflight (2026-04-27,
+`owlmlx_release_floor_3_5A0_harness_runner_missing`):
+
+- `files/execution-prompts/owlmlx/owlmlx-release-floor-3-5A0-codex-live-comparative-evidence-preflight.md`
+  ran as the Codex desktop / Computer Use live preflight lane
+- evidence lives under
+  `files/evidence/owlmlx/comparative-evidence/20260427T094224Z/`
+- `omlx` is available through the local probe venv and returned assistant
+  content `OK` for `gemma-4-31B-it`
+- `vmlx` is available through the local probe venv and `vmlx doctor`
+  passed inference on `gemma-4-31B-it`
+- local weights exist at
+  `/Users/yeemio/AI/Agent/models/gemma-4-31B-it`
+- the comparative-evidence HTTP surface served an isolated
+  `verdict_grade = "inconclusive"` ledger through a real `uvicorn`
+  process, and ports `8059` / `8060` were released after cleanup
+- no `verdict_grade = "measured"` record exists; floor `3.5` remains
+  open
+- exact blocker narrowed to `harness_runner_missing`: the current
+  `scripts/runtime_comparative_evidence.py` has only
+  `append-rejected-record`, `latest`, and `history`, with no measured
+  runner for two repeat runs, metric collection, raw artifacts, or a
+  measured ledger append
+
+Next active executor allocation (issued 2026-04-27):
+
+- prompt:
+  `files/execution-prompts/owlmlx/owlmlx-release-floor-3-5B-measured-comparative-runner.md`
+- assigned executor: ClaudeCode
+- role: implement the smallest honest measured comparative runner for
+  `single_prompt_short` using the existing schema and ledger
+- scope: code/tests/docs/handoff for the runner; do not flip the
+  `3.5` backlog row unless a real same-host `verdict_grade =
+  "measured"` record exists and is served through HTTP
+- expected follow-up: if the runner is introduced but no live measured
+  record is produced, send Codex desktop back for live measured-run
+  review with process/port monitoring
+
+3.5B runner introduction (2026-04-27,
+`owlmlx_release_floor_3_5B_measured_runner_introduced_pending_live_review`):
+
+- new runtime-owned module
+  `owlmlx/comparative_evidence_runner.py` owns the subprocess attempt
+  executor, RSS sampler (via `psutil`), per-runtime aggregation across
+  repeats (mean of successes for latency/throughput/wall-clock; max of
+  attempts for peak RSS; sum for completed/failure counts), and the
+  three-grade verdict computation: `measured` only when every runtime
+  has all configured repeats successful; `inconclusive` on any partial
+  failure; `rejected` when any runtime has zero successful attempts
+- `scripts/runtime_comparative_evidence.py` exposes a new
+  `run-measured-short-prompt` subcommand that takes a runner-config
+  JSON (one `owlmlx` entry plus one `reference` entry whose
+  `runtime_id` must be in the frozen `RUNTIME_IDS` enumeration),
+  executes the configured argv with `{prompt}` / `{max_tokens}` /
+  `{temperature}` / `{model_id}` / `{model_path}` placeholder
+  substitution, writes per-attempt `*.stdout.txt` / `*.stderr.txt` /
+  `*.rss.jsonl` plus `manifest.json` / `commands.json` / `summary.md`
+  artifacts, appends exactly one validated v1 record to the supplied
+  ledger, and prints the appended record as JSON
+- new test file
+  `tests/test_runtime_comparative_evidence_measured_runner.py` adds
+  28 deterministic-fake-command tests covering CLI shape, attempt
+  success / silent / non-zero-exit / spawn-failure paths, runtime
+  aggregation, the three-grade verdict policy, banned-vocabulary
+  rejection across the full vocabulary, runner-config JSON loading,
+  end-to-end measured / inconclusive / rejected CLI flows, HTTP
+  surface serving the measured ledger via `TestClient`, and an AST
+  check that the runner module imports nothing from OwlOps / OwlCoda
+- verification matrix this round: 27 passes
+  (`test_comparative_evidence_schema.py` +
+  `test_comparative_evidence_record.py`) + 28 passes
+  (`test_runtime_comparative_evidence_measured_runner.py`) + 4 passes
+  (`test_runtime_server.py -k comparative_evidence`); `py_compile`
+  clean; `git diff --check` clean; `python3
+  scripts/runtime_comparative_evidence.py --help` lists the new
+  subcommand
+- this round did **not** attempt the live 58G `gemma-4-31B-it` run on
+  this host: 3.5A0 already proved the owlmlx first-smoke path can
+  hang past ~133s without returning generated output. Per §8 of the
+  3.5B prompt the live measured-run is left to the Codex desktop
+  review lane with process/port monitoring; `release-readiness-backlog.md`
+  row `3.5` therefore stays `open (contract surface)` until a real
+  `verdict_grade = "measured"` record is appended and served by HTTP
+
+Next active executor allocation (issued 2026-04-27):
+
+- prompt:
+  `files/execution-prompts/owlmlx/owlmlx-release-floor-3-5C-codex-live-measured-run-review.md`
+- assigned executor: Codex desktop with Computer Use
+- role: live measured-run review using the new runner
+- scope: owns the live invocation of
+  `python3 scripts/runtime_comparative_evidence.py
+  run-measured-short-prompt --runner-config <live.json> ...`,
+  pointing the `owlmlx` argv at a real owlmlx generation entry and the
+  `reference` argv at a live `omlx` probe-venv command / HTTP client,
+  with process/port supervision so a hung first-smoke can be killed and
+  recorded as `inconclusive` rather than blocking the lane
+- ledger discipline: the live record must be appended to a dedicated
+  evidence-directory ledger; only after one real
+  `verdict_grade = "measured"` record exists and is served by both
+  comparative-evidence HTTP routes may the coordinator consider
+  flipping `release-readiness-backlog.md` row `3.5` to closed
+
+3.5C live review (2026-04-27,
+`owlmlx_release_floor_3_5C_measured_runner_needs_fix`):
+
+- Codex desktop with Computer Use ran the live owlmlx + omlx workload
+  through the 3.5B runner under
+  `files/evidence/owlmlx/comparative-evidence/20260427T133443Z/`, with
+  `omlx serve` on port 8061 and the HTTP-served measured ledger on
+  port 8062
+- the runner produced a schema-valid HTTP-served record with
+  `verdict_grade = "measured"`, but the live review **rejected** it
+  as closeout evidence because two runner defects make the measured
+  fields untrue:
+  1. `peak_resident_set_bytes` only sampled the immediate wrapper
+     subprocess PID; the real owlmlx MLX child workers and the live
+     `omlx serve` process (PID 59803, RSS ~47.9 GB) were not in the
+     measurement
+  2. `first_token_latency_ms` started at the first non-empty stdout
+     line, which for `runtime_large_weight_first_smoke.py` is the
+     gate diagnostic JSON, not generated-token output
+- ports 8061 and 8062 were released after verification; no
+  runner / first-smoke / MLX child / `omlx serve` / uvicorn process
+  remained
+- coordinator decision: `do_not_close_floor_3_5_yet`. Floor `3.5`
+  remains open. The next allocation is a code-lane fix, not another
+  blind live run
+
+3.5D runner process-tree + token-detection fix (2026-04-27,
+`owlmlx_release_floor_3_5D_measured_runner_process_tree_and_token_detection_fix`):
+
+- `owlmlx/comparative_evidence_runner.py` updated:
+  - `RuntimeRunnerConfig` now exposes `external_pids: tuple[int, ...]`
+    and `external_pid_file: str | None`; the runner samples those
+    PIDs alongside the wrapper PID, so a live `omlx serve` (or any
+    long-running reference server) can be measured honestly
+  - `_RssSampler` now walks every root PID plus
+    `psutil.Process(...).children(recursive=True)` on each tick; the
+    JSONL artifact records `per_pid_rss_bytes` and the
+    `tick_total_rss_bytes`; reported `peak_resident_set_bytes` is the
+    max-over-ticks of that per-tick sum (over-count of shared pages
+    is acknowledged in the run summary)
+  - `first_token_strategy` is now wired through a `_FirstTokenDetector`
+    that supports `first_nonempty_chunk` (default; back-compat),
+    `after_marker:<substring>` (defers first-token until a stdout line
+    contains the substring), and `regex:<python pattern>` (matches
+    each non-empty line); invalid strategies and invalid regex
+    patterns are rejected at runner-config load
+  - `commands.json` artifact now records `external_pids`,
+    `external_pid_file`, and `first_token_strategy` per runtime
+- `tests/test_runtime_comparative_evidence_measured_runner.py` adds
+  9 new tests (28 → 37 total) covering: process-tree RSS observes a
+  forked child; static `external_pids` are sampled; `external_pid_file`
+  is read line-by-line; `after_marker:` defers first-token past a
+  diagnostic JSON line; `regex:` matches the generation pattern;
+  default `first_nonempty_chunk` back-compat preserved; load-time
+  rejection of unsupported strategy and invalid regex; round-trip
+  loading of `external_pids` and `external_pid_file` from JSON config
+- §8 verification matrix: 27 passes
+  (`test_comparative_evidence_schema.py` +
+  `test_comparative_evidence_record.py`) + 37 passes
+  (`test_runtime_comparative_evidence_measured_runner.py`) + 4 passes
+  (`test_runtime_server.py -k comparative_evidence`); `py_compile`
+  clean; `git diff --check` clean; subcommand `--help` lists the
+  same flags
+- this round did **not** attempt the live 58G `gemma-4-31B-it` run
+  again; per the user's lane discipline (`runner 自己坏了 → 回
+  ClaudeCode 修 runner，不再继续盲跑`), the next round must be
+  another supervised Codex desktop live measured-run, this time with
+  `external_pids` (or `external_pid_file`) pointing at the live
+  `omlx serve` PID and `first_token_strategy = "after_marker:..."`
+  or `"regex:..."` chosen against the actual owlmlx generation
+  stdout shape
+- `release-readiness-backlog.md` row `3.5` was **not** modified
+
+Next active executor allocation (issued 2026-04-27):
+
+- prompt:
+  `files/execution-prompts/owlmlx/owlmlx-release-floor-3-5E-codex-live-measured-run-rerun.md`
+- assigned executor: Codex desktop with Computer Use
+- role: supervised live same-host measured-run rerun using the fixed
+  3.5D runner
+- required live config: the live `omlx serve` PID must be declared via
+  `external_pids` or `external_pid_file`; `owlmlx.first_token_strategy`
+  must use `after_marker:<substring>` or `regex:<pattern>` chosen from
+  the actual stdout shape so first-token timing reflects generated
+  output, not diagnostic preamble
+- closure discipline: only if the fresh record is
+  `verdict_grade = "measured"`, RSS reflects the server/child process
+  tree, first-token timing reflects generated output, and both
+  comparative-evidence HTTP routes serve the fresh ledger may the
+  coordinator consider flipping `release-readiness-backlog.md` row
+  `3.5`
+
+3.5E live rerun (2026-04-28,
+`owlmlx_release_floor_3_5E_live_measured_record_closed_recommended`):
+
+- `files/execution-prompts/owlmlx/owlmlx-release-floor-3-5E-codex-live-measured-run-rerun.md`
+  ran as the supervised Codex desktop live-measurement lane
+- evidence lives under
+  `files/evidence/owlmlx/comparative-evidence/20260428T004500Z/`
+- fresh ledger contains a closeout-recommended
+  `verdict_grade = "measured"` record for `owlmlx` and `omlx` on
+  `host_class = "Mac17,6-arm64-macOS-26.4.1-128GB"` and
+  `workload_class = "single_prompt_short"`
+- both runtimes completed two repeats with `failure_count = 0`;
+  `owlmlx.peak_resident_set_bytes = 59764850688`, and
+  `omlx.peak_resident_set_bytes = 53823569920`
+- `omlx serve` PID `84730` was declared through `external_pid_file`
+  and sampled by the runner; `owlmlx.first_token_strategy` used
+  `regex:"text":\s*"[^"]+"` and matched generated output `"text":
+  " OK."`, not diagnostic JSON
+- both comparative-evidence HTTP routes served the fresh ledger with
+  `200 OK`; ports `8063` / `8064` were released and no lane-owned
+  runner / `omlx serve` / uvicorn / MLX child process remained
+- this round recommends closing floor `3.5` but does **not** move
+  `release-readiness-backlog.md`; a closeout review must verify the
+  evidence first
+
+3.5F closeout review (2026-04-28,
+`owlmlx_release_floor_3_5F_closeout_closed`):
+
+- `files/execution-prompts/owlmlx/owlmlx-release-floor-3-5F-comparative-evidence-closeout-review.md`
+  ran as the independent closeout-review lane; no new measured-run
+  implementation was performed
+- reviewer verification passed:
+  `tests/test_comparative_evidence_schema.py` plus
+  `tests/test_comparative_evidence_record.py` 27 passed;
+  `tests/test_runtime_comparative_evidence_measured_runner.py` 37 passed;
+  `tests/test_runtime_server.py -k "comparative_evidence"` 4 passed
+  (37 deselected); `py_compile` passed for the comparative-evidence modules,
+  operator script, and runtime server; fresh-ledger `latest` and `history`
+  CLI reads both returned the measured record; `git diff --check` was clean
+- the reviewer answered all 18 closeout questions in the affirmative:
+  harness-contract section `8` is satisfied; the runtime-owned record module
+  and operator entry exist; the ledger contains a measured record; latest and
+  history HTTP captures agree with the fresh ledger; both runtimes ran the
+  same workload and invariants on the same host; both completed two repeats
+  with `failure_count = 0`; raw stdout/stderr, resource samples, manifest,
+  commands, and summary artifacts are present; `omlx` RSS includes external
+  live server PID `84730`; `owlmlx` RSS includes wrapper plus child process
+  tree; `owlmlx.first_token_strategy = regex:"text":\s*"[^"]+"` matched
+  generated output `"text": " OK."`; cleanup released ports `8063` / `8064`;
+  and the record avoids banned verdict vocabulary
+- coordinator action applied 2026-04-28: `release-readiness-backlog.md`
+  row `3.5 comparative evidence` flipped from `open (contract surface)` to
+  `closed (via same-host measured comparative evidence)` with references to
+  the harness contract, schema stub, measured runner test, operator script,
+  fresh ledger, manifest, HTTP captures, the 3.5E handoff, and the 3.5F
+  handoff
+- this closure does **not** imply release readiness, parity, replacement,
+  production-grade, or superiority; floors `3.6` and `3.7` remain open
+
+Next active executor allocation (issued 2026-04-28):
+
+- coordinator packet:
+  `files/execution-prompts/owlmlx/owlmlx-final-two-floor-sprint-allocation-20260428.md`
+- Executor A:
+  `files/execution-prompts/owlmlx/owlmlx-release-floor-3-6A-external-customer-evidence-minimum-record.md`
+  - assigned executor: Codex desktop with Computer Use
+  - role: acquire or freeze one external deployment evidence record with
+    host class, workload class, frozen pass/fail/blocker verdict, and
+    external blocker/success outcome
+  - boundary: no external repo edits and no `release-readiness-backlog.md`
+    flip in this lane
+- Executor B:
+  `files/execution-prompts/owlmlx/owlmlx-release-floor-3-7A-public-surface-freeze.md`
+  - assigned executor: ClaudeCode
+  - role: freeze `docs/source-of-truth/public-surface.md`, add narrow
+    validation, and return a closeout recommendation
+  - boundary: no external deployment work and no release-ready claim while
+    `3.6` remains open
+
+These lanes may run in parallel because `3.6` owns external deployment
+evidence while `3.7` owns public-surface boundary truth. If both return
+closeout-recommended, the coordinator should run one final ledger-sync
+closeout for the remaining release floors.
+
+3.6A external customer evidence candidate (2026-04-28,
+`owlmlx_release_floor_3_6A_external_customer_evidence_pass_candidate`):
+
+- `files/execution-prompts/owlmlx/owlmlx-release-floor-3-6A-external-customer-evidence-minimum-record.md`
+  ran as the Codex desktop external-evidence lane
+- evidence lives under
+  `files/evidence/owlmlx/external-customer-evidence/20260428T025051Z/`
+- external deployment / consumer boundary:
+  `/Users/yeemio/AI/gitrep/owlops` issuing live HTTP requests to an
+  `owlmlx` runtime service on `127.0.0.1:8065`
+- workload class: `external_runtime_status_probe`
+- runtime surfaces used: `GET /v1/runtime/status` and `GET /healthz`
+- verdict recorded in
+  `docs/source-of-truth/phase45-customer-runtime-evidence-ledger.md`:
+  `pass`
+- external success: OwlOps-boundary external consumer successfully fetched
+  `owlmlx` runtime status and health truth over HTTP from outside the
+  `owlmlx` repository
+- verification: `tests/test_customer_runtime_evidence.py` 53 passed;
+  `scripts/runtime_customer_runtime_evidence.py --help` printed help;
+  `py_compile` passed for `owlmlx/customer_runtime_evidence.py` and
+  `scripts/runtime_customer_runtime_evidence.py`; the external HTTP probe
+  exited `0` with empty stderr; `git diff --check` was clean
+- cleanup: uvicorn PID `67075` was terminated, and port `8065` had no
+  remaining listener
+- this is closeout-recommended for floor `3.6`, but this lane did **not**
+  flip `release-readiness-backlog.md`; a closeout reviewer / coordinator
+  should decide whether to move row `3.6` to closed after reviewing this
+  record and the parallel `3.7A` result
+- no release, parity, replacement, production-grade, superiority, wins, beats,
+  or equivalent claim was made
+
+3.7A public surface freeze (2026-04-28,
+`owlmlx_release_floor_3_7A_public_surface_closed_recommended`):
+
+- `files/execution-prompts/owlmlx/owlmlx-release-floor-3-7A-public-surface-freeze.md`
+  ran as the ClaudeCode public-surface lane
+- new authoritative doc `docs/source-of-truth/public-surface.md` freezes the
+  technical-preview boundary with stable label vocabulary
+  (`supported / partial / experimental / internal / not in scope`),
+  the supported HTTP routes (liveness, status, generation, OpenAI / Anthropic
+  compatibility, lifecycle, model visibility, every release-floor contract
+  surface, and both comparative-evidence routes), the supported runtime
+  Python modules, the supported operator scripts, and the supported
+  source-of-truth contracts
+- §7 records the public consumer rules; §8 records the
+  internal-only surfaces (the entire `scripts/runtime_cache_*` family,
+  every `owlmlx.cache_*` module, every `phase45-*` doc except those
+  explicitly linked, and the kernel's `_*` private methods); §10 ties the
+  banned-vocabulary listing back to
+  `owlmlx.comparative_evidence_schema.BANNED_VERDICT_VOCABULARY`; §11
+  freezes the additive-change rule and the deprecation cycle for breaking
+  changes; §12 records the restart condition
+- new validation test `tests/test_public_surface_contract.py` (12 cases)
+  asserts: doc exists, label vocabulary present, internal-default rule
+  declared, banned-verdict vocabulary cross-reference present, "Explicitly
+  Unsupported Claims" section present, every referenced
+  `docs/source-of-truth/*.md` and `scripts/runtime_*.py` path resolves to
+  a real file, the supported HTTP routes for the closed floors are listed,
+  the comparative-evidence operator script is listed, no line outside the
+  unsupported-claims section uses banned vocabulary as a current claim,
+  no positive-assertion sentence claims owlmlx is release-ready / parity /
+  replacement / equivalent / production-grade, and the floor 3.6 caveat is
+  recorded
+- master-outline gained entry 134 for `public-surface.md`; master-outline
+  date bumped to `2026-04-28`
+- verification: `pytest -q tests/test_public_surface_contract.py` 12 passed;
+  `python3 -m py_compile owlmlx/runtime/server.py` clean; `git diff --check`
+  clean
+- this lane did **not** flip `release-readiness-backlog.md`; coordinator
+  closeout decides whether row `3.7` and (if 3.6A is also accepted) row
+  `3.6` may move
+- no release, parity, replacement, production-grade, superiority, wins,
+  beats, equivalent, or matches claim was made
+
+3.6B / 3.7B final closeout ledger sync (2026-04-28,
+`owlmlx_release_floor_3_6B_3_7B_final_closeout_closed`):
+
+- `files/execution-prompts/owlmlx/owlmlx-release-floor-3-6B-3-7B-final-closeout-ledger-sync.md`
+  ran as the single ClaudeCode closeout reviewer; no second executor
+  was assigned and no live external HTTP probe was rerun
+- 3.6 closeout questions (§4 of the prompt) all answered `yes`:
+  the 3.6A record exists with verdict `pass` in
+  `phase45-customer-runtime-evidence-ledger.md` §9; the consumer
+  boundary was `/Users/yeemio/AI/gitrep/owlops`; both
+  `/v1/runtime/status` and `/healthz` were fetched over HTTP and both
+  returned `200`; probe exit-status was `0`; stderr was empty; port
+  `8065` had no remaining listener after cleanup; the lane did not
+  promote a local-only sanity run; no banned current-claim was made
+- 3.7 closeout questions (§5 of the prompt) all answered `yes`:
+  `public-surface.md` exists, identifies itself as authoritative,
+  freezes the technical-preview boundary, declares the label
+  vocabulary, states the internal-default rule, keeps phase45
+  cache/exactness machinery internal, references existing
+  source-of-truth docs instead of duplicating them;
+  `tests/test_public_surface_contract.py` validates the boundary,
+  referenced docs, referenced scripts, route listing,
+  banned-vocabulary discipline, and the floor 3.6 caveat; the
+  `master-outline.md` index includes `public-surface.md`; no banned
+  current-claim was made
+- §6 verification matrix this round:
+  `tests/test_customer_runtime_evidence.py` 53 passed;
+  `tests/test_public_surface_contract.py` 12 passed; `py_compile` clean
+  for `owlmlx/customer_runtime_evidence.py`,
+  `scripts/runtime_customer_runtime_evidence.py`, and
+  `owlmlx/runtime/server.py`; `git diff --check` clean
+- coordinator action applied 2026-04-28: section 5 row for `3.6`
+  flipped from `open` to
+  `closed (via OwlOps-boundary external runtime-truth consumer evidence)`
+  with references to the customer runtime evidence ledger, the
+  `20260428T025051Z` evidence directory, the 3.6A handoff, and this
+  3.6B / 3.7B handoff; section 5 row for `3.7` flipped from `open`
+  to `closed (via runtime-owned public-surface freeze)` with
+  references to `public-surface.md`,
+  `tests/test_public_surface_contract.py`, the 3.7A handoff, and
+  this 3.6B / 3.7B handoff; the §3.6 and §3.7 "Current state" prose
+  in the backlog were refreshed to reflect closure; section 2 floor
+  count moved from `5/7` to `7/7`
+- this closure does **not** promote `owlmlx` to release-ready,
+  parity, replacement, or production-grade. It does open the
+  `technical preview` interim claim (governed by
+  `public-surface.md` §2 / §10), but only with the supported HTTP
+  routes / modules / scripts / contracts named in the freeze
+- no runtime code was edited; no external repository was touched;
+  no public-surface widening occurred; no new evidence was generated
 
 The `3.2` A/B prompts exist:
 

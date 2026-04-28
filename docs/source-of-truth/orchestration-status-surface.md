@@ -100,9 +100,15 @@ Current honest layer-assessment posture is:
 - `recovery`
   - `classification_status = partial`
   - recovery-barrier classification now comes from
-    `recovery_supervisor_contract`, while automatic recovery supervisor loops,
-    failed-reclaim barriers, and broader worker-pollution detection remain
-    unfrozen
+    `recovery_supervisor_contract`, which consumes
+    `owlmlx.reclaim_barrier_event` cleanup-boundary failure events
+    (failed unload, failed reclaim, restart unload stage failure) as a
+    hard recovery barrier; the cause-to-action policy itself is frozen
+    by `owlmlx.termination_recovery_policy` (`retry / quarantine /
+    surface_to_coordinator / drop`), with auto-resolution on
+    successful same-model follow-up operation; automatic recovery
+    supervisor loops, automatic action execution, and broader
+    worker-pollution detection remain unfrozen
 - `unknown`
   - retained as an explicit fallback when no stronger current-layer verdict is
     runtime-owned
@@ -112,8 +118,10 @@ Current honest layer-assessment posture is:
 `summary.bottleneck_layer` is intentionally conservative:
 
 - `recovery`
-  - only when `recovery_supervisor_contract` reports a hard recovery barrier
-    such as backend unhealthy, restart exhausted, or contaminated substrate
+  - when `recovery_supervisor_contract` reports a hard recovery barrier
+    such as backend unhealthy, restart exhausted, contaminated substrate,
+    or `failed_reclaim_barrier` (any unresolved
+    `owlmlx.reclaim_barrier_event` cleanup-boundary failure)
 - `memory_pressure`
   - only when `memory_pressure_contract.summary.pressure_classification =
     "over_budget"`

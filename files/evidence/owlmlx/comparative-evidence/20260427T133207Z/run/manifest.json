@@ -1,0 +1,201 @@
+{
+  "appended_record": {
+    "evidence_pointer": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/manifest.json",
+    "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+    "recorded_at": "2026-04-27T13:33:46Z",
+    "runtimes": [
+      {
+        "measurement": {
+          "completed_request_count": 2,
+          "failure_count": 0,
+          "first_token_latency_ms": 13588.812834001146,
+          "peak_resident_set_bytes": 37224448,
+          "throughput_tokens_per_second": 0.14766754583763753,
+          "wall_clock_ms": 13605.584916993394
+        },
+        "runtime_id": "owlmlx",
+        "runtime_version": "unknown-local-checkout"
+      },
+      {
+        "measurement": {
+          "completed_request_count": 0,
+          "failure_causes": [
+            "harness_runtime_invocation_error_non_zero_exit"
+          ],
+          "failure_count": 2,
+          "first_token_latency_ms": 0.0,
+          "peak_resident_set_bytes": 26443776,
+          "throughput_tokens_per_second": 0.0,
+          "wall_clock_ms": 0.0
+        },
+        "runtime_id": "omlx",
+        "runtime_version": "0.3.5-probe-venv"
+      }
+    ],
+    "surface": "owlmlx.comparative_evidence_record",
+    "verdict_grade": "rejected",
+    "verdict_text": "rejected: omlx_runtime_invocation_failed:harness_runtime_invocation_error_non_zero_exit on host_class=Mac17,6-arm64-macOS-26.4.1-128GB, workload_class=single_prompt_short",
+    "version": "v1",
+    "workload_class": "single_prompt_short",
+    "workload_invariants": {
+      "decode_max_tokens": 2,
+      "decode_temperature": 0.0,
+      "model_id": "gemma-4-31B-it",
+      "model_quantization": "full_precision_unquantized",
+      "prompt_set_hash": "sha256:b4d50a67a784a449e0c763c401bb9f95fb37804dff5765d8b4f95fd202eb7d77",
+      "serving_budget_bytes": 85899345920
+    }
+  },
+  "completed_at": "2026-04-27T13:33:46Z",
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "ledger_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/live-ledger.jsonl",
+  "repeats": 2,
+  "runtimes": [
+    {
+      "attempts": [
+        {
+          "attempt_index": 1,
+          "command_argv": [
+            "python3",
+            "scripts/runtime_large_weight_first_smoke.py",
+            "--specimen-path",
+            "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+            "--memory-gb",
+            "80",
+            "--prompt",
+            "Reply with exactly OK.",
+            "--max-tokens",
+            "2",
+            "--include-known-venvs"
+          ],
+          "completed_at_iso": "2026-04-27T13:33:31Z",
+          "failure_cause": null,
+          "first_token_latency_ms": 12672.781458997633,
+          "generated_token_count": 2,
+          "ok": true,
+          "peak_resident_set_bytes": 37224448,
+          "return_code": 0,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/owlmlx_attempt1.rss.jsonl",
+          "runtime_id": "owlmlx",
+          "started_at_iso": "2026-04-27T13:33:19Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/owlmlx_attempt1.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/owlmlx_attempt1.stdout.txt",
+          "throughput_tokens_per_second": 0.15760749510023905,
+          "wall_clock_ms": 12689.751833997434
+        },
+        {
+          "attempt_index": 2,
+          "command_argv": [
+            "python3",
+            "scripts/runtime_large_weight_first_smoke.py",
+            "--specimen-path",
+            "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+            "--memory-gb",
+            "80",
+            "--prompt",
+            "Reply with exactly OK.",
+            "--max-tokens",
+            "2",
+            "--include-known-venvs"
+          ],
+          "completed_at_iso": "2026-04-27T13:33:46Z",
+          "failure_cause": null,
+          "first_token_latency_ms": 14504.84420900466,
+          "generated_token_count": 2,
+          "ok": true,
+          "peak_resident_set_bytes": 36896768,
+          "return_code": 0,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/owlmlx_attempt2.rss.jsonl",
+          "runtime_id": "owlmlx",
+          "started_at_iso": "2026-04-27T13:33:31Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/owlmlx_attempt2.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/owlmlx_attempt2.stdout.txt",
+          "throughput_tokens_per_second": 0.13772759657503603,
+          "wall_clock_ms": 14521.417999989353
+        }
+      ],
+      "completed_request_count": 2,
+      "failure_causes": [],
+      "failure_count": 0,
+      "first_token_latency_ms": 13588.812834001146,
+      "peak_resident_set_bytes": 37224448,
+      "runtime_id": "owlmlx",
+      "runtime_version": "unknown-local-checkout",
+      "throughput_tokens_per_second": 0.14766754583763753,
+      "wall_clock_ms": 13605.584916993394
+    },
+    {
+      "attempts": [
+        {
+          "attempt_index": 1,
+          "command_argv": [
+            "python3",
+            "-c",
+            "import json, urllib.request; payload={\"model\":\"{model_id}\",\"messages\":[{\"role\":\"user\",\"content\":\"{prompt}\"}],\"max_tokens\":int(\"{max_tokens}\"),\"temperature\":float(\"{temperature}\"),\"stream\":False}; req=urllib.request.Request(\"http://127.0.0.1:8061/v1/chat/completions\", data=json.dumps(payload).encode(), headers={\"Content-Type\":\"application/json\"}); data=json.loads(urllib.request.urlopen(req, timeout=180).read().decode()); print(data[\"choices\"][0][\"message\"][\"content\"] or \"\")"
+          ],
+          "completed_at_iso": "2026-04-27T13:33:46Z",
+          "failure_cause": "harness_runtime_invocation_error_non_zero_exit",
+          "first_token_latency_ms": null,
+          "generated_token_count": 0,
+          "ok": false,
+          "peak_resident_set_bytes": 26443776,
+          "return_code": 1,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/omlx_attempt1.rss.jsonl",
+          "runtime_id": "omlx",
+          "started_at_iso": "2026-04-27T13:33:46Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/omlx_attempt1.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/omlx_attempt1.stdout.txt",
+          "throughput_tokens_per_second": null,
+          "wall_clock_ms": 60.5311669933144
+        },
+        {
+          "attempt_index": 2,
+          "command_argv": [
+            "python3",
+            "-c",
+            "import json, urllib.request; payload={\"model\":\"{model_id}\",\"messages\":[{\"role\":\"user\",\"content\":\"{prompt}\"}],\"max_tokens\":int(\"{max_tokens}\"),\"temperature\":float(\"{temperature}\"),\"stream\":False}; req=urllib.request.Request(\"http://127.0.0.1:8061/v1/chat/completions\", data=json.dumps(payload).encode(), headers={\"Content-Type\":\"application/json\"}); data=json.loads(urllib.request.urlopen(req, timeout=180).read().decode()); print(data[\"choices\"][0][\"message\"][\"content\"] or \"\")"
+          ],
+          "completed_at_iso": "2026-04-27T13:33:46Z",
+          "failure_cause": "harness_runtime_invocation_error_non_zero_exit",
+          "first_token_latency_ms": null,
+          "generated_token_count": 0,
+          "ok": false,
+          "peak_resident_set_bytes": 26394624,
+          "return_code": 1,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/omlx_attempt2.rss.jsonl",
+          "runtime_id": "omlx",
+          "started_at_iso": "2026-04-27T13:33:46Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/omlx_attempt2.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260427T133207Z/run/omlx_attempt2.stdout.txt",
+          "throughput_tokens_per_second": null,
+          "wall_clock_ms": 58.87958299717866
+        }
+      ],
+      "completed_request_count": 0,
+      "failure_causes": [
+        "harness_runtime_invocation_error_non_zero_exit"
+      ],
+      "failure_count": 2,
+      "first_token_latency_ms": 0.0,
+      "peak_resident_set_bytes": 26443776,
+      "runtime_id": "omlx",
+      "runtime_version": "0.3.5-probe-venv",
+      "throughput_tokens_per_second": 0.0,
+      "wall_clock_ms": 0.0
+    }
+  ],
+  "started_at": "2026-04-27T13:33:19Z",
+  "verdict_grade": "rejected",
+  "verdict_text": "rejected: omlx_runtime_invocation_failed:harness_runtime_invocation_error_non_zero_exit on host_class=Mac17,6-arm64-macOS-26.4.1-128GB, workload_class=single_prompt_short",
+  "workload": {
+    "decode_max_tokens": 2,
+    "decode_temperature": 0.0,
+    "model_id": "gemma-4-31B-it",
+    "model_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+    "model_quantization": "full_precision_unquantized",
+    "prompt": "Reply with exactly OK.",
+    "prompt_set_hash": "sha256:b4d50a67a784a449e0c763c401bb9f95fb37804dff5765d8b4f95fd202eb7d77",
+    "serving_budget_bytes": 85899345920,
+    "workload_class": "single_prompt_short"
+  }
+}
