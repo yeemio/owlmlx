@@ -1,7 +1,7 @@
 # owlmlx Public Surface
 
 > Status: authoritative
-> Updated: 2026-04-28
+> Updated: 2026-05-05
 > Scope: which modules, contracts, HTTP routes, and operator scripts are part
 > of the supported public technical-preview surface, and which surfaces remain
 > internal
@@ -19,8 +19,10 @@ documents instead of duplicating their content.
 
 This document does **not** make any claim of release readiness, parity,
 replacement, production-grade capability, or any banned-vocabulary verdict
-about owlmlx. Floor `3.6 External Customer Evidence` remains open in the
-release-readiness backlog at the time this surface is frozen.
+about owlmlx. The release-readiness floors are closed at `7 / 7` in
+`release-readiness-backlog.md`, including floor `3.6 External Customer
+Evidence` and floor `3.7 Public Surface Freeze`; that closure permits the
+technical-preview boundary below, not a stronger public claim.
 
 ## 2. Support Label Vocabulary
 
@@ -126,6 +128,9 @@ inside a supported module.
   `FakeBackend`, `MlxLmBackend`/`MlxLmSubprocessBackend`
 - `owlmlx.runtime.server` — `supported` — `create_app(...)`,
   `create_fake_app(...)`
+- `owlmlx.runtime.technical_preview` — `supported` — side-by-side
+  technical-preview app factory for the real `MlxLmSubprocessBackend`
+  serving path; it does not stop or mutate legacy services
 - `owlmlx.serving` — `supported` — `GenerationGate`
 - `owlmlx.memory_budget` — `supported`
 - `owlmlx.context_concurrency` — `supported`
@@ -181,6 +186,9 @@ Their CLIs are stable; their internal helpers are not.
 - `scripts/runtime_mlx_blocker_report.py` — `supported`
 - `scripts/runtime_mlx_host_forensics.py` — `supported`
 - `scripts/runtime_mlx_probe_matrix.py` — `supported`
+- `scripts/runtime_technical_preview_server.py` — `supported` — operator
+  entry for side-by-side owlmlx technical-preview serving with the real
+  MLX subprocess backend; it does not stop legacy `oMLX` or router services
 - `scripts/runtime_large_weight_specimen_gate.py` — `supported`
 - `scripts/runtime_large_weight_first_smoke.py` — `supported`
 - `scripts/runtime_large_weight_first_smoke_decision.py` — `supported`
@@ -295,11 +303,11 @@ The current honest interim claims are exactly:
 
 - `early formal runtime`
 - `internal source-of-truth project`
-- `technical preview` (only valid once this `public-surface.md` freeze is
-  recorded in the backlog ledger)
+- `technical preview`
 
-This document does not by itself promote owlmlx to release-ready. Floor
-`3.6 External Customer Evidence` remains open at the time of this freeze.
+This document does not by itself promote owlmlx to release-ready. The 7 / 7
+release-floor closure is a technical-preview signoff boundary, not a release,
+parity, replacement, production-grade, or superiority verdict.
 
 ## 11. Versioning And Change Rule
 

@@ -16,6 +16,47 @@ from contextlib import redirect_stdout
 from typing import Any
 
 
+_SAMPLER_PARAM_NAMES = (
+    "temp",
+    "top_p",
+    "min_p",
+    "min_tokens_to_keep",
+    "top_k",
+    "xtc_probability",
+    "xtc_threshold",
+    "xtc_special_tokens",
+)
+
+
+def _prepare_generation_params(params: dict[str, Any]) -> dict[str, Any]:
+    """Adapt API-facing sampling params to the installed ``mlx_lm`` API.
+
+    Current ``mlx_lm.generate`` forwards unknown keyword arguments to
+    ``generate_step``. OpenAI-compatible callers send ``temperature`` and
+    ``top_p``, while this mlx-lm version expects those to be wrapped in a
+    sampler callable.
+    """
+
+    prepared = dict(params)
+    sampler_kwargs: dict[str, Any] = {}
+
+    if "temperature" in prepared:
+        sampler_kwargs["temp"] = prepared.pop("temperature")
+    if "temp" in prepared:
+        sampler_kwargs["temp"] = prepared.pop("temp")
+
+    for name in _SAMPLER_PARAM_NAMES:
+        if name in prepared:
+            sampler_kwargs[name] = prepared.pop(name)
+
+    if sampler_kwargs:
+        from mlx_lm.sample_utils import make_sampler  # noqa: PLC0415
+
+        prepared["sampler"] = make_sampler(**sampler_kwargs)
+
+    return prepared
+
+
 def _fallback_prompt_from_messages(messages: list[dict[str, Any]]) -> str:
     return "\n".join(
         f"{str(message.get('role') or 'user')}: {str(message.get('content') or '')}"
@@ -121,7 +162,7 @@ def main() -> int:
                         model,
                         tokenizer,
                         prompt=str(prompt),
-                        **params,
+                        **_prepare_generation_params(params),
                     )
                 generation_count += 1
                 _emit(
@@ -163,7 +204,9 @@ def main() -> int:
                             model,
                             tokenizer,
                             prompt=str(payload.get("prompt", "")),
-                            **dict(payload.get("params") or {}),
+                            **_prepare_generation_params(
+                                dict(payload.get("params") or {})
+                            ),
                         )
                         results.append(
                             {
@@ -210,7 +253,7 @@ def main() -> int:
                         model,
                         tokenizer,
                         prompt=rendered_prompt,
-                        **params,
+                        **_prepare_generation_params(params),
                     )
                 generation_count += 1
                 _emit(
@@ -253,7 +296,7 @@ def main() -> int:
                         model,
                         tokenizer,
                         prompt=str(prompt),
-                        **params,
+                        **_prepare_generation_params(params),
                     ):
                         sequence += 1
                         prompt_tokens = getattr(response, "prompt_tokens", prompt_tokens)
@@ -377,7 +420,7 @@ def main() -> int:
                         model,
                         tokenizer,
                         prompt=rendered_prompt,
-                        **params,
+                        **_prepare_generation_params(params),
                     ):
                         sequence += 1
                         prompt_tokens = getattr(response, "prompt_tokens", prompt_tokens)

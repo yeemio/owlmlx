@@ -1,0 +1,32 @@
+{
+  "cmd": [
+    "curl",
+    "-sS",
+    "-w",
+    "\n%{http_code}",
+    "-X",
+    "POST",
+    "http://127.0.0.1:8066/v1/unload",
+    "-H",
+    "Accept: application/json",
+    "-H",
+    "Content-Type: application/json",
+    "--data-binary",
+    "{\"model_id\": \"gemma-4-31B-it\"}"
+  ],
+  "cwd": "/Users/yeemio/AI/gitrep/owlops",
+  "duration_s": 0.4599,
+  "payload": {
+    "detail": {
+      "pid": 40904
+    },
+    "error_code": null,
+    "freed_gb": 64.0,
+    "message": "unloaded gemma-4-31B-it",
+    "model_id": "gemma-4-31B-it",
+    "ok": true
+  },
+  "returncode": 0,
+  "status": 200,
+  "stderr": ""
+}

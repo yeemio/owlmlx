@@ -1,0 +1,33 @@
+{
+  "cmd": [
+    "curl",
+    "-sS",
+    "-w",
+    "\n%{http_code}",
+    "-X",
+    "GET",
+    "http://127.0.0.1:8066/healthz",
+    "-H",
+    "Accept: application/json"
+  ],
+  "cwd": "/Users/yeemio/AI/gitrep/owlops",
+  "duration_s": 0.0122,
+  "payload": {
+    "active_model_id": null,
+    "backend_error": null,
+    "backend_name": "mlx-lm-subprocess",
+    "child_health": {},
+    "contract": {
+      "surface": "owlmlx.healthz",
+      "version": "stabilization1"
+    },
+    "model_count": 0,
+    "ok": true,
+    "persistent_child": true,
+    "readiness": "degraded",
+    "runtime": "owlmlx"
+  },
+  "returncode": 0,
+  "status": 200,
+  "stderr": ""
+}

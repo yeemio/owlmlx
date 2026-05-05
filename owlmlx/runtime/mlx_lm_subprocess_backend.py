@@ -575,6 +575,7 @@ class MlxLmSubprocessBackend:
         python_executable: str | None = None,
         env_overrides: dict[str, str] | None = None,
         runner_module: str = "owlmlx.runtime.mlx_lm_runner",
+        model_path_resolver: Callable[[str], str] | None = None,
         timeout_s: float = 600.0,
         health_probe_timeout_s: float = 2.0,
         auto_restart_dead_session: bool = True,
@@ -584,6 +585,7 @@ class MlxLmSubprocessBackend:
         self.python_executable = python_executable or sys.executable
         self.env_overrides = dict(env_overrides or {})
         self.runner_module = runner_module
+        self.model_path_resolver = model_path_resolver
         self.timeout_s = timeout_s
         self.health_probe_timeout_s = health_probe_timeout_s
         self.auto_restart_dead_session = auto_restart_dead_session
@@ -697,6 +699,18 @@ class MlxLmSubprocessBackend:
         self._stream_debug_before_terminal_payload_commit: (
             Callable[[dict[str, Any]], None] | None
         ) = None
+
+    def _runner_model_id(self, model_id: str) -> str:
+        """Return the model identifier sent to the child runner.
+
+        The public runtime API keeps stable logical model ids, while the
+        technical-preview launcher may need to resolve those ids to local
+        filesystem paths for ``mlx_lm.load``.
+        """
+
+        if self.model_path_resolver is None:
+            return model_id
+        return str(self.model_path_resolver(model_id))
 
     def _read_stream_transport_line(
         self,
@@ -1236,7 +1250,7 @@ class MlxLmSubprocessBackend:
             session,
             {
                 "action": "load",
-                "model_id": model_id,
+                "model_id": self._runner_model_id(model_id),
             },
         )
         self._last_result = result
@@ -1268,6 +1282,7 @@ class MlxLmSubprocessBackend:
             detail={
                 "pid": session.pid,
                 "load_time_s": round(time.monotonic() - load_started, 4),
+                "runner_model_id": result.payload.get("model_id"),
             },
             model=info,
         )
@@ -1608,7 +1623,7 @@ class MlxLmSubprocessBackend:
     def _probe_session(self, model_id: str, session: _ChildSession) -> dict[str, Any]:
         result = self._exchange(
             session,
-            {"action": "ping", "model_id": model_id},
+            {"action": "ping", "model_id": self._runner_model_id(model_id)},
             timeout_s=self.health_probe_timeout_s,
         )
         if result.ok:
@@ -1657,7 +1672,7 @@ class MlxLmSubprocessBackend:
         session = self._start_session(model)
         result = self._exchange(
             session,
-            {"action": "load", "model_id": model_id},
+            {"action": "load", "model_id": self._runner_model_id(model_id)},
         )
         self._last_result = result
         if result.ok:
@@ -1777,7 +1792,7 @@ class MlxLmSubprocessBackend:
             session,
             {
                 "action": "generate",
-                "model_id": model_id,
+                "model_id": self._runner_model_id(model_id),
                 "prompt": prompt,
                 "params": dict(kwargs),
             },
@@ -1833,7 +1848,7 @@ class MlxLmSubprocessBackend:
             session,
             {
                 "action": "generate_messages",
-                "model_id": model_id,
+                "model_id": self._runner_model_id(model_id),
                 "messages": [
                     {"role": message.role, "content": message.content}
                     for message in messages
@@ -1908,7 +1923,7 @@ class MlxLmSubprocessBackend:
 
         request_payload = {
             "action": "generate_batch",
-            "model_id": model_id,
+            "model_id": self._runner_model_id(model_id),
             "requests": [
                 {
                     "prompt": prompt,
@@ -2056,7 +2071,7 @@ class MlxLmSubprocessBackend:
                 session,
                 {
                     "action": "stream_generate",
-                    "model_id": model_id,
+                    "model_id": self._runner_model_id(model_id),
                     "prompt": prompt,
                     "params": dict(kwargs),
                 },
@@ -2148,7 +2163,7 @@ class MlxLmSubprocessBackend:
                 session,
                 {
                     "action": "stream_generate_messages",
-                    "model_id": model_id,
+                    "model_id": self._runner_model_id(model_id),
                     "messages": [
                         {"role": message.role, "content": message.content}
                         for message in messages
@@ -2241,7 +2256,7 @@ class MlxLmSubprocessBackend:
             session,
             {
                 "action": "shutdown",
-                "model_id": model_id,
+                "model_id": self._runner_model_id(model_id),
             },
         )
         if session.proc.poll() is None:

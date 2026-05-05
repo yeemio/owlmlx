@@ -1,0 +1,160 @@
+{
+  "cmd": [
+    "curl",
+    "-sS",
+    "-w",
+    "\n%{http_code}",
+    "-X",
+    "GET",
+    "http://127.0.0.1:8066/v1/runtime/model-visibility",
+    "-H",
+    "Accept: application/json"
+  ],
+  "cwd": "/Users/yeemio/AI/gitrep/owlops",
+  "duration_s": 0.01,
+  "payload": {
+    "blocked_model_ids": [
+      "Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+      "Qwen3.5-35B-A3B-4bit",
+      "gpt-oss-20b-MXFP4-Q4",
+      "Qwen3-Embedding-8B-4bit-DWQ"
+    ],
+    "contract_version": "runtime-owned-2",
+    "diagnostic_surface": {
+      "component": "owlmlx",
+      "endpoint": "/v1/runtime/model-visibility",
+      "role": "diagnostic",
+      "shape": "owlmlx.runtime.model_visibility"
+    },
+    "distinct_from_loaded_inventory": {
+      "loaded_model_ids": [],
+      "reason": "loaded inventory tracks active backend state; visibility tracks owlmlx-registered local models that are loadable on demand."
+    },
+    "distinct_from_platform_rule": {
+      "platform_rule": "gate_required_before_visible",
+      "platform_surface": {
+        "component": "llm_router",
+        "endpoint": "/v1/models"
+      },
+      "reason": "owlmlx visibility no longer depends on router-owned lifecycle curation or platform gate files; it is derived from owlmlx registration plus base-model artifact presence."
+    },
+    "entries": [
+      {
+        "block_reason": "base_model_directory_missing",
+        "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit/config.json",
+        "config_present": false,
+        "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+        "local_model_dir_present": false,
+        "model_id": "Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+        "registered": true,
+        "visible": false
+      },
+      {
+        "block_reason": "base_model_directory_missing",
+        "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit/config.json",
+        "config_present": false,
+        "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit",
+        "local_model_dir_present": false,
+        "model_id": "Qwen3.5-35B-A3B-4bit",
+        "registered": true,
+        "visible": false
+      },
+      {
+        "block_reason": null,
+        "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B/config.json",
+        "config_present": true,
+        "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B",
+        "local_model_dir_present": true,
+        "model_id": "Qwen3.6-27B",
+        "registered": true,
+        "visible": true
+      },
+      {
+        "block_reason": null,
+        "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B/config.json",
+        "config_present": true,
+        "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B",
+        "local_model_dir_present": true,
+        "model_id": "Qwen3.6-35B-A3B",
+        "registered": true,
+        "visible": true
+      },
+      {
+        "block_reason": null,
+        "config_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it/config.json",
+        "config_present": true,
+        "local_model_dir": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+        "local_model_dir_present": true,
+        "model_id": "gemma-4-31B-it",
+        "registered": true,
+        "visible": true
+      },
+      {
+        "block_reason": null,
+        "config_path": "/Users/yeemio/AI/Agent/models/gpt-oss-120b-MXFP4-Q4/config.json",
+        "config_present": true,
+        "local_model_dir": "/Users/yeemio/AI/Agent/models/gpt-oss-120b-MXFP4-Q4",
+        "local_model_dir_present": true,
+        "model_id": "gpt-oss-120b-MXFP4-Q4",
+        "registered": true,
+        "visible": true
+      },
+      {
+        "block_reason": "base_model_directory_missing",
+        "config_path": "/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4/config.json",
+        "config_present": false,
+        "local_model_dir": "/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4",
+        "local_model_dir_present": false,
+        "model_id": "gpt-oss-20b-MXFP4-Q4",
+        "registered": true,
+        "visible": false
+      },
+      {
+        "block_reason": "base_model_directory_missing",
+        "config_path": "/Users/yeemio/AI/Agent/models/Qwen3-Embedding-8B-4bit-DWQ/config.json",
+        "config_present": false,
+        "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3-Embedding-8B-4bit-DWQ",
+        "local_model_dir_present": false,
+        "model_id": "Qwen3-Embedding-8B-4bit-DWQ",
+        "registered": true,
+        "visible": false
+      }
+    ],
+    "formal_surface": {
+      "component": "owlmlx",
+      "endpoint": "/v1/openai/models",
+      "role": "authoritative",
+      "shape": "openai.model.list"
+    },
+    "gate": {
+      "kind": "registered_base_model_config_present",
+      "models_root": "/Users/yeemio/AI/Agent/models",
+      "owner": "owlmlx",
+      "required_artifact": "{model-id}/config.json"
+    },
+    "loaded_inventory_surface": {
+      "component": "owlmlx",
+      "endpoint": "/v1/models",
+      "semantic_role": "currently_loaded_inventory_only",
+      "shape": "owlmlx.runtime.inventory"
+    },
+    "model_count": 4,
+    "registered_model_count": 8,
+    "rule": "runtime_gate_required_before_visible",
+    "surface": "owlmlx.runtime.model_visibility",
+    "visible_model_ids": [
+      "Qwen3.6-27B",
+      "Qwen3.6-35B-A3B",
+      "gemma-4-31B-it",
+      "gpt-oss-120b-MXFP4-Q4"
+    ],
+    "visible_when": {
+      "base_model_config_present": true,
+      "base_model_directory_present": true,
+      "registered_in_owlmlx_visibility_registry": true
+    }
+  },
+  "returncode": 0,
+  "status": 200,
+  "stderr": ""
+}

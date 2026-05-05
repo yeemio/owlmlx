@@ -1,0 +1,40 @@
+{
+  "cmd": [
+    "curl",
+    "-sS",
+    "-w",
+    "\n%{http_code}",
+    "-X",
+    "POST",
+    "http://127.0.0.1:8066/v1/generate",
+    "-H",
+    "Accept: application/json",
+    "-H",
+    "Content-Type: application/json",
+    "--data-binary",
+    "{\"prompt\": \"Reply with exactly OK.\", \"params\": {\"max_tokens\": 2, \"temperature\": 0.0}}"
+  ],
+  "cwd": "/Users/yeemio/AI/gitrep/owlops",
+  "duration_s": 2.3971,
+  "payload": {
+    "completion_tokens": null,
+    "detail": {
+      "generation_count": 1,
+      "pid": 40904,
+      "returncode": 0
+    },
+    "error_code": null,
+    "execution_time_s": 2.3603,
+    "finish_reason": null,
+    "message": "generated",
+    "model_id": "gemma-4-31B-it",
+    "ok": true,
+    "prompt_tokens": null,
+    "text": " OK.",
+    "wait_time_s": 0.0251,
+    "was_queued": false
+  },
+  "returncode": 0,
+  "status": 200,
+  "stderr": ""
+}

@@ -1,0 +1,1131 @@
+{
+  "evidence_dir": "files/evidence/owlmlx/technical-preview-cutover/20260430T030415Z",
+  "generate": {
+    "duration_s": 3.1895,
+    "payload": {
+      "completion_tokens": null,
+      "detail": {
+        "generation_count": 1,
+        "pid": 34917,
+        "returncode": 0
+      },
+      "error_code": null,
+      "execution_time_s": 3.1631,
+      "finish_reason": null,
+      "message": "generated",
+      "model_id": "gemma-4-31B-it",
+      "ok": true,
+      "prompt_tokens": null,
+      "text": " OK.",
+      "wait_time_s": 0.025,
+      "was_queued": false
+    },
+    "status": 200
+  },
+  "generate_ok": true,
+  "generate_text": " OK.",
+  "healthz_before": {
+    "duration_s": 0.0046,
+    "payload": {
+      "active_model_id": null,
+      "backend_error": null,
+      "backend_name": "mlx-lm-subprocess",
+      "child_health": {},
+      "contract": {
+        "surface": "owlmlx.healthz",
+        "version": "stabilization1"
+      },
+      "model_count": 0,
+      "ok": true,
+      "persistent_child": true,
+      "readiness": "degraded",
+      "runtime": "owlmlx"
+    },
+    "status": 200
+  },
+  "load": {
+    "duration_s": 7.5173,
+    "payload": {
+      "detail": {
+        "load_time_s": 7.5129,
+        "pid": 34917,
+        "runner_model_id": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it"
+      },
+      "error_code": null,
+      "message": "loaded gemma-4-31B-it in persistent child pid=34917",
+      "model": {
+        "backend": "mlx-lm-subprocess",
+        "loaded_at": 1777518256.980065,
+        "memory_gb": 64.0,
+        "model_id": "gemma-4-31B-it"
+      },
+      "ok": true
+    },
+    "status": 200
+  },
+  "load_ok": true,
+  "model_visibility": {
+    "duration_s": 0.0008,
+    "payload": {
+      "blocked_model_ids": [
+        "Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+        "Qwen3.5-35B-A3B-4bit",
+        "gpt-oss-20b-MXFP4-Q4",
+        "Qwen3-Embedding-8B-4bit-DWQ"
+      ],
+      "contract_version": "runtime-owned-2",
+      "diagnostic_surface": {
+        "component": "owlmlx",
+        "endpoint": "/v1/runtime/model-visibility",
+        "role": "diagnostic",
+        "shape": "owlmlx.runtime.model_visibility"
+      },
+      "distinct_from_loaded_inventory": {
+        "loaded_model_ids": [],
+        "reason": "loaded inventory tracks active backend state; visibility tracks owlmlx-registered local models that are loadable on demand."
+      },
+      "distinct_from_platform_rule": {
+        "platform_rule": "gate_required_before_visible",
+        "platform_surface": {
+          "component": "llm_router",
+          "endpoint": "/v1/models"
+        },
+        "reason": "owlmlx visibility no longer depends on router-owned lifecycle curation or platform gate files; it is derived from owlmlx registration plus base-model artifact presence."
+      },
+      "entries": [
+        {
+          "block_reason": "base_model_directory_missing",
+          "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit/config.json",
+          "config_present": false,
+          "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+          "local_model_dir_present": false,
+          "model_id": "Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+          "registered": true,
+          "visible": false
+        },
+        {
+          "block_reason": "base_model_directory_missing",
+          "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit/config.json",
+          "config_present": false,
+          "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit",
+          "local_model_dir_present": false,
+          "model_id": "Qwen3.5-35B-A3B-4bit",
+          "registered": true,
+          "visible": false
+        },
+        {
+          "block_reason": null,
+          "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B/config.json",
+          "config_present": true,
+          "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B",
+          "local_model_dir_present": true,
+          "model_id": "Qwen3.6-27B",
+          "registered": true,
+          "visible": true
+        },
+        {
+          "block_reason": null,
+          "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B/config.json",
+          "config_present": true,
+          "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B",
+          "local_model_dir_present": true,
+          "model_id": "Qwen3.6-35B-A3B",
+          "registered": true,
+          "visible": true
+        },
+        {
+          "block_reason": null,
+          "config_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it/config.json",
+          "config_present": true,
+          "local_model_dir": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+          "local_model_dir_present": true,
+          "model_id": "gemma-4-31B-it",
+          "registered": true,
+          "visible": true
+        },
+        {
+          "block_reason": null,
+          "config_path": "/Users/yeemio/AI/Agent/models/gpt-oss-120b-MXFP4-Q4/config.json",
+          "config_present": true,
+          "local_model_dir": "/Users/yeemio/AI/Agent/models/gpt-oss-120b-MXFP4-Q4",
+          "local_model_dir_present": true,
+          "model_id": "gpt-oss-120b-MXFP4-Q4",
+          "registered": true,
+          "visible": true
+        },
+        {
+          "block_reason": "base_model_directory_missing",
+          "config_path": "/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4/config.json",
+          "config_present": false,
+          "local_model_dir": "/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4",
+          "local_model_dir_present": false,
+          "model_id": "gpt-oss-20b-MXFP4-Q4",
+          "registered": true,
+          "visible": false
+        },
+        {
+          "block_reason": "base_model_directory_missing",
+          "config_path": "/Users/yeemio/AI/Agent/models/Qwen3-Embedding-8B-4bit-DWQ/config.json",
+          "config_present": false,
+          "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3-Embedding-8B-4bit-DWQ",
+          "local_model_dir_present": false,
+          "model_id": "Qwen3-Embedding-8B-4bit-DWQ",
+          "registered": true,
+          "visible": false
+        }
+      ],
+      "formal_surface": {
+        "component": "owlmlx",
+        "endpoint": "/v1/openai/models",
+        "role": "authoritative",
+        "shape": "openai.model.list"
+      },
+      "gate": {
+        "kind": "registered_base_model_config_present",
+        "models_root": "/Users/yeemio/AI/Agent/models",
+        "owner": "owlmlx",
+        "required_artifact": "{model-id}/config.json"
+      },
+      "loaded_inventory_surface": {
+        "component": "owlmlx",
+        "endpoint": "/v1/models",
+        "semantic_role": "currently_loaded_inventory_only",
+        "shape": "owlmlx.runtime.inventory"
+      },
+      "model_count": 4,
+      "registered_model_count": 8,
+      "rule": "runtime_gate_required_before_visible",
+      "surface": "owlmlx.runtime.model_visibility",
+      "visible_model_ids": [
+        "Qwen3.6-27B",
+        "Qwen3.6-35B-A3B",
+        "gemma-4-31B-it",
+        "gpt-oss-120b-MXFP4-Q4"
+      ],
+      "visible_when": {
+        "base_model_config_present": true,
+        "base_model_directory_present": true,
+        "registered_in_owlmlx_visibility_registry": true
+      }
+    },
+    "status": 200
+  },
+  "models_before": {
+    "duration_s": 0.0009,
+    "payload": {
+      "active_model_id": null,
+      "backend": {
+        "backend_name": "mlx-lm-subprocess",
+        "detail": {
+          "auto_restart_dead_session": true,
+          "cache_runtime_observations": {
+            "aggregated_child_exchange_batch_count": 0,
+            "aggregated_child_exchange_request_count": 0,
+            "aggregated_child_exchange_visible": false,
+            "cache_counter_visibility": {
+              "eviction": false,
+              "residency": false,
+              "reuse": false
+            },
+            "child_exchange_mode": "single_request_per_child_exchange",
+            "max_aggregated_child_batch_size": 0,
+            "persistent_child_reuse_visible": false,
+            "repeated_generation_models": [],
+            "reuse_counter": 0,
+            "total_generation_count": 0
+          },
+          "child_health": {},
+          "children": {},
+          "last_error": null,
+          "last_subprocess": null,
+          "max_restart_attempts": 1,
+          "model_count": 0,
+          "persistent_child": true,
+          "recoverability": {
+            "restart_exhausted_models": [],
+            "restartable_models": []
+          }
+        },
+        "healthy": true,
+        "loaded_models": []
+      },
+      "budget": {
+        "available_gb": 116.0,
+        "currently_loaded_gb": 0.0,
+        "serving_budget_gb": 116.0,
+        "system_memory_gb": 128.0,
+        "system_reserve_gb": 12.0,
+        "utilization": 0.0,
+        "warning_threshold_gb": 100.0
+      },
+      "generation_gate": {
+        "generation_gate": "idle",
+        "longest_exec_s": 0.0,
+        "longest_wait_s": 0.0,
+        "max_concurrent": 1,
+        "pre_gate_admission": {
+          "active_handoff_request_count": 0,
+          "aggregation_scope": "pre_claim_window_only",
+          "capacity": 32,
+          "cohort_count": 0,
+          "cohort_handoff_status": "not_visible",
+          "cohort_window_status": "idle",
+          "forbidden_expansions": [
+            "no_bypass_of_whole_request_gate_claim",
+            "no_post_claim_reordering",
+            "no_post_claim_parallel_generation",
+            "no_child_exchange_from_pre_claim_hook",
+            "no_stream_rewrite_from_pre_claim_hook"
+          ],
+          "hook_boundary": "before_whole_request_gate_claim",
+          "hook_mode": "bounded_runtime_owned_cohort_window",
+          "hook_status": "present",
+          "last_handoff_request_count": 0,
+          "longest_window_wait_s": 0.0,
+          "open_cohort_size": 0,
+          "peak_cohort_size": 0,
+          "peak_staged_count": 0,
+          "preserved_post_claim_invariants": [
+            "max_concurrent_1_after_gate_claim",
+            "ticketed_fifo_after_gate_claim",
+            "serial_safety_validated_only_after_gate_claim"
+          ],
+          "staged_count": 0,
+          "staging_units": [
+            "immutable_request_metadata_snapshot",
+            "ticket_reservation_without_gate_claim",
+            "bounded_pre_claim_cohort_window_membership",
+            "pre_claim_bounded_admission_bookkeeping"
+          ],
+          "total_claimed": 0,
+          "total_cohorts_formed": 0,
+          "total_discarded": 0,
+          "total_handoffs": 0,
+          "total_staged": 0,
+          "total_window_wait_s": 0.0,
+          "window_ms": 20
+        },
+        "queue_discipline": "serial",
+        "queue_policy": "ticketed_fifo",
+        "total_exec_s": 0.0,
+        "total_queued": 0,
+        "total_served": 0,
+        "total_wait_s": 0.0,
+        "waiters": 0
+      },
+      "health": {
+        "block_reason": null,
+        "inference_health": "reachable_not_serving",
+        "is_ready": false,
+        "load_state": "cold",
+        "readiness": "degraded",
+        "truth_level": "unavailable",
+        "wait_tier": "short_wait"
+      },
+      "inventory": {
+        "entries": [],
+        "loaded_count": 0,
+        "model_count": 0,
+        "timestamp": null,
+        "total_loaded_gb": 0.0
+      },
+      "visibility_contract": {
+        "blocked_model_ids": [
+          "Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+          "Qwen3.5-35B-A3B-4bit",
+          "gpt-oss-20b-MXFP4-Q4",
+          "Qwen3-Embedding-8B-4bit-DWQ"
+        ],
+        "contract_version": "runtime-owned-2",
+        "diagnostic_surface": {
+          "component": "owlmlx",
+          "endpoint": "/v1/runtime/model-visibility",
+          "role": "diagnostic",
+          "shape": "owlmlx.runtime.model_visibility"
+        },
+        "distinct_from_loaded_inventory": {
+          "loaded_model_ids": [],
+          "reason": "loaded inventory tracks active backend state; visibility tracks owlmlx-registered local models that are loadable on demand."
+        },
+        "distinct_from_platform_rule": {
+          "platform_rule": "gate_required_before_visible",
+          "platform_surface": {
+            "component": "llm_router",
+            "endpoint": "/v1/models"
+          },
+          "reason": "owlmlx visibility no longer depends on router-owned lifecycle curation or platform gate files; it is derived from owlmlx registration plus base-model artifact presence."
+        },
+        "entries": [
+          {
+            "block_reason": "base_model_directory_missing",
+            "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit/config.json",
+            "config_present": false,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+            "local_model_dir_present": false,
+            "model_id": "Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+            "registered": true,
+            "visible": false
+          },
+          {
+            "block_reason": "base_model_directory_missing",
+            "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit/config.json",
+            "config_present": false,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit",
+            "local_model_dir_present": false,
+            "model_id": "Qwen3.5-35B-A3B-4bit",
+            "registered": true,
+            "visible": false
+          },
+          {
+            "block_reason": null,
+            "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B/config.json",
+            "config_present": true,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B",
+            "local_model_dir_present": true,
+            "model_id": "Qwen3.6-27B",
+            "registered": true,
+            "visible": true
+          },
+          {
+            "block_reason": null,
+            "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B/config.json",
+            "config_present": true,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B",
+            "local_model_dir_present": true,
+            "model_id": "Qwen3.6-35B-A3B",
+            "registered": true,
+            "visible": true
+          },
+          {
+            "block_reason": null,
+            "config_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it/config.json",
+            "config_present": true,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+            "local_model_dir_present": true,
+            "model_id": "gemma-4-31B-it",
+            "registered": true,
+            "visible": true
+          },
+          {
+            "block_reason": null,
+            "config_path": "/Users/yeemio/AI/Agent/models/gpt-oss-120b-MXFP4-Q4/config.json",
+            "config_present": true,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/gpt-oss-120b-MXFP4-Q4",
+            "local_model_dir_present": true,
+            "model_id": "gpt-oss-120b-MXFP4-Q4",
+            "registered": true,
+            "visible": true
+          },
+          {
+            "block_reason": "base_model_directory_missing",
+            "config_path": "/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4/config.json",
+            "config_present": false,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4",
+            "local_model_dir_present": false,
+            "model_id": "gpt-oss-20b-MXFP4-Q4",
+            "registered": true,
+            "visible": false
+          },
+          {
+            "block_reason": "base_model_directory_missing",
+            "config_path": "/Users/yeemio/AI/Agent/models/Qwen3-Embedding-8B-4bit-DWQ/config.json",
+            "config_present": false,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3-Embedding-8B-4bit-DWQ",
+            "local_model_dir_present": false,
+            "model_id": "Qwen3-Embedding-8B-4bit-DWQ",
+            "registered": true,
+            "visible": false
+          }
+        ],
+        "formal_surface": {
+          "component": "owlmlx",
+          "endpoint": "/v1/openai/models",
+          "role": "authoritative",
+          "shape": "openai.model.list"
+        },
+        "gate": {
+          "kind": "registered_base_model_config_present",
+          "models_root": "/Users/yeemio/AI/Agent/models",
+          "owner": "owlmlx",
+          "required_artifact": "{model-id}/config.json"
+        },
+        "loaded_inventory_surface": {
+          "component": "owlmlx",
+          "endpoint": "/v1/models",
+          "semantic_role": "currently_loaded_inventory_only",
+          "shape": "owlmlx.runtime.inventory"
+        },
+        "model_count": 4,
+        "registered_model_count": 8,
+        "rule": "runtime_gate_required_before_visible",
+        "surface": "owlmlx.runtime.model_visibility",
+        "visible_model_ids": [
+          "Qwen3.6-27B",
+          "Qwen3.6-35B-A3B",
+          "gemma-4-31B-it",
+          "gpt-oss-120b-MXFP4-Q4"
+        ],
+        "visible_when": {
+          "base_model_config_present": true,
+          "base_model_directory_present": true,
+          "registered_in_owlmlx_visibility_registry": true
+        }
+      }
+    },
+    "status": 200
+  },
+  "server_pid": 34916,
+  "server_returncode": -15,
+  "status_after_generate": {
+    "duration_s": 0.0009,
+    "payload": {
+      "active_model_id": "gemma-4-31B-it",
+      "backend": {
+        "backend_name": "mlx-lm-subprocess",
+        "detail": {
+          "auto_restart_dead_session": true,
+          "cache_runtime_observations": {
+            "aggregated_child_exchange_batch_count": 0,
+            "aggregated_child_exchange_request_count": 0,
+            "aggregated_child_exchange_visible": false,
+            "cache_counter_visibility": {
+              "eviction": false,
+              "residency": false,
+              "reuse": false
+            },
+            "child_exchange_mode": "single_request_per_child_exchange",
+            "max_aggregated_child_batch_size": 0,
+            "persistent_child_reuse_visible": false,
+            "repeated_generation_models": [],
+            "reuse_counter": 0,
+            "total_generation_count": 1
+          },
+          "child_health": {
+            "gemma-4-31B-it": {
+              "generation_count": 1,
+              "ok": true,
+              "pid": 34917
+            }
+          },
+          "children": {
+            "gemma-4-31B-it": {
+              "aggregated_dispatch_count": 0,
+              "aggregated_dispatch_request_count": 0,
+              "alive": true,
+              "generation_count": 1,
+              "max_aggregated_dispatch_batch_size": 0,
+              "pid": 34917,
+              "restart_count": 0
+            }
+          },
+          "last_error": null,
+          "last_subprocess": {
+            "ok": true,
+            "payload": {
+              "action": "generate",
+              "generation_count": 1,
+              "model_id": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+              "ok": true,
+              "pid": 34917,
+              "text": " OK."
+            },
+            "returncode": 0,
+            "stderr": "",
+            "stdout": ""
+          },
+          "max_restart_attempts": 1,
+          "model_count": 1,
+          "persistent_child": true,
+          "recoverability": {
+            "restart_exhausted_models": [],
+            "restartable_models": []
+          }
+        },
+        "healthy": true,
+        "loaded_models": [
+          {
+            "backend": "mlx-lm-subprocess",
+            "loaded_at": 1777518256.980065,
+            "memory_gb": 64.0,
+            "model_id": "gemma-4-31B-it"
+          }
+        ]
+      },
+      "budget": {
+        "available_gb": 52.0,
+        "currently_loaded_gb": 64.0,
+        "serving_budget_gb": 116.0,
+        "system_memory_gb": 128.0,
+        "system_reserve_gb": 12.0,
+        "utilization": 0.552,
+        "warning_threshold_gb": 100.0
+      },
+      "contract": {
+        "diagnostic_sections": [
+          "backend.detail",
+          "governance_observations",
+          "governance_policy",
+          "generation_gate",
+          "reclaim_barrier",
+          "load_failure"
+        ],
+        "stable_sections": [
+          "summary",
+          "health",
+          "inventory",
+          "budget",
+          "restart"
+        ],
+        "surface": "owlmlx.runtime.status",
+        "version": "stabilization1"
+      },
+      "generation_gate": {
+        "generation_gate": "idle",
+        "longest_exec_s": 3.163,
+        "longest_wait_s": 0.025,
+        "max_concurrent": 1,
+        "pre_gate_admission": {
+          "active_handoff_request_count": 0,
+          "aggregation_scope": "pre_claim_window_only",
+          "capacity": 32,
+          "cohort_count": 0,
+          "cohort_handoff_status": "not_visible",
+          "cohort_window_status": "idle",
+          "forbidden_expansions": [
+            "no_bypass_of_whole_request_gate_claim",
+            "no_post_claim_reordering",
+            "no_post_claim_parallel_generation",
+            "no_child_exchange_from_pre_claim_hook",
+            "no_stream_rewrite_from_pre_claim_hook"
+          ],
+          "hook_boundary": "before_whole_request_gate_claim",
+          "hook_mode": "bounded_runtime_owned_cohort_window",
+          "hook_status": "present",
+          "last_handoff_request_count": 0,
+          "longest_window_wait_s": 0.025,
+          "open_cohort_size": 0,
+          "peak_cohort_size": 1,
+          "peak_staged_count": 1,
+          "preserved_post_claim_invariants": [
+            "max_concurrent_1_after_gate_claim",
+            "ticketed_fifo_after_gate_claim",
+            "serial_safety_validated_only_after_gate_claim"
+          ],
+          "staged_count": 0,
+          "staging_units": [
+            "immutable_request_metadata_snapshot",
+            "ticket_reservation_without_gate_claim",
+            "bounded_pre_claim_cohort_window_membership",
+            "pre_claim_bounded_admission_bookkeeping"
+          ],
+          "total_claimed": 1,
+          "total_cohorts_formed": 1,
+          "total_discarded": 0,
+          "total_handoffs": 0,
+          "total_staged": 1,
+          "total_window_wait_s": 0.025,
+          "window_ms": 20
+        },
+        "queue_discipline": "serial",
+        "queue_policy": "ticketed_fifo",
+        "total_exec_s": 3.163,
+        "total_queued": 1,
+        "total_served": 1,
+        "total_wait_s": 0.025,
+        "waiters": 0
+      },
+      "governance_observations": {
+        "active_reassignment_visible": false,
+        "eviction_history_events_visible": false,
+        "explicit_targeting_evidence_visible": false,
+        "pinning_events_visible": false,
+        "recent_window_runs": 0,
+        "restart_restore_visible": false,
+        "transition_count": 1,
+        "ttl_events_visible": false,
+        "ttl_expiry_visible": false
+      },
+      "governance_policy": {
+        "backend_ttl_visible": false,
+        "eviction_history_count": 0,
+        "eviction_history_visible": false,
+        "pinned_model_count": 0,
+        "pinned_model_ids": [],
+        "pinning_supported": true,
+        "recent_eviction_history": [],
+        "ttl_expired_model_ids": [],
+        "ttl_expired_pinned_model_ids": [],
+        "ttl_model_ids": [],
+        "ttl_policy_count": 0,
+        "ttl_policy_mode": "kernel_explicit_sweep",
+        "ttl_supported": true
+      },
+      "health": {
+        "block_reason": null,
+        "inference_health": "serving",
+        "is_ready": true,
+        "load_state": "true_loaded",
+        "readiness": "ready",
+        "truth_level": "true",
+        "wait_tier": "ready_now"
+      },
+      "inventory": {
+        "entries": [
+          {
+            "backend": "mlx-lm-subprocess",
+            "load_state": "true_loaded",
+            "loaded_at": 1777518256.980065,
+            "memory_gb": 64.0,
+            "model_id": "gemma-4-31B-it",
+            "truth_level": "true"
+          }
+        ],
+        "loaded_count": 1,
+        "model_count": 1,
+        "timestamp": null,
+        "total_loaded_gb": 64.0
+      },
+      "load_failure": {
+        "events": [],
+        "total_event_count": 0,
+        "unresolved_event_count": 0
+      },
+      "reclaim_barrier": {
+        "events": [],
+        "total_event_count": 0,
+        "unresolved_event_count": 0
+      },
+      "restart": {
+        "active_model_id": "gemma-4-31B-it",
+        "auto_restart_dead_session": true,
+        "restart_exhausted_models": [],
+        "restartable_models": []
+      },
+      "summary": {
+        "active_model_id": "gemma-4-31B-it",
+        "backend_healthy": true,
+        "backend_name": "mlx-lm-subprocess",
+        "block_reason": null,
+        "model_count": 1,
+        "persistent_child": true,
+        "readiness": "ready",
+        "runtime": "owlmlx"
+      }
+    },
+    "status": 200
+  },
+  "status_after_unload": {
+    "duration_s": 0.0007,
+    "payload": {
+      "active_model_id": null,
+      "backend": {
+        "backend_name": "mlx-lm-subprocess",
+        "detail": {
+          "auto_restart_dead_session": true,
+          "cache_runtime_observations": {
+            "aggregated_child_exchange_batch_count": 0,
+            "aggregated_child_exchange_request_count": 0,
+            "aggregated_child_exchange_visible": false,
+            "cache_counter_visibility": {
+              "eviction": false,
+              "residency": false,
+              "reuse": false
+            },
+            "child_exchange_mode": "single_request_per_child_exchange",
+            "max_aggregated_child_batch_size": 0,
+            "persistent_child_reuse_visible": false,
+            "repeated_generation_models": [],
+            "reuse_counter": 0,
+            "total_generation_count": 0
+          },
+          "child_health": {},
+          "children": {},
+          "last_error": null,
+          "last_subprocess": {
+            "ok": true,
+            "payload": {
+              "action": "generate",
+              "generation_count": 1,
+              "model_id": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+              "ok": true,
+              "pid": 34917,
+              "text": " OK."
+            },
+            "returncode": 0,
+            "stderr": "",
+            "stdout": ""
+          },
+          "max_restart_attempts": 1,
+          "model_count": 0,
+          "persistent_child": true,
+          "recoverability": {
+            "restart_exhausted_models": [],
+            "restartable_models": []
+          }
+        },
+        "healthy": true,
+        "loaded_models": []
+      },
+      "budget": {
+        "available_gb": 116.0,
+        "currently_loaded_gb": 0.0,
+        "serving_budget_gb": 116.0,
+        "system_memory_gb": 128.0,
+        "system_reserve_gb": 12.0,
+        "utilization": 0.0,
+        "warning_threshold_gb": 100.0
+      },
+      "contract": {
+        "diagnostic_sections": [
+          "backend.detail",
+          "governance_observations",
+          "governance_policy",
+          "generation_gate",
+          "reclaim_barrier",
+          "load_failure"
+        ],
+        "stable_sections": [
+          "summary",
+          "health",
+          "inventory",
+          "budget",
+          "restart"
+        ],
+        "surface": "owlmlx.runtime.status",
+        "version": "stabilization1"
+      },
+      "generation_gate": {
+        "generation_gate": "idle",
+        "longest_exec_s": 3.163,
+        "longest_wait_s": 0.025,
+        "max_concurrent": 1,
+        "pre_gate_admission": {
+          "active_handoff_request_count": 0,
+          "aggregation_scope": "pre_claim_window_only",
+          "capacity": 32,
+          "cohort_count": 0,
+          "cohort_handoff_status": "not_visible",
+          "cohort_window_status": "idle",
+          "forbidden_expansions": [
+            "no_bypass_of_whole_request_gate_claim",
+            "no_post_claim_reordering",
+            "no_post_claim_parallel_generation",
+            "no_child_exchange_from_pre_claim_hook",
+            "no_stream_rewrite_from_pre_claim_hook"
+          ],
+          "hook_boundary": "before_whole_request_gate_claim",
+          "hook_mode": "bounded_runtime_owned_cohort_window",
+          "hook_status": "present",
+          "last_handoff_request_count": 0,
+          "longest_window_wait_s": 0.025,
+          "open_cohort_size": 0,
+          "peak_cohort_size": 1,
+          "peak_staged_count": 1,
+          "preserved_post_claim_invariants": [
+            "max_concurrent_1_after_gate_claim",
+            "ticketed_fifo_after_gate_claim",
+            "serial_safety_validated_only_after_gate_claim"
+          ],
+          "staged_count": 0,
+          "staging_units": [
+            "immutable_request_metadata_snapshot",
+            "ticket_reservation_without_gate_claim",
+            "bounded_pre_claim_cohort_window_membership",
+            "pre_claim_bounded_admission_bookkeeping"
+          ],
+          "total_claimed": 1,
+          "total_cohorts_formed": 1,
+          "total_discarded": 0,
+          "total_handoffs": 0,
+          "total_staged": 1,
+          "total_window_wait_s": 0.025,
+          "window_ms": 20
+        },
+        "queue_discipline": "serial",
+        "queue_policy": "ticketed_fifo",
+        "total_exec_s": 3.163,
+        "total_queued": 1,
+        "total_served": 1,
+        "total_wait_s": 0.025,
+        "waiters": 0
+      },
+      "governance_observations": {
+        "active_reassignment_visible": false,
+        "eviction_history_events_visible": false,
+        "explicit_targeting_evidence_visible": false,
+        "pinning_events_visible": false,
+        "recent_window_runs": 0,
+        "restart_restore_visible": false,
+        "transition_count": 2,
+        "ttl_events_visible": false,
+        "ttl_expiry_visible": false
+      },
+      "governance_policy": {
+        "backend_ttl_visible": false,
+        "eviction_history_count": 0,
+        "eviction_history_visible": false,
+        "pinned_model_count": 0,
+        "pinned_model_ids": [],
+        "pinning_supported": true,
+        "recent_eviction_history": [],
+        "ttl_expired_model_ids": [],
+        "ttl_expired_pinned_model_ids": [],
+        "ttl_model_ids": [],
+        "ttl_policy_count": 0,
+        "ttl_policy_mode": "kernel_explicit_sweep",
+        "ttl_supported": true
+      },
+      "health": {
+        "block_reason": null,
+        "inference_health": "reachable_not_serving",
+        "is_ready": false,
+        "load_state": "cold",
+        "readiness": "degraded",
+        "truth_level": "unavailable",
+        "wait_tier": "short_wait"
+      },
+      "inventory": {
+        "entries": [],
+        "loaded_count": 0,
+        "model_count": 0,
+        "timestamp": null,
+        "total_loaded_gb": 0.0
+      },
+      "load_failure": {
+        "events": [],
+        "total_event_count": 0,
+        "unresolved_event_count": 0
+      },
+      "reclaim_barrier": {
+        "events": [],
+        "total_event_count": 0,
+        "unresolved_event_count": 0
+      },
+      "restart": {
+        "active_model_id": null,
+        "auto_restart_dead_session": true,
+        "restart_exhausted_models": [],
+        "restartable_models": []
+      },
+      "summary": {
+        "active_model_id": null,
+        "backend_healthy": true,
+        "backend_name": "mlx-lm-subprocess",
+        "block_reason": null,
+        "model_count": 0,
+        "persistent_child": true,
+        "readiness": "degraded",
+        "runtime": "owlmlx"
+      }
+    },
+    "status": 200
+  },
+  "status_before": {
+    "duration_s": 0.0009,
+    "payload": {
+      "active_model_id": null,
+      "backend": {
+        "backend_name": "mlx-lm-subprocess",
+        "detail": {
+          "auto_restart_dead_session": true,
+          "cache_runtime_observations": {
+            "aggregated_child_exchange_batch_count": 0,
+            "aggregated_child_exchange_request_count": 0,
+            "aggregated_child_exchange_visible": false,
+            "cache_counter_visibility": {
+              "eviction": false,
+              "residency": false,
+              "reuse": false
+            },
+            "child_exchange_mode": "single_request_per_child_exchange",
+            "max_aggregated_child_batch_size": 0,
+            "persistent_child_reuse_visible": false,
+            "repeated_generation_models": [],
+            "reuse_counter": 0,
+            "total_generation_count": 0
+          },
+          "child_health": {},
+          "children": {},
+          "last_error": null,
+          "last_subprocess": null,
+          "max_restart_attempts": 1,
+          "model_count": 0,
+          "persistent_child": true,
+          "recoverability": {
+            "restart_exhausted_models": [],
+            "restartable_models": []
+          }
+        },
+        "healthy": true,
+        "loaded_models": []
+      },
+      "budget": {
+        "available_gb": 116.0,
+        "currently_loaded_gb": 0.0,
+        "serving_budget_gb": 116.0,
+        "system_memory_gb": 128.0,
+        "system_reserve_gb": 12.0,
+        "utilization": 0.0,
+        "warning_threshold_gb": 100.0
+      },
+      "contract": {
+        "diagnostic_sections": [
+          "backend.detail",
+          "governance_observations",
+          "governance_policy",
+          "generation_gate",
+          "reclaim_barrier",
+          "load_failure"
+        ],
+        "stable_sections": [
+          "summary",
+          "health",
+          "inventory",
+          "budget",
+          "restart"
+        ],
+        "surface": "owlmlx.runtime.status",
+        "version": "stabilization1"
+      },
+      "generation_gate": {
+        "generation_gate": "idle",
+        "longest_exec_s": 0.0,
+        "longest_wait_s": 0.0,
+        "max_concurrent": 1,
+        "pre_gate_admission": {
+          "active_handoff_request_count": 0,
+          "aggregation_scope": "pre_claim_window_only",
+          "capacity": 32,
+          "cohort_count": 0,
+          "cohort_handoff_status": "not_visible",
+          "cohort_window_status": "idle",
+          "forbidden_expansions": [
+            "no_bypass_of_whole_request_gate_claim",
+            "no_post_claim_reordering",
+            "no_post_claim_parallel_generation",
+            "no_child_exchange_from_pre_claim_hook",
+            "no_stream_rewrite_from_pre_claim_hook"
+          ],
+          "hook_boundary": "before_whole_request_gate_claim",
+          "hook_mode": "bounded_runtime_owned_cohort_window",
+          "hook_status": "present",
+          "last_handoff_request_count": 0,
+          "longest_window_wait_s": 0.0,
+          "open_cohort_size": 0,
+          "peak_cohort_size": 0,
+          "peak_staged_count": 0,
+          "preserved_post_claim_invariants": [
+            "max_concurrent_1_after_gate_claim",
+            "ticketed_fifo_after_gate_claim",
+            "serial_safety_validated_only_after_gate_claim"
+          ],
+          "staged_count": 0,
+          "staging_units": [
+            "immutable_request_metadata_snapshot",
+            "ticket_reservation_without_gate_claim",
+            "bounded_pre_claim_cohort_window_membership",
+            "pre_claim_bounded_admission_bookkeeping"
+          ],
+          "total_claimed": 0,
+          "total_cohorts_formed": 0,
+          "total_discarded": 0,
+          "total_handoffs": 0,
+          "total_staged": 0,
+          "total_window_wait_s": 0.0,
+          "window_ms": 20
+        },
+        "queue_discipline": "serial",
+        "queue_policy": "ticketed_fifo",
+        "total_exec_s": 0.0,
+        "total_queued": 0,
+        "total_served": 0,
+        "total_wait_s": 0.0,
+        "waiters": 0
+      },
+      "governance_observations": {
+        "active_reassignment_visible": false,
+        "eviction_history_events_visible": false,
+        "explicit_targeting_evidence_visible": false,
+        "pinning_events_visible": false,
+        "recent_window_runs": 0,
+        "restart_restore_visible": false,
+        "transition_count": 0,
+        "ttl_events_visible": false,
+        "ttl_expiry_visible": false
+      },
+      "governance_policy": {
+        "backend_ttl_visible": false,
+        "eviction_history_count": 0,
+        "eviction_history_visible": false,
+        "pinned_model_count": 0,
+        "pinned_model_ids": [],
+        "pinning_supported": true,
+        "recent_eviction_history": [],
+        "ttl_expired_model_ids": [],
+        "ttl_expired_pinned_model_ids": [],
+        "ttl_model_ids": [],
+        "ttl_policy_count": 0,
+        "ttl_policy_mode": "kernel_explicit_sweep",
+        "ttl_supported": true
+      },
+      "health": {
+        "block_reason": null,
+        "inference_health": "reachable_not_serving",
+        "is_ready": false,
+        "load_state": "cold",
+        "readiness": "degraded",
+        "truth_level": "unavailable",
+        "wait_tier": "short_wait"
+      },
+      "inventory": {
+        "entries": [],
+        "loaded_count": 0,
+        "model_count": 0,
+        "timestamp": null,
+        "total_loaded_gb": 0.0
+      },
+      "load_failure": {
+        "events": [],
+        "total_event_count": 0,
+        "unresolved_event_count": 0
+      },
+      "reclaim_barrier": {
+        "events": [],
+        "total_event_count": 0,
+        "unresolved_event_count": 0
+      },
+      "restart": {
+        "active_model_id": null,
+        "auto_restart_dead_session": true,
+        "restart_exhausted_models": [],
+        "restartable_models": []
+      },
+      "summary": {
+        "active_model_id": null,
+        "backend_healthy": true,
+        "backend_name": "mlx-lm-subprocess",
+        "block_reason": null,
+        "model_count": 0,
+        "persistent_child": true,
+        "readiness": "degraded",
+        "runtime": "owlmlx"
+      }
+    },
+    "status": 200
+  },
+  "unload": {
+    "duration_s": 0.3997,
+    "payload": {
+      "detail": {
+        "pid": 34917
+      },
+      "error_code": null,
+      "freed_gb": 64.0,
+      "message": "unloaded gemma-4-31B-it",
+      "model_id": "gemma-4-31B-it",
+      "ok": true
+    },
+    "status": 200
+  },
+  "unload_ok": true
+}

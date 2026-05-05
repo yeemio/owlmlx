@@ -1,0 +1,43 @@
+{
+  "cmd": [
+    "curl",
+    "-sS",
+    "-w",
+    "\n%{http_code}",
+    "-X",
+    "GET",
+    "http://127.0.0.1:8066/v1/openai/models",
+    "-H",
+    "Accept: application/json"
+  ],
+  "cwd": "/Users/yeemio/AI/gitrep/owlops",
+  "duration_s": 0.0095,
+  "payload": {
+    "data": [
+      {
+        "id": "Qwen3.6-27B",
+        "object": "model",
+        "owned_by": "owlmlx"
+      },
+      {
+        "id": "Qwen3.6-35B-A3B",
+        "object": "model",
+        "owned_by": "owlmlx"
+      },
+      {
+        "id": "gemma-4-31B-it",
+        "object": "model",
+        "owned_by": "owlmlx"
+      },
+      {
+        "id": "gpt-oss-120b-MXFP4-Q4",
+        "object": "model",
+        "owned_by": "owlmlx"
+      }
+    ],
+    "object": "list"
+  },
+  "returncode": 0,
+  "status": 200,
+  "stderr": ""
+}

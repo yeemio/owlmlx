@@ -1,0 +1,14 @@
+[
+  ".venv/bin/python",
+  "scripts/runtime_technical_preview_server.py",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "8066",
+  "--models-root",
+  "/Users/yeemio/AI/Agent/models",
+  "--backend-timeout-s",
+  "900",
+  "--log-level",
+  "warning"
+]

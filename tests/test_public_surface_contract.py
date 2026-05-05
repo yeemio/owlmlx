@@ -65,7 +65,7 @@ def test_public_surface_lists_supported_label_vocabulary() -> None:
 
 
 def test_public_surface_declares_internal_default_rule() -> None:
-    text = _public_surface_text().lower()
+    text = " ".join(_public_surface_text().lower().split())
     # Strip Markdown backticks so the rule reads cleanly whether the text uses
     # `internal` by default or internal-by-default.
     stripped = text.replace("`", "")
@@ -217,7 +217,7 @@ def test_public_surface_does_not_make_banned_current_claims() -> None:
 def test_public_surface_does_not_assert_owlmlx_is_replacement_or_parity() -> None:
     """Direct-assertion check, independent of the line-level scan."""
 
-    text = _public_surface_text().lower()
+    text = " ".join(_public_surface_text().lower().split())
     forbidden_positive_phrases = (
         "owlmlx is release-ready",
         "owlmlx is production-grade",
@@ -233,10 +233,17 @@ def test_public_surface_does_not_assert_owlmlx_is_replacement_or_parity() -> Non
         )
 
 
-def test_public_surface_records_open_floor_3_6_caveat() -> None:
-    """Floor 3.6 remains open at the time of this freeze; the doc must say so."""
+def test_public_surface_records_closed_floor_boundary_without_release_claim() -> None:
+    """The doc must reflect 7/7 closure without promoting the claim."""
 
-    text = _public_surface_text()
-    assert "3.6" in text and "open" in text.lower(), (
-        "public-surface.md must record that floor 3.6 remains open"
+    text = " ".join(_public_surface_text().lower().split())
+    assert "7 / 7" in text and "3.6 external customer evidence" in text, (
+        "public-surface.md must record the closed floor-3.6 boundary"
+    )
+    assert "3.7 public surface freeze" in text, (
+        "public-surface.md must record the closed floor-3.7 boundary"
+    )
+    assert "not a release" in text and "release-ready" in text, (
+        "public-surface.md must prevent 7/7 closure from becoming a "
+        "release-ready claim"
     )
