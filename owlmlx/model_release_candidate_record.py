@@ -96,6 +96,12 @@ class ModelReleaseCandidateRecord:
     prompt_template_id: str | None = None
     quality_caveats: tuple[str, ...] = ()
     memory_peak_source: str | None = None
+    runtime_stream_wall_ms: float | None = None
+    runtime_first_response_ms: float | None = None
+    runtime_first_visible_token_ms: float | None = None
+    runtime_prompt_render_ms: float | None = None
+    runtime_timing_repeat_count: int | None = None
+    runtime_timing_gate_status: str | None = None
 
 
 def _now_iso_utc() -> str:
@@ -171,6 +177,12 @@ def model_release_candidate_record_to_dict(
         "prompt_template_id": record.prompt_template_id,
         "quality_caveats": list(record.quality_caveats),
         "memory_peak_source": record.memory_peak_source,
+        "runtime_stream_wall_ms": record.runtime_stream_wall_ms,
+        "runtime_first_response_ms": record.runtime_first_response_ms,
+        "runtime_first_visible_token_ms": record.runtime_first_visible_token_ms,
+        "runtime_prompt_render_ms": record.runtime_prompt_render_ms,
+        "runtime_timing_repeat_count": record.runtime_timing_repeat_count,
+        "runtime_timing_gate_status": record.runtime_timing_gate_status,
     }
     validate_model_release_candidate_record(payload)
     return payload
@@ -211,6 +223,12 @@ def build_model_release_candidate_record(
     prompt_template_id: str | None = None,
     quality_caveats: tuple[str, ...] | list[str] = (),
     memory_peak_source: str | None = None,
+    runtime_stream_wall_ms: float | None = None,
+    runtime_first_response_ms: float | None = None,
+    runtime_first_visible_token_ms: float | None = None,
+    runtime_prompt_render_ms: float | None = None,
+    runtime_timing_repeat_count: int | None = None,
+    runtime_timing_gate_status: str | None = None,
 ) -> ModelReleaseCandidateRecord:
     """Build and validate one model RC v1 record with optional observability v2 fields."""
 
@@ -250,6 +268,12 @@ def build_model_release_candidate_record(
         prompt_template_id=prompt_template_id,
         quality_caveats=tuple(quality_caveats),
         memory_peak_source=memory_peak_source,
+        runtime_stream_wall_ms=runtime_stream_wall_ms,
+        runtime_first_response_ms=runtime_first_response_ms,
+        runtime_first_visible_token_ms=runtime_first_visible_token_ms,
+        runtime_prompt_render_ms=runtime_prompt_render_ms,
+        runtime_timing_repeat_count=runtime_timing_repeat_count,
+        runtime_timing_gate_status=runtime_timing_gate_status,
     )
     model_release_candidate_record_to_dict(record)
     return record
@@ -323,6 +347,12 @@ def build_dry_run_model_release_candidate_records(
                 prompt_template_id="unknown",
                 quality_caveats=(),
                 memory_peak_source="unknown",
+                runtime_stream_wall_ms=None,
+                runtime_first_response_ms=None,
+                runtime_first_visible_token_ms=None,
+                runtime_prompt_render_ms=None,
+                runtime_timing_repeat_count=None,
+                runtime_timing_gate_status="not_in_scope",
             )
         )
     return tuple(records)

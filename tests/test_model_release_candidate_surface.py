@@ -296,6 +296,12 @@ def test_build_model_release_candidate_record_accepts_live_like_metrics() -> Non
         prompt_template_id="operator_prompt_raw",
         quality_caveats=[],
         memory_peak_source="process_tree_rss",
+        runtime_stream_wall_ms=13.0,
+        runtime_first_response_ms=11.0,
+        runtime_first_visible_token_ms=12.0,
+        runtime_prompt_render_ms=2.0,
+        runtime_timing_repeat_count=2,
+        runtime_timing_gate_status="supported",
     )
     payload = model_release_candidate_record_to_dict(record)
     assert payload["verdict"] == "pass"
@@ -304,6 +310,9 @@ def test_build_model_release_candidate_record_accepts_live_like_metrics() -> Non
     assert payload["decode_tokens_per_second"] == 40.0
     assert payload["end_to_end_tokens_per_second"] == 25.0
     assert payload["memory_peak_source"] == "process_tree_rss"
+    assert payload["runtime_first_response_ms"] == 11.0
+    assert payload["runtime_timing_repeat_count"] == 2
+    assert payload["runtime_timing_gate_status"] == "supported"
 
 
 def test_validate_accepts_legacy_v1_record_without_observability_v2_fields() -> None:
@@ -320,6 +329,12 @@ def test_validate_accepts_legacy_v1_record_without_observability_v2_fields() -> 
         "prompt_template_id",
         "quality_caveats",
         "memory_peak_source",
+        "runtime_stream_wall_ms",
+        "runtime_first_response_ms",
+        "runtime_first_visible_token_ms",
+        "runtime_prompt_render_ms",
+        "runtime_timing_repeat_count",
+        "runtime_timing_gate_status",
     ):
         payload.pop(field, None)
 
@@ -593,6 +608,16 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
                             "completion_tokens": 3,
                             "finish_reason": "stop",
                             "wait_time_s": 0.012,
+                            "detail": {
+                                "timing": {
+                                    "surface": "owlmlx.child_stream_timing",
+                                    "version": "v1",
+                                    "prompt_render_ms": 2.0,
+                                    "first_response_ms": 11.0,
+                                    "first_visible_token_ms": 12.0,
+                                    "stream_wall_ms": 13.0,
+                                }
+                            },
                         }
                     ).encode("utf-8")
                     + b"\n"
@@ -634,6 +659,7 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
                 str(os.getpid()),
                 "--rss-sample-interval-s",
                 "0.05",
+                "--timing-gate-resident-repeat",
             ],
             check=True,
             cwd=str(Path(__file__).parents[1]),
@@ -671,6 +697,12 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
         "blocker:reference_runtime_comparison_missing",
     ]
     assert payload["memory_peak_source"] == "process_tree_rss"
+    assert payload["runtime_stream_wall_ms"] == 13.0
+    assert payload["runtime_first_response_ms"] == 11.0
+    assert payload["runtime_first_visible_token_ms"] == 12.0
+    assert payload["runtime_prompt_render_ms"] == 2.0
+    assert payload["runtime_timing_repeat_count"] == 4
+    assert payload["runtime_timing_gate_status"] == "supported"
     assert payload["peak_resident_set_bytes"] is not None
     runner_config = json.loads((evidence_dir / "runner-config.json").read_text())
     assert runner_config["model_profile"]["profile_id"] == "qwen3_6_text"
@@ -694,6 +726,8 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     assert first_timing["post_first_token_decode_tokens"] == 2
     assert first_timing["post_first_token_decode_wall_ms"] is not None
     assert first_timing["post_first_token_decode_wall_ms"] > 0
+    assert first_generation["runtime_stream_timing"]["stream_wall_ms"] == 13.0
+    assert first_timing["runtime_first_response_ms"] == 11.0
     assert abs(
         first_timing["stream_request_wall_ms"]
         - (
@@ -703,6 +737,18 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     ) <= 0.002
     assert first_generation["reasoning_trace_policy"]["visible_reasoning_trace"] is False
     assert first_generation["reasoning_trace_policy"]["final_text"] == "OK."
+    resident_generation = json.loads(
+        (evidence_dir / "repeat-01-resident-generation.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert resident_generation["runtime_stream_timing"]["first_visible_token_ms"] == 12.0
+    timing_gate = json.loads(
+        (evidence_dir / "timing-gate-summary.json").read_text(encoding="utf-8")
+    )
+    assert timing_gate["status"] == "supported"
+    assert timing_gate["runtime_timing_repeat_count"] == 4
+    assert timing_gate["classification"] == "measured_without_cold_dominance"
     assert (evidence_dir / "post-run-healthz.json").exists()
     assert (evidence_dir / "post-run-runtime-status.json").exists()
     assert (evidence_dir / "record.json").exists()

@@ -384,13 +384,14 @@ def _repeat_timing_breakdown(
     first_token_ms: float | None,
     queue_wait_ms: float | None,
     completion_tokens: int,
+    runtime_stream_timing: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     post_first_token_decode_wall_ms = (
         max(stream_wall_ms - first_token_ms, 0.0)
         if first_token_ms is not None
         else None
     )
-    return {
+    payload = {
         "load_elapsed_ms": _rounded_ms(load_elapsed_ms),
         "stream_request_wall_ms": _rounded_ms(stream_wall_ms),
         "first_token_latency_ms": _rounded_ms(first_token_ms),
@@ -401,6 +402,59 @@ def _repeat_timing_breakdown(
         "completion_tokens": completion_tokens,
         "post_first_token_decode_tokens": max(completion_tokens - 1, 0),
     }
+    if runtime_stream_timing:
+        payload.update(
+            {
+                "runtime_stream_wall_ms": runtime_stream_timing.get("stream_wall_ms"),
+                "runtime_first_response_ms": runtime_stream_timing.get(
+                    "first_response_ms"
+                ),
+                "runtime_first_visible_token_ms": runtime_stream_timing.get(
+                    "first_visible_token_ms"
+                ),
+                "runtime_prompt_render_ms": runtime_stream_timing.get(
+                    "prompt_render_ms"
+                ),
+            }
+        )
+    return payload
+
+
+def _stream_event_timing(events: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for event in reversed(events):
+        detail = event.get("detail") if isinstance(event, dict) else None
+        timing = detail.get("timing") if isinstance(detail, dict) else None
+        if not isinstance(timing, dict):
+            timing = event.get("timing") if isinstance(event, dict) else None
+        if not isinstance(timing, dict):
+            continue
+        payload: dict[str, Any] = {}
+        for key, value in timing.items():
+            if isinstance(value, (str, bool)) or value is None:
+                payload[str(key)] = value
+            elif isinstance(value, (int, float)):
+                payload[str(key)] = _rounded_ms(float(value))
+            elif isinstance(value, list) and all(
+                isinstance(item, str) for item in value
+            ):
+                payload[str(key)] = list(value)
+        if payload.get("surface") == "owlmlx.child_stream_timing":
+            return payload
+    return None
+
+
+def _runtime_timing_gate_status(
+    *,
+    completed_generation_count: int,
+    runtime_timing_count: int,
+) -> str:
+    if completed_generation_count <= 0:
+        return "not_in_scope"
+    if runtime_timing_count == completed_generation_count:
+        return "supported"
+    if runtime_timing_count > 0:
+        return "partial"
+    return "unsupported"
 
 
 def _classify_output_sanity(
@@ -603,6 +657,8 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         runner_config["memory_gb"] = args.memory_gb
     if args.apply_model_profile_defaults:
         runner_config["effective_generation_policy"] = effective_policy
+    if args.timing_gate_resident_repeat:
+        runner_config["timing_gate_resident_repeat"] = True
     _write_json(
         evidence_dir / "runner-config.json",
         runner_config,
@@ -631,10 +687,15 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
     unload_time_ms_values: list[float] = []
     decode_token_values: list[int] = []
     decode_wall_ms_values: list[float] = []
+    runtime_stream_wall_ms_values: list[float] = []
+    runtime_first_response_ms_values: list[float] = []
+    runtime_first_visible_token_ms_values: list[float] = []
+    runtime_prompt_render_ms_values: list[float] = []
     generated_texts: list[str] = []
     load_results: list[dict[str, Any]] = []
     reload_results: list[dict[str, Any]] = []
     generation_results: list[dict[str, Any]] = []
+    resident_generation_results: list[dict[str, Any]] = []
     unload_results: list[dict[str, Any]] = []
 
     blockers: list[str] = [
@@ -744,44 +805,71 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                     params["chat_template_kwargs"] = dict(chat_template_kwargs)
                 if effective_policy.get("stop_token_strings_applied"):
                     params["stop"] = list(effective_policy["stop_token_strings"])
-                stream_artifact = evidence_dir / f"repeat-{index:02d}-stream.ndjson"
-                if effective_policy["request_mode"] == "raw_generate_stream":
-                    request_payload = {
-                        "model_id": args.model_id,
-                        "prompt": args.prompt,
-                        "params": params,
-                    }
-                    stream_status, events, stream_wall_ms, first_token_ms = _stream_http_ndjson(
-                        url=f"{runtime_url}/v1/generate/stream",
-                        payload=request_payload,
-                        timeout_s=args.http_timeout_s,
-                        artifact_path=stream_artifact,
-                    )
-                elif effective_policy["request_mode"] == "openai_chat_stream":
-                    messages = _chat_messages_for_prompt(
-                        prompt=args.prompt,
-                        effective_policy=effective_policy,
-                    )
-                    request_payload = {
-                        "model": args.model_id,
-                        "messages": messages,
-                        "stream": True,
-                    }
-                    request_payload.update(params)
-                    stream_status, events, stream_wall_ms, first_token_ms = _stream_http_openai_chat_sse(
-                        url=f"{runtime_url}/v1/chat/completions",
-                        model_id=args.model_id,
-                        messages=messages,
-                        params=params,
-                        timeout_s=args.http_timeout_s,
-                        artifact_path=stream_artifact,
-                    )
-                else:  # pragma: no cover - argparse choices guard this.
-                    raise ValueError(
+
+                def stream_once(
+                    *,
+                    artifact_path: Path,
+                ) -> tuple[dict[str, Any], int, list[dict[str, Any]], float, float | None]:
+                    if effective_policy["request_mode"] == "raw_generate_stream":
+                        raw_request_payload = {
+                            "model_id": args.model_id,
+                            "prompt": args.prompt,
+                            "params": params,
+                        }
+                        raw_status, raw_events, raw_wall_ms, raw_first_token_ms = (
+                            _stream_http_ndjson(
+                                url=f"{runtime_url}/v1/generate/stream",
+                                payload=raw_request_payload,
+                                timeout_s=args.http_timeout_s,
+                                artifact_path=artifact_path,
+                            )
+                        )
+                        return (
+                            raw_request_payload,
+                            raw_status,
+                            raw_events,
+                            raw_wall_ms,
+                            raw_first_token_ms,
+                        )
+                    if effective_policy["request_mode"] == "openai_chat_stream":
+                        messages = _chat_messages_for_prompt(
+                            prompt=args.prompt,
+                            effective_policy=effective_policy,
+                        )
+                        chat_request_payload = {
+                            "model": args.model_id,
+                            "messages": messages,
+                            "stream": True,
+                        }
+                        chat_request_payload.update(params)
+                        chat_status, chat_events, chat_wall_ms, chat_first_token_ms = (
+                            _stream_http_openai_chat_sse(
+                                url=f"{runtime_url}/v1/chat/completions",
+                                model_id=args.model_id,
+                                messages=messages,
+                                params=params,
+                                timeout_s=args.http_timeout_s,
+                                artifact_path=artifact_path,
+                            )
+                        )
+                        return (
+                            chat_request_payload,
+                            chat_status,
+                            chat_events,
+                            chat_wall_ms,
+                            chat_first_token_ms,
+                        )
+                    raise ValueError(  # pragma: no cover - argparse choices guard this.
                         f"unsupported request_mode: {effective_policy['request_mode']}"
                     )
+
+                stream_artifact = evidence_dir / f"repeat-{index:02d}-stream.ndjson"
+                request_payload, stream_status, events, stream_wall_ms, first_token_ms = (
+                    stream_once(artifact_path=stream_artifact)
+                )
                 done = next((event for event in reversed(events) if event.get("event") == "done"), None)
                 token_events = [event for event in events if event.get("event") == "token"]
+                runtime_stream_timing = _stream_event_timing(events)
                 text = "".join(str(event.get("text") or "") for event in token_events)
                 generated_texts.append(text)
                 completion_tokens = (
@@ -803,6 +891,23 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                     queue_wait_ms_values.append(queue_wait_ms)
                 else:
                     queue_wait_ms = None
+                if runtime_stream_timing:
+                    if isinstance(runtime_stream_timing.get("stream_wall_ms"), (int, float)):
+                        runtime_stream_wall_ms_values.append(
+                            float(runtime_stream_timing["stream_wall_ms"])
+                        )
+                    if isinstance(runtime_stream_timing.get("first_response_ms"), (int, float)):
+                        runtime_first_response_ms_values.append(
+                            float(runtime_stream_timing["first_response_ms"])
+                        )
+                    if isinstance(runtime_stream_timing.get("first_visible_token_ms"), (int, float)):
+                        runtime_first_visible_token_ms_values.append(
+                            float(runtime_stream_timing["first_visible_token_ms"])
+                        )
+                    if isinstance(runtime_stream_timing.get("prompt_render_ms"), (int, float)):
+                        runtime_prompt_render_ms_values.append(
+                            float(runtime_stream_timing["prompt_render_ms"])
+                        )
                 generation_entry = {
                     "status_code": stream_status,
                     "elapsed_ms": round(stream_wall_ms, 3),
@@ -813,6 +918,7 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                     "event_count": len(events),
                     "done": done,
                     "request_payload": request_payload,
+                    "runtime_stream_timing": runtime_stream_timing,
                     "text_preview": text[:500],
                     "reasoning_trace_policy": apply_reasoning_trace_policy(
                         text,
@@ -829,6 +935,7 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                         first_token_ms=first_token_ms,
                         queue_wait_ms=queue_wait_ms,
                         completion_tokens=completion_tokens,
+                        runtime_stream_timing=runtime_stream_timing,
                     ),
                 }
                 _write_json(evidence_dir / f"repeat-{index:02d}-generation.json", generation_entry)
@@ -836,6 +943,99 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                 if stream_status != 200 or done is None:
                     failure_count += 1
                     blockers.append("generation_failed")
+
+                if (
+                    args.timing_gate_resident_repeat
+                    and stream_status == 200
+                    and done is not None
+                ):
+                    resident_artifact = (
+                        evidence_dir / f"repeat-{index:02d}-resident-stream.ndjson"
+                    )
+                    (
+                        resident_request_payload,
+                        resident_stream_status,
+                        resident_events,
+                        resident_stream_wall_ms,
+                        resident_first_token_ms,
+                    ) = stream_once(artifact_path=resident_artifact)
+                    resident_done = next(
+                        (
+                            event
+                            for event in reversed(resident_events)
+                            if event.get("event") == "done"
+                        ),
+                        None,
+                    )
+                    resident_token_events = [
+                        event
+                        for event in resident_events
+                        if event.get("event") == "token"
+                    ]
+                    resident_runtime_stream_timing = _stream_event_timing(
+                        resident_events
+                    )
+                    resident_text = "".join(
+                        str(event.get("text") or "")
+                        for event in resident_token_events
+                    )
+                    resident_completion_tokens = (
+                        int(resident_done.get("completion_tokens"))
+                        if isinstance(resident_done, dict)
+                        and isinstance(resident_done.get("completion_tokens"), int)
+                        else len(resident_token_events)
+                    )
+                    resident_queue_wait_ms = (
+                        float(resident_done["wait_time_s"]) * 1000.0
+                        if isinstance(resident_done, dict)
+                        and isinstance(resident_done.get("wait_time_s"), (int, float))
+                        else None
+                    )
+                    resident_entry = {
+                        "status_code": resident_stream_status,
+                        "elapsed_ms": round(resident_stream_wall_ms, 3),
+                        "first_token_latency_ms": (
+                            round(resident_first_token_ms, 3)
+                            if resident_first_token_ms is not None
+                            else None
+                        ),
+                        "completion_tokens": resident_completion_tokens,
+                        "event_count": len(resident_events),
+                        "done": resident_done,
+                        "request_payload": resident_request_payload,
+                        "runtime_stream_timing": resident_runtime_stream_timing,
+                        "text_preview": resident_text[:500],
+                        "timing_breakdown": _repeat_timing_breakdown(
+                            load_elapsed_ms=load_elapsed_ms,
+                            stream_wall_ms=resident_stream_wall_ms,
+                            first_token_ms=resident_first_token_ms,
+                            queue_wait_ms=resident_queue_wait_ms,
+                            completion_tokens=resident_completion_tokens,
+                            runtime_stream_timing=resident_runtime_stream_timing,
+                        ),
+                    }
+                    _write_json(
+                        evidence_dir / f"repeat-{index:02d}-resident-generation.json",
+                        resident_entry,
+                    )
+                    resident_generation_results.append(resident_entry)
+                    if resident_runtime_stream_timing:
+                        if isinstance(resident_runtime_stream_timing.get("stream_wall_ms"), (int, float)):
+                            runtime_stream_wall_ms_values.append(
+                                float(resident_runtime_stream_timing["stream_wall_ms"])
+                            )
+                        if isinstance(resident_runtime_stream_timing.get("first_response_ms"), (int, float)):
+                            runtime_first_response_ms_values.append(
+                                float(resident_runtime_stream_timing["first_response_ms"])
+                            )
+                        if isinstance(resident_runtime_stream_timing.get("first_visible_token_ms"), (int, float)):
+                            runtime_first_visible_token_ms_values.append(
+                                float(resident_runtime_stream_timing["first_visible_token_ms"])
+                            )
+                        if isinstance(resident_runtime_stream_timing.get("prompt_render_ms"), (int, float)):
+                            runtime_prompt_render_ms_values.append(
+                                float(resident_runtime_stream_timing["prompt_render_ms"])
+                            )
 
                 unload_started = time.monotonic()
                 unload_status, unload_payload = _http_json(
@@ -916,6 +1116,87 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         if total_decode_tokens > 0 and total_decode_s > 0
         else None
     )
+    timing_scope_entries = [
+        entry
+        for entry in [*generation_results, *resident_generation_results]
+        if entry.get("status_code") == 200 and entry.get("done") is not None
+    ]
+    runtime_timing_count = sum(
+        1
+        for entry in timing_scope_entries
+        if isinstance(entry.get("runtime_stream_timing"), dict)
+    )
+    runtime_timing_gate_status = _runtime_timing_gate_status(
+        completed_generation_count=len(timing_scope_entries),
+        runtime_timing_count=runtime_timing_count,
+    )
+    first_main_timing = (
+        generation_results[0].get("runtime_stream_timing")
+        if generation_results
+        and isinstance(generation_results[0].get("runtime_stream_timing"), dict)
+        else None
+    )
+    first_resident_timing = (
+        resident_generation_results[0].get("runtime_stream_timing")
+        if resident_generation_results
+        and isinstance(
+            resident_generation_results[0].get("runtime_stream_timing"),
+            dict,
+        )
+        else None
+    )
+    timing_gate_summary: dict[str, Any] = {
+        "surface": "owlmlx.model_rc_timing_gate",
+        "version": "v1",
+        "status": runtime_timing_gate_status,
+        "request_mode": effective_policy["request_mode"],
+        "completed_generation_count": len(timing_scope_entries),
+        "runtime_timing_repeat_count": runtime_timing_count,
+        "resident_repeat_enabled": bool(args.timing_gate_resident_repeat),
+        "runtime_stream_wall_ms": _rounded_ms(_mean(runtime_stream_wall_ms_values)),
+        "runtime_first_response_ms": _rounded_ms(
+            _mean(runtime_first_response_ms_values)
+        ),
+        "runtime_first_visible_token_ms": _rounded_ms(
+            _mean(runtime_first_visible_token_ms_values)
+        ),
+        "runtime_prompt_render_ms": _rounded_ms(_mean(runtime_prompt_render_ms_values)),
+    }
+    if isinstance(first_main_timing, dict):
+        timing_gate_summary["cold_first_response_ms"] = first_main_timing.get(
+            "first_response_ms"
+        )
+        timing_gate_summary["cold_first_visible_token_ms"] = first_main_timing.get(
+            "first_visible_token_ms"
+        )
+    if isinstance(first_resident_timing, dict):
+        timing_gate_summary["resident_first_response_ms"] = first_resident_timing.get(
+            "first_response_ms"
+        )
+        timing_gate_summary["resident_first_visible_token_ms"] = (
+            first_resident_timing.get("first_visible_token_ms")
+        )
+    if (
+        isinstance(first_main_timing, dict)
+        and isinstance(first_resident_timing, dict)
+        and isinstance(first_main_timing.get("first_response_ms"), (int, float))
+        and isinstance(first_resident_timing.get("first_response_ms"), (int, float))
+    ):
+        cold_first_response = float(first_main_timing["first_response_ms"])
+        resident_first_response = float(first_resident_timing["first_response_ms"])
+        timing_gate_summary["resident_delta_first_response_ms"] = _rounded_ms(
+            cold_first_response - resident_first_response
+        )
+        timing_gate_summary["classification"] = (
+            "cold_first_response_dominant"
+            if cold_first_response > max(resident_first_response * 2.0, resident_first_response + 250.0)
+            else "measured_without_cold_dominance"
+        )
+    elif runtime_timing_gate_status in ("supported", "partial"):
+        timing_gate_summary["classification"] = "runtime_timing_measured"
+    else:
+        timing_gate_summary["classification"] = "runtime_timing_unavailable"
+    _write_json(evidence_dir / "timing-gate-summary.json", timing_gate_summary)
 
     if first_token_latency is None:
         blockers.append("first_token_latency_missing")
@@ -1033,6 +1314,14 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         prompt_template_id=str(effective_policy["prompt_template_id"]),
         quality_caveats=tuple(quality_caveats),
         memory_peak_source="process_tree_rss",
+        runtime_stream_wall_ms=timing_gate_summary["runtime_stream_wall_ms"],
+        runtime_first_response_ms=timing_gate_summary["runtime_first_response_ms"],
+        runtime_first_visible_token_ms=timing_gate_summary[
+            "runtime_first_visible_token_ms"
+        ],
+        runtime_prompt_render_ms=timing_gate_summary["runtime_prompt_render_ms"],
+        runtime_timing_repeat_count=runtime_timing_count,
+        runtime_timing_gate_status=runtime_timing_gate_status,
     )
     payload = model_release_candidate_record_to_dict(record)
     _write_json(evidence_dir / "record.json", payload)
@@ -1146,6 +1435,16 @@ def main() -> int:
     live.add_argument("--http-timeout-s", type=float, default=900.0)
     live.add_argument("--rss-root-pid", type=int, default=None)
     live.add_argument("--rss-sample-interval-s", type=float, default=0.5)
+    live.add_argument(
+        "--timing-gate-resident-repeat",
+        action="store_true",
+        help=(
+            "After the main generation in each load cycle, run one diagnostic "
+            "same-resident generation before unload and summarize cold vs "
+            "resident runtime StreamEvent.detail.timing. This does not count "
+            "as an additional lifecycle repeat."
+        ),
+    )
     live.add_argument(
         "--apply-model-profile-defaults",
         action="store_true",

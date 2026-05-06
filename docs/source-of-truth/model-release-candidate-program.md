@@ -474,6 +474,29 @@ Qwen35 TTFT root-cause decomposition on 2026-05-06:
   framing, or parent process exchange. It remains `needs_optimization`, not a
   solved performance row.
 
+Qwen35 Model RC timing gate on 2026-05-06:
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-model-rc-timing-gate-live-proof/timing-gate-summary.json`
+  and the appended cumulative ledger row at
+  `files/evidence/owlmlx/model-release-candidates/cumulative-ledger.jsonl`.
+- The Model RC runner now records per-generation
+  `runtime_stream_timing`, per-repeat timing-breakdown fields, and record-level
+  `runtime_stream_wall_ms`, `runtime_first_response_ms`,
+  `runtime_first_visible_token_ms`, `runtime_prompt_render_ms`,
+  `runtime_timing_repeat_count`, and `runtime_timing_gate_status`.
+- With `--timing-gate-resident-repeat`, the runner keeps the normal lifecycle
+  repeat semantics but adds one diagnostic same-resident generation before
+  unload. That diagnostic generation does not count as an additional lifecycle
+  repeat.
+- The live Qwen35 timing gate status is `supported` with
+  `runtime_timing_repeat_count = 2`. Cold first response was `3820.178ms`;
+  same-resident first response was `235.366ms`; classification is
+  `cold_first_response_dominant`.
+- This converts TTFT root cause into an automated Model RC gate. It still does
+  not claim a TTFT optimization: the next optimization work is warmup, prefill,
+  cache, or scheduler mitigation against the cold first-response spike.
+
 ## 9. Non-Goals
 
 This phase does not:

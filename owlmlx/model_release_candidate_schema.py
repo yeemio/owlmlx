@@ -93,6 +93,12 @@ OPTIONAL_MODEL_RELEASE_CANDIDATE_OBSERVABILITY_FIELDS: tuple[str, ...] = (
     "prompt_template_id",
     "quality_caveats",
     "memory_peak_source",
+    "runtime_stream_wall_ms",
+    "runtime_first_response_ms",
+    "runtime_first_visible_token_ms",
+    "runtime_prompt_render_ms",
+    "runtime_timing_repeat_count",
+    "runtime_timing_gate_status",
 )
 
 
@@ -250,6 +256,10 @@ def validate_model_release_candidate_record(record: Mapping[str, Any]) -> None:
         "ttft_ms",
         "decode_tokens_per_second",
         "end_to_end_tokens_per_second",
+        "runtime_stream_wall_ms",
+        "runtime_first_response_ms",
+        "runtime_first_visible_token_ms",
+        "runtime_prompt_render_ms",
     ):
         if field in record:
             _validate_nullable_non_negative_number(
@@ -265,6 +275,20 @@ def validate_model_release_candidate_record(record: Mapping[str, Any]) -> None:
 
     if "quality_caveats" in record:
         _validate_string_list(record["quality_caveats"], field="record.quality_caveats")
+
+    if "runtime_timing_repeat_count" in record and record["runtime_timing_repeat_count"] is not None:
+        value = record["runtime_timing_repeat_count"]
+        if not isinstance(value, int) or value < 0:
+            raise ModelReleaseCandidateSchemaError(
+                "record.runtime_timing_repeat_count must be null or a non-negative int"
+            )
+
+    if "runtime_timing_gate_status" in record and record["runtime_timing_gate_status"] is not None:
+        status = record["runtime_timing_gate_status"]
+        if status not in ("supported", "partial", "unsupported", "not_in_scope"):
+            raise ModelReleaseCandidateSchemaError(
+                "record.runtime_timing_gate_status must be supported, partial, unsupported, or not_in_scope"
+            )
 
     if record["lane"] == "flagship_experimental" and record["verdict"] == "pass":
         raise ModelReleaseCandidateSchemaError(

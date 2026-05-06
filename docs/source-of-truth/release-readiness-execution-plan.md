@@ -584,6 +584,28 @@ Next dominant gap:
   request against resident repeat, and only then evaluate warmup/prefill/cache
   mitigations.
 
+Model RC timing gate return (2026-05-06,
+`owlmlx_qwen35_model_rc_timing_gate_live_proof`):
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-model-rc-timing-gate-live-proof/timing-gate-summary.json`.
+- The runner now stores `runtime_stream_timing` in each generation JSON, writes
+  `timing-gate-summary.json`, and appends record-level timing observability to
+  the cumulative ledger.
+- The live Qwen35 gate used raw rendered-template stream mode because OpenAI
+  chat SSE currently normalizes away runtime `detail.timing`. This is a raw
+  runtime diagnostic gate, not a global OpenAI-compatible field guarantee.
+- Result: `runtime_timing_gate_status = supported`,
+  `runtime_timing_repeat_count = 2`, cold first response `3820.178ms`,
+  same-resident first response `235.366ms`, and classification
+  `cold_first_response_dominant`.
+
+Next dominant gap:
+
+- Evaluate a bounded warmup/prefill mitigation for Qwen35 cold
+  first-response latency, while keeping `load -> generate -> unload -> health
+  clean` as the hard lifecycle gate.
+
 ## 3. Ownership Model
 
 Coordinator:

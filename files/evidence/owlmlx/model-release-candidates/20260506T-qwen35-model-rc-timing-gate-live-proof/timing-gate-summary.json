@@ -1,0 +1,19 @@
+{
+  "classification": "cold_first_response_dominant",
+  "cold_first_response_ms": 3820.178,
+  "cold_first_visible_token_ms": 3820.187,
+  "completed_generation_count": 2,
+  "request_mode": "raw_generate_stream",
+  "resident_delta_first_response_ms": 3584.812,
+  "resident_first_response_ms": 235.366,
+  "resident_first_visible_token_ms": 235.371,
+  "resident_repeat_enabled": true,
+  "runtime_first_response_ms": 2027.772,
+  "runtime_first_visible_token_ms": 2027.779,
+  "runtime_prompt_render_ms": 0.001,
+  "runtime_stream_wall_ms": 2423.077,
+  "runtime_timing_repeat_count": 2,
+  "status": "supported",
+  "surface": "owlmlx.model_rc_timing_gate",
+  "version": "v1"
+}

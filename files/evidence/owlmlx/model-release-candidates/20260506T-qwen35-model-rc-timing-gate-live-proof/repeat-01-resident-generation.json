@@ -1,0 +1,68 @@
+{
+  "completion_tokens": 24,
+  "done": {
+    "completion_tokens": 24,
+    "detail": {
+      "generation_count": 2,
+      "pid": 67596,
+      "timing": {
+        "chat_template_applied": false,
+        "first_response_ms": 235.366,
+        "first_visible_token_ms": 235.371,
+        "prompt_character_count": 108,
+        "prompt_render_ms": 0.001,
+        "stream_call_start_ms": 0.013,
+        "stream_wall_ms": 634.142,
+        "surface": "owlmlx.child_stream_timing",
+        "version": "v1"
+      }
+    },
+    "error_code": null,
+    "event": "done",
+    "execution_time_s": null,
+    "finish_reason": "stop",
+    "model_id": "Qwen3.6-35B-A3B",
+    "prompt_tokens": 21,
+    "sequence": 23,
+    "text": "",
+    "wait_time_s": 0.082,
+    "was_queued": false
+  },
+  "elapsed_ms": 725.545,
+  "event_count": 24,
+  "first_token_latency_ms": 321.415,
+  "request_payload": {
+    "model_id": "Qwen3.6-35B-A3B",
+    "params": {
+      "max_tokens": 32,
+      "temperature": 0.0
+    },
+    "prompt": "<|im_start|>user\nIn one short sentence, define local AI.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+  },
+  "runtime_stream_timing": {
+    "chat_template_applied": false,
+    "first_response_ms": 235.366,
+    "first_visible_token_ms": 235.371,
+    "prompt_character_count": 108.0,
+    "prompt_render_ms": 0.001,
+    "stream_call_start_ms": 0.013,
+    "stream_wall_ms": 634.142,
+    "surface": "owlmlx.child_stream_timing",
+    "version": "v1"
+  },
+  "status_code": 200,
+  "text_preview": "Local AI refers to artificial intelligence models that run directly on a user's personal device rather than on remote cloud servers.",
+  "timing_breakdown": {
+    "completion_tokens": 24,
+    "first_token_latency_ms": 321.415,
+    "load_elapsed_ms": 14549.304,
+    "post_first_token_decode_tokens": 23,
+    "post_first_token_decode_wall_ms": 404.13,
+    "queue_wait_ms": 82.0,
+    "runtime_first_response_ms": 235.366,
+    "runtime_first_visible_token_ms": 235.371,
+    "runtime_prompt_render_ms": 0.001,
+    "runtime_stream_wall_ms": 634.142,
+    "stream_request_wall_ms": 725.545
+  }
+}

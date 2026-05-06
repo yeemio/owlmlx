@@ -60,6 +60,11 @@ Current live evidence:
   `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-child-stream-timing-live-proof/summary.json`.
   This is root-cause evidence only; no warmup/prefill/cache optimization or
   parity claim is made.
+- Model RC timing-gate follow-up now appends runtime stream timing fields to
+  the cumulative ledger for raw stream evidence. Qwen35 gate proof:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-model-rc-timing-gate-live-proof/timing-gate-summary.json`.
+  It classifies the short-workload Qwen35 latency as
+  `cold_first_response_dominant`, not optimized.
 
 This improves the Gemma, Qwen27, and Qwen35 reference evidence floor, but it is
 still not a parity claim and does not cover measured DeepSeek generation,

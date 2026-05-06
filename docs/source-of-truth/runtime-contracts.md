@@ -72,6 +72,20 @@ It exists to separate template/render overhead, parent exchange overhead, and
 child `mlx_lm.stream_generate` pre-first-response latency during Model RC and
 reference-runtime closure rounds.
 
+Model RC records may aggregate this diagnostic timing into optional
+observability fields:
+
+- `runtime_stream_wall_ms`
+- `runtime_first_response_ms`
+- `runtime_first_visible_token_ms`
+- `runtime_prompt_render_ms`
+- `runtime_timing_repeat_count`
+- `runtime_timing_gate_status`
+
+Valid timing-gate statuses are `supported`, `partial`, `unsupported`, and
+`not_in_scope`. These are evidence availability labels, not performance
+success labels.
+
 ## 5. Large-Weight Runtime Path Contract
 
 The large-weight runtime path contract exists to expose runtime facts specific
