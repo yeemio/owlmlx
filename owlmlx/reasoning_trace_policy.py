@@ -11,6 +11,7 @@ REASONING_TRACE_POLICY_VERSION = "v1"
 
 _CHANNEL_THOUGHT_RE = re.compile(r"<\|channel\>\s*thought\b", re.IGNORECASE)
 _CHANNEL_FINAL_RE = re.compile(r"<\|channel\>\s*final\b", re.IGNORECASE)
+_ESCAPED_FINAL_RE = re.compile(r"(?:^|\n)\s*\\final\b\s*", re.IGNORECASE)
 _CHANNEL_CLOSE_RE = re.compile(r"<channel\|>", re.IGNORECASE)
 _THINK_OPEN_RE = re.compile(r"<think\b[^>]*>", re.IGNORECASE)
 _THINK_CLOSE_RE = re.compile(r"</think>", re.IGNORECASE)
@@ -76,6 +77,13 @@ def apply_reasoning_trace_policy(
     channel_result = _analyze_channel_trace(text, finish_reason=finish_reason)
     if channel_result is not None:
         return channel_result
+
+    escaped_final_result = _analyze_escaped_final_trace(
+        text,
+        finish_reason=finish_reason,
+    )
+    if escaped_final_result is not None:
+        return escaped_final_result
 
     think_result = _analyze_think_trace(text, finish_reason=finish_reason)
     if think_result is not None:
@@ -166,6 +174,50 @@ def _analyze_channel_trace(
         final_text_source="channel_final",
         output_sanity_label="reasoning_trace_visible",
         caveats=("visible reasoning trace was routed separately from final text",),
+    )
+
+
+def _analyze_escaped_final_trace(
+    text: str,
+    *,
+    finish_reason: str | None,
+) -> ReasoningTracePolicyResult | None:
+    matches = list(_ESCAPED_FINAL_RE.finditer(text))
+    if not matches:
+        return None
+
+    final_match = matches[-1]
+    if finish_reason == "length":
+        return _result(
+            visible_reasoning_trace=True,
+            trace_marker_family="escaped_final_channel",
+            trace_status="truncated",
+            final_text=None,
+            final_text_source=None,
+            output_sanity_label="reasoning_trace_truncated",
+            caveats=("escaped final channel marker may have truncated final text",),
+        )
+
+    final_text = _clean_candidate(text[final_match.end() :])
+    if final_text is None:
+        return _result(
+            visible_reasoning_trace=True,
+            trace_marker_family="escaped_final_channel",
+            trace_status="visible",
+            final_text=None,
+            final_text_source=None,
+            output_sanity_label="reasoning_trace_visible",
+            caveats=("escaped final channel marker was present but final text was empty",),
+        )
+
+    return _result(
+        visible_reasoning_trace=True,
+        trace_marker_family="escaped_final_channel",
+        trace_status="visible",
+        final_text=final_text,
+        final_text_source="escaped_final_channel",
+        output_sanity_label="reasoning_trace_visible",
+        caveats=("visible escaped final channel marker was routed to final text",),
     )
 
 

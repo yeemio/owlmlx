@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from owlmlx.context_concurrency import HIGH_CONTEXT_THRESHOLD_TOKENS
 from owlmlx.memory_budget import MachineMemoryProfile
-from owlmlx.runtime import FakeBackend, RuntimeKernel
+from owlmlx.runtime import FakeBackend, GenerateResult, RuntimeKernel, StreamEvent
 from owlmlx.runtime.server import create_app
 
 
@@ -229,6 +229,234 @@ def test_chat_completions_passes_chat_template_kwargs_to_backend() -> None:
     assert backend.seen_kwargs[-1]["chat_template_kwargs"] == {
         "enable_thinking": False
     }
+
+
+def test_chat_completions_applies_known_model_profile_defaults() -> None:
+    class RecordingBackend(FakeBackend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.seen_kwargs: list[dict[str, object]] = []
+
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            self.seen_kwargs.append(dict(kwargs))
+            return super().generate_messages(model_id, messages, **kwargs)
+
+    backend = RecordingBackend()
+    model_id = "gemma-4-31B-it"
+    client = TestClient(create_app(RuntimeKernel(backend, profile=_profile())))
+    client.post("/v1/load", json={"model_id": model_id, "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": model_id,
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+        },
+    )
+
+    assert response.status_code == 200
+    assert backend.seen_kwargs[-1]["stop"] == ["<eos>", "<turn|>"]
+    assert backend.seen_kwargs[-1]["chat_template_kwargs"] == {
+        "enable_thinking": False
+    }
+
+
+def test_chat_completions_preserves_explicit_profile_overrides() -> None:
+    class RecordingBackend(FakeBackend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.seen_kwargs: list[dict[str, object]] = []
+
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            self.seen_kwargs.append(dict(kwargs))
+            return super().generate_messages(model_id, messages, **kwargs)
+
+    backend = RecordingBackend()
+    model_id = "gemma-4-31B-it"
+    client = TestClient(create_app(RuntimeKernel(backend, profile=_profile())))
+    client.post("/v1/load", json={"model_id": model_id, "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": model_id,
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+            "stop": "CUSTOM_STOP",
+            "chat_template_kwargs": {
+                "enable_thinking": True,
+                "tokenize": False,
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert backend.seen_kwargs[-1]["stop"] == "CUSTOM_STOP"
+    assert backend.seen_kwargs[-1]["chat_template_kwargs"] == {
+        "enable_thinking": True,
+        "tokenize": False,
+    }
+
+
+def test_chat_completions_profile_default_routes_gemma_escaped_final_content() -> None:
+    class EscapedFinalBackend(FakeBackend):
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return GenerateResult(
+                ok=True,
+                message="generated escaped final marker",
+                model_id=model_id,
+                text="Draft answer.\n\n\\final Clean answer.",
+                finish_reason="stop",
+                prompt_tokens=4,
+                completion_tokens=8,
+            )
+
+    model_id = "gemma-4-31B-it"
+    client = TestClient(create_app(RuntimeKernel(EscapedFinalBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": model_id, "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": model_id,
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 16,
+        },
+    )
+
+    assert response.status_code == 200
+    message = response.json()["choices"][0]["message"]
+    assert message["content"] == "Clean answer."
+    assert (
+        message["owlmlx_reasoning_trace_policy"]["final_text_source"]
+        == "escaped_final_channel"
+    )
+
+
+def test_chat_completions_non_stream_routes_visible_reasoning_to_final_content() -> None:
+    class ReasoningBackend(FakeBackend):
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return GenerateResult(
+                ok=True,
+                message="generated channel trace",
+                model_id=model_id,
+                text="<|channel>thought\nPlan.\n<|channel>final\nClean answer.",
+                finish_reason="stop",
+                prompt_tokens=4,
+                completion_tokens=8,
+            )
+
+    client = TestClient(create_app(RuntimeKernel(ReasoningBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "gemma-4-31B-it", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "gemma-4-31B-it",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 16,
+            "extra_body": {
+                "owlmlx_reasoning_trace_policy": "final_answer_content"
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    message = response.json()["choices"][0]["message"]
+    assert message["content"] == "Clean answer."
+    policy = message["owlmlx_reasoning_trace_policy"]
+    assert policy["visible_reasoning_trace"] is True
+    assert policy["trace_marker_family"] == "channel"
+    assert policy["final_text_source"] == "channel_final"
+
+
+def test_chat_completions_non_stream_routes_escaped_final_marker_to_final_content() -> None:
+    class EscapedFinalBackend(FakeBackend):
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return GenerateResult(
+                ok=True,
+                message="generated escaped final marker",
+                model_id=model_id,
+                text="Draft answer.\n\n\\final Clean answer.",
+                finish_reason="stop",
+                prompt_tokens=4,
+                completion_tokens=8,
+            )
+
+    client = TestClient(create_app(RuntimeKernel(EscapedFinalBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "gemma-4-31B-it", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "gemma-4-31B-it",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 16,
+            "extra_body": {
+                "owlmlx_reasoning_trace_policy": "final_answer_content"
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    message = response.json()["choices"][0]["message"]
+    assert message["content"] == "Clean answer."
+    policy = message["owlmlx_reasoning_trace_policy"]
+    assert policy["trace_marker_family"] == "escaped_final_channel"
+    assert policy["final_text_source"] == "escaped_final_channel"
+
+
+def test_chat_completions_stream_routes_visible_reasoning_to_final_content() -> None:
+    class ReasoningStreamBackend(FakeBackend):
+        def stream_generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return [
+                StreamEvent(event="token", model_id=model_id, text="<|channel>thought\nPlan.\n"),
+                StreamEvent(event="token", model_id=model_id, text="<|channel>final\nClean answer."),
+                StreamEvent(
+                    event="done",
+                    model_id=model_id,
+                    finish_reason="stop",
+                    prompt_tokens=4,
+                    completion_tokens=8,
+                ),
+            ]
+
+    client = TestClient(create_app(RuntimeKernel(ReasoningStreamBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "gemma-4-31B-it", "memory_gb": 2.0})
+
+    with client.stream(
+        "POST",
+        "/v1/chat/completions",
+        json={
+            "model": "gemma-4-31B-it",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 16,
+            "stream": True,
+            "extra_body": {
+                "owlmlx_reasoning_trace_policy": "final_answer_content"
+            },
+        },
+    ) as response:
+        assert response.status_code == 200
+        chunks = [line for line in response.iter_lines() if line]
+
+    data_chunks = [
+        json.loads(line[len("data: "):])
+        for line in chunks
+        if line.startswith("data: ") and line != "data: [DONE]"
+    ]
+    content_parts = [
+        choice["delta"]["content"]
+        for chunk in data_chunks
+        for choice in chunk.get("choices", [])
+        if choice.get("delta", {}).get("content")
+    ]
+    assert content_parts == ["Clean answer."]
+    assert all("<|channel>thought" not in part for part in content_parts)
+    done_chunk = data_chunks[-1]
+    assert done_chunk["choices"][0]["finish_reason"] == "stop"
+    assert done_chunk["owlmlx_reasoning_trace_policy"]["final_text_source"] == "channel_final"
 
 
 def test_completions_non_stream_provides_openai_shape() -> None:

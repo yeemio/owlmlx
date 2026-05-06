@@ -1,0 +1,2 @@
+{"completion_tokens": 1, "event": "token", "model_id": "gemma-4-31B-it", "text": "Local AI refers to artificial intelligence models that are downloaded and run on a user's own hardware rather than on a remote cloud server."}
+{"completion_tokens": 1, "event": "done", "finish_reason": "stop", "model_id": "gemma-4-31B-it"}

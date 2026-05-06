@@ -1,0 +1,57 @@
+{
+  "completion_tokens": 1,
+  "done": {
+    "completion_tokens": 1,
+    "event": "done",
+    "finish_reason": "stop",
+    "model_id": "gemma-4-31B-it"
+  },
+  "elapsed_ms": 10349.771,
+  "event_count": 2,
+  "first_token_latency_ms": 10349.52,
+  "reasoning_trace_policy": {
+    "caveats": [],
+    "final_text": "Local AI refers to artificial intelligence models that are downloaded and run on a user's own hardware rather than on a remote cloud server.",
+    "final_text_source": "plain_text",
+    "output_sanity_label": "valid_text",
+    "surface": "owlmlx.reasoning_trace_policy",
+    "trace_marker_family": null,
+    "trace_status": "none",
+    "version": "v1",
+    "visible_reasoning_trace": false
+  },
+  "request_payload": {
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "extra_body": {
+      "owlmlx_reasoning_trace_policy": "final_answer_content"
+    },
+    "max_tokens": 96,
+    "messages": [
+      {
+        "content": "Answer with the final answer only. If your template emits channel markers, put the user-visible answer after <|channel>final and do not continue thought text.\n\nUser request:\nIn one short sentence, define local AI.",
+        "role": "user"
+      }
+    ],
+    "model": "gemma-4-31B-it",
+    "stop": [
+      "<eos>",
+      "<turn|>"
+    ],
+    "stream": true,
+    "temperature": 0.0
+  },
+  "runtime_stream_timing": null,
+  "status_code": 200,
+  "text_preview": "Local AI refers to artificial intelligence models that are downloaded and run on a user's own hardware rather than on a remote cloud server.",
+  "timing_breakdown": {
+    "completion_tokens": 1,
+    "first_token_latency_ms": 10349.52,
+    "load_elapsed_ms": 8355.48,
+    "post_first_token_decode_tokens": 0,
+    "post_first_token_decode_wall_ms": 0.25,
+    "queue_wait_ms": null,
+    "stream_request_wall_ms": 10349.771
+  }
+}

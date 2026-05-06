@@ -222,6 +222,12 @@ def test_profile_policy_gemma_records_channel_reasoning_caveats_when_opted_in() 
         "quality_caveats"
     ]
     assert policy["prompt_control"]["mode"] == "final_answer_only_user_prefix"
+    assert policy["prompt_control"]["runtime_parser"] == (
+        "owlmlx_reasoning_trace_policy:final_answer_content"
+    )
+    assert policy["extra_body"] == {
+        "owlmlx_reasoning_trace_policy": "final_answer_content"
+    }
 
 
 def test_gemma_profile_prompt_control_wraps_user_message_only_when_opted_in() -> None:
@@ -1138,6 +1144,9 @@ def test_operator_live_http_mainline_can_use_openai_chat_stream(tmp_path) -> Non
     assert first_generation["request_payload"]["model"] == "gemma-4-31B-it"
     assert first_generation["request_payload"]["stream"] is True
     assert first_generation["request_payload"]["stop"] == ["<eos>", "<turn|>"]
+    assert first_generation["request_payload"]["extra_body"] == {
+        "owlmlx_reasoning_trace_policy": "final_answer_content"
+    }
     assert first_generation["request_payload"]["chat_template_kwargs"] == {
         "enable_thinking": False
     }
@@ -1171,6 +1180,9 @@ def test_operator_live_http_mainline_can_use_openai_chat_stream(tmp_path) -> Non
     assert effective_policy["request_mode"] == "openai_chat_stream"
     assert effective_policy["request_mode_source"] == "explicit_cli"
     assert effective_policy["prompt_control"]["mode"] == "final_answer_only_user_prefix"
+    assert effective_policy["extra_body"] == {
+        "owlmlx_reasoning_trace_policy": "final_answer_content"
+    }
     assert effective_policy["stop_token_strings_applied"] is True
     assert effective_policy["chat_template_kwargs"] == {"enable_thinking": False}
 

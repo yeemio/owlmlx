@@ -448,6 +448,43 @@ Gemma `enable_thinking=false` live proof on 2026-05-06:
   OwlOps observation, same-host reference comparison closure, longer prompts,
   multi-turn behavior, and cache safety remain separate gates.
 
+Gemma runtime-owned final-answer default follow-up on 2026-05-06:
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-final-answer-parser-live-proof/record.json`
+  (superseded diagnostic row),
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-final-answer-parser-live-proof-v2/record.json`
+  (accepted explicit-parser row), and
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-runtime-profile-default-live-proof/record.json`.
+- The first diagnostic row removed visible thought-channel output but exposed
+  a literal `\final` duplicate in the returned text, so it is not the
+  acceptance proof. The v2 row is the first clean explicit-parser proof after
+  escaped final-channel handling landed.
+- `owlmlx.reasoning_trace_policy:v1` now recognizes Gemma escaped
+  `\final` channel markers in addition to `<|channel>final`, and routes only
+  the safe post-marker final candidate when the OpenAI surface asks for
+  `final_answer_content`.
+- `/v1/chat/completions` now resolves known model profiles directly. For
+  `gemma-4-31B-it`, a direct OpenAI chat request that does not supply profile
+  kwargs receives runtime defaults for `chat_template_kwargs.enable_thinking`,
+  stop strings, and final-answer parser routing; explicit caller-provided
+  stop/template kwargs remain overrides.
+- The explicit-parser live row returned clean final text with
+  `output_sanity_label=valid_text`, `ttft_ms=10349.52`,
+  `tokens_per_second=0.097`, load/generate/unload `pass`, and post-run health
+  clean idle. Its low TPS is not a decode-speed claim because final-answer
+  parser routing buffers trace-shaped content and emits one visible final
+  chunk.
+- The direct-runtime-default live row sent no `chat_template_kwargs`, `stop`,
+  or `extra_body` in the client request payload, yet returned plain final text
+  with `visible_reasoning_trace=false`, `trace_status=none`,
+  `final_text_source=plain_text`, `output_sanity_label=valid_text`,
+  `ttft_ms=5239.115`, and clean post-run health.
+- This moves Gemma final-answer cleanup from runner-only evidence into the
+  runtime-owned OpenAI chat default path. The row still remains
+  `needs_optimization` because OwlOps observation and same-model reference
+  comparison consumption are separate gates.
+
 Qwen35 `enable_thinking=false` live proof on 2026-05-06:
 
 - Evidence:

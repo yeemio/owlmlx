@@ -73,6 +73,8 @@ from owlmlx.model_release_candidate_ledger import (
     model_release_candidate_history_envelope,
     model_release_candidate_still_blocked_payload,
 )
+from owlmlx.model_profile import ModelProfile, resolve_model_profile
+from owlmlx.reasoning_trace_policy import apply_reasoning_trace_policy
 from owlmlx.request_context_length_truth import (
     build_request_context_length_truth,
     request_context_length_truth_to_dict,
@@ -220,6 +222,8 @@ def _messages_to_turns(messages: list[ChatMessage]) -> list[ChatTurn]:
 
 def _chat_template_kwargs_from_openai_payload(
     payload: ChatCompletionRequest,
+    *,
+    profile_defaults: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     candidates: list[dict[str, Any]] = []
     if isinstance(payload.extra_body, dict):
@@ -229,12 +233,57 @@ def _chat_template_kwargs_from_openai_payload(
     if isinstance(payload.chat_template_kwargs, dict):
         candidates.append(payload.chat_template_kwargs)
 
-    merged: dict[str, Any] = {}
+    merged: dict[str, Any] = dict(profile_defaults or {})
     for candidate in candidates:
         for key, value in candidate.items():
             if isinstance(key, str) and key:
                 merged[key] = value
     return merged
+
+
+def _openai_profile_for_model(model_id: str | None) -> ModelProfile | None:
+    if not model_id:
+        return None
+    profile = resolve_model_profile(model_id)
+    if profile.profile_id == "unknown":
+        return None
+    return profile
+
+
+def _openai_reasoning_trace_policy(
+    payload: ChatCompletionRequest,
+    *,
+    profile: ModelProfile | None = None,
+) -> str | None:
+    raw_policy = None
+    if isinstance(payload.extra_body, dict):
+        raw_policy = payload.extra_body.get("owlmlx_reasoning_trace_policy")
+        if raw_policy is None:
+            raw_policy = payload.extra_body.get("reasoning_trace_policy")
+    if raw_policy in {"final_answer_content", "route_final_answer_content"}:
+        return "final_answer_content"
+    if raw_policy in {"raw", "none", "disabled"}:
+        return None
+    if (
+        profile is not None
+        and profile.thinking_policy.get("default_mode") == "parser_cleanup_required"
+    ):
+        return "final_answer_content"
+    return None
+
+
+def _openai_visible_text_for_policy(
+    text: str,
+    *,
+    finish_reason: str | None,
+    policy: str | None,
+) -> tuple[str, dict[str, object] | None]:
+    if policy != "final_answer_content":
+        return text, None
+    result = apply_reasoning_trace_policy(text, finish_reason=finish_reason)
+    if not result.visible_reasoning_trace:
+        return text, result.to_dict()
+    return result.final_text or "", result.to_dict()
 
 
 def _anthropic_messages_to_turns(
@@ -307,6 +356,7 @@ def _openai_response_dict(
     finish_reason: str = "stop",
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
+    reasoning_trace_policy: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     usage = None
     if prompt_tokens is not None or completion_tokens is not None:
@@ -317,6 +367,9 @@ def _openai_response_dict(
             "completion_tokens": ct,
             "total_tokens": pt + ct,
         }
+    message: dict[str, Any] = {"role": "assistant", "content": text}
+    if reasoning_trace_policy is not None:
+        message["owlmlx_reasoning_trace_policy"] = reasoning_trace_policy
     payload = {
         "id": completion_id,
         "object": "chat.completion",
@@ -325,7 +378,7 @@ def _openai_response_dict(
         "choices": [
             {
                 "index": 0,
-                "message": {"role": "assistant", "content": text},
+                "message": message,
                 "finish_reason": finish_reason,
             }
         ],
@@ -625,6 +678,7 @@ def create_app(
     @app.post("/v1/chat/completions")
     async def chat_completions(payload: ChatCompletionRequest):
         target_model = payload.model or runtime.active_model_id
+        profile = _openai_profile_for_model(target_model)
         completion_id = f"chatcmpl-{uuid.uuid4().hex}"
         request_id = f"req_{uuid.uuid4().hex}"
         messages = _messages_to_turns(payload.messages)
@@ -635,9 +689,15 @@ def create_app(
             params["temperature"] = payload.temperature
         if payload.stop is not None:
             params["stop"] = payload.stop
-        chat_template_kwargs = _chat_template_kwargs_from_openai_payload(payload)
+        elif profile is not None and profile.stop_token_strings:
+            params["stop"] = list(profile.stop_token_strings)
+        chat_template_kwargs = _chat_template_kwargs_from_openai_payload(
+            payload,
+            profile_defaults=profile.chat_template_kwargs if profile is not None else None,
+        )
         if chat_template_kwargs:
             params["chat_template_kwargs"] = chat_template_kwargs
+        reasoning_policy = _openai_reasoning_trace_policy(payload, profile=profile)
 
         if not payload.stream:
             result = await runtime.generate_messages(messages, model_id=target_model, **params)
@@ -649,19 +709,103 @@ def create_app(
                     code=result.error_code.value if result.error_code is not None else "backend_error",
                     status_code=status_code,
                 )
+            visible_text, reasoning_policy_payload = _openai_visible_text_for_policy(
+                result.text,
+                finish_reason=result.finish_reason,
+                policy=reasoning_policy,
+            )
             return JSONResponse(
                 headers={"x-request-id": request_id},
                 content=_openai_response_dict(
                     completion_id=completion_id,
                     model=target_model or "unknown",
-                    text=result.text,
-                    finish_reason="stop",
+                    text=visible_text,
+                    finish_reason=result.finish_reason or "stop",
                     prompt_tokens=result.prompt_tokens,
                     completion_tokens=result.completion_tokens,
+                    reasoning_trace_policy=reasoning_policy_payload,
                 ),
             )
 
         async def sse_source():
+            if reasoning_policy == "final_answer_content":
+                buffered_text: list[str] = []
+                finish_reason = "stop"
+                prompt_tokens: int | None = None
+                completion_tokens: int | None = None
+                async for event in runtime.generate_stream_messages(
+                    messages,
+                    model_id=target_model,
+                    **params,
+                ):
+                    if event.prompt_tokens is not None:
+                        prompt_tokens = event.prompt_tokens
+                    if event.completion_tokens is not None:
+                        completion_tokens = event.completion_tokens
+                    if event.finish_reason:
+                        finish_reason = event.finish_reason
+                    if event.event == "token":
+                        buffered_text.append(event.text)
+                    elif event.event == "done":
+                        visible_text, policy_payload = _openai_visible_text_for_policy(
+                            "".join(buffered_text),
+                            finish_reason=finish_reason,
+                            policy=reasoning_policy,
+                        )
+                        if visible_text:
+                            chunk = {
+                                "id": completion_id,
+                                "object": "chat.completion.chunk",
+                                "created": int(time.time()),
+                                "model": target_model or "unknown",
+                                "choices": [
+                                    {
+                                        "index": 0,
+                                        "delta": {"content": visible_text},
+                                        "finish_reason": None,
+                                    }
+                                ],
+                            }
+                            yield f"data: {json.dumps(chunk)}\n\n"
+                        done_chunk = {
+                            "id": completion_id,
+                            "object": "chat.completion.chunk",
+                            "created": int(time.time()),
+                            "model": target_model or "unknown",
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "delta": {},
+                                    "finish_reason": finish_reason or "stop",
+                                }
+                            ],
+                        }
+                        if policy_payload is not None:
+                            done_chunk["owlmlx_reasoning_trace_policy"] = policy_payload
+                        if prompt_tokens is not None or completion_tokens is not None:
+                            pt = int(prompt_tokens or 0)
+                            ct = int(completion_tokens or 0)
+                            done_chunk["usage"] = {
+                                "prompt_tokens": pt,
+                                "completion_tokens": ct,
+                                "total_tokens": pt + ct,
+                            }
+                        yield f"data: {json.dumps(done_chunk)}\n\n"
+                        yield "data: [DONE]\n\n"
+                        return
+                    elif event.event == "error":
+                        chunk = {
+                            "id": completion_id,
+                            "object": "error",
+                            "error": {
+                                "message": event.detail.get("message", "stream generation failed"),
+                                "code": event.error_code.value if event.error_code is not None else "backend_error",
+                            },
+                        }
+                        yield f"data: {json.dumps(chunk)}\n\n"
+                        yield "data: [DONE]\n\n"
+                        return
+
             async for event in runtime.generate_stream_messages(
                 messages,
                 model_id=target_model,

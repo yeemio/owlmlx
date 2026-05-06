@@ -521,6 +521,36 @@ Next dominant gap:
   trace and high TTFT. Gemma should not be reopened as dirty-output blocked
   unless a future live row regresses.
 
+Gemma runtime-owned OpenAI chat default return (2026-05-06,
+`owlmlx_model_rc_gemma_runtime_profile_default_live_proof`):
+
+- The latest Gemma final-answer follow-up evidence is
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-final-answer-parser-live-proof/record.json`
+  as a superseded diagnostic row,
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-final-answer-parser-live-proof-v2/record.json`
+  as the accepted explicit-parser row, and
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-runtime-profile-default-live-proof/record.json`.
+- The superseded diagnostic row still leaked a literal `\final` duplicate, so
+  it must not be used as the clean-output proof.
+- The shared `owlmlx.reasoning_trace_policy:v1` now treats escaped `\final`
+  as a Gemma final-channel marker, so parser routing can extract the safe
+  post-marker final answer instead of leaking the marker into product output.
+- `/v1/chat/completions` now applies known model-family defaults directly:
+  Gemma receives default `chat_template_kwargs.enable_thinking=false`, profile
+  stop strings, and final-answer parser routing unless the caller explicitly
+  overrides those fields.
+- The direct-runtime-default proof sent no `chat_template_kwargs`, `stop`, or
+  `extra_body` in the client request payload. It still returned plain final
+  text with `visible_reasoning_trace=false`, `trace_status=none`,
+  `final_text_source=plain_text`, `output_sanity_label=valid_text`,
+  `ttft_ms=5239.115`, and clean post-run health.
+- This is the important boundary change: Gemma final-answer cleanliness is no
+  longer only a Model RC runner behavior. It is now on the runtime-owned
+  OpenAI-compatible default path that OwlOps-style consumers call. Do not turn
+  this into a performance or parity claim; the row remains
+  `needs_optimization` because OwlOps observation and reference-comparison
+  gates remain open.
+
 Qwen35 `enable_thinking=false` live proof return (2026-05-06,
 `owlmlx_model_rc_qwen35_enable_thinking_false_live_proof`):
 

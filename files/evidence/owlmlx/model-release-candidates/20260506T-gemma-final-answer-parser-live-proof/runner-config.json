@@ -1,0 +1,92 @@
+{
+  "artifact_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+  "comparative_evidence_ledger_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/comparative-evidence/cumulative-ledger.jsonl",
+  "effective_generation_policy": {
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "decision_source": "profile_default",
+    "extra_body": {
+      "owlmlx_reasoning_trace_policy": "final_answer_content"
+    },
+    "profile_applied": true,
+    "profile_family": "gemma4",
+    "profile_id": "gemma4_text",
+    "prompt_control": {
+      "instruction": "Answer with the final answer only. If your template emits channel markers, put the user-visible answer after <|channel>final and do not continue thought text.",
+      "mode": "final_answer_only_user_prefix",
+      "runtime_parser": "owlmlx_reasoning_trace_policy:final_answer_content",
+      "status": "experimental_profile_control",
+      "target": "user_message_content"
+    },
+    "prompt_template_id": "openai_chat_completions_apply_chat_template",
+    "prompt_template_id_source": "profile_default",
+    "quality_caveats": [
+      "model_profile:gemma_final_answer_only_prompt_control",
+      "model_profile:Gemma profile includes stop-token and channel-cleanup caveats.",
+      "model_profile:Mixed-attention cache reuse can cause repetitive output without proof.",
+      "model_profile:profile_stop_tokens_applied_experimental"
+    ],
+    "request_mode": "openai_chat_stream",
+    "request_mode_source": "profile_default",
+    "stop_token_application": {
+      "source": "model_profile.stop_token_strings",
+      "status": "experimental_profile_control",
+      "target": "http_generation_params.stop"
+    },
+    "stop_token_strings": [
+      "<eos>",
+      "<turn|>"
+    ],
+    "stop_token_strings_applied": true,
+    "unknown_model_conservative": false
+  },
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "max_tokens": 96,
+  "model_id": "gemma-4-31B-it",
+  "model_profile": {
+    "cache_policy": {
+      "cache_caveat": "bypass prefix reuse until Gemma mixed-attention proof exists",
+      "prefix_cache": "caution_mixed_attention"
+    },
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "model_id_patterns": [
+      "\\bgemma\\b.*\\b4\\b.*\\b31b\\b.*\\bit\\b"
+    ],
+    "profile_caveats": [
+      "Gemma profile includes stop-token and channel-cleanup caveats.",
+      "Mixed-attention cache reuse can cause repetitive output without proof."
+    ],
+    "profile_family": "gemma4",
+    "profile_id": "gemma4_text",
+    "reasoning_parser_family": "gemma4",
+    "sampler_defaults": {
+      "repetition_penalty_probe": "recommended",
+      "temperature": 0.0,
+      "top_p": 1.0
+    },
+    "source_basis": [
+      "docs/source-of-truth/peer-reference-mechanism-audit-for-model-profiles.md",
+      "docs/source-of-truth/model-release-candidate-program.md"
+    ],
+    "stop_token_strings": [
+      "<eos>",
+      "<turn|>"
+    ],
+    "surface": "owlmlx.model_profile",
+    "thinking_policy": {
+      "channel_policy": "strip_or_route_channel_markers_before_final_text",
+      "default_mode": "parser_cleanup_required",
+      "final_text_candidate_policy": "only_when_derived_outside_visible_trace",
+      "reasoning_trace_policy": "owlmlx.reasoning_trace_policy:v1"
+    },
+    "version": "v1"
+  },
+  "prompt": "In one short sentence, define local AI.",
+  "prompt_template_id": null,
+  "repeats": 1,
+  "request_mode": "openai_chat_stream",
+  "runtime_url": "http://127.0.0.1:8066"
+}

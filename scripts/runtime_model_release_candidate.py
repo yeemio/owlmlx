@@ -45,8 +45,9 @@ DEFAULT_LEDGER_PATH = (
 )
 
 GEMMA_FINAL_ANSWER_ONLY_INSTRUCTION = (
-    "Answer with the final answer only. Do not include reasoning, analysis, "
-    "hidden thoughts, or channel markers such as <|channel>thought or <think>."
+    "Answer with the final answer only. If your template emits channel markers, "
+    "put the user-visible answer after <|channel>final and do not continue "
+    "thought text."
 )
 
 
@@ -653,6 +654,7 @@ def _effective_generation_policy(args: argparse.Namespace) -> dict[str, Any]:
     prompt_control: dict[str, Any] | None = None
     stop_token_strings_applied = False
     stop_token_application: dict[str, Any] | None = None
+    extra_body: dict[str, Any] = {}
 
     if args.apply_model_profile_defaults:
         decision_source = "profile_default"
@@ -671,7 +673,9 @@ def _effective_generation_policy(args: argparse.Namespace) -> dict[str, Any]:
                     "target": "user_message_content",
                     "instruction": GEMMA_FINAL_ANSWER_ONLY_INSTRUCTION,
                     "status": "experimental_profile_control",
+                    "runtime_parser": "owlmlx_reasoning_trace_policy:final_answer_content",
                 }
+                extra_body["owlmlx_reasoning_trace_policy"] = "final_answer_content"
                 caveats.append("model_profile:gemma_final_answer_only_prompt_control")
         elif model_profile.profile_id == "deepseek_v4_experimental":
             caveats.append("model_profile:deepseek_v4_experimental_not_routed_to_mainline")
@@ -715,6 +719,7 @@ def _effective_generation_policy(args: argparse.Namespace) -> dict[str, Any]:
         ),
         "stop_token_strings": list(model_profile.stop_token_strings),
         "stop_token_strings_applied": stop_token_strings_applied,
+        "extra_body": extra_body,
         "quality_caveats": list(dict.fromkeys(caveats)),
         "unknown_model_conservative": model_profile.profile_id == "unknown",
     }
@@ -951,6 +956,8 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                     params["chat_template_kwargs"] = dict(chat_template_kwargs)
                 if effective_policy.get("stop_token_strings_applied"):
                     params["stop"] = list(effective_policy["stop_token_strings"])
+                if effective_policy.get("extra_body"):
+                    params["extra_body"] = dict(effective_policy["extra_body"])
 
                 def stream_once(
                     *,

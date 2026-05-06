@@ -1,0 +1,35 @@
+{"elapsed_ms": 16.276, "pids": [{"pid": 96045, "rss_bytes": 72810496}], "root_pid": 96045, "rss_bytes": 72810496}
+{"elapsed_ms": 557.524, "pids": [{"pid": 4937, "rss_bytes": 79020032}, {"pid": 96045, "rss_bytes": 72810496}], "root_pid": 96045, "rss_bytes": 151830528}
+{"elapsed_ms": 1102.063, "pids": [{"pid": 4977, "rss_bytes": 60702720}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 133595136}
+{"elapsed_ms": 1657.372, "pids": [{"pid": 4977, "rss_bytes": 1262010368}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 1334902784}
+{"elapsed_ms": 2206.903, "pids": [{"pid": 4977, "rss_bytes": 8124891136}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 8197783552}
+{"elapsed_ms": 2760.813, "pids": [{"pid": 4977, "rss_bytes": 15425765376}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 15498657792}
+{"elapsed_ms": 3312.602, "pids": [{"pid": 4977, "rss_bytes": 22694871040}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 22767763456}
+{"elapsed_ms": 3859.937, "pids": [{"pid": 4977, "rss_bytes": 29839769600}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 29912662016}
+{"elapsed_ms": 4420.778, "pids": [{"pid": 4977, "rss_bytes": 36598775808}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 36671668224}
+{"elapsed_ms": 4988.913, "pids": [{"pid": 4977, "rss_bytes": 43304681472}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 43377573888}
+{"elapsed_ms": 5550.637, "pids": [{"pid": 4977, "rss_bytes": 50022481920}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 50095374336}
+{"elapsed_ms": 6109.443, "pids": [{"pid": 4977, "rss_bytes": 52566327296}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 52639219712}
+{"elapsed_ms": 6682.672, "pids": [{"pid": 4977, "rss_bytes": 53756608512}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 53829500928}
+{"elapsed_ms": 7251.093, "pids": [{"pid": 4977, "rss_bytes": 54442115072}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 54515007488}
+{"elapsed_ms": 7819.787, "pids": [{"pid": 4977, "rss_bytes": 54578135040}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 54651027456}
+{"elapsed_ms": 8363.312, "pids": [{"pid": 4977, "rss_bytes": 54720790528}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 54793682944}
+{"elapsed_ms": 8920.759, "pids": [{"pid": 4977, "rss_bytes": 54443491328}, {"pid": 96045, "rss_bytes": 72892416}], "root_pid": 96045, "rss_bytes": 54516383744}
+{"elapsed_ms": 9467.503, "pids": [{"pid": 4977, "rss_bytes": 53657059328}, {"pid": 96045, "rss_bytes": 72974336}], "root_pid": 96045, "rss_bytes": 53730033664}
+{"elapsed_ms": 10015.974, "pids": [{"pid": 4977, "rss_bytes": 53662433280}, {"pid": 96045, "rss_bytes": 72974336}], "root_pid": 96045, "rss_bytes": 53735407616}
+{"elapsed_ms": 10571.667, "pids": [{"pid": 4977, "rss_bytes": 53662433280}, {"pid": 96045, "rss_bytes": 72974336}], "root_pid": 96045, "rss_bytes": 53735407616}
+{"elapsed_ms": 11122.203, "pids": [{"pid": 4977, "rss_bytes": 53664956416}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738012672}
+{"elapsed_ms": 11673.664, "pids": [{"pid": 4977, "rss_bytes": 53665169408}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738225664}
+{"elapsed_ms": 12231.828, "pids": [{"pid": 4977, "rss_bytes": 53665169408}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738225664}
+{"elapsed_ms": 12782.556, "pids": [{"pid": 4977, "rss_bytes": 53665169408}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738225664}
+{"elapsed_ms": 13333.222, "pids": [{"pid": 4977, "rss_bytes": 53665169408}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738225664}
+{"elapsed_ms": 13889.827, "pids": [{"pid": 4977, "rss_bytes": 53665202176}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738258432}
+{"elapsed_ms": 14442.801, "pids": [{"pid": 4977, "rss_bytes": 53665202176}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738258432}
+{"elapsed_ms": 15002.657, "pids": [{"pid": 4977, "rss_bytes": 53665218560}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738274816}
+{"elapsed_ms": 15557.276, "pids": [{"pid": 4977, "rss_bytes": 53665218560}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738274816}
+{"elapsed_ms": 16112.643, "pids": [{"pid": 4977, "rss_bytes": 53665234944}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738291200}
+{"elapsed_ms": 16675.904, "pids": [{"pid": 4977, "rss_bytes": 53665300480}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738356736}
+{"elapsed_ms": 17245.251, "pids": [{"pid": 4977, "rss_bytes": 53665300480}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738356736}
+{"elapsed_ms": 17801.743, "pids": [{"pid": 4977, "rss_bytes": 53665300480}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738356736}
+{"elapsed_ms": 18360.501, "pids": [{"pid": 4977, "rss_bytes": 53665300480}, {"pid": 96045, "rss_bytes": 73056256}], "root_pid": 96045, "rss_bytes": 53738356736}
+{"elapsed_ms": 18888.938, "pids": [{"pid": 96045, "rss_bytes": 73367552}], "root_pid": 96045, "rss_bytes": 73367552}

@@ -50,6 +50,12 @@ Current live evidence:
   The same profile control also produced clean short-prompt final text for
   Qwen35 at
   `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-enable-thinking-false-live-proof/record.json`.
+  A later Gemma follow-up moved this from runner-only behavior into the
+  runtime-owned OpenAI chat default path:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-runtime-profile-default-live-proof/record.json`.
+  That direct request sent no client-side profile kwargs, stop strings, or
+  parser `extra_body`, yet still returned clean final text and clean post-run
+  health.
   This improves Gemma and Qwen35 short-prompt output quality but is still not a
   full parity or replacement claim.
 - Qwen35 TTFT follow-up has narrowed the short-workload latency spike to child

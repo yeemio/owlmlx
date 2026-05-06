@@ -72,6 +72,20 @@ def test_channel_final_marker_without_text_does_not_create_valid_text() -> None:
     assert result.output_sanity_label == "reasoning_trace_visible"
 
 
+def test_escaped_final_marker_yields_final_candidate() -> None:
+    result = apply_reasoning_trace_policy(
+        "Draft answer.\n\n\\final Clean answer.",
+        finish_reason="stop",
+    )
+
+    assert result.visible_reasoning_trace is True
+    assert result.trace_marker_family == "escaped_final_channel"
+    assert result.trace_status == "visible"
+    assert result.final_text == "Clean answer."
+    assert result.final_text_source == "escaped_final_channel"
+    assert result.output_sanity_label == "reasoning_trace_visible"
+
+
 def test_closed_think_trace_can_yield_post_think_candidate() -> None:
     result = apply_reasoning_trace_policy(
         "<think>short plan</think>\nFinal answer.",
