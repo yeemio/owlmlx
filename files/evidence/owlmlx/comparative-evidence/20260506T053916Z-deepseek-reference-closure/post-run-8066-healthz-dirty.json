@@ -1,0 +1,1 @@
+{"contract":{"surface":"owlmlx.healthz","version":"stabilization1"},"runtime":"owlmlx","ok":false,"readiness":"blocked","active_model_id":null,"model_count":0,"backend_name":"mlx-lm-subprocess","backend_error":"ValueError: Model type deepseek_v4 not supported.","persistent_child":true,"child_health":{}}

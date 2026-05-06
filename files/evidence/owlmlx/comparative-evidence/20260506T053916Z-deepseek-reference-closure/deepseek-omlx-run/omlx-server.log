@@ -1,0 +1,192 @@
+COMMAND omlx serve --model-dir /Users/yeemio/AI/Agent/model-candidates/mlx-community --host 127.0.0.1 --port 8063 --log-level warning --paged-ssd-cache-dir /Users/yeemio/AI/Agent/.omlx-cache --hot-cache-max-size 8GB
+2026-05-06 13:40:49,216 - omlx.server - ERROR - POST /v1/chat/completions → 500 (unhandled): Model type deepseek_v4 not supported.
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_lm/utils.py", line 188, in _get_classes
+    arch = importlib.import_module(f"mlx_lm.models.{model_type}")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1140, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'mlx_lm.models.deepseek_v4'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/protocols/http/h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/applications.py", line 1163, in __call__
+    await super().__call__(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/middleware/cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/server.py", line 530, in __call__
+    await self.app(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/server.py", line 1834, in create_chat_completion
+    engine = await get_engine_for_model(request.model)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/server.py", line 686, in get_engine_for_model
+    return await get_engine(model, EngineType.LLM)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/server.py", line 611, in get_engine
+    engine = await pool.get_engine(model_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine_pool.py", line 572, in get_engine
+    await self._load_engine(model_id, force_lm=force_lm)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine_pool.py", line 808, in _load_engine
+    await engine.start()
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine/batched.py", line 213, in start
+    self._model, self._tokenizer = await loop.run_in_executor(
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine/batched.py", line 207, in _load_model_sync
+    return load(
+           ^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_lm/utils.py", line 491, in load
+    model, config = load_model(model_path, lazy, model_config=model_config)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_lm/utils.py", line 334, in load_model
+    model_class, model_args_class = get_model_classes(config=config)
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_lm/utils.py", line 191, in _get_classes
+    raise ValueError(msg)
+ValueError: Model type deepseek_v4 not supported.
+COMMAND omlx serve --model-dir /Users/yeemio/AI/Agent/model-candidates/mlx-community --host 127.0.0.1 --port 8063 --log-level warning --paged-ssd-cache-dir /Users/yeemio/AI/Agent/.omlx-cache --hot-cache-max-size 8GB
+2026-05-06 13:40:50,471 - omlx.server - ERROR - POST /v1/chat/completions → 500 (unhandled): Model type deepseek_v4 not supported.
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_lm/utils.py", line 188, in _get_classes
+    arch = importlib.import_module(f"mlx_lm.models.{model_type}")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1140, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'mlx_lm.models.deepseek_v4'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/protocols/http/h11_impl.py", line 415, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/applications.py", line 1163, in __call__
+    await super().__call__(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/middleware/cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/server.py", line 530, in __call__
+    await self.app(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/server.py", line 1834, in create_chat_completion
+    engine = await get_engine_for_model(request.model)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/server.py", line 686, in get_engine_for_model
+    return await get_engine(model, EngineType.LLM)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/server.py", line 611, in get_engine
+    engine = await pool.get_engine(model_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine_pool.py", line 572, in get_engine
+    await self._load_engine(model_id, force_lm=force_lm)
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine_pool.py", line 808, in _load_engine
+    await engine.start()
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine/batched.py", line 213, in start
+    self._model, self._tokenizer = await loop.run_in_executor(
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine/batched.py", line 207, in _load_model_sync
+    return load(
+           ^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_lm/utils.py", line 491, in load
+    model, config = load_model(model_path, lazy, model_config=model_config)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_lm/utils.py", line 334, in load_model
+    model_class, model_args_class = get_model_classes(config=config)
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_lm/utils.py", line 191, in _get_classes
+    raise ValueError(msg)
+ValueError: Model type deepseek_v4 not supported.

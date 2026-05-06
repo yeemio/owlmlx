@@ -1,0 +1,52 @@
+{
+  "owlmlx": {
+    "runtime_version": "9389cad-current-8066-comparative-ledger",
+    "argv": [
+      "python3",
+      "files/evidence/owlmlx/comparative-evidence/20260506T053916Z-deepseek-reference-closure/openai_stream_client.py",
+      "http://127.0.0.1:8066",
+      "{model_path}",
+      "{prompt}",
+      "{max_tokens}",
+      "{temperature}"
+    ],
+    "env": {
+      "OPENAI_STREAM_CLIENT_PRELOAD_MODE": "owlmlx_v1_load",
+      "OPENAI_STREAM_CLIENT_UNLOAD_MODE": "owlmlx_v1_unload",
+      "OPENAI_STREAM_CLIENT_MEMORY_GB": "116"
+    },
+    "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+    "tokens_method": "max_tokens",
+    "first_token_strategy": "first_nonempty_chunk",
+    "external_pid_file": "files/evidence/owlmlx/comparative-evidence/20260506T053916Z-deepseek-reference-closure/deepseek-omlx-run/owlmlx-8066.pid",
+    "external_listener_ports": [
+      8066
+    ],
+    "timeout_s": 2400.0
+  },
+  "reference": {
+    "runtime_id": "omlx",
+    "runtime_version": "0.3.4-homebrew-jundot-omlx-sidecar-model-candidates-portpid",
+    "argv": [
+      "python3",
+      "files/evidence/owlmlx/comparative-evidence/20260506T053916Z-deepseek-reference-closure/omlx_serve_once_client.py",
+      "/Users/yeemio/AI/Agent/model-candidates/mlx-community",
+      "{model_id}",
+      "8063",
+      "{prompt}",
+      "{max_tokens}",
+      "{temperature}",
+      "files/evidence/owlmlx/comparative-evidence/20260506T053916Z-deepseek-reference-closure/deepseek-omlx-run/omlx-server.log"
+    ],
+    "env": {
+      "OMLX_COMMAND": "omlx"
+    },
+    "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+    "tokens_method": "max_tokens",
+    "first_token_strategy": "first_nonempty_chunk",
+    "external_listener_ports": [
+      8063
+    ],
+    "timeout_s": 2400.0
+  }
+}

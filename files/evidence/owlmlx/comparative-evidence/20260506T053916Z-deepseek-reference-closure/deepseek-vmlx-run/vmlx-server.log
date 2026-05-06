@@ -1,0 +1,168 @@
+COMMAND /Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/bin/python -m vmlx_engine.cli serve /Users/yeemio/AI/Agent/model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ --served-model-name DeepSeek-V4-Flash-2bit-DQ --host 127.0.0.1 --port 8064 --max-tokens 64 --default-temperature 0.0 --log-level WARNING
+ERROR:vmlx_engine.models.llm:Failed to load model: Model type deepseek_v4 not supported.
+Traceback (most recent call last):
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1520, in load_model
+    asyncio.get_running_loop()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1750, in <module>
+    main()
+    ~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1727, in main
+    serve_command(args)
+    ~~~~~~~~~~~~~^^^^^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 524, in serve_command
+    load_model(
+    ~~~~~~~~~~^
+        args.model,
+        ^^^^^^^^^^^
+    ...<15 lines>...
+        flash_moe_io_split=getattr(args, 'flash_moe_io_split', 4),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1526, in load_model
+    asyncio.run(_engine.start())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/engine/simple.py", line 99, in start
+    self._model.load()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/models/llm.py", line 97, in load
+    self.model, self.tokenizer = load_model_with_fallback(
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.model_name,
+        ^^^^^^^^^^^^^^^^
+        tokenizer_config=tokenizer_config,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/utils/tokenizer.py", line 344, in load_model_with_fallback
+    model, tokenizer = load(
+                       ~~~~^
+        model_name, tokenizer_config=tokenizer_config, lazy=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/lib/python3.14/site-packages/mlx_lm/utils.py", line 491, in load
+    model, config = load_model(model_path, lazy, model_config=model_config)
+                    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/lib/python3.14/site-packages/mlx_lm/utils.py", line 334, in load_model
+    model_class, model_args_class = get_model_classes(config=config)
+                                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/lib/python3.14/site-packages/mlx_lm/utils.py", line 191, in _get_classes
+    raise ValueError(msg)
+ValueError: Model type deepseek_v4 not supported.
+============================================================
+SECURITY CONFIGURATION
+============================================================
+  Authentication: DISABLED - Use --api-key to enable
+  Rate limiting: DISABLED - Use --rate-limit to enable
+  Request timeout: 300.0s
+  Tool calling: Use --enable-auto-tool-choice to enable
+  Reasoning: Use --reasoning-parser to enable
+  Speculative decoding: Use --speculative-model to enable
+============================================================
+Loading model: /Users/yeemio/AI/Agent/model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ
+Served model name: DeepSeek-V4-Flash-2bit-DQ
+Default max tokens: 64
+Mode: Simple (maximum throughput)
+  NOTE: These settings require --continuous-batching and will be ignored: --enable-prefix-cache
+COMMAND /Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/bin/python -m vmlx_engine.cli serve /Users/yeemio/AI/Agent/model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ --served-model-name DeepSeek-V4-Flash-2bit-DQ --host 127.0.0.1 --port 8064 --max-tokens 64 --default-temperature 0.0 --log-level WARNING
+ERROR:vmlx_engine.models.llm:Failed to load model: Model type deepseek_v4 not supported.
+Traceback (most recent call last):
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1520, in load_model
+    asyncio.get_running_loop()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1750, in <module>
+    main()
+    ~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1727, in main
+    serve_command(args)
+    ~~~~~~~~~~~~~^^^^^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 524, in serve_command
+    load_model(
+    ~~~~~~~~~~^
+        args.model,
+        ^^^^^^^^^^^
+    ...<15 lines>...
+        flash_moe_io_split=getattr(args, 'flash_moe_io_split', 4),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1526, in load_model
+    asyncio.run(_engine.start())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/engine/simple.py", line 99, in start
+    self._model.load()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/models/llm.py", line 97, in load
+    self.model, self.tokenizer = load_model_with_fallback(
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.model_name,
+        ^^^^^^^^^^^^^^^^
+        tokenizer_config=tokenizer_config,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/utils/tokenizer.py", line 344, in load_model_with_fallback
+    model, tokenizer = load(
+                       ~~~~^
+        model_name, tokenizer_config=tokenizer_config, lazy=False
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/lib/python3.14/site-packages/mlx_lm/utils.py", line 491, in load
+    model, config = load_model(model_path, lazy, model_config=model_config)
+                    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/lib/python3.14/site-packages/mlx_lm/utils.py", line 334, in load_model
+    model_class, model_args_class = get_model_classes(config=config)
+                                    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/lib/python3.14/site-packages/mlx_lm/utils.py", line 191, in _get_classes
+    raise ValueError(msg)
+ValueError: Model type deepseek_v4 not supported.
+============================================================
+SECURITY CONFIGURATION
+============================================================
+  Authentication: DISABLED - Use --api-key to enable
+  Rate limiting: DISABLED - Use --rate-limit to enable
+  Request timeout: 300.0s
+  Tool calling: Use --enable-auto-tool-choice to enable
+  Reasoning: Use --reasoning-parser to enable
+  Speculative decoding: Use --speculative-model to enable
+============================================================
+Loading model: /Users/yeemio/AI/Agent/model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ
+Served model name: DeepSeek-V4-Flash-2bit-DQ
+Default max tokens: 64
+Mode: Simple (maximum throughput)
+  NOTE: These settings require --continuous-batching and will be ignored: --enable-prefix-cache

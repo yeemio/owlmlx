@@ -12,6 +12,8 @@ The latest same-host live comparison notes are:
 
 `docs/source-of-truth/reference-runtime-live-comparison-qwen27-qwen35-20260506.md`
 
+`docs/source-of-truth/reference-runtime-live-comparison-deepseek-20260506.md`
+
 They cover only short-prompt, `max_tokens=64`, `temperature=0`, same-host runs
 on `Mac17,6-arm64-macOS-26.4.1-128GB`.
 
@@ -28,10 +30,17 @@ Current live evidence:
   a reasoning-aware stream consumer for Gemma.
 - `vMLX`: `rejected` for both local Qwen directories because `vMLX serve`
   selects the multimodal loader and the local reference venv lacks `mlx-vlm`.
+- `DeepSeek-V4-Flash-2bit-DQ`: `rejected` against both Homebrew `oMLX 0.3.4`
+  sidecar and local `vMLX` probe because current stock loader paths do not
+  support `model_type=deepseek_v4`.
+- `DeepSeek-V4-Flash-2bit-DQ`: `owlmlx` also rejects before observable first
+  token through the same missing `deepseek_v4` loader support, and the failed
+  load currently dirties 8066 backend health until restart.
 
 This improves the Gemma, Qwen27, and Qwen35 reference evidence floor, but it is
-still not a parity claim and does not cover DeepSeek, longer prompts, multi-turn
-behavior, concurrent workloads, cache reuse, or final-answer quality.
+still not a parity claim and does not cover measured DeepSeek generation,
+longer prompts, multi-turn behavior, concurrent workloads, cache reuse, or
+final-answer quality.
 
 ## 1. Purpose
 

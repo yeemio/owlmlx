@@ -1,0 +1,59 @@
+{
+  "rerun_python": "/opt/homebrew/opt/python@3.14/bin/python3.14",
+  "runtime_argv": [
+    {
+      "argv": [
+        "python3",
+        "files/evidence/owlmlx/comparative-evidence/20260506T053916Z-deepseek-reference-closure/openai_stream_client.py",
+        "http://127.0.0.1:8066",
+        "/Users/yeemio/AI/Agent/model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ",
+        "In one short sentence, define local AI.",
+        "64",
+        "0.0"
+      ],
+      "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+      "env": {
+        "OPENAI_STREAM_CLIENT_MEMORY_GB": "116",
+        "OPENAI_STREAM_CLIENT_PRELOAD_MODE": "owlmlx_v1_load",
+        "OPENAI_STREAM_CLIENT_UNLOAD_MODE": "owlmlx_v1_unload"
+      },
+      "external_listener_ports": [
+        8066
+      ],
+      "external_pid_file": "files/evidence/owlmlx/comparative-evidence/20260506T053916Z-deepseek-reference-closure/deepseek-vmlx-run/owlmlx-8066.pid",
+      "external_pids": [],
+      "first_token_strategy": "first_nonempty_chunk",
+      "runtime_id": "owlmlx",
+      "runtime_version": "9389cad-current-8066-comparative-ledger",
+      "timeout_s": 2400.0,
+      "tokens_method": "max_tokens"
+    },
+    {
+      "argv": [
+        "python3",
+        "files/evidence/owlmlx/comparative-evidence/20260506T053916Z-deepseek-reference-closure/vmlx_serve_once_client.py",
+        "/Users/yeemio/AI/Agent/model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ",
+        "DeepSeek-V4-Flash-2bit-DQ",
+        "8064",
+        "In one short sentence, define local AI.",
+        "64",
+        "0.0",
+        "files/evidence/owlmlx/comparative-evidence/20260506T053916Z-deepseek-reference-closure/deepseek-vmlx-run/vmlx-server.log"
+      ],
+      "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+      "env": {
+        "VMLINUX_PYTHON": "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/bin/python"
+      },
+      "external_listener_ports": [
+        8064
+      ],
+      "external_pid_file": null,
+      "external_pids": [],
+      "first_token_strategy": "first_nonempty_chunk",
+      "runtime_id": "vmlx",
+      "runtime_version": "vmlx-engine-probe-venv-9fe1bb7-deepseek-doctor-unsupported-portpid",
+      "timeout_s": 2400.0,
+      "tokens_method": "max_tokens"
+    }
+  ]
+}
