@@ -761,6 +761,87 @@ def test_cli_run_measured_short_prompt_emits_measured_record_with_fake_commands(
     assert ledger.latest()["verdict_grade"] == "measured"
 
 
+def test_cli_import_manifest_record_appends_validated_record(tmp_path) -> None:
+    source_ledger_path = tmp_path / "source-ledger.jsonl"
+    source_evidence_dir = tmp_path / "source-evidence"
+    config_path = tmp_path / "runner.json"
+    _write_runner_config(
+        config_path,
+        owlmlx_argv=_fake_success_command("OWL"),
+        reference_argv=_fake_success_command("REF"),
+    )
+    subprocess.run(
+        _common_cli_args(
+            ledger_path=source_ledger_path,
+            config_path=config_path,
+            evidence_dir=source_evidence_dir,
+        ),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    target_ledger_path = tmp_path / "target-ledger.jsonl"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--ledger-path",
+            str(target_ledger_path),
+            "import-manifest-record",
+            "--manifest-path",
+            str(source_evidence_dir / "manifest.json"),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    imported = json.loads(completed.stdout)
+    source = ComparativeEvidenceLedger(source_ledger_path).latest()
+    assert imported == source
+    target = ComparativeEvidenceLedger(target_ledger_path)
+    assert target.history() == [source]
+
+
+def test_cli_import_manifest_record_rejects_duplicate_pointer(tmp_path) -> None:
+    source_ledger_path = tmp_path / "source-ledger.jsonl"
+    source_evidence_dir = tmp_path / "source-evidence"
+    config_path = tmp_path / "runner.json"
+    _write_runner_config(
+        config_path,
+        owlmlx_argv=_fake_success_command("OWL"),
+        reference_argv=_fake_success_command("REF"),
+    )
+    subprocess.run(
+        _common_cli_args(
+            ledger_path=source_ledger_path,
+            config_path=config_path,
+            evidence_dir=source_evidence_dir,
+        ),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    target_ledger_path = tmp_path / "target-ledger.jsonl"
+    import_cmd = [
+        sys.executable,
+        str(SCRIPT_PATH),
+        "--ledger-path",
+        str(target_ledger_path),
+        "import-manifest-record",
+        "--manifest-path",
+        str(source_evidence_dir / "manifest.json"),
+    ]
+    subprocess.run(import_cmd, capture_output=True, text=True, check=True)
+    duplicate = subprocess.run(import_cmd, capture_output=True, text=True)
+
+    assert duplicate.returncode != 0
+    assert "already imported" in duplicate.stderr
+    assert len(ComparativeEvidenceLedger(target_ledger_path).history()) == 1
+
+
 def test_cli_run_measured_short_prompt_emits_inconclusive_when_reference_partially_fails(
     tmp_path,
 ) -> None:

@@ -1,0 +1,70 @@
+{
+  "artifact_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+  "blockers": [
+    "owlops_observation_pending"
+  ],
+  "created_at": "2026-05-06T09:06:21Z",
+  "decode_tokens_per_second": null,
+  "end_to_end_tokens_per_second": 0.177,
+  "experimental_prefill_warmup_included_in_metrics": null,
+  "experimental_prefill_warmup_mode": null,
+  "experimental_prefill_warmup_ms": null,
+  "experimental_prefill_warmup_status": "not_run",
+  "failure_count": 0,
+  "first_token_latency_ms": 5636.876,
+  "generation_result": {
+    "detail": "1 stream generations completed",
+    "status": "pass"
+  },
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "lane": "mainline",
+  "load_result": {
+    "detail": "initial load completed for gemma-4-31B-it",
+    "status": "pass"
+  },
+  "load_time_ms": 7926.457,
+  "memory_headroom_bytes": 91792654336,
+  "memory_peak_source": "process_tree_rss",
+  "model_id": "gemma-4-31B-it",
+  "output_sanity_label": "valid_text",
+  "owlops_observation_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/model-release-candidates/20260506T-gemma-reference-comparison-consumption-live-proof",
+  "peak_resident_set_bytes": 45646299136,
+  "prompt_template_id": "openai_chat_completions_runtime_profile_default",
+  "quality_caveats": [
+    "model_profile:explicit_prompt_template_id_preserved",
+    "blocker:owlops_observation_pending"
+  ],
+  "queue_wait_ms": null,
+  "reference_comparison_evidence_pointer": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-reasoning-aware-run/run/manifest.json",
+  "reference_comparison_runtime_ids": [
+    "owlmlx",
+    "vmlx"
+  ],
+  "reference_comparison_status": "measured",
+  "reload_result": {
+    "detail": "reload requires at least two repeats",
+    "status": "not_applicable"
+  },
+  "reload_time_ms": null,
+  "repeat_count": 1,
+  "resident_mode": "load_unload_per_repeat",
+  "runtime_first_response_ms": null,
+  "runtime_first_visible_token_ms": null,
+  "runtime_prompt_render_ms": null,
+  "runtime_stream_wall_ms": null,
+  "runtime_timing_gate_status": "unsupported",
+  "runtime_timing_repeat_count": 0,
+  "runtime_url": "http://127.0.0.1:8066",
+  "surface": "owlmlx.model_release_candidate_record",
+  "tokens_per_second": 0.177,
+  "ttft_ms": 5636.876,
+  "unload_result": {
+    "detail": "1 unload operations completed",
+    "status": "pass"
+  },
+  "unload_time_ms": 406.374,
+  "verdict": "needs_optimization",
+  "version": "v1",
+  "visibility_status": "visible",
+  "wall_clock_ms": 13985.907
+}

@@ -83,6 +83,11 @@ Current live evidence:
   `files/evidence/owlmlx/model-release-candidates/20260506T-qwen27-reference-comparison-consumption-live-proof/record.json`
   and
   `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-reference-comparison-consumption-live-proof/record.json`.
+- Gemma now also consumes its same-model vMLX reasoning-aware `measured`
+  record from the cumulative comparative ledger. Latest Model RC proof:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-reference-comparison-consumption-live-proof/record.json`.
+  It clears `reference_runtime_comparison_missing` for Gemma while keeping the
+  broader claim narrow.
 
 This improves the Gemma, Qwen27, and Qwen35 reference evidence floor, but it is
 still not a parity claim and does not cover measured DeepSeek generation,

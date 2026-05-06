@@ -551,6 +551,30 @@ Gemma runtime-owned OpenAI chat default return (2026-05-06,
   `needs_optimization` because OwlOps observation and reference-comparison
   gates remain open.
 
+Gemma reference-comparison consumption return (2026-05-06,
+`owlmlx_model_rc_gemma_reference_comparison_consumption_live_proof`):
+
+- The latest Gemma reference-consumption row is
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-reference-comparison-consumption-live-proof/record.json`.
+- The existing vMLX reasoning-aware Gemma measured manifest was imported into
+  `files/evidence/owlmlx/comparative-evidence/cumulative-ledger.jsonl` through
+  `scripts/runtime_comparative_evidence.py import-manifest-record`, with
+  duplicate `evidence_pointer` protection.
+- The consumed evidence pointer is
+  `files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-reasoning-aware-run/run/manifest.json`.
+- The Model RC row now records `reference_comparison_status=measured`,
+  `reference_comparison_runtime_ids=["owlmlx", "vmlx"]`, and its blocker list
+  is only `owlops_observation_pending`.
+- Runtime output stayed clean final text:
+  `visible_reasoning_trace=false`, `trace_status=none`,
+  `final_text_source=plain_text`, and `output_sanity_label=valid_text`.
+  Lifecycle completed with load/generate/unload `pass` and post-run 8066
+  returned to clean idle.
+- This retires Gemma's stale `reference_runtime_comparison_missing` blocker.
+  It is still not a parity claim: the reference comparison is short-prompt,
+  same-host, reasoning-aware vMLX evidence only, and broader workloads plus
+  OwlOps observation remain open.
+
 Qwen35 `enable_thinking=false` live proof return (2026-05-06,
 `owlmlx_model_rc_qwen35_enable_thinking_false_live_proof`):
 

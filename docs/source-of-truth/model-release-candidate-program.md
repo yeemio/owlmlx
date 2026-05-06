@@ -485,6 +485,27 @@ Gemma runtime-owned final-answer default follow-up on 2026-05-06:
   `needs_optimization` because OwlOps observation and same-model reference
   comparison consumption are separate gates.
 
+Gemma comparative-ledger consumption proof on 2026-05-06:
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-reference-comparison-consumption-live-proof/record.json`.
+- The existing Gemma vMLX reasoning-aware measured manifest was imported into
+  the cumulative comparative ledger through
+  `scripts/runtime_comparative_evidence.py import-manifest-record`, preserving
+  the original evidence pointer:
+  `files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-reasoning-aware-run/run/manifest.json`.
+- The imported comparison is still narrow: short prompt, `max_tokens=64`,
+  `temperature=0`, same host, and reasoning-aware vMLX stream consumption.
+  It records `owlmlx` TPS `3.7468` / TTFT `8225.989ms` versus `vmlx` TPS
+  `3.8304` / TTFT `8306.498ms`.
+- The latest Gemma Model RC row now writes
+  `reference_comparison_status=measured`,
+  `reference_comparison_runtime_ids=["owlmlx", "vmlx"]`, and removes
+  `reference_runtime_comparison_missing` from blockers.
+- That row still returns `verdict=needs_optimization` because
+  `owlops_observation_pending` remains open. This is reference-comparison
+  consumption closure, not parity or replacement-grade signoff.
+
 Qwen35 `enable_thinking=false` live proof on 2026-05-06:
 
 - Evidence:

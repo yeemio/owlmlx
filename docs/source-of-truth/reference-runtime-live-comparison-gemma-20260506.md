@@ -27,6 +27,18 @@ The honest outcome is:
 | `oMLX` | `rejected` | TPS `3.7212`, TTFT `8365.658ms`, peak RSS `53963571200` | reference completed `0/2`; peak RSS `53200093184` before failure | oMLX generated tokens in attempt 1, then the server disconnected/restarted around unload/lifecycle; no clean two-repeat measured record |
 | `vMLX` | `measured` | TPS `3.7468`, TTFT `8225.989ms`, peak RSS `54586949632` | TPS `3.8304`, TTFT `8306.498ms`, peak RSS `55705976832` | vMLX is essentially neck-and-neck on this narrow reasoning-aware Gemma stream workload |
 
+Follow-up ledger consumption:
+
+- The vMLX reasoning-aware measured record was imported into
+  `files/evidence/owlmlx/comparative-evidence/cumulative-ledger.jsonl` via
+  `scripts/runtime_comparative_evidence.py import-manifest-record`.
+- Latest Model RC consumption proof:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-reference-comparison-consumption-live-proof/record.json`.
+- That row records `reference_comparison_status=measured`,
+  `reference_comparison_runtime_ids=["owlmlx", "vmlx"]`, and clears the stale
+  Gemma `reference_runtime_comparison_missing` blocker. It remains a narrow
+  short-prompt, reasoning-aware vMLX comparison, not a parity claim.
+
 This supports saying:
 
 - `owlmlx` can stand in the same short-prompt Gemma arena as `vMLX` on this

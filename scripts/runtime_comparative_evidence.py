@@ -13,6 +13,8 @@ Subcommands:
   write raw artifacts, and append exactly one validated
   ``comparative_evidence_record`` whose ``verdict_grade`` is one of
   ``measured`` / ``inconclusive`` / ``rejected`` per the harness contract.
+- ``import-manifest-record``: import a previously written manifest's validated
+  ``appended_record`` into the selected cumulative ledger.
 - ``latest``: print the latest record (or the explicit ``still_blocked``
   payload when no record exists).
 - ``history``: print the full history envelope.
@@ -36,17 +38,6 @@ from owlmlx.comparative_evidence_record import (
     ComparativeEvidenceRuntime,
     build_comparative_evidence_record,
 )
-from owlmlx.comparative_evidence_runner import (
-    RuntimeRunnerConfig,
-    WorkloadInputs,
-    aggregate_runtime,
-    aggregate_to_record_runtime,
-    compute_verdict,
-    execute_attempt,
-    load_runner_config_file,
-    write_run_artifacts,
-)
-
 
 DEFAULT_LEDGER_PATH = (
     Path(__file__).resolve().parents[1] / "data" / "comparative-evidence-ledger.jsonl"
@@ -135,6 +126,16 @@ def _run_measured_short_prompt(
     7. return the appended record
     """
 
+    from owlmlx.comparative_evidence_runner import (
+        WorkloadInputs,
+        aggregate_runtime,
+        aggregate_to_record_runtime,
+        compute_verdict,
+        execute_attempt,
+        load_runner_config_file,
+        write_run_artifacts,
+    )
+
     workload = WorkloadInputs(
         prompt=args.prompt,
         decode_max_tokens=int(args.decode_max_tokens),
@@ -221,6 +222,40 @@ def _run_measured_short_prompt(
     return appended
 
 
+def _import_manifest_record(
+    *,
+    ledger: ComparativeEvidenceLedger,
+    manifest_path: Path,
+    allow_duplicate: bool = False,
+) -> dict[str, Any]:
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    record_payload = payload.get("appended_record")
+    if not isinstance(record_payload, dict):
+        raise ValueError("manifest must contain object field appended_record")
+
+    evidence_pointer = str(record_payload.get("evidence_pointer") or "")
+    if not evidence_pointer:
+        raise ValueError("manifest appended_record must contain evidence_pointer")
+    if not allow_duplicate:
+        for existing in ledger.history():
+            if existing.get("evidence_pointer") == evidence_pointer:
+                raise ValueError(
+                    f"comparative evidence record already imported: {evidence_pointer}"
+                )
+
+    record = build_comparative_evidence_record(
+        recorded_at=str(record_payload["recorded_at"]),
+        evidence_pointer=evidence_pointer,
+        host_class=str(record_payload["host_class"]),
+        workload_class=str(record_payload["workload_class"]),
+        workload_invariants=record_payload["workload_invariants"],
+        runtimes=record_payload["runtimes"],
+        verdict_text=str(record_payload["verdict_text"]),
+        verdict_grade=str(record_payload["verdict_grade"]),
+    )
+    return ledger.append(record)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Operator entry for the comparative-evidence record surface."
@@ -286,6 +321,20 @@ def main() -> int:
         help="Defaults to the manifest.json path inside --evidence-dir",
     )
 
+    import_manifest = sub.add_parser(
+        "import-manifest-record",
+        help=(
+            "Import a previously written comparative manifest appended_record "
+            "into the selected JSONL ledger"
+        ),
+    )
+    import_manifest.add_argument("--manifest-path", required=True)
+    import_manifest.add_argument(
+        "--allow-duplicate",
+        action="store_true",
+        help="Append even when the evidence_pointer already exists in the ledger.",
+    )
+
     sub.add_parser("latest", help="Print the latest record or still_blocked payload")
     sub.add_parser("history", help="Print the full history envelope")
 
@@ -311,6 +360,15 @@ def main() -> int:
 
     if args.command == "run-measured-short-prompt":
         payload = _run_measured_short_prompt(ledger=ledger, args=args)
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "import-manifest-record":
+        payload = _import_manifest_record(
+            ledger=ledger,
+            manifest_path=Path(args.manifest_path),
+            allow_duplicate=args.allow_duplicate,
+        )
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
 
