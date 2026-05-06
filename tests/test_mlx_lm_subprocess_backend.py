@@ -103,6 +103,19 @@ def _write_runner(
     return module.stem
 
 
+def _write_fake_mlx_lm_package(
+    tmp_path: Path,
+    *,
+    model_modules: tuple[str, ...] = (),
+) -> None:
+    models_dir = tmp_path / "mlx_lm" / "models"
+    models_dir.mkdir(parents=True)
+    (tmp_path / "mlx_lm" / "__init__.py").write_text("", encoding="utf-8")
+    (models_dir / "__init__.py").write_text("", encoding="utf-8")
+    for module_name in model_modules:
+        (models_dir / f"{module_name}.py").write_text("", encoding="utf-8")
+
+
 def _write_metal_oom_runner(tmp_path: Path) -> str:
     module = tmp_path / "metal_oom_runner.py"
     module.write_text(
@@ -148,6 +161,43 @@ def test_subprocess_backend_load_starts_persistent_child(tmp_path: Path) -> None
     assert status.detail["children"]["model-a"]["alive"] is True
     assert status.detail["children"]["model-a"]["pid"] is not None
     backend.unload("model-a")
+
+
+def test_subprocess_backend_rejects_unsupported_model_type_without_dirty_health(
+    tmp_path: Path,
+) -> None:
+    _write_fake_mlx_lm_package(tmp_path, model_modules=("gemma4",))
+    model_dir = tmp_path / "DeepSeek-V4-Flash-2bit-DQ"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text(
+        '{"model_type": "deepseek_v4"}',
+        encoding="utf-8",
+    )
+    runner = _write_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        python_executable=sys.executable,
+        runner_module=runner,
+        model_path_resolver=lambda _model_id: str(model_dir),
+        extra_pythonpath=(str(tmp_path),),
+    )
+    kernel = RuntimeKernel(backend)
+
+    result = kernel.load_model("DeepSeek-V4-Flash-2bit-DQ", memory_gb=1.0)
+
+    assert result.ok is False
+    assert result.error_code is RuntimeErrorCode.unsupported_model_family
+    assert result.detail["does_not_start_child"] is True
+    assert result.detail["does_not_dirty_backend_health"] is True
+    assert result.detail["preflight"]["model_type"] == "deepseek_v4"
+    assert result.detail["preflight"]["module_name"] == "mlx_lm.models.deepseek_v4"
+    status = kernel.status_dict()
+    assert status["backend"]["healthy"] is True
+    assert status["backend"]["detail"]["last_error"] is None
+    assert status["backend"]["detail"]["children"] == {}
+    assert status["backend"]["detail"]["model_count"] == 0
+    assert status["health"]["readiness"] == "degraded"
+    assert status["load_failure"]["events"] == []
+    assert status["load_failure"]["unresolved_event_count"] == 0
 
 
 def test_subprocess_backend_generate_reuses_same_child(tmp_path: Path) -> None:

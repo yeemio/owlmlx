@@ -19,6 +19,7 @@ import time
 from collections import deque
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from .types import (
@@ -64,6 +65,19 @@ class _ChildSession:
     @property
     def pid(self) -> int | None:
         return self.proc.pid
+
+
+@dataclass(frozen=True, slots=True)
+class _ModelTypeSupportProbe:
+    """Child-runtime probe for whether mlx-lm exposes a model_type module."""
+
+    model_path: str
+    model_type: str
+    supported: bool
+    module_name: str
+    returncode: int
+    stdout: str = ""
+    stderr: str = ""
 
 
 def _drain_stderr(pipe: Any, buffer: deque[str]) -> None:
@@ -127,6 +141,25 @@ def _classify_last_subprocess_failure(
         return "backend_error"
     if last_result is not None and not last_result.ok:
         return "backend_error"
+    return None
+
+
+def _read_model_type_from_config(model_path: str) -> str | None:
+    """Return a local Hugging Face/MLX config model_type, if cheaply readable."""
+
+    path = Path(model_path).expanduser()
+    config_path = path / "config.json" if path.is_dir() else None
+    if config_path is None or not config_path.is_file():
+        return None
+    try:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    model_type = payload.get("model_type")
+    if isinstance(model_type, str) and model_type.strip():
+        return model_type.strip()
     return None
 
 
@@ -762,6 +795,55 @@ class MlxLmSubprocessBackend:
             return model_id
         return str(self.model_path_resolver(model_id))
 
+    def _probe_model_type_support(
+        self,
+        *,
+        runner_model_id: str,
+        model_type: str,
+    ) -> _ModelTypeSupportProbe | None:
+        """Probe model-family support in the child runtime without importing it here."""
+
+        module_name = f"mlx_lm.models.{model_type}"
+        code = (
+            "import importlib.util, json, sys\n"
+            "module = sys.argv[1]\n"
+            "try:\n"
+            "    spec = importlib.util.find_spec(module)\n"
+            "except ModuleNotFoundError as exc:\n"
+            "    print(json.dumps({'probe_error': str(exc), 'module_name': module}))\n"
+            "    raise SystemExit(1)\n"
+            "print(json.dumps({'supported': spec is not None, 'module_name': module}))\n"
+        )
+        try:
+            completed = subprocess.run(
+                [self.python_executable, "-c", code, module_name],
+                cwd=None,
+                env=self._build_env(),
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=min(max(float(self.health_probe_timeout_s), 1.0), 10.0),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        supported = False
+        try:
+            payload = json.loads(completed.stdout.strip() or "{}")
+            supported = bool(payload.get("supported"))
+        except json.JSONDecodeError:
+            return None
+        if completed.returncode != 0 or payload.get("probe_error"):
+            return None
+        return _ModelTypeSupportProbe(
+            model_path=runner_model_id,
+            model_type=model_type,
+            supported=supported,
+            module_name=module_name,
+            returncode=int(completed.returncode),
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+        )
+
     def _read_stream_transport_line(
         self,
         stdout: Any,
@@ -1288,6 +1370,39 @@ class MlxLmSubprocessBackend:
                 error_code=RuntimeErrorCode.model_already_loaded,
                 model=self._registrations[model_id],
             )
+        runner_model_id = self._runner_model_id(model_id)
+        model_type = _read_model_type_from_config(runner_model_id)
+        support_probe = (
+            self._probe_model_type_support(
+                runner_model_id=runner_model_id,
+                model_type=model_type,
+            )
+            if model_type
+            else None
+        )
+        if support_probe is not None and not support_probe.supported:
+            return LoadResult(
+                ok=False,
+                message=(
+                    "unsupported model family: "
+                    f"model_type={model_type} has no {support_probe.module_name} "
+                    "loader in the configured mlx-lm runtime"
+                ),
+                error_code=RuntimeErrorCode.unsupported_model_family,
+                detail={
+                    "preflight": {
+                        "stage": "model_type_loader_support",
+                        "model_path": support_probe.model_path,
+                        "model_type": support_probe.model_type,
+                        "module_name": support_probe.module_name,
+                        "supported": support_probe.supported,
+                        "returncode": support_probe.returncode,
+                        "stderr": support_probe.stderr[-2000:],
+                    },
+                    "does_not_start_child": True,
+                    "does_not_dirty_backend_health": True,
+                },
+            )
         info = LoadedModelInfo(
             model_id=model_id,
             memory_gb=memory_gb if memory_gb is not None else 0.0,
@@ -1300,7 +1415,7 @@ class MlxLmSubprocessBackend:
             session,
             {
                 "action": "load",
-                "model_id": self._runner_model_id(model_id),
+                "model_id": runner_model_id,
             },
         )
         self._last_result = result

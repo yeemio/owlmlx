@@ -1,0 +1,5 @@
+dashboard:tmux:1030:Python:yeemiodeMacBook-Pro.local
+omlx:tmux:12141:Python:yeemiodeMacBook-Pro.local
+owlmlx-8066-runtime-monitor:tmux:14350:Python:yeemiodeMacBook-Pro.local
+router:zsh:11710:Python:yeemiodeMacBook-Pro.local
+supervisor:zsh:893:Python:yeemiodeMacBook-Pro.local

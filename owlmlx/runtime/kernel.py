@@ -289,7 +289,10 @@ class RuntimeKernel:
             # Successful same-model load resolves any prior unresolved load
             # failure event for that model id (auto-resolution rule).
             self._resolve_matching_load_failure_events(model_id=model_id)
-        elif result.error_code is not RuntimeErrorCode.model_already_loaded:
+        elif result.error_code not in {
+            RuntimeErrorCode.model_already_loaded,
+            RuntimeErrorCode.unsupported_model_family,
+        }:
             cause_class = (
                 "oom_class_failure"
                 if result.error_code is RuntimeErrorCode.memory_budget_exceeded

@@ -32,6 +32,7 @@ class RuntimeErrorCode(str, Enum):
     model_not_loaded = "model_not_loaded"
     model_already_loaded = "model_already_loaded"
     model_not_found = "model_not_found"
+    unsupported_model_family = "unsupported_model_family"
     memory_budget_exceeded = "memory_budget_exceeded"
     backend_error = "backend_error"
     invalid_request = "invalid_request"

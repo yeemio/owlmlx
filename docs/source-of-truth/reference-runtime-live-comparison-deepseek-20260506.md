@@ -148,7 +148,7 @@ This is a reference-runtime loader blocker, not a measured comparison.
 ## owlmlx Lifecycle Finding
 
 The owlmlx attempts also failed before observable first token. The immediate
-post-run health was dirty:
+post-run health from the original comparison run was dirty:
 
 - `/healthz`: `ok=false`
 - `readiness=blocked`
@@ -169,6 +169,42 @@ runtime-monitor trend ledgers attached.
 
 This lifecycle behavior is a real gap. Unsupported model-family loads should
 be rejected as unsupported without dirtying post-run backend health.
+
+## Follow-up Clean-Reject Closure
+
+Follow-up implementation evidence:
+
+`files/evidence/owlmlx/comparative-evidence/20260506T055608Z-deepseek-unsupported-family-clean-reject/`
+
+The runtime now performs a pre-load model-family support probe for local model
+directories that expose `config.json` with `model_type`.
+
+For the same DeepSeek 2bit-DQ artifact, `/v1/load` now returns:
+
+- `ok=false`
+- `error_code=unsupported_model_family`
+- `detail.preflight.model_type=deepseek_v4`
+- `detail.preflight.module_name=mlx_lm.models.deepseek_v4`
+- `detail.does_not_start_child=true`
+- `detail.does_not_dirty_backend_health=true`
+
+Post-load `/healthz` stays clean:
+
+- `ok=true`
+- `readiness=degraded`
+- `active_model_id=null`
+- `model_count=0`
+- `backend_error=null`
+
+Post-load `/v1/runtime/status` also keeps the runtime out of recovery noise:
+
+- `backend.detail.children={}`
+- `load_failure.events=[]`
+- `load_failure.unresolved_event_count=0`
+
+This closes the lifecycle dirty-health part of the DeepSeek finding. It does
+not close DeepSeek generation support; that still requires a licensed/proven
+`deepseek_v4` loader path.
 
 ## Operational Read
 

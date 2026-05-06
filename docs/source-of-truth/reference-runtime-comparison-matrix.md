@@ -35,7 +35,11 @@ Current live evidence:
   support `model_type=deepseek_v4`.
 - `DeepSeek-V4-Flash-2bit-DQ`: `owlmlx` also rejects before observable first
   token through the same missing `deepseek_v4` loader support, and the failed
-  load currently dirties 8066 backend health until restart.
+  load originally dirtied 8066 backend health until restart.
+- `DeepSeek-V4-Flash-2bit-DQ`: follow-up runtime evidence now shows
+  `owlmlx` returns a clean pre-load `unsupported_model_family` response for
+  missing `deepseek_v4` loader support without dirtying 8066 health or adding
+  load-failure recovery noise.
 
 This improves the Gemma, Qwen27, and Qwen35 reference evidence floor, but it is
 still not a parity claim and does not cover measured DeepSeek generation,
