@@ -457,6 +457,26 @@ def _runtime_timing_gate_status(
     return "unsupported"
 
 
+def _append_runtime_timing_values(
+    timing: dict[str, Any] | None,
+    *,
+    stream_wall_ms_values: list[float],
+    first_response_ms_values: list[float],
+    first_visible_token_ms_values: list[float],
+    prompt_render_ms_values: list[float],
+) -> None:
+    if not timing:
+        return
+    if isinstance(timing.get("stream_wall_ms"), (int, float)):
+        stream_wall_ms_values.append(float(timing["stream_wall_ms"]))
+    if isinstance(timing.get("first_response_ms"), (int, float)):
+        first_response_ms_values.append(float(timing["first_response_ms"]))
+    if isinstance(timing.get("first_visible_token_ms"), (int, float)):
+        first_visible_token_ms_values.append(float(timing["first_visible_token_ms"]))
+    if isinstance(timing.get("prompt_render_ms"), (int, float)):
+        prompt_render_ms_values.append(float(timing["prompt_render_ms"]))
+
+
 def _classify_output_sanity(
     *,
     generated_texts: list[str],
@@ -659,6 +679,14 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         runner_config["effective_generation_policy"] = effective_policy
     if args.timing_gate_resident_repeat:
         runner_config["timing_gate_resident_repeat"] = True
+    if args.experimental_prefill_warmup:
+        runner_config["experimental_prefill_warmup"] = True
+        runner_config["experimental_prefill_warmup_max_tokens"] = (
+            args.experimental_prefill_warmup_max_tokens
+        )
+        runner_config["experimental_prefill_warmup_prompt"] = (
+            args.experimental_prefill_warmup_prompt or args.prompt
+        )
     _write_json(
         evidence_dir / "runner-config.json",
         runner_config,
@@ -694,6 +722,7 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
     generated_texts: list[str] = []
     load_results: list[dict[str, Any]] = []
     reload_results: list[dict[str, Any]] = []
+    warmup_generation_results: list[dict[str, Any]] = []
     generation_results: list[dict[str, Any]] = []
     resident_generation_results: list[dict[str, Any]] = []
     unload_results: list[dict[str, Any]] = []
@@ -809,11 +838,13 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                 def stream_once(
                     *,
                     artifact_path: Path,
+                    prompt: str,
+                    params: dict[str, Any],
                 ) -> tuple[dict[str, Any], int, list[dict[str, Any]], float, float | None]:
                     if effective_policy["request_mode"] == "raw_generate_stream":
                         raw_request_payload = {
                             "model_id": args.model_id,
-                            "prompt": args.prompt,
+                            "prompt": prompt,
                             "params": params,
                         }
                         raw_status, raw_events, raw_wall_ms, raw_first_token_ms = (
@@ -833,7 +864,7 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                         )
                     if effective_policy["request_mode"] == "openai_chat_stream":
                         messages = _chat_messages_for_prompt(
-                            prompt=args.prompt,
+                            prompt=prompt,
                             effective_policy=effective_policy,
                         )
                         chat_request_payload = {
@@ -863,9 +894,94 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                         f"unsupported request_mode: {effective_policy['request_mode']}"
                     )
 
+                if args.experimental_prefill_warmup:
+                    warmup_params = dict(params)
+                    warmup_params["max_tokens"] = args.experimental_prefill_warmup_max_tokens
+                    warmup_prompt = args.experimental_prefill_warmup_prompt or args.prompt
+                    warmup_artifact = (
+                        evidence_dir / f"repeat-{index:02d}-prefill-warmup-stream.ndjson"
+                    )
+                    (
+                        warmup_request_payload,
+                        warmup_stream_status,
+                        warmup_events,
+                        warmup_stream_wall_ms,
+                        warmup_first_token_ms,
+                    ) = stream_once(
+                        artifact_path=warmup_artifact,
+                        prompt=warmup_prompt,
+                        params=warmup_params,
+                    )
+                    warmup_done = next(
+                        (
+                            event
+                            for event in reversed(warmup_events)
+                            if event.get("event") == "done"
+                        ),
+                        None,
+                    )
+                    warmup_token_events = [
+                        event for event in warmup_events if event.get("event") == "token"
+                    ]
+                    warmup_runtime_stream_timing = _stream_event_timing(warmup_events)
+                    warmup_text = "".join(
+                        str(event.get("text") or "")
+                        for event in warmup_token_events
+                    )
+                    warmup_completion_tokens = (
+                        int(warmup_done.get("completion_tokens"))
+                        if isinstance(warmup_done, dict)
+                        and isinstance(warmup_done.get("completion_tokens"), int)
+                        else len(warmup_token_events)
+                    )
+                    warmup_queue_wait_ms = (
+                        float(warmup_done["wait_time_s"]) * 1000.0
+                        if isinstance(warmup_done, dict)
+                        and isinstance(warmup_done.get("wait_time_s"), (int, float))
+                        else None
+                    )
+                    warmup_entry = {
+                        "enabled": True,
+                        "mode": "post_load_pre_measured_stream",
+                        "included_in_primary_metrics": False,
+                        "status_code": warmup_stream_status,
+                        "elapsed_ms": round(warmup_stream_wall_ms, 3),
+                        "first_token_latency_ms": (
+                            round(warmup_first_token_ms, 3)
+                            if warmup_first_token_ms is not None
+                            else None
+                        ),
+                        "completion_tokens": warmup_completion_tokens,
+                        "event_count": len(warmup_events),
+                        "done": warmup_done,
+                        "request_payload": warmup_request_payload,
+                        "runtime_stream_timing": warmup_runtime_stream_timing,
+                        "text_preview": warmup_text[:500],
+                        "timing_breakdown": _repeat_timing_breakdown(
+                            load_elapsed_ms=load_elapsed_ms,
+                            stream_wall_ms=warmup_stream_wall_ms,
+                            first_token_ms=warmup_first_token_ms,
+                            queue_wait_ms=warmup_queue_wait_ms,
+                            completion_tokens=warmup_completion_tokens,
+                            runtime_stream_timing=warmup_runtime_stream_timing,
+                        ),
+                    }
+                    _write_json(
+                        evidence_dir / f"repeat-{index:02d}-prefill-warmup.json",
+                        warmup_entry,
+                    )
+                    warmup_generation_results.append(warmup_entry)
+                    if warmup_stream_status != 200 or warmup_done is None:
+                        failure_count += 1
+                        blockers.append("warmup_generation_failed")
+
                 stream_artifact = evidence_dir / f"repeat-{index:02d}-stream.ndjson"
                 request_payload, stream_status, events, stream_wall_ms, first_token_ms = (
-                    stream_once(artifact_path=stream_artifact)
+                    stream_once(
+                        artifact_path=stream_artifact,
+                        prompt=args.prompt,
+                        params=params,
+                    )
                 )
                 done = next((event for event in reversed(events) if event.get("event") == "done"), None)
                 token_events = [event for event in events if event.get("event") == "token"]
@@ -891,23 +1007,13 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                     queue_wait_ms_values.append(queue_wait_ms)
                 else:
                     queue_wait_ms = None
-                if runtime_stream_timing:
-                    if isinstance(runtime_stream_timing.get("stream_wall_ms"), (int, float)):
-                        runtime_stream_wall_ms_values.append(
-                            float(runtime_stream_timing["stream_wall_ms"])
-                        )
-                    if isinstance(runtime_stream_timing.get("first_response_ms"), (int, float)):
-                        runtime_first_response_ms_values.append(
-                            float(runtime_stream_timing["first_response_ms"])
-                        )
-                    if isinstance(runtime_stream_timing.get("first_visible_token_ms"), (int, float)):
-                        runtime_first_visible_token_ms_values.append(
-                            float(runtime_stream_timing["first_visible_token_ms"])
-                        )
-                    if isinstance(runtime_stream_timing.get("prompt_render_ms"), (int, float)):
-                        runtime_prompt_render_ms_values.append(
-                            float(runtime_stream_timing["prompt_render_ms"])
-                        )
+                _append_runtime_timing_values(
+                    runtime_stream_timing,
+                    stream_wall_ms_values=runtime_stream_wall_ms_values,
+                    first_response_ms_values=runtime_first_response_ms_values,
+                    first_visible_token_ms_values=runtime_first_visible_token_ms_values,
+                    prompt_render_ms_values=runtime_prompt_render_ms_values,
+                )
                 generation_entry = {
                     "status_code": stream_status,
                     "elapsed_ms": round(stream_wall_ms, 3),
@@ -958,7 +1064,11 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                         resident_events,
                         resident_stream_wall_ms,
                         resident_first_token_ms,
-                    ) = stream_once(artifact_path=resident_artifact)
+                    ) = stream_once(
+                        artifact_path=resident_artifact,
+                        prompt=args.prompt,
+                        params=params,
+                    )
                     resident_done = next(
                         (
                             event
@@ -1019,23 +1129,6 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                         resident_entry,
                     )
                     resident_generation_results.append(resident_entry)
-                    if resident_runtime_stream_timing:
-                        if isinstance(resident_runtime_stream_timing.get("stream_wall_ms"), (int, float)):
-                            runtime_stream_wall_ms_values.append(
-                                float(resident_runtime_stream_timing["stream_wall_ms"])
-                            )
-                        if isinstance(resident_runtime_stream_timing.get("first_response_ms"), (int, float)):
-                            runtime_first_response_ms_values.append(
-                                float(resident_runtime_stream_timing["first_response_ms"])
-                            )
-                        if isinstance(resident_runtime_stream_timing.get("first_visible_token_ms"), (int, float)):
-                            runtime_first_visible_token_ms_values.append(
-                                float(resident_runtime_stream_timing["first_visible_token_ms"])
-                            )
-                        if isinstance(resident_runtime_stream_timing.get("prompt_render_ms"), (int, float)):
-                            runtime_prompt_render_ms_values.append(
-                                float(resident_runtime_stream_timing["prompt_render_ms"])
-                            )
 
                 unload_started = time.monotonic()
                 unload_status, unload_payload = _http_json(
@@ -1136,6 +1229,13 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         and isinstance(generation_results[0].get("runtime_stream_timing"), dict)
         else None
     )
+    first_warmup_entry = warmup_generation_results[0] if warmup_generation_results else None
+    first_warmup_timing = (
+        first_warmup_entry.get("runtime_stream_timing")
+        if isinstance(first_warmup_entry, dict)
+        and isinstance(first_warmup_entry.get("runtime_stream_timing"), dict)
+        else None
+    )
     first_resident_timing = (
         resident_generation_results[0].get("runtime_stream_timing")
         if resident_generation_results
@@ -1152,6 +1252,7 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         "request_mode": effective_policy["request_mode"],
         "completed_generation_count": len(timing_scope_entries),
         "runtime_timing_repeat_count": runtime_timing_count,
+        "experimental_prefill_warmup_enabled": bool(args.experimental_prefill_warmup),
         "resident_repeat_enabled": bool(args.timing_gate_resident_repeat),
         "runtime_stream_wall_ms": _rounded_ms(_mean(runtime_stream_wall_ms_values)),
         "runtime_first_response_ms": _rounded_ms(
@@ -1162,7 +1263,63 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         ),
         "runtime_prompt_render_ms": _rounded_ms(_mean(runtime_prompt_render_ms_values)),
     }
+    if (
+        isinstance(first_warmup_entry, dict)
+        and first_warmup_entry.get("status_code") == 200
+        and first_warmup_entry.get("done") is not None
+        and isinstance(first_warmup_timing, dict)
+    ):
+        timing_gate_summary["experimental_prefill_warmup_status"] = "completed"
+        timing_gate_summary["experimental_prefill_warmup_mode"] = (
+            "post_load_pre_measured_stream"
+        )
+        timing_gate_summary["experimental_prefill_warmup_included_in_metrics"] = False
+        timing_gate_summary["warmup_first_response_ms"] = first_warmup_timing.get(
+            "first_response_ms"
+        )
+        timing_gate_summary["warmup_first_visible_token_ms"] = first_warmup_timing.get(
+            "first_visible_token_ms"
+        )
+        timing_gate_summary["warmup_stream_wall_ms"] = first_warmup_timing.get(
+            "stream_wall_ms"
+        )
+    elif args.experimental_prefill_warmup:
+        timing_gate_summary["experimental_prefill_warmup_status"] = "failed"
+        timing_gate_summary["experimental_prefill_warmup_mode"] = (
+            "post_load_pre_measured_stream"
+        )
+        timing_gate_summary["experimental_prefill_warmup_included_in_metrics"] = False
+    else:
+        timing_gate_summary["experimental_prefill_warmup_status"] = "not_run"
     if isinstance(first_main_timing, dict):
+        measured_first_response = first_main_timing.get("first_response_ms")
+        timing_gate_summary["measured_first_response_ms"] = measured_first_response
+        timing_gate_summary["measured_first_visible_token_ms"] = first_main_timing.get(
+            "first_visible_token_ms"
+        )
+        if not args.experimental_prefill_warmup:
+            timing_gate_summary["cold_first_response_ms"] = measured_first_response
+            timing_gate_summary["cold_first_visible_token_ms"] = first_main_timing.get(
+                "first_visible_token_ms"
+            )
+    if (
+        isinstance(first_warmup_timing, dict)
+        and isinstance(first_main_timing, dict)
+        and isinstance(first_warmup_timing.get("first_response_ms"), (int, float))
+        and isinstance(first_main_timing.get("first_response_ms"), (int, float))
+    ):
+        warmup_first_response = float(first_warmup_timing["first_response_ms"])
+        measured_first_response = float(first_main_timing["first_response_ms"])
+        timing_gate_summary["experimental_prefill_warmup_delta_first_response_ms"] = (
+            _rounded_ms(warmup_first_response - measured_first_response)
+        )
+        timing_gate_summary["classification"] = (
+            "experimental_prefill_warmup_reduces_measured_first_response"
+            if warmup_first_response
+            > max(measured_first_response * 2.0, measured_first_response + 250.0)
+            else "experimental_prefill_warmup_no_observed_gain"
+        )
+    elif isinstance(first_main_timing, dict):
         timing_gate_summary["cold_first_response_ms"] = first_main_timing.get(
             "first_response_ms"
         )
@@ -1176,26 +1333,31 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         timing_gate_summary["resident_first_visible_token_ms"] = (
             first_resident_timing.get("first_visible_token_ms")
         )
-    if (
-        isinstance(first_main_timing, dict)
-        and isinstance(first_resident_timing, dict)
-        and isinstance(first_main_timing.get("first_response_ms"), (int, float))
-        and isinstance(first_resident_timing.get("first_response_ms"), (int, float))
-    ):
-        cold_first_response = float(first_main_timing["first_response_ms"])
-        resident_first_response = float(first_resident_timing["first_response_ms"])
-        timing_gate_summary["resident_delta_first_response_ms"] = _rounded_ms(
-            cold_first_response - resident_first_response
-        )
-        timing_gate_summary["classification"] = (
-            "cold_first_response_dominant"
-            if cold_first_response > max(resident_first_response * 2.0, resident_first_response + 250.0)
-            else "measured_without_cold_dominance"
-        )
-    elif runtime_timing_gate_status in ("supported", "partial"):
-        timing_gate_summary["classification"] = "runtime_timing_measured"
-    else:
-        timing_gate_summary["classification"] = "runtime_timing_unavailable"
+    if "classification" not in timing_gate_summary:
+        if (
+            isinstance(first_main_timing, dict)
+            and isinstance(first_resident_timing, dict)
+            and isinstance(first_main_timing.get("first_response_ms"), (int, float))
+            and isinstance(
+                first_resident_timing.get("first_response_ms"),
+                (int, float),
+            )
+        ):
+            cold_first_response = float(first_main_timing["first_response_ms"])
+            resident_first_response = float(first_resident_timing["first_response_ms"])
+            timing_gate_summary["resident_delta_first_response_ms"] = _rounded_ms(
+                cold_first_response - resident_first_response
+            )
+            timing_gate_summary["classification"] = (
+                "cold_first_response_dominant"
+                if cold_first_response
+                > max(resident_first_response * 2.0, resident_first_response + 250.0)
+                else "measured_without_cold_dominance"
+            )
+        elif runtime_timing_gate_status in ("supported", "partial"):
+            timing_gate_summary["classification"] = "runtime_timing_measured"
+        else:
+            timing_gate_summary["classification"] = "runtime_timing_unavailable"
     _write_json(evidence_dir / "timing-gate-summary.json", timing_gate_summary)
 
     if first_token_latency is None:
@@ -1322,6 +1484,16 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         runtime_prompt_render_ms=timing_gate_summary["runtime_prompt_render_ms"],
         runtime_timing_repeat_count=runtime_timing_count,
         runtime_timing_gate_status=runtime_timing_gate_status,
+        experimental_prefill_warmup_status=timing_gate_summary[
+            "experimental_prefill_warmup_status"
+        ],
+        experimental_prefill_warmup_mode=timing_gate_summary.get(
+            "experimental_prefill_warmup_mode"
+        ),
+        experimental_prefill_warmup_ms=timing_gate_summary.get("warmup_stream_wall_ms"),
+        experimental_prefill_warmup_included_in_metrics=timing_gate_summary.get(
+            "experimental_prefill_warmup_included_in_metrics"
+        ),
     )
     payload = model_release_candidate_record_to_dict(record)
     _write_json(evidence_dir / "record.json", payload)
@@ -1443,6 +1615,29 @@ def main() -> int:
             "same-resident generation before unload and summarize cold vs "
             "resident runtime StreamEvent.detail.timing. This does not count "
             "as an additional lifecycle repeat."
+        ),
+    )
+    live.add_argument(
+        "--experimental-prefill-warmup",
+        action="store_true",
+        help=(
+            "Run one experimental post-load, pre-measured stream generation "
+            "before each measured repeat. This is Model RC-only evidence and "
+            "does not count toward primary TTFT/TPS metrics."
+        ),
+    )
+    live.add_argument(
+        "--experimental-prefill-warmup-max-tokens",
+        type=int,
+        default=1,
+        help="Max tokens for --experimental-prefill-warmup.",
+    )
+    live.add_argument(
+        "--experimental-prefill-warmup-prompt",
+        default=None,
+        help=(
+            "Optional prompt for --experimental-prefill-warmup; defaults to "
+            "the measured prompt."
         ),
     )
     live.add_argument(

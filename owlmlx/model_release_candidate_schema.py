@@ -99,6 +99,10 @@ OPTIONAL_MODEL_RELEASE_CANDIDATE_OBSERVABILITY_FIELDS: tuple[str, ...] = (
     "runtime_prompt_render_ms",
     "runtime_timing_repeat_count",
     "runtime_timing_gate_status",
+    "experimental_prefill_warmup_status",
+    "experimental_prefill_warmup_mode",
+    "experimental_prefill_warmup_ms",
+    "experimental_prefill_warmup_included_in_metrics",
 )
 
 
@@ -260,6 +264,7 @@ def validate_model_release_candidate_record(record: Mapping[str, Any]) -> None:
         "runtime_first_response_ms",
         "runtime_first_visible_token_ms",
         "runtime_prompt_render_ms",
+        "experimental_prefill_warmup_ms",
     ):
         if field in record:
             _validate_nullable_non_negative_number(
@@ -289,6 +294,34 @@ def validate_model_release_candidate_record(record: Mapping[str, Any]) -> None:
             raise ModelReleaseCandidateSchemaError(
                 "record.runtime_timing_gate_status must be supported, partial, unsupported, or not_in_scope"
             )
+
+    if (
+        "experimental_prefill_warmup_status" in record
+        and record["experimental_prefill_warmup_status"] is not None
+    ):
+        status = record["experimental_prefill_warmup_status"]
+        if status not in ("not_run", "completed", "failed"):
+            raise ModelReleaseCandidateSchemaError(
+                "record.experimental_prefill_warmup_status must be not_run, completed, or failed"
+            )
+
+    if (
+        "experimental_prefill_warmup_mode" in record
+        and record["experimental_prefill_warmup_mode"] is not None
+    ):
+        _validate_non_empty_string(
+            record["experimental_prefill_warmup_mode"],
+            field="record.experimental_prefill_warmup_mode",
+        )
+
+    if (
+        "experimental_prefill_warmup_included_in_metrics" in record
+        and record["experimental_prefill_warmup_included_in_metrics"] is not None
+        and not isinstance(record["experimental_prefill_warmup_included_in_metrics"], bool)
+    ):
+        raise ModelReleaseCandidateSchemaError(
+            "record.experimental_prefill_warmup_included_in_metrics must be null or bool"
+        )
 
     if record["lane"] == "flagship_experimental" and record["verdict"] == "pass":
         raise ModelReleaseCandidateSchemaError(

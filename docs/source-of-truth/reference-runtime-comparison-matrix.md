@@ -65,6 +65,12 @@ Current live evidence:
   `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-model-rc-timing-gate-live-proof/timing-gate-summary.json`.
   It classifies the short-workload Qwen35 latency as
   `cold_first_response_dominant`, not optimized.
+- Qwen35 experimental prefill-warmup follow-up produced a bounded Model
+  RC-only mitigation proof:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-experimental-prefill-warmup-live-proof/timing-gate-summary.json`.
+  Warmup first response was `3198.552ms`; the measured post-warmup first
+  response was `210.355ms`; the row stayed `needs_optimization` and does not
+  make warmup a default serving behavior.
 
 This improves the Gemma, Qwen27, and Qwen35 reference evidence floor, but it is
 still not a parity claim and does not cover measured DeepSeek generation,

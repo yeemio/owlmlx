@@ -1,0 +1,71 @@
+{
+  "completion_tokens": 1,
+  "done": {
+    "completion_tokens": 1,
+    "detail": {
+      "generation_count": 1,
+      "pid": 69503,
+      "timing": {
+        "chat_template_applied": false,
+        "first_response_ms": 3198.552,
+        "first_visible_token_ms": 3198.558,
+        "prompt_character_count": 108,
+        "prompt_render_ms": 0.001,
+        "stream_call_start_ms": 0.011,
+        "stream_wall_ms": 3207.578,
+        "surface": "owlmlx.child_stream_timing",
+        "version": "v1"
+      }
+    },
+    "error_code": null,
+    "event": "done",
+    "execution_time_s": null,
+    "finish_reason": "length",
+    "model_id": "Qwen3.6-35B-A3B",
+    "prompt_tokens": 21,
+    "sequence": 1,
+    "text": "",
+    "wait_time_s": 0.0935,
+    "was_queued": false
+  },
+  "elapsed_ms": 3311.011,
+  "enabled": true,
+  "event_count": 2,
+  "first_token_latency_ms": 3296.135,
+  "included_in_primary_metrics": false,
+  "mode": "post_load_pre_measured_stream",
+  "request_payload": {
+    "model_id": "Qwen3.6-35B-A3B",
+    "params": {
+      "max_tokens": 1,
+      "temperature": 0.0
+    },
+    "prompt": "<|im_start|>user\nIn one short sentence, define local AI.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+  },
+  "runtime_stream_timing": {
+    "chat_template_applied": false,
+    "first_response_ms": 3198.552,
+    "first_visible_token_ms": 3198.558,
+    "prompt_character_count": 108.0,
+    "prompt_render_ms": 0.001,
+    "stream_call_start_ms": 0.011,
+    "stream_wall_ms": 3207.578,
+    "surface": "owlmlx.child_stream_timing",
+    "version": "v1"
+  },
+  "status_code": 200,
+  "text_preview": "Local",
+  "timing_breakdown": {
+    "completion_tokens": 1,
+    "first_token_latency_ms": 3296.135,
+    "load_elapsed_ms": 13769.868,
+    "post_first_token_decode_tokens": 0,
+    "post_first_token_decode_wall_ms": 14.876,
+    "queue_wait_ms": 93.5,
+    "runtime_first_response_ms": 3198.552,
+    "runtime_first_visible_token_ms": 3198.558,
+    "runtime_prompt_render_ms": 0.001,
+    "runtime_stream_wall_ms": 3207.578,
+    "stream_request_wall_ms": 3311.011
+  }
+}

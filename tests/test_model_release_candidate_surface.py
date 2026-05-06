@@ -302,6 +302,10 @@ def test_build_model_release_candidate_record_accepts_live_like_metrics() -> Non
         runtime_prompt_render_ms=2.0,
         runtime_timing_repeat_count=2,
         runtime_timing_gate_status="supported",
+        experimental_prefill_warmup_status="completed",
+        experimental_prefill_warmup_mode="post_load_pre_measured_stream",
+        experimental_prefill_warmup_ms=8.0,
+        experimental_prefill_warmup_included_in_metrics=False,
     )
     payload = model_release_candidate_record_to_dict(record)
     assert payload["verdict"] == "pass"
@@ -313,6 +317,10 @@ def test_build_model_release_candidate_record_accepts_live_like_metrics() -> Non
     assert payload["runtime_first_response_ms"] == 11.0
     assert payload["runtime_timing_repeat_count"] == 2
     assert payload["runtime_timing_gate_status"] == "supported"
+    assert payload["experimental_prefill_warmup_status"] == "completed"
+    assert payload["experimental_prefill_warmup_mode"] == "post_load_pre_measured_stream"
+    assert payload["experimental_prefill_warmup_ms"] == 8.0
+    assert payload["experimental_prefill_warmup_included_in_metrics"] is False
 
 
 def test_validate_accepts_legacy_v1_record_without_observability_v2_fields() -> None:
@@ -335,6 +343,10 @@ def test_validate_accepts_legacy_v1_record_without_observability_v2_fields() -> 
         "runtime_prompt_render_ms",
         "runtime_timing_repeat_count",
         "runtime_timing_gate_status",
+        "experimental_prefill_warmup_status",
+        "experimental_prefill_warmup_mode",
+        "experimental_prefill_warmup_ms",
+        "experimental_prefill_warmup_included_in_metrics",
     ):
         payload.pop(field, None)
 
@@ -349,6 +361,21 @@ def test_validate_rejects_invalid_observability_v2_fields() -> None:
 
     payload = _record_dicts()[0]
     payload["quality_caveats"] = ["ok", ""]
+    with pytest.raises(ModelReleaseCandidateSchemaError):
+        validate_model_release_candidate_record(payload)
+
+    payload = _record_dicts()[0]
+    payload["experimental_prefill_warmup_status"] = "maybe"
+    with pytest.raises(ModelReleaseCandidateSchemaError):
+        validate_model_release_candidate_record(payload)
+
+    payload = _record_dicts()[0]
+    payload["experimental_prefill_warmup_mode"] = ""
+    with pytest.raises(ModelReleaseCandidateSchemaError):
+        validate_model_release_candidate_record(payload)
+
+    payload = _record_dicts()[0]
+    payload["experimental_prefill_warmup_included_in_metrics"] = "false"
     with pytest.raises(ModelReleaseCandidateSchemaError):
         validate_model_release_candidate_record(payload)
 
@@ -660,6 +687,9 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
                 "--rss-sample-interval-s",
                 "0.05",
                 "--timing-gate-resident-repeat",
+                "--experimental-prefill-warmup",
+                "--experimental-prefill-warmup-max-tokens",
+                "1",
             ],
             check=True,
             cwd=str(Path(__file__).parents[1]),
@@ -703,12 +733,33 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     assert payload["runtime_prompt_render_ms"] == 2.0
     assert payload["runtime_timing_repeat_count"] == 4
     assert payload["runtime_timing_gate_status"] == "supported"
+    assert payload["experimental_prefill_warmup_status"] == "completed"
+    assert payload["experimental_prefill_warmup_mode"] == "post_load_pre_measured_stream"
+    assert payload["experimental_prefill_warmup_ms"] == 13.0
+    assert payload["experimental_prefill_warmup_included_in_metrics"] is False
     assert payload["peak_resident_set_bytes"] is not None
     runner_config = json.loads((evidence_dir / "runner-config.json").read_text())
     assert runner_config["model_profile"]["profile_id"] == "qwen3_6_text"
     assert "effective_generation_policy" not in runner_config
+    assert runner_config["experimental_prefill_warmup"] is True
+    assert runner_config["experimental_prefill_warmup_max_tokens"] == 1
+    assert runner_config["experimental_prefill_warmup_prompt"] == "hello"
     assert (evidence_dir / "repeat-01-host-pressure-sample.json").exists()
     assert (evidence_dir / "repeat-01-model-load-admission-before.json").exists()
+    warmup_generation = json.loads(
+        (evidence_dir / "repeat-01-prefill-warmup.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert warmup_generation["included_in_primary_metrics"] is False
+    assert warmup_generation["mode"] == "post_load_pre_measured_stream"
+    assert warmup_generation["request_payload"] == {
+        "model_id": "Qwen3.6-27B",
+        "prompt": "hello",
+        "params": {"max_tokens": 1, "temperature": 0.0},
+    }
+    assert warmup_generation["runtime_stream_timing"]["first_response_ms"] == 11.0
+    assert (evidence_dir / "repeat-01-prefill-warmup-stream.ndjson").exists()
     first_generation = json.loads(
         (evidence_dir / "repeat-01-generation.json").read_text(encoding="utf-8")
     )
@@ -748,7 +799,15 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     )
     assert timing_gate["status"] == "supported"
     assert timing_gate["runtime_timing_repeat_count"] == 4
-    assert timing_gate["classification"] == "measured_without_cold_dominance"
+    assert timing_gate["experimental_prefill_warmup_status"] == "completed"
+    assert timing_gate["experimental_prefill_warmup_mode"] == (
+        "post_load_pre_measured_stream"
+    )
+    assert timing_gate["experimental_prefill_warmup_included_in_metrics"] is False
+    assert timing_gate["warmup_first_response_ms"] == 11.0
+    assert timing_gate["measured_first_response_ms"] == 11.0
+    assert timing_gate["experimental_prefill_warmup_delta_first_response_ms"] == 0.0
+    assert timing_gate["classification"] == "experimental_prefill_warmup_no_observed_gain"
     assert (evidence_dir / "post-run-healthz.json").exists()
     assert (evidence_dir / "post-run-runtime-status.json").exists()
     assert (evidence_dir / "record.json").exists()

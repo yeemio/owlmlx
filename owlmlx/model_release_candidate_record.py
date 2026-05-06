@@ -102,6 +102,10 @@ class ModelReleaseCandidateRecord:
     runtime_prompt_render_ms: float | None = None
     runtime_timing_repeat_count: int | None = None
     runtime_timing_gate_status: str | None = None
+    experimental_prefill_warmup_status: str | None = None
+    experimental_prefill_warmup_mode: str | None = None
+    experimental_prefill_warmup_ms: float | None = None
+    experimental_prefill_warmup_included_in_metrics: bool | None = None
 
 
 def _now_iso_utc() -> str:
@@ -183,6 +187,14 @@ def model_release_candidate_record_to_dict(
         "runtime_prompt_render_ms": record.runtime_prompt_render_ms,
         "runtime_timing_repeat_count": record.runtime_timing_repeat_count,
         "runtime_timing_gate_status": record.runtime_timing_gate_status,
+        "experimental_prefill_warmup_status": (
+            record.experimental_prefill_warmup_status
+        ),
+        "experimental_prefill_warmup_mode": record.experimental_prefill_warmup_mode,
+        "experimental_prefill_warmup_ms": record.experimental_prefill_warmup_ms,
+        "experimental_prefill_warmup_included_in_metrics": (
+            record.experimental_prefill_warmup_included_in_metrics
+        ),
     }
     validate_model_release_candidate_record(payload)
     return payload
@@ -229,6 +241,10 @@ def build_model_release_candidate_record(
     runtime_prompt_render_ms: float | None = None,
     runtime_timing_repeat_count: int | None = None,
     runtime_timing_gate_status: str | None = None,
+    experimental_prefill_warmup_status: str | None = None,
+    experimental_prefill_warmup_mode: str | None = None,
+    experimental_prefill_warmup_ms: float | None = None,
+    experimental_prefill_warmup_included_in_metrics: bool | None = None,
 ) -> ModelReleaseCandidateRecord:
     """Build and validate one model RC v1 record with optional observability v2 fields."""
 
@@ -274,6 +290,12 @@ def build_model_release_candidate_record(
         runtime_prompt_render_ms=runtime_prompt_render_ms,
         runtime_timing_repeat_count=runtime_timing_repeat_count,
         runtime_timing_gate_status=runtime_timing_gate_status,
+        experimental_prefill_warmup_status=experimental_prefill_warmup_status,
+        experimental_prefill_warmup_mode=experimental_prefill_warmup_mode,
+        experimental_prefill_warmup_ms=experimental_prefill_warmup_ms,
+        experimental_prefill_warmup_included_in_metrics=(
+            experimental_prefill_warmup_included_in_metrics
+        ),
     )
     model_release_candidate_record_to_dict(record)
     return record
@@ -353,6 +375,10 @@ def build_dry_run_model_release_candidate_records(
                 runtime_prompt_render_ms=None,
                 runtime_timing_repeat_count=None,
                 runtime_timing_gate_status="not_in_scope",
+                experimental_prefill_warmup_status="not_run",
+                experimental_prefill_warmup_mode=None,
+                experimental_prefill_warmup_ms=None,
+                experimental_prefill_warmup_included_in_metrics=None,
             )
         )
     return tuple(records)

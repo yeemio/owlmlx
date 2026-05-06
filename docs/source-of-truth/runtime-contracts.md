@@ -1,7 +1,7 @@
 # owlmlx Runtime Contracts
 
 > Status: authoritative
-> Updated: 2026-04-09
+> Updated: 2026-05-06
 
 ## 1. Purpose
 
@@ -81,10 +81,20 @@ observability fields:
 - `runtime_prompt_render_ms`
 - `runtime_timing_repeat_count`
 - `runtime_timing_gate_status`
+- `experimental_prefill_warmup_status`
+- `experimental_prefill_warmup_mode`
+- `experimental_prefill_warmup_ms`
+- `experimental_prefill_warmup_included_in_metrics`
 
 Valid timing-gate statuses are `supported`, `partial`, `unsupported`, and
 `not_in_scope`. These are evidence availability labels, not performance
 success labels.
+
+Experimental prefill warmup fields are Model RC-only observability. They
+describe an explicitly requested post-load, pre-measured stream generation and
+must not be interpreted as a default runtime serving behavior. Warmup
+generations are excluded from primary TTFT, TPS, lifecycle repeat counts, and
+pass/fail verdict metrics unless the warmup operation itself fails.
 
 ## 5. Large-Weight Runtime Path Contract
 

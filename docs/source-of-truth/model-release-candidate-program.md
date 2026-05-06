@@ -162,6 +162,17 @@ v1 cumulative-ledger rows stay readable:
 - `memory_peak_source`: memory measurement provenance such as
   `process_tree_rss`; future isolated DeepSeek records may use
   `mlx_reported_peak` or `mixed` only when actually measured that way
+- `runtime_stream_wall_ms`, `runtime_first_response_ms`,
+  `runtime_first_visible_token_ms`, `runtime_prompt_render_ms`,
+  `runtime_timing_repeat_count`, and `runtime_timing_gate_status`:
+  runtime-owned stream timing diagnostics when the generation path exposes
+  `detail.timing.surface = owlmlx.child_stream_timing`
+- `experimental_prefill_warmup_status`,
+  `experimental_prefill_warmup_mode`, `experimental_prefill_warmup_ms`, and
+  `experimental_prefill_warmup_included_in_metrics`: Model RC-only evidence
+  for an explicitly requested post-load, pre-measured warmup generation;
+  warmup generations are excluded from primary TTFT/TPS and lifecycle repeat
+  metrics
 
 Missing or unmeasured v2 signals must be represented as absent, `null`, or by
 a blocking/caveat string such as `process_tree_rss_missing`. They must not be
@@ -496,6 +507,32 @@ Qwen35 Model RC timing gate on 2026-05-06:
 - This converts TTFT root cause into an automated Model RC gate. It still does
   not claim a TTFT optimization: the next optimization work is warmup, prefill,
   cache, or scheduler mitigation against the cold first-response spike.
+
+Qwen35 experimental prefill-warmup proof on 2026-05-06:
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-experimental-prefill-warmup-live-proof/timing-gate-summary.json`
+  and the appended cumulative ledger row at
+  `files/evidence/owlmlx/model-release-candidates/cumulative-ledger.jsonl`.
+- The Model RC runner now supports an explicit
+  `--experimental-prefill-warmup` option. It runs one post-load,
+  pre-measured stream generation before the measured request, writes
+  `repeat-01-prefill-warmup-stream.ndjson` and
+  `repeat-01-prefill-warmup.json`, and excludes that warmup from primary
+  TTFT/TPS and lifecycle repeat metrics.
+- In the live Qwen35 proof, warmup first response was `3198.552ms`; the
+  immediately following measured first response was `210.355ms`; same-resident
+  diagnostic first response was `214.895ms`; classification is
+  `experimental_prefill_warmup_reduces_measured_first_response`.
+- The measured primary row recorded `ttft_ms = 262.827`,
+  `runtime_timing_gate_status = supported`,
+  `runtime_timing_repeat_count = 2`, `failure_count = 0`,
+  `peak_resident_set_bytes = 45992984576`, and clean post-run health.
+- This is a bounded mitigation proof for this short Qwen35 workload, not a
+  runtime default or a release-pass claim. Qwen35 remains
+  `needs_optimization` because OwlOps observation, same-host reference
+  comparison, broader workload coverage, and production warmup semantics remain
+  separate gates.
 
 ## 9. Non-Goals
 

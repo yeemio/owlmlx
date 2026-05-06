@@ -606,6 +606,31 @@ Next dominant gap:
   first-response latency, while keeping `load -> generate -> unload -> health
   clean` as the hard lifecycle gate.
 
+Qwen35 experimental prefill-warmup return (2026-05-06,
+`owlmlx_qwen35_experimental_prefill_warmup_live_proof`):
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-experimental-prefill-warmup-live-proof/timing-gate-summary.json`.
+- The runner now has an explicit `--experimental-prefill-warmup` flag that
+  writes separate warmup stream/generation artifacts and keeps warmup outside
+  primary TTFT, TPS, lifecycle repeat count, and verdict metrics.
+- Result: warmup first response `3198.552ms`, measured first response
+  `210.355ms`, same-resident diagnostic first response `214.895ms`,
+  measured TTFT `262.827ms`, and classification
+  `experimental_prefill_warmup_reduces_measured_first_response`.
+- Lifecycle remained clean: `failure_count = 0`, unload passed, post-run
+  `/healthz` returned `active_model_id = null`, `model_count = 0`, and backend
+  healthy.
+- This is a Model RC-only mitigation proof for the short Qwen35 workload. It
+  does not promote warmup to a serving default and does not make Qwen35 a pass
+  row.
+
+Next dominant gap:
+
+- Return to same-host reference comparison closure for Qwen27 and Qwen35,
+  using the hardened runner expectations for PID drift, runtime disconnects,
+  reasoning-aware stream consumption, and lifecycle health classification.
+
 ## 3. Ownership Model
 
 Coordinator:

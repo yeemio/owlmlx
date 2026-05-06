@@ -1,0 +1,79 @@
+{
+  "completion_tokens": 24,
+  "done": {
+    "completion_tokens": 24,
+    "detail": {
+      "generation_count": 2,
+      "pid": 69503,
+      "timing": {
+        "chat_template_applied": false,
+        "first_response_ms": 210.355,
+        "first_visible_token_ms": 210.365,
+        "prompt_character_count": 108,
+        "prompt_render_ms": 0.001,
+        "stream_call_start_ms": 0.01,
+        "stream_wall_ms": 550.424,
+        "surface": "owlmlx.child_stream_timing",
+        "version": "v1"
+      }
+    },
+    "error_code": null,
+    "event": "done",
+    "execution_time_s": null,
+    "finish_reason": "stop",
+    "model_id": "Qwen3.6-35B-A3B",
+    "prompt_tokens": 21,
+    "sequence": 23,
+    "text": "",
+    "wait_time_s": 0.0486,
+    "was_queued": false
+  },
+  "elapsed_ms": 609.182,
+  "event_count": 24,
+  "first_token_latency_ms": 262.827,
+  "reasoning_trace_policy": {
+    "caveats": [],
+    "final_text": "Local AI refers to artificial intelligence models that run directly on a user's personal device rather than on remote cloud servers.",
+    "final_text_source": "plain_text",
+    "output_sanity_label": "valid_text",
+    "surface": "owlmlx.reasoning_trace_policy",
+    "trace_marker_family": null,
+    "trace_status": "none",
+    "version": "v1",
+    "visible_reasoning_trace": false
+  },
+  "request_payload": {
+    "model_id": "Qwen3.6-35B-A3B",
+    "params": {
+      "max_tokens": 24,
+      "temperature": 0.0
+    },
+    "prompt": "<|im_start|>user\nIn one short sentence, define local AI.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+  },
+  "runtime_stream_timing": {
+    "chat_template_applied": false,
+    "first_response_ms": 210.355,
+    "first_visible_token_ms": 210.365,
+    "prompt_character_count": 108.0,
+    "prompt_render_ms": 0.001,
+    "stream_call_start_ms": 0.01,
+    "stream_wall_ms": 550.424,
+    "surface": "owlmlx.child_stream_timing",
+    "version": "v1"
+  },
+  "status_code": 200,
+  "text_preview": "Local AI refers to artificial intelligence models that run directly on a user's personal device rather than on remote cloud servers.",
+  "timing_breakdown": {
+    "completion_tokens": 24,
+    "first_token_latency_ms": 262.827,
+    "load_elapsed_ms": 13769.868,
+    "post_first_token_decode_tokens": 23,
+    "post_first_token_decode_wall_ms": 346.355,
+    "queue_wait_ms": 48.6,
+    "runtime_first_response_ms": 210.355,
+    "runtime_first_visible_token_ms": 210.365,
+    "runtime_prompt_render_ms": 0.001,
+    "runtime_stream_wall_ms": 550.424,
+    "stream_request_wall_ms": 609.182
+  }
+}
