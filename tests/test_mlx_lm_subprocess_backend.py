@@ -70,13 +70,15 @@ def _write_runner(
                     "        print(json.dumps({'ok': True, 'action': 'generate_messages', 'text': text + ' :: child', 'pid': os.getpid(), 'generation_count': count, 'message_count': len(req.get('messages', []))}), flush=True)",
                     "    elif action == 'stream_generate':",
                     "        count += 1",
-                    "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
-                    "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                    "        timing = {'surface': 'owlmlx.child_stream_timing', 'version': 'v1', 'first_response_ms': 11.0, 'first_visible_token_ms': 12.0, 'stream_wall_ms': 13.0}",
+                    "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming', 'timing': timing}), flush=True)",
+                    "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop', 'timing': timing}), flush=True)",
                     "    elif action == 'stream_generate_messages':",
                     "        count += 1",
                     "        text = ' | '.join(f\"{m['role']}:{m['content']}\" for m in req.get('messages', []))",
-                    "        print(json.dumps({'ok': True, 'action': 'stream_message_event', 'event': 'token', 'text': text, 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming', 'message_count': len(req.get('messages', []))}), flush=True)",
-                    "        print(json.dumps({'ok': True, 'action': 'stream_message_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop', 'message_count': len(req.get('messages', []))}), flush=True)",
+                    "        timing = {'surface': 'owlmlx.child_stream_timing', 'version': 'v1', 'prompt_render_ms': 2.0, 'first_response_ms': 11.0, 'first_visible_token_ms': 12.0, 'stream_wall_ms': 13.0}",
+                    "        print(json.dumps({'ok': True, 'action': 'stream_message_event', 'event': 'token', 'text': text, 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming', 'message_count': len(req.get('messages', [])), 'timing': timing}), flush=True)",
+                    "        print(json.dumps({'ok': True, 'action': 'stream_message_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop', 'message_count': len(req.get('messages', [])), 'timing': timing}), flush=True)",
                     "    elif action == 'ping':",
                     "        print(json.dumps({'ok': True, 'action': 'ping', 'model_id': loaded, 'pid': os.getpid(), 'generation_count': count}), flush=True)",
                     "    elif action in ('shutdown', 'unload'):",
@@ -246,6 +248,8 @@ def test_subprocess_backend_stream_generate_reuses_same_child(tmp_path: Path) ->
     assert [event.event for event in events] == ["token", "done"]
     assert events[0].text == "hello"
     assert events[0].detail["pid"] == events[1].detail["pid"]
+    assert events[0].detail["timing"]["first_visible_token_ms"] == 12.0
+    assert events[1].detail["timing"]["surface"] == "owlmlx.child_stream_timing"
     assert backend.status().detail["children"]["model-a"]["generation_count"] == 1
     backend.unload("model-a")
 
@@ -3860,6 +3864,8 @@ def test_subprocess_backend_stream_generate_messages_reuses_same_child(tmp_path:
     assert [event.event for event in events] == ["token", "done"]
     assert events[0].text == "user:hello | assistant:hi"
     assert events[0].detail["message_count"] == 2
+    assert events[0].detail["timing"]["prompt_render_ms"] == 2.0
+    assert events[1].detail["timing"]["stream_wall_ms"] == 13.0
     backend.unload("model-a")
 
 

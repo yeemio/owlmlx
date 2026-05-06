@@ -1,0 +1,27 @@
+{
+  "event_count": 24,
+  "finish_reason": "stop",
+  "first_token_latency_ms": 335.949,
+  "request_payload": {
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "max_tokens": 64,
+    "messages": [
+      {
+        "content": "In one short sentence, define local AI.",
+        "role": "user"
+      }
+    ],
+    "model": "Qwen3.6-35B-A3B",
+    "stop": [
+      "<|im_end|>"
+    ],
+    "stream": true,
+    "temperature": 0.0
+  },
+  "status_code": 200,
+  "stream_artifact": "files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-ttft-raw-template-decomposition/cycle-02-chat-stream.sse",
+  "stream_request_wall_ms": 687.889,
+  "text_preview": "Local AI refers to artificial intelligence models that run directly on a user's personal device rather than on remote cloud servers."
+}

@@ -1,0 +1,264 @@
+{
+  "body": {
+    "active_model_id": "Qwen3.6-35B-A3B",
+    "backend": {
+      "backend_name": "mlx-lm-subprocess",
+      "detail": {
+        "auto_restart_dead_session": true,
+        "cache_runtime_observations": {
+          "aggregated_child_exchange_batch_count": 0,
+          "aggregated_child_exchange_request_count": 0,
+          "aggregated_child_exchange_visible": false,
+          "cache_counter_visibility": {
+            "eviction": false,
+            "residency": false,
+            "reuse": false
+          },
+          "child_exchange_mode": "single_request_per_child_exchange",
+          "max_aggregated_child_batch_size": 0,
+          "persistent_child_reuse_visible": false,
+          "repeated_generation_models": [],
+          "reuse_counter": 0,
+          "total_generation_count": 0
+        },
+        "child_health": {
+          "Qwen3.6-35B-A3B": {
+            "generation_count": 0,
+            "ok": true,
+            "pid": 65556
+          }
+        },
+        "children": {
+          "Qwen3.6-35B-A3B": {
+            "aggregated_dispatch_count": 0,
+            "aggregated_dispatch_request_count": 0,
+            "alive": true,
+            "generation_count": 0,
+            "max_aggregated_dispatch_batch_size": 0,
+            "pid": 65556,
+            "restart_count": 0
+          }
+        },
+        "dead_registered_models": [],
+        "last_error": null,
+        "last_failure_class": null,
+        "last_subprocess": {
+          "ok": true,
+          "payload": {
+            "action": "load",
+            "model_id": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B",
+            "ok": true,
+            "pid": 65556
+          },
+          "returncode": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "max_restart_attempts": 1,
+        "model_count": 1,
+        "persistent_child": true,
+        "recoverability": {
+          "restart_exhausted_models": [],
+          "restartable_models": []
+        }
+      },
+      "healthy": true,
+      "loaded_models": [
+        {
+          "backend": "mlx-lm-subprocess",
+          "loaded_at": 1778051520.46343,
+          "memory_gb": 60.0,
+          "model_id": "Qwen3.6-35B-A3B"
+        }
+      ]
+    },
+    "budget": {
+      "available_gb": 56.0,
+      "currently_loaded_gb": 60.0,
+      "serving_budget_gb": 116.0,
+      "system_memory_gb": 128.0,
+      "system_reserve_gb": 12.0,
+      "utilization": 0.517,
+      "warning_threshold_gb": 100.0
+    },
+    "contract": {
+      "diagnostic_sections": [
+        "backend.detail",
+        "governance_observations",
+        "governance_policy",
+        "generation_gate",
+        "reclaim_barrier",
+        "load_failure",
+        "memory_pressure_cooldown",
+        "host_pressure"
+      ],
+      "stable_sections": [
+        "summary",
+        "health",
+        "inventory",
+        "budget",
+        "restart"
+      ],
+      "surface": "owlmlx.runtime.status",
+      "version": "stabilization1"
+    },
+    "generation_gate": {
+      "generation_gate": "idle",
+      "longest_exec_s": 5.634,
+      "longest_wait_s": 0.083,
+      "max_concurrent": 1,
+      "pre_gate_admission": {
+        "active_handoff_request_count": 0,
+        "aggregation_scope": "pre_claim_window_only",
+        "capacity": 32,
+        "cohort_count": 0,
+        "cohort_handoff_status": "not_visible",
+        "cohort_window_status": "idle",
+        "forbidden_expansions": [
+          "no_bypass_of_whole_request_gate_claim",
+          "no_post_claim_reordering",
+          "no_post_claim_parallel_generation",
+          "no_child_exchange_from_pre_claim_hook",
+          "no_stream_rewrite_from_pre_claim_hook"
+        ],
+        "hook_boundary": "before_whole_request_gate_claim",
+        "hook_mode": "bounded_runtime_owned_cohort_window",
+        "hook_status": "present",
+        "last_handoff_request_count": 0,
+        "longest_window_wait_s": 0.083,
+        "open_cohort_size": 0,
+        "peak_cohort_size": 1,
+        "peak_staged_count": 1,
+        "preserved_post_claim_invariants": [
+          "max_concurrent_1_after_gate_claim",
+          "ticketed_fifo_after_gate_claim",
+          "serial_safety_validated_only_after_gate_claim"
+        ],
+        "staged_count": 0,
+        "staging_units": [
+          "immutable_request_metadata_snapshot",
+          "ticket_reservation_without_gate_claim",
+          "bounded_pre_claim_cohort_window_membership",
+          "pre_claim_bounded_admission_bookkeeping"
+        ],
+        "total_claimed": 4,
+        "total_cohorts_formed": 4,
+        "total_discarded": 0,
+        "total_handoffs": 0,
+        "total_staged": 4,
+        "total_window_wait_s": 0.264,
+        "window_ms": 20
+      },
+      "queue_discipline": "serial",
+      "queue_policy": "ticketed_fifo",
+      "total_exec_s": 17.026,
+      "total_queued": 4,
+      "total_served": 4,
+      "total_wait_s": 0.264,
+      "waiters": 0
+    },
+    "governance_observations": {
+      "active_reassignment_visible": false,
+      "eviction_history_events_visible": false,
+      "explicit_targeting_evidence_visible": false,
+      "pinning_events_visible": false,
+      "recent_window_runs": 0,
+      "restart_restore_visible": false,
+      "transition_count": 9,
+      "ttl_events_visible": false,
+      "ttl_expiry_visible": false
+    },
+    "governance_policy": {
+      "backend_ttl_visible": false,
+      "eviction_history_count": 0,
+      "eviction_history_visible": false,
+      "pinned_model_count": 0,
+      "pinned_model_ids": [],
+      "pinning_supported": true,
+      "recent_eviction_history": [],
+      "ttl_expired_model_ids": [],
+      "ttl_expired_pinned_model_ids": [],
+      "ttl_model_ids": [],
+      "ttl_policy_count": 0,
+      "ttl_policy_mode": "kernel_explicit_sweep",
+      "ttl_supported": true
+    },
+    "health": {
+      "block_reason": null,
+      "inference_health": "serving",
+      "is_ready": true,
+      "load_state": "true_loaded",
+      "readiness": "ready",
+      "truth_level": "true",
+      "wait_tier": "ready_now"
+    },
+    "host_pressure": {
+      "available": true,
+      "block_free_percent": 10.0,
+      "classification": "normal",
+      "compressor_gb": 2.945786,
+      "free_gb": 59.492279,
+      "free_percent": 93.0,
+      "raw_excerpt": "The system has 137438953472 (8388608 pages with a page size of 16384).\n\nStats: \nPages free: 3898886 \nPages purgeable: 28597 \nPages purged: 1707772 \n\nSwap I/O:\nSwapins: 5073036 \nSwapouts: 7627912 \n\nPage Q counts:\nPages active: 1436062 \nPages inactive: 2374180 \nPages speculative: 33212 \nPages throttled: 0 \nPages wired down: 350986 \n\nCompressor Stats:\nPages used by compressor: 193055 \nPages decompressed: 59839611 \nPages compressed: 66673476 \n\nFile I/O:\nPageins: 166106039 \nPageouts: 15335 \n\nSystem-wide memory free percentage: 93%\n",
+      "reason_code": "free_percent_above_warning_threshold",
+      "reason_message": "Host free memory is above the runtime-owned warning threshold.",
+      "sampled_at_s": 21273.951567,
+      "source": "memory_pressure",
+      "total_gb": 128.0,
+      "warn_free_percent": 20.0,
+      "wired_gb": 5.355621
+    },
+    "inventory": {
+      "entries": [
+        {
+          "backend": "mlx-lm-subprocess",
+          "load_state": "true_loaded",
+          "loaded_at": 1778051520.46343,
+          "memory_gb": 60.0,
+          "model_id": "Qwen3.6-35B-A3B",
+          "truth_level": "true"
+        }
+      ],
+      "loaded_count": 1,
+      "model_count": 1,
+      "timestamp": null,
+      "total_loaded_gb": 60.0
+    },
+    "load_failure": {
+      "events": [],
+      "total_event_count": 0,
+      "unresolved_event_count": 0
+    },
+    "memory_pressure_cooldown": {
+      "active": false,
+      "cooldown_until_s": null,
+      "policy": "metal_oom_child_loss_cooldown",
+      "reason_code": null,
+      "reason_message": null,
+      "remaining_s": 0.0
+    },
+    "reclaim_barrier": {
+      "events": [],
+      "total_event_count": 0,
+      "unresolved_event_count": 0
+    },
+    "restart": {
+      "active_model_id": "Qwen3.6-35B-A3B",
+      "auto_restart_dead_session": true,
+      "restart_exhausted_models": [],
+      "restartable_models": []
+    },
+    "summary": {
+      "active_model_id": "Qwen3.6-35B-A3B",
+      "backend_healthy": true,
+      "backend_name": "mlx-lm-subprocess",
+      "block_reason": null,
+      "model_count": 1,
+      "persistent_child": true,
+      "readiness": "ready",
+      "runtime": "owlmlx"
+    }
+  },
+  "elapsed_ms": 0.923,
+  "status_code": 200
+}

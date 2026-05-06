@@ -1,0 +1,10 @@
+{
+  "chat_template_kwargs": {
+    "enable_thinking": false
+  },
+  "prompt_token_count": 21,
+  "render_ms": 10.219,
+  "rendered_prompt_preview": "<|im_start|>user\nIn one short sentence, define local AI.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+  "token_count_ms": 0.432,
+  "tokenizer_load_ms": 489.626
+}

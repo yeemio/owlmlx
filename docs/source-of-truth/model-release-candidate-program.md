@@ -450,6 +450,30 @@ Qwen35 `enable_thinking=false` live proof on 2026-05-06:
   pre-first-token optimization line: per-repeat first-token latency was about
   `3.1s-3.5s`, while post-first-token decode took about `0.34s`.
 
+Qwen35 TTFT root-cause decomposition on 2026-05-06:
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-ttft-raw-template-decomposition/summary.json`
+  and
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-child-stream-timing-live-proof/summary.json`.
+- Offline tokenizer rendering for the same Qwen35 chat prompt took
+  `10.219ms` for a `21` token rendered prompt, so template rendering is not the
+  dominant source of the multi-second cold TTFT.
+- In one resident session, the first raw rendered-template request had
+  `first_token_latency_ms = 3636.59`, while immediately following OpenAI chat
+  and raw repeat requests dropped to `335.949ms` and `316.898ms`. This points
+  to cold first-generation backend warmup rather than OpenAI route framing.
+- Runtime-owned child stream timing is now emitted on raw stream `done` events
+  as `detail.timing.surface = owlmlx.child_stream_timing`. The live proof
+  recorded `prompt_render_ms = 0.001`, `stream_call_start_ms = 0.02`,
+  `first_response_ms = 2867.858`, `first_visible_token_ms = 2896.208`, and
+  client `first_token_latency_ms = 2993.762`.
+- The root-cause classification for this workload is therefore:
+  Qwen35 cold TTFT is dominated by child `mlx_lm.stream_generate`
+  first-response latency, not Python chat-template rendering, OpenAI HTTP
+  framing, or parent process exchange. It remains `needs_optimization`, not a
+  solved performance row.
+
 ## 9. Non-Goals
 
 This phase does not:

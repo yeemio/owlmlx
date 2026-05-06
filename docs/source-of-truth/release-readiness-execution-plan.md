@@ -546,12 +546,43 @@ Qwen35 `enable_thinking=false` live proof return (2026-05-06,
   consumption, longer prompt / multi-turn output quality, and TTFT optimization
   are closed.
 
-Next dominant gap:
+Selected gap before this round:
 
 - Move from final-answer channel control to TTFT/root-cause closure for Qwen35:
   the clean row still spends about `3.1s-3.5s` before first token while
   post-first-token decode takes only about `0.34s`, so the remaining latency
   gap is pre-first-token work, not output parsing.
+
+Qwen35 TTFT root-cause return (2026-05-06,
+`owlmlx_qwen35_child_stream_timing_live_proof`):
+
+- The TTFT decomposition evidence is now
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-ttft-raw-template-decomposition/summary.json`
+  plus
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-child-stream-timing-live-proof/summary.json`.
+- The same rendered prompt had `prompt_token_count = 21` and offline template
+  render cost `10.219ms`; this rules out template rendering as the dominant
+  multi-second TTFT source for this short workload.
+- In a resident session, the first raw rendered-template request measured
+  `3636.59ms` to first token, while the following OpenAI chat request and raw
+  repeat measured `335.949ms` and `316.898ms`. The spike is cold
+  first-generation warmup, not steady-state wrapper overhead.
+- Runtime-owned child timing is now surfaced on raw stream `done` events under
+  `detail.timing.surface = owlmlx.child_stream_timing`. The live proof recorded
+  `prompt_render_ms = 0.001`, `stream_call_start_ms = 0.02`,
+  `first_response_ms = 2867.858`, and
+  `first_visible_token_ms = 2896.208`, while client-side first token was
+  `2993.762ms`.
+- Keep the Qwen35 verdict at `needs_optimization`: the root cause is narrowed
+  to child `mlx_lm.stream_generate` cold first-response latency, but no warmup,
+  prefill, cache, or scheduling optimization has been claimed yet.
+
+Next dominant gap:
+
+- Convert this root-cause result into an automated Model RC timing gate:
+  capture `detail.timing` from runtime-owned stream events, compare cold first
+  request against resident repeat, and only then evaluate warmup/prefill/cache
+  mitigations.
 
 ## 3. Ownership Model
 

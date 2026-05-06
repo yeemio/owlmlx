@@ -56,6 +56,22 @@ such as:
 This contract may initially be fulfilled through external runtime surfaces, but
 the contract itself belongs to `owlmlx`.
 
+### 4.1 Stream Timing Diagnostic Contract
+
+Raw stream generation may include diagnostic timing detail on `done` events:
+
+- `detail.timing.surface = owlmlx.child_stream_timing`
+- `prompt_render_ms`
+- `stream_call_start_ms`
+- `first_response_ms`
+- `first_visible_token_ms`
+- `stream_wall_ms`
+
+This is runtime-owned diagnostic evidence, not a stable product UI contract.
+It exists to separate template/render overhead, parent exchange overhead, and
+child `mlx_lm.stream_generate` pre-first-response latency during Model RC and
+reference-runtime closure rounds.
+
 ## 5. Large-Weight Runtime Path Contract
 
 The large-weight runtime path contract exists to expose runtime facts specific

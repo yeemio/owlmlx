@@ -12,6 +12,7 @@ import json
 import gc
 import os
 import sys
+import time
 from contextlib import redirect_stdout
 from typing import Any
 
@@ -170,6 +171,10 @@ def _parse_request(line: str) -> dict[str, Any]:
 def _emit(payload: dict[str, Any]) -> None:
     sys.__stdout__.write(json.dumps(payload) + "\n")
     sys.__stdout__.flush()
+
+
+def _elapsed_ms(start: float) -> float:
+    return round((time.perf_counter() - start) * 1000, 3)
 
 
 def main() -> int:
@@ -387,19 +392,28 @@ def main() -> int:
 
                 import mlx_lm  # noqa: PLC0415
 
+                request_start = time.perf_counter()
+                prompt_render_start = time.perf_counter()
+                rendered_prompt = str(prompt)
+                prompt_render_ms = _elapsed_ms(prompt_render_start)
                 sequence = 0
                 prompt_tokens = None
                 completion_tokens = 0
                 finish_reason = "stop"
                 stop_strings = _stop_strings_from_params(params)
                 stop_filter = _StopStringStreamFilter(stop_strings)
+                first_response_ms = None
+                first_visible_token_ms = None
                 with redirect_stdout(sys.stderr):
+                    stream_call_start = time.perf_counter()
                     for response in mlx_lm.stream_generate(
                         model,
                         tokenizer,
-                        prompt=str(prompt),
+                        prompt=rendered_prompt,
                         **_prepare_generation_params(params),
                     ):
+                        if first_response_ms is None:
+                            first_response_ms = _elapsed_ms(request_start)
                         prompt_tokens = getattr(response, "prompt_tokens", prompt_tokens)
                         completion_tokens = int(
                             getattr(response, "generation_tokens", completion_tokens) or 0
@@ -415,6 +429,8 @@ def main() -> int:
                         if not text and not stop_hit:
                             continue
                         if text:
+                            if first_visible_token_ms is None:
+                                first_visible_token_ms = _elapsed_ms(request_start)
                             sequence += 1
                             _emit(
                                 {
@@ -428,12 +444,18 @@ def main() -> int:
                                     "prompt_tokens": prompt_tokens,
                                     "completion_tokens": completion_tokens,
                                     "finish_reason": finish_reason,
+                                    "timing": {
+                                        "first_response_ms": first_response_ms,
+                                        "first_visible_token_ms": first_visible_token_ms,
+                                    },
                                 }
                             )
                         if stop_hit:
                             break
                     tail = stop_filter.flush()
                     if tail:
+                        if first_visible_token_ms is None:
+                            first_visible_token_ms = _elapsed_ms(request_start)
                         sequence += 1
                         _emit(
                             {
@@ -447,9 +469,27 @@ def main() -> int:
                                 "prompt_tokens": prompt_tokens,
                                 "completion_tokens": completion_tokens,
                                 "finish_reason": finish_reason,
+                                "timing": {
+                                    "first_response_ms": first_response_ms,
+                                    "first_visible_token_ms": first_visible_token_ms,
+                                },
                             }
                         )
                 generation_count += 1
+                timing = {
+                    "surface": "owlmlx.child_stream_timing",
+                    "version": "v1",
+                    "prompt_render_ms": prompt_render_ms,
+                    "prompt_character_count": len(rendered_prompt),
+                    "chat_template_applied": False,
+                    "stream_call_start_ms": round(
+                        (stream_call_start - request_start) * 1000,
+                        3,
+                    ),
+                    "first_response_ms": first_response_ms,
+                    "first_visible_token_ms": first_visible_token_ms,
+                    "stream_wall_ms": _elapsed_ms(request_start),
+                }
                 _emit(
                     {
                         "ok": True,
@@ -517,6 +557,7 @@ def main() -> int:
                         "prompt_tokens": prompt_tokens,
                         "completion_tokens": completion_tokens,
                         "finish_reason": finish_reason,
+                        "timing": timing,
                     }
                 )
                 continue
@@ -539,24 +580,33 @@ def main() -> int:
 
                 import mlx_lm  # noqa: PLC0415
 
+                request_start = time.perf_counter()
+                chat_template_kwargs = _chat_template_kwargs_from_params(params)
+                prompt_render_start = time.perf_counter()
                 rendered_prompt = _prompt_from_messages(
                     tokenizer,
                     messages,
-                    chat_template_kwargs=_chat_template_kwargs_from_params(params),
+                    chat_template_kwargs=chat_template_kwargs,
                 )
+                prompt_render_ms = _elapsed_ms(prompt_render_start)
                 sequence = 0
                 prompt_tokens = None
                 completion_tokens = 0
                 finish_reason = "stop"
                 stop_strings = _stop_strings_from_params(params)
                 stop_filter = _StopStringStreamFilter(stop_strings)
+                first_response_ms = None
+                first_visible_token_ms = None
                 with redirect_stdout(sys.stderr):
+                    stream_call_start = time.perf_counter()
                     for response in mlx_lm.stream_generate(
                         model,
                         tokenizer,
                         prompt=rendered_prompt,
                         **_prepare_generation_params(params),
                     ):
+                        if first_response_ms is None:
+                            first_response_ms = _elapsed_ms(request_start)
                         prompt_tokens = getattr(response, "prompt_tokens", prompt_tokens)
                         completion_tokens = int(
                             getattr(response, "generation_tokens", completion_tokens) or 0
@@ -572,6 +622,8 @@ def main() -> int:
                         if not text and not stop_hit:
                             continue
                         if text:
+                            if first_visible_token_ms is None:
+                                first_visible_token_ms = _elapsed_ms(request_start)
                             sequence += 1
                             _emit(
                                 {
@@ -586,12 +638,18 @@ def main() -> int:
                                     "completion_tokens": completion_tokens,
                                     "finish_reason": finish_reason,
                                     "message_count": len(messages),
+                                    "timing": {
+                                        "first_response_ms": first_response_ms,
+                                        "first_visible_token_ms": first_visible_token_ms,
+                                    },
                                 }
                             )
                         if stop_hit:
                             break
                     tail = stop_filter.flush()
                     if tail:
+                        if first_visible_token_ms is None:
+                            first_visible_token_ms = _elapsed_ms(request_start)
                         sequence += 1
                         _emit(
                             {
@@ -606,9 +664,28 @@ def main() -> int:
                                 "completion_tokens": completion_tokens,
                                 "finish_reason": finish_reason,
                                 "message_count": len(messages),
+                                "timing": {
+                                    "first_response_ms": first_response_ms,
+                                    "first_visible_token_ms": first_visible_token_ms,
+                                },
                             }
                         )
                 generation_count += 1
+                timing = {
+                    "surface": "owlmlx.child_stream_timing",
+                    "version": "v1",
+                    "prompt_render_ms": prompt_render_ms,
+                    "prompt_character_count": len(rendered_prompt),
+                    "chat_template_applied": True,
+                    "chat_template_kwarg_keys": sorted(chat_template_kwargs),
+                    "stream_call_start_ms": round(
+                        (stream_call_start - request_start) * 1000,
+                        3,
+                    ),
+                    "first_response_ms": first_response_ms,
+                    "first_visible_token_ms": first_visible_token_ms,
+                    "stream_wall_ms": _elapsed_ms(request_start),
+                }
                 _emit(
                     {
                         "ok": True,
@@ -682,6 +759,7 @@ def main() -> int:
                         "completion_tokens": completion_tokens,
                         "finish_reason": finish_reason,
                         "message_count": len(messages),
+                        "timing": timing,
                     }
                 )
                 continue

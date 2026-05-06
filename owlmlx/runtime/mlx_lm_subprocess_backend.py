@@ -94,6 +94,23 @@ def _drain_stderr(pipe: Any, buffer: deque[str]) -> None:
         return
 
 
+def _stream_payload_detail(
+    payload: dict[str, Any],
+    *,
+    include_message_count: bool = False,
+    include_generation_count: bool = False,
+) -> dict[str, Any]:
+    detail: dict[str, Any] = {"pid": payload.get("pid")}
+    if include_generation_count:
+        detail["generation_count"] = payload.get("generation_count")
+    if include_message_count:
+        detail["message_count"] = payload.get("message_count")
+    timing = payload.get("timing")
+    if isinstance(timing, dict):
+        detail["timing"] = timing
+    return detail
+
+
 def _classify_failure_text(text: str) -> str | None:
     lowered = text.lower()
     if (
@@ -2271,7 +2288,7 @@ class MlxLmSubprocessBackend:
                         prompt_tokens=payload.get("prompt_tokens"),
                         completion_tokens=payload.get("completion_tokens"),
                         finish_reason=payload.get("finish_reason"),
-                        detail={"pid": payload.get("pid")},
+                        detail=_stream_payload_detail(payload),
                     )
                     continue
                 if event == "done":
@@ -2288,10 +2305,10 @@ class MlxLmSubprocessBackend:
                         prompt_tokens=payload.get("prompt_tokens"),
                         completion_tokens=payload.get("completion_tokens"),
                         finish_reason=payload.get("finish_reason"),
-                        detail={
-                            "pid": payload.get("pid"),
-                            "generation_count": payload.get("generation_count"),
-                        },
+                        detail=_stream_payload_detail(
+                            payload,
+                            include_generation_count=True,
+                        ),
                     )
                     return
         except Exception as exc:
@@ -2366,10 +2383,10 @@ class MlxLmSubprocessBackend:
                         prompt_tokens=payload.get("prompt_tokens"),
                         completion_tokens=payload.get("completion_tokens"),
                         finish_reason=payload.get("finish_reason"),
-                        detail={
-                            "pid": payload.get("pid"),
-                            "message_count": payload.get("message_count"),
-                        },
+                        detail=_stream_payload_detail(
+                            payload,
+                            include_message_count=True,
+                        ),
                     )
                     continue
                 if event == "done":
@@ -2386,11 +2403,11 @@ class MlxLmSubprocessBackend:
                         prompt_tokens=payload.get("prompt_tokens"),
                         completion_tokens=payload.get("completion_tokens"),
                         finish_reason=payload.get("finish_reason"),
-                        detail={
-                            "pid": payload.get("pid"),
-                            "generation_count": payload.get("generation_count"),
-                            "message_count": payload.get("message_count"),
-                        },
+                        detail=_stream_payload_detail(
+                            payload,
+                            include_generation_count=True,
+                            include_message_count=True,
+                        ),
                     )
                     return
         except Exception as exc:

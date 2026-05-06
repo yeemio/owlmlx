@@ -1,0 +1,37 @@
+{
+  "completion_tokens": 24,
+  "done": {
+    "completion_tokens": 24,
+    "detail": {
+      "generation_count": 3,
+      "pid": 65556
+    },
+    "error_code": null,
+    "event": "done",
+    "execution_time_s": null,
+    "finish_reason": "stop",
+    "model_id": "Qwen3.6-35B-A3B",
+    "prompt_tokens": 21,
+    "sequence": 22,
+    "text": "",
+    "wait_time_s": 0.0606,
+    "was_queued": false
+  },
+  "event_count": 23,
+  "first_token_latency_ms": 316.898,
+  "request_payload": {
+    "model_id": "Qwen3.6-35B-A3B",
+    "params": {
+      "max_tokens": 64,
+      "stop": [
+        "<|im_end|>"
+      ],
+      "temperature": 0.0
+    },
+    "prompt": "<|im_start|>user\nIn one short sentence, define local AI.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+  },
+  "status_code": 200,
+  "stream_artifact": "files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-ttft-raw-template-decomposition/cycle-03-raw-stream.ndjson",
+  "stream_request_wall_ms": 665.591,
+  "text_preview": "Local AI refers to artificial intelligence models that run directly on a user's personal device rather than on remote cloud servers."
+}

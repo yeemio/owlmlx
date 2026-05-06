@@ -1,0 +1,19 @@
+{
+  "body": {
+    "active_model_id": null,
+    "backend_error": null,
+    "backend_name": "mlx-lm-subprocess",
+    "child_health": {},
+    "contract": {
+      "surface": "owlmlx.healthz",
+      "version": "stabilization1"
+    },
+    "model_count": 0,
+    "ok": true,
+    "persistent_child": true,
+    "readiness": "degraded",
+    "runtime": "owlmlx"
+  },
+  "elapsed_ms": 6.008,
+  "status_code": 200
+}

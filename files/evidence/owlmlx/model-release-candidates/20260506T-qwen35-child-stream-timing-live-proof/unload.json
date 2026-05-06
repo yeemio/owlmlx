@@ -1,0 +1,14 @@
+{
+  "body": {
+    "detail": {
+      "pid": 94211
+    },
+    "error_code": null,
+    "freed_gb": 60.0,
+    "message": "unloaded Qwen3.6-35B-A3B",
+    "model_id": "Qwen3.6-35B-A3B",
+    "ok": true
+  },
+  "elapsed_ms": 551.38,
+  "status_code": 200
+}

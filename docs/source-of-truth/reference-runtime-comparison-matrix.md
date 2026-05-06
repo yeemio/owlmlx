@@ -52,6 +52,14 @@ Current live evidence:
   `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-enable-thinking-false-live-proof/record.json`.
   This improves Gemma and Qwen35 short-prompt output quality but is still not a
   full parity or replacement claim.
+- Qwen35 TTFT follow-up has narrowed the short-workload latency spike to child
+  `mlx_lm.stream_generate` cold first-response behavior rather than OpenAI
+  route framing or chat-template rendering. Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-ttft-raw-template-decomposition/summary.json`
+  and
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-child-stream-timing-live-proof/summary.json`.
+  This is root-cause evidence only; no warmup/prefill/cache optimization or
+  parity claim is made.
 
 This improves the Gemma, Qwen27, and Qwen35 reference evidence floor, but it is
 still not a parity claim and does not cover measured DeepSeek generation,

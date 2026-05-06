@@ -1,0 +1,46 @@
+{
+  "done": {
+    "completion_tokens": 24,
+    "detail": {
+      "generation_count": 1,
+      "pid": 94211,
+      "timing": {
+        "chat_template_applied": false,
+        "first_response_ms": 2867.858,
+        "first_visible_token_ms": 2896.208,
+        "prompt_character_count": 108,
+        "prompt_render_ms": 0.001,
+        "stream_call_start_ms": 0.02,
+        "stream_wall_ms": 3202.896,
+        "surface": "owlmlx.child_stream_timing",
+        "version": "v1"
+      }
+    },
+    "error_code": null,
+    "event": "done",
+    "execution_time_s": null,
+    "finish_reason": "stop",
+    "model_id": "Qwen3.6-35B-A3B",
+    "prompt_tokens": 21,
+    "sequence": 22,
+    "text": "",
+    "wait_time_s": 0.0921,
+    "was_queued": false
+  },
+  "done_timing": {
+    "chat_template_applied": false,
+    "first_response_ms": 2867.858,
+    "first_visible_token_ms": 2896.208,
+    "prompt_character_count": 108,
+    "prompt_render_ms": 0.001,
+    "stream_call_start_ms": 0.02,
+    "stream_wall_ms": 3202.896,
+    "surface": "owlmlx.child_stream_timing",
+    "version": "v1"
+  },
+  "event_count": 23,
+  "first_token_latency_ms": 2993.762,
+  "status_code": 200,
+  "stream_request_wall_ms": 3306.466,
+  "text_preview": "Local AI refers to artificial intelligence models that run directly on a user's personal device rather than on remote cloud servers."
+}
