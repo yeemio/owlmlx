@@ -1,0 +1,14 @@
+{
+  "completion_tokens": 64,
+  "done": {
+    "completion_tokens": 64,
+    "event": "done",
+    "finish_reason": "length",
+    "model_id": "gemma-4-31B-it"
+  },
+  "elapsed_ms": 23639.073,
+  "event_count": 65,
+  "first_token_latency_ms": 1602.475,
+  "status_code": 200,
+  "text_preview": "<|channel>thought\n*   Topic: Local AI.\n    *   Constraint 1: One short sentence.\n    *   Constraint 2: Define it.\n\n    *   What is it? AI models running on a user's own hardware.\n    *   Key characteristics: No cloud, privacy,"
+}

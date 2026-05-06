@@ -92,7 +92,6 @@ DEFAULT_REGISTERED_RUNTIME_VISIBLE_MODELS: tuple[RegisteredRuntimeVisibleModel, 
     RegisteredRuntimeVisibleModel("Qwen3.6-27B"),
     RegisteredRuntimeVisibleModel("Qwen3.6-35B-A3B"),
     RegisteredRuntimeVisibleModel("gemma-4-31B-it"),
-    RegisteredRuntimeVisibleModel("gpt-oss-120b-MXFP4-Q4"),
     RegisteredRuntimeVisibleModel("gpt-oss-20b-MXFP4-Q4"),
     RegisteredRuntimeVisibleModel("Qwen3-Embedding-8B-4bit-DWQ"),
 )
@@ -280,4 +279,3 @@ def derive_runtime_model_visibility_contract(
             registry=registry,
         )
     )
-

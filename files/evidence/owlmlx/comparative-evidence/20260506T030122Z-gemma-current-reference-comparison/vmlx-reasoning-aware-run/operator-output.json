@@ -1,0 +1,44 @@
+{
+  "evidence_pointer": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-reasoning-aware-run/run/manifest.json",
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "recorded_at": "2026-05-06T03:25:25Z",
+  "runtimes": [
+    {
+      "measurement": {
+        "completed_request_count": 2,
+        "failure_count": 0,
+        "first_token_latency_ms": 8225.988562499879,
+        "peak_resident_set_bytes": 54586949632,
+        "throughput_tokens_per_second": 3.7467778433672363,
+        "wall_clock_ms": 17088.520249999874
+      },
+      "runtime_id": "owlmlx",
+      "runtime_version": "3e14497-dirty-current-8066"
+    },
+    {
+      "measurement": {
+        "completed_request_count": 2,
+        "failure_count": 0,
+        "first_token_latency_ms": 8306.498250000004,
+        "peak_resident_set_bytes": 55705976832,
+        "throughput_tokens_per_second": 3.8304453154474745,
+        "wall_clock_ms": 16712.185688000318
+      },
+      "runtime_id": "vmlx",
+      "runtime_version": "vmlx-engine-probe-venv-9fe1bb7-reasoning-aware-client"
+    }
+  ],
+  "surface": "owlmlx.comparative_evidence_record",
+  "verdict_grade": "measured",
+  "verdict_text": "measured: owlmlx tokens_per_second 3.7468 vs vmlx tokens_per_second 3.8304 on host_class=Mac17,6-arm64-macOS-26.4.1-128GB, workload_class=single_prompt_short",
+  "version": "v1",
+  "workload_class": "single_prompt_short",
+  "workload_invariants": {
+    "decode_max_tokens": 64,
+    "decode_temperature": 0.0,
+    "model_id": "gemma-4-31B-it",
+    "model_quantization": "full_precision_unquantized",
+    "prompt_set_hash": "sha256:d394e1ea7857e2ca0bb2859ed62a4fc7782534cbbab9aca64c9f7f9fd38090e4",
+    "serving_budget_bytes": 85899345920
+  }
+}

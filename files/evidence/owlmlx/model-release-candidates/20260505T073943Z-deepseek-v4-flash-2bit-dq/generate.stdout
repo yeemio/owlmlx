@@ -1,0 +1,7 @@
+Calling `python -m mlx_lm.generate...` directly is deprecated. Use `mlx_lm.generate...` or `python -m mlx_lm generate ...` instead.
+==========
+Local AI refers to artificial intelligence systems deployed on local devices, enabling real-time, privacy-focused, and low-l latency processing without relying on centralized cloud servers.
+==========
+Prompt: 12 tokens, 0.478 tokens-per-sec
+Generation: 32 tokens, 31.804 tokens-per-sec
+Peak memory: 96.574 GB

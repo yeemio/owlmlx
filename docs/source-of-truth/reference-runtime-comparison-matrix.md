@@ -1,8 +1,29 @@
 # owlmlx Reference Runtime Comparison Matrix
 
 > Status: authoritative
-> Updated: 2026-04-16
+> Updated: 2026-05-06
 > Scope: honest runtime-only comparison between `owlmlx` and the current local reference runtimes `oMLX` / `vMLX`
+
+## 0. Latest Live Evidence Addendum
+
+The latest same-host live comparison note is:
+
+`docs/source-of-truth/reference-runtime-live-comparison-gemma-20260506.md`
+
+That run covers only `gemma-4-31B-it`, `single_prompt_short`, `max_tokens=64`,
+`temperature=0`, on `Mac17,6-arm64-macOS-26.4.1-128GB`.
+
+It produced:
+
+- `oMLX`: `rejected`, because oMLX generated visible text in attempt 1 but the
+  service disconnected/restarted around lifecycle/unload, so no clean
+  two-repeat measured record exists.
+- `vMLX`: `measured`, with `owlmlx` TPS `3.7468` vs `vMLX` TPS `3.8304` under
+  a reasoning-aware stream consumer.
+
+This improves the Gemma reference evidence floor, but it is still not a
+parity claim and does not cover Qwen27, Qwen35, DeepSeek, longer prompts,
+multi-turn behavior, or final-answer quality.
 
 ## 1. Purpose
 

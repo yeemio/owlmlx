@@ -1,0 +1,14 @@
+{
+  "base_prompt": "In one short sentence, define local AI.",
+  "chat_template": {
+    "applied": true,
+    "attempted": true,
+    "error": null,
+    "method": "apply_chat_template(tokenize=False, add_generation_prompt=True)"
+  },
+  "max_tokens": 64,
+  "model_id": "gemma-4-31B-it",
+  "prompt_used_preview": "<bos><|turn>user\nIn one short sentence, define local AI.<turn|>\n<|turn>model\n<|channel>thought\n<channel|>",
+  "repeats": 2,
+  "temperature": 0.0
+}

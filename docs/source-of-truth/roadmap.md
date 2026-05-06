@@ -219,6 +219,33 @@ Acceptance:
 - `owlmlx` has its own implementation center of gravity
 - runtime behavior is documented and owned here first
 
+### 4.1 Phase 3A: Single-Host Orchestration Architecture
+
+Goal:
+
+- freeze the runtime-owned architecture for single-host orchestration before
+  wider scheduler or residency implementation expands
+
+Focus areas:
+
+- admission-control policy
+- request-scheduler policy
+- model-residency policy
+- memory-pressure handling
+- recovery policy
+- orchestration truth surfaces
+
+Acceptance:
+
+- `single-host-orchestration-architecture.md` exists as authoritative design
+  truth
+- the orchestration layer is clearly owned by `owlmlx core runtime`
+- current floor versus missing scheduler depth is explicit and honest
+- future implementation work can be routed to named contracts instead of broad
+  "scheduler" narration
+
+Status: **started** (2026-04-23)
+
 ## 5. Phase 4: Additional Runtime Paths
 
 Goal:
@@ -330,7 +357,8 @@ Goal:
 - absorb mature capabilities from the original local LLM platform into owlmlx
 - freeze ownership boundary between runtime (owlmlx) and control-plane/shell
 - prevent owlmlx from becoming a parallel system that duplicates the platform
-- place model lines (Gemma, Kimi 1T, gpt-oss-120b) in unified architecture
+- place model lines (Gemma, Kimi 1T, retired gpt-oss-120b) in unified
+  architecture
 
 Program contract: `owlmlx-platform-capability-absorption-and-convergence`
 
@@ -359,7 +387,8 @@ Delivered:
 - 19 runtime-owned capabilities (10 already owned, 9 to absorb)
 - 9 control-plane, 7 routing, 5 shell-hosted, 6 product-surface
 - Ownership split rules frozen (runtime IS vs platform DOES WITH)
-- Provisional model-line placement for Gemma, Kimi 1T, gpt-oss-120b
+- Provisional model-line placement for Gemma, Kimi 1T, and the now-retired
+  gpt-oss-120b local line
 - Truth owner index for future questions
 
 ### Round 3 — Freeze Model-Line Placement
@@ -371,7 +400,7 @@ Delivered:
 - `model-line-placement.md` — formal position for every model line
 - Gemma: owlmlx-native production mainline (only training-integrated line)
 - Kimi 1T: large-weight path specimen (lab, not production)
-- gpt-oss-120b: platform-managed stable heavy synthesis
+- gpt-oss-120b: retired from the active local model set on 2026-05-05
 - Distilled-27B: platform default (standard + backup paths)
 - Qwen3.5, Mistral-Large: standard platform models
 - Two runtime path classes identified: standard MLX + large-weight

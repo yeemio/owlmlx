@@ -1,0 +1,13 @@
+# verification
+created_at=2026-05-05T15:11:18Z
+
+$ .venv/bin/python -m pytest -q tests/test_model_release_candidate_surface.py
+.............................                                            [100%]
+29 passed in 3.35s
+pytest_exit=0
+
+$ .venv/bin/python -m py_compile scripts/runtime_model_release_candidate.py
+py_compile_exit=0
+
+$ git diff --check -- evidence and handoff
+git_diff_check_exit=0

@@ -102,6 +102,56 @@ def test_memory_pressure_contract_classifies_over_budget() -> None:
     assert payload["reason"]["code"] == "budget_headroom_negative"
 
 
+def test_memory_pressure_contract_classifies_metal_oom_cooldown_barrier() -> None:
+    status = _runtime_status_payload(
+        currently_loaded_gb=0.0,
+        available_gb=116.0,
+        utilization=0.0,
+    )
+    status["memory_pressure_cooldown"] = {
+        "active": True,
+        "reason_code": "metal_oom_child_loss_cooldown",
+        "remaining_s": 92.0,
+    }
+
+    payload = memory_pressure_contract_to_dict(
+        build_memory_pressure_contract(runtime_status=status)
+    )
+
+    assert payload["summary"]["pressure_classification"] == "cooldown_barrier"
+    assert payload["summary"]["confidence"] == "high"
+    assert payload["reason"]["code"] == "metal_oom_cooldown_active"
+    assert payload["recovery_context"]["memory_pressure_cooldown"]["active"] is True
+    assert payload["policy_boundaries"]["runtime_owned_pressure_event_visible"] is True
+    assert payload["policy_boundaries"]["runtime_owned_metal_oom_cooldown"] is True
+
+
+def test_memory_pressure_contract_classifies_host_pressure_barrier() -> None:
+    status = _runtime_status_payload(
+        currently_loaded_gb=0.0,
+        available_gb=116.0,
+        utilization=0.0,
+    )
+    status["host_pressure"] = {
+        "available": True,
+        "source": "memory_pressure",
+        "classification": "host_pressure_block",
+        "reason_code": "free_percent_at_or_below_block_threshold",
+        "free_percent": 8.0,
+    }
+
+    payload = memory_pressure_contract_to_dict(
+        build_memory_pressure_contract(runtime_status=status)
+    )
+
+    assert payload["summary"]["pressure_classification"] == "host_pressure_barrier"
+    assert payload["summary"]["confidence"] == "high"
+    assert payload["reason"]["code"] == "host_pressure_admission_barrier_active"
+    assert payload["recovery_context"]["host_pressure"]["free_percent"] == 8.0
+    assert payload["policy_boundaries"]["runtime_owned_pressure_event_visible"] is True
+    assert payload["policy_boundaries"]["runtime_owned_host_pressure_sample"] is True
+
+
 def test_memory_pressure_contract_marks_missing_budget_unknown() -> None:
     payload = memory_pressure_contract_to_dict(
         build_memory_pressure_contract(runtime_status={"budget": {}})
@@ -128,7 +178,15 @@ def test_memory_pressure_contract_keeps_reclaim_and_eviction_insufficient_signal
     )
     assert payload["residency_context"]["ttl_sweep_evictable_model_ids"] == ["fake-b"]
     assert "pressure_ranked_eviction" in payload["policy_boundaries"]["out_of_scope"]
-    assert any(item["layer"] == "reclaim" for item in payload["missing_signals"])
+    # reclaim attempt-result visibility now lives in owlmlx.reclaim_barrier_event;
+    # the pressure contract still does not own a reclaim engine, but it should
+    # no longer claim reclaim-attempt visibility is entirely missing.
+    assert (
+        "reclaim_barrier_event"
+        in payload["policy_boundaries"]["runtime_owned_reclaim_attempt_result_visibility"]
+    )
+    assert payload["policy_boundaries"]["runtime_owned_reclaim_barrier"] is False
+    assert any(item["layer"] == "eviction" for item in payload["missing_signals"])
 
 
 def test_runtime_memory_pressure_contract_route_returns_surface() -> None:

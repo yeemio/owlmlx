@@ -1,0 +1,64 @@
+{
+  "artifact_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B",
+  "blockers": [
+    "owlops_observation_pending",
+    "reference_runtime_comparison_missing",
+    "load_failed",
+    "first_token_latency_missing",
+    "tokens_per_second_missing",
+    "live_repeated_run_incomplete"
+  ],
+  "created_at": "2026-05-05T13:08:36Z",
+  "decode_tokens_per_second": null,
+  "end_to_end_tokens_per_second": null,
+  "failure_count": 1,
+  "first_token_latency_ms": null,
+  "generation_result": {
+    "detail": "stream generation did not complete",
+    "status": "failed"
+  },
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "lane": "mainline",
+  "load_result": {
+    "detail": "memory_gb is required when backend has no default memory estimate",
+    "error_code": "invalid_request",
+    "status": "failed"
+  },
+  "load_time_ms": 3.851,
+  "memory_headroom_bytes": 137374351360,
+  "memory_peak_source": "process_tree_rss",
+  "model_id": "Qwen3.6-27B",
+  "output_sanity_label": "not_run",
+  "owlops_observation_path": "files/evidence/owlmlx/model-release-candidates/20260505T130835Z-qwen36-27b-v2",
+  "peak_resident_set_bytes": 64602112,
+  "prompt_template_id": "operator_prompt_raw",
+  "quality_caveats": [
+    "blocker:owlops_observation_pending",
+    "blocker:reference_runtime_comparison_missing",
+    "blocker:load_failed",
+    "blocker:first_token_latency_missing",
+    "blocker:tokens_per_second_missing",
+    "blocker:live_repeated_run_incomplete"
+  ],
+  "queue_wait_ms": null,
+  "reload_result": {
+    "detail": "reload requires at least two repeats",
+    "status": "failed"
+  },
+  "reload_time_ms": null,
+  "repeat_count": 0,
+  "resident_mode": "load_unload_per_repeat",
+  "runtime_url": "http://127.0.0.1:8066",
+  "surface": "owlmlx.model_release_candidate_record",
+  "tokens_per_second": null,
+  "ttft_ms": null,
+  "unload_result": {
+    "detail": "operation did not run",
+    "status": "failed"
+  },
+  "unload_time_ms": null,
+  "verdict": "blocked",
+  "version": "v1",
+  "visibility_status": "visible",
+  "wall_clock_ms": 30.604
+}

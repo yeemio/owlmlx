@@ -1,0 +1,14 @@
+{
+  "completion_tokens": 62,
+  "done": {
+    "completion_tokens": 62,
+    "event": "done",
+    "finish_reason": "length",
+    "model_id": "Qwen3.6-35B-A3B"
+  },
+  "elapsed_ms": 3739.534,
+  "event_count": 63,
+  "first_token_latency_ms": 1696.069,
+  "status_code": 200,
+  "text_preview": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - **Topic:** Local AI\n   - **Requirement:** Define it in one short sentence.\n\n2.  **Identify Key Concepts of \"Local AI\":**\n   - Runs on personal devices (laptops, desktop"
+}

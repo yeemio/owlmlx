@@ -15,6 +15,12 @@ from owlmlx.memory_budget import (
     budget_snapshot,
     default_machine_profile,
 )
+from owlmlx.host_pressure import (
+    HostPressureSnapshot,
+    host_pressure_not_sampled_snapshot,
+    host_pressure_snapshot_to_dict,
+    sample_host_pressure,
+)
 from owlmlx.model_inventory import (
     LoadedModelEntry,
     ModelInventorySnapshot,
@@ -45,6 +51,9 @@ from .types import (
 )
 
 
+_METAL_OOM_COOLDOWN_S = 120.0
+
+
 class RuntimeKernel:
     """Self-owned runtime control object.
 
@@ -62,12 +71,19 @@ class RuntimeKernel:
         generation_gate: GenerationGate | None = None,
         abort_recovery: AbortRecoveryTracker | None = None,
         clock: Callable[[], float] | None = None,
+        host_pressure_sampler: Callable[[], HostPressureSnapshot | Mapping[str, Any]] | None = None,
     ) -> None:
         self.backend = backend
         self.profile = profile if profile is not None else default_machine_profile()
         self.generation_gate = generation_gate if generation_gate is not None else GenerationGate()
         self.abort_recovery = abort_recovery if abort_recovery is not None else AbortRecoveryTracker()
         self._clock = clock if clock is not None else monotonic
+        self._host_pressure_sampler = (
+            host_pressure_sampler if host_pressure_sampler is not None else sample_host_pressure
+        )
+        self._last_host_pressure_snapshot = host_pressure_snapshot_to_dict(
+            host_pressure_not_sampled_snapshot()
+        )
         self._active_model_id: str | None = None
         self._pinned_model_ids: set[str] = set()
         self._ttl_seconds_by_model_id: dict[str, float] = {}
@@ -86,12 +102,81 @@ class RuntimeKernel:
         self._reclaim_barrier_event_seq: int = 0
         self._load_failure_events: list[dict[str, Any]] = []
         self._load_failure_event_seq: int = 0
+        self._memory_pressure_cooldown_until_s: float | None = None
+        self._memory_pressure_cooldown_reason_code: str | None = None
+        self._memory_pressure_cooldown_reason_message: str | None = None
+        self._memory_pressure_cooldown_failure_fingerprint: tuple[object, ...] | None = None
 
     @property
     def active_model_id(self) -> str | None:
         """Current default model used when generate() omits model_id."""
 
         return self._active_model_id
+
+    def _memory_pressure_cooldown_snapshot(self) -> dict[str, Any]:
+        now_s = self._now_s()
+        until_s = self._memory_pressure_cooldown_until_s
+        remaining_s = max(float(until_s) - now_s, 0.0) if until_s is not None else 0.0
+        active = remaining_s > 0.0
+        return {
+            "active": active,
+            "reason_code": self._memory_pressure_cooldown_reason_code,
+            "reason_message": self._memory_pressure_cooldown_reason_message,
+            "remaining_s": round(remaining_s, 6),
+            "cooldown_until_s": round(until_s, 6) if until_s is not None else None,
+            "policy": "metal_oom_child_loss_cooldown",
+        }
+
+    def _sync_memory_pressure_cooldown_from_backend(
+        self,
+        backend_status: Any,
+    ) -> None:
+        detail = getattr(backend_status, "detail", {})
+        if not isinstance(detail, Mapping):
+            return
+        if detail.get("last_failure_class") != "metal_oom":
+            return
+        last_subprocess = detail.get("last_subprocess")
+        if isinstance(last_subprocess, Mapping):
+            fingerprint: tuple[object, ...] = (
+                "metal_oom",
+                last_subprocess.get("returncode"),
+                str(last_subprocess.get("stderr") or "")[-512:],
+                str(last_subprocess.get("payload") or "")[-512:],
+            )
+        else:
+            fingerprint = ("metal_oom", str(detail.get("last_error") or "")[-512:])
+        if fingerprint == self._memory_pressure_cooldown_failure_fingerprint:
+            return
+        self._memory_pressure_cooldown_failure_fingerprint = fingerprint
+        self._memory_pressure_cooldown_until_s = self._now_s() + _METAL_OOM_COOLDOWN_S
+        self._memory_pressure_cooldown_reason_code = "metal_oom_child_loss_cooldown"
+        self._memory_pressure_cooldown_reason_message = (
+            "A subprocess-backed generation failed with Metal insufficient-memory "
+            "signals; new model loads are blocked until the runtime-owned "
+            "cooldown window expires."
+        )
+
+    def _sample_host_pressure_for_load(self) -> dict[str, Any]:
+        try:
+            snapshot = self._host_pressure_sampler()
+        except Exception as exc:  # pragma: no cover - defensive boundary
+            snapshot_dict = {
+                "available": False,
+                "source": "host_pressure_sampler",
+                "classification": "unknown",
+                "reason_code": "host_pressure_sampler_failed",
+                "reason_message": f"Host pressure sampler failed: {exc}",
+            }
+        else:
+            snapshot_dict = host_pressure_snapshot_to_dict(snapshot)
+        self._last_host_pressure_snapshot = snapshot_dict
+        return snapshot_dict
+
+    def sample_host_pressure(self) -> dict[str, Any]:
+        """Explicitly refresh the cached host-pressure load-admission sample."""
+
+        return self._sample_host_pressure_for_load()
 
     def inventory_snapshot(self) -> ModelInventorySnapshot:
         """Build model inventory from backend-owned loaded model state."""
@@ -115,10 +200,56 @@ class RuntimeKernel:
     def load_model(self, model_id: str, *, memory_gb: float | None = None) -> LoadResult:
         """Load a model after owlmlx memory-budget preflight."""
 
+        backend_status = self.backend.status()
+        self._sync_memory_pressure_cooldown_from_backend(backend_status)
+        dead_registered_models = tuple(
+            str(item)
+            for item in backend_status.detail.get("dead_registered_models", [])
+            if isinstance(item, str) and item
+        )
+        if dead_registered_models:
+            return LoadResult(
+                ok=False,
+                message=(
+                    "recovery barrier: stale subprocess registration requires "
+                    f"cleanup before loading {model_id}"
+                ),
+                error_code=RuntimeErrorCode.backend_error,
+                detail={
+                    "recovery_barrier": {
+                        "reason_code": "dead_registered_models_require_unload",
+                        "dead_registered_models": list(dead_registered_models),
+                    }
+                },
+            )
+        cooldown = self._memory_pressure_cooldown_snapshot()
+        if cooldown["active"]:
+            return LoadResult(
+                ok=False,
+                message=(
+                    "memory pressure cooldown active after Metal OOM; "
+                    f"refusing to load {model_id}"
+                ),
+                error_code=RuntimeErrorCode.backend_error,
+                detail={"memory_pressure_cooldown": cooldown},
+            )
+
+        host_pressure = self._sample_host_pressure_for_load()
+        if host_pressure.get("classification") == "host_pressure_block":
+            return LoadResult(
+                ok=False,
+                message=(
+                    "host pressure admission barrier active; "
+                    f"refusing to load {model_id}"
+                ),
+                error_code=RuntimeErrorCode.backend_error,
+                detail={"host_pressure": dict(host_pressure)},
+            )
+
         requested_gb = (
             memory_gb
             if memory_gb is not None
-            else self.backend.status().detail.get("default_memory_gb")
+            else backend_status.detail.get("default_memory_gb")
         )
         if requested_gb is None:
             return LoadResult(
@@ -1238,6 +1369,7 @@ class RuntimeKernel:
             "total_event_count": len(self._load_failure_events),
             "unresolved_event_count": load_failure_unresolved,
         }
+        memory_pressure_cooldown = self._memory_pressure_cooldown_snapshot()
         return {
             "contract": {
                 "surface": "owlmlx.runtime.status",
@@ -1256,6 +1388,8 @@ class RuntimeKernel:
                     "generation_gate",
                     "reclaim_barrier",
                     "load_failure",
+                    "memory_pressure_cooldown",
+                    "host_pressure",
                 ],
             },
             "summary": summary,
@@ -1284,5 +1418,7 @@ class RuntimeKernel:
             "generation_gate": status.generation_gate,
             "reclaim_barrier": reclaim_barrier_section,
             "load_failure": load_failure_section,
+            "memory_pressure_cooldown": memory_pressure_cooldown,
+            "host_pressure": dict(self._last_host_pressure_snapshot),
             "active_model_id": status.active_model_id,
         }

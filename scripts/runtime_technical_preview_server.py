@@ -37,6 +37,11 @@ def main() -> int:
         help="Optional JSONL ledger path for comparative-evidence HTTP routes.",
     )
     parser.add_argument(
+        "--model-release-candidate-ledger-path",
+        default=os.environ.get("OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH", ""),
+        help="Optional JSONL ledger path for Model RC HTTP routes.",
+    )
+    parser.add_argument(
         "--backend-timeout-s",
         type=float,
         default=float(os.environ.get("OWLMLX_BACKEND_TIMEOUT_S", "600")),
@@ -56,6 +61,10 @@ def main() -> int:
     if args.comparative_evidence_ledger_path:
         os.environ["OWLMLX_COMPARATIVE_EVIDENCE_LEDGER_PATH"] = str(
             Path(args.comparative_evidence_ledger_path).expanduser()
+        )
+    if args.model_release_candidate_ledger_path:
+        os.environ["OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH"] = str(
+            Path(args.model_release_candidate_ledger_path).expanduser()
         )
     if args.force_cpu:
         os.environ["OWLMLX_FORCE_CPU"] = "1"

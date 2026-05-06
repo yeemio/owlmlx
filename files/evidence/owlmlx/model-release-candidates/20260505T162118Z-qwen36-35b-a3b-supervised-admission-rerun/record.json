@@ -1,0 +1,58 @@
+{
+  "artifact_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B",
+  "blockers": [
+    "owlops_observation_pending",
+    "reference_runtime_comparison_missing"
+  ],
+  "created_at": "2026-05-05T16:21:43Z",
+  "decode_tokens_per_second": 31.1,
+  "end_to_end_tokens_per_second": 16.643,
+  "failure_count": 0,
+  "first_token_latency_ms": 1763.931,
+  "generation_result": {
+    "detail": "2 stream generations completed",
+    "status": "pass"
+  },
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "lane": "mainline",
+  "load_result": {
+    "detail": "initial load completed for Qwen3.6-35B-A3B",
+    "status": "pass"
+  },
+  "load_time_ms": 8244.558,
+  "memory_headroom_bytes": 74812653568,
+  "memory_peak_source": "process_tree_rss",
+  "model_id": "Qwen3.6-35B-A3B",
+  "output_sanity_label": "valid_text",
+  "owlops_observation_path": "files/evidence/owlmlx/model-release-candidates/20260505T162118Z-qwen36-35b-a3b-supervised-admission-rerun",
+  "peak_resident_set_bytes": 62626299904,
+  "prompt_template_id": "openai_chat_completions_apply_chat_template",
+  "quality_caveats": [
+    "model_profile:Qwen MoE profile keeps think-in-template behavior explicit.",
+    "model_profile:Short responses can be dominated by reasoning trace tokens.",
+    "model_profile:profile_stop_tokens_not_applied",
+    "blocker:owlops_observation_pending",
+    "blocker:reference_runtime_comparison_missing"
+  ],
+  "queue_wait_ms": null,
+  "reload_result": {
+    "detail": "1 reload operations completed",
+    "status": "pass"
+  },
+  "reload_time_ms": 7126.438,
+  "repeat_count": 2,
+  "resident_mode": "load_unload_per_repeat",
+  "runtime_url": "http://127.0.0.1:8066",
+  "surface": "owlmlx.model_release_candidate_record",
+  "tokens_per_second": 16.643,
+  "ttft_ms": 1763.931,
+  "unload_result": {
+    "detail": "2 unload operations completed",
+    "status": "pass"
+  },
+  "unload_time_ms": 562.112,
+  "verdict": "needs_optimization",
+  "version": "v1",
+  "visibility_status": "visible",
+  "wall_clock_ms": 23973.598
+}

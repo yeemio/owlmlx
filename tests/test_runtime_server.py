@@ -167,6 +167,34 @@ def test_chat_completions_stream_provides_sse_chunks() -> None:
     assert chunks[-1] == "data: [DONE]"
 
 
+def test_chat_completions_passes_stop_to_backend() -> None:
+    class RecordingBackend(FakeBackend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.seen_kwargs: list[dict[str, object]] = []
+
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            self.seen_kwargs.append(dict(kwargs))
+            return super().generate_messages(model_id, messages, **kwargs)
+
+    backend = RecordingBackend()
+    client = TestClient(create_app(RuntimeKernel(backend, profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-a",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+            "stop": ["<eos>", "<turn|>"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert backend.seen_kwargs[-1]["stop"] == ["<eos>", "<turn|>"]
+
+
 def test_completions_non_stream_provides_openai_shape() -> None:
     client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
     client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
@@ -723,6 +751,8 @@ def test_runtime_status_returns_full_kernel_snapshot() -> None:
         "generation_gate",
         "reclaim_barrier",
         "load_failure",
+        "memory_pressure_cooldown",
+        "host_pressure",
     ]
     assert payload["governance_observations"]["transition_count"] == 1
     assert payload["governance_observations"]["active_reassignment_visible"] is False
@@ -965,3 +995,143 @@ def test_comparative_evidence_endpoint_returns_real_record_when_ledger_seeded(tm
     assert history_body["ledger_status"] == "available"
     assert len(history_body["records"]) == 1
     assert history_body["records"][0]["host_class"] == "darwin-arm64-test-host"
+
+
+def test_model_load_admission_endpoint_consumes_visibility_and_model_rc_ledger(tmp_path) -> None:
+    from owlmlx.model_release_candidate_ledger import ModelReleaseCandidateLedger
+    from owlmlx.model_release_candidate_record import build_model_release_candidate_record
+    from owlmlx.runtime_model_visibility import RegisteredRuntimeVisibleModel
+
+    models_root = tmp_path / "models"
+    model_dir = models_root / "Qwen3.6-35B-A3B"
+    model_dir.mkdir(parents=True)
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
+    ledger_path = tmp_path / "model-rc-ledger.jsonl"
+    ModelReleaseCandidateLedger(ledger_path).append(
+        build_model_release_candidate_record(
+            created_at="2026-05-05T00:00:00Z",
+            model_id="Qwen3.6-35B-A3B",
+            lane="mainline",
+            runtime_url="http://127.0.0.1:8066",
+            host_class="test-host",
+            artifact_path=str(model_dir),
+            visibility_status="visible",
+            load_result={"status": "pass", "detail": "loaded"},
+            generation_result={"status": "pass", "detail": "generated"},
+            unload_result={"status": "pass", "detail": "unloaded"},
+            reload_result={"status": "pass", "detail": "reloaded"},
+            repeat_count=2,
+            failure_count=0,
+            first_token_latency_ms=1000.0,
+            tokens_per_second=4.0,
+            wall_clock_ms=2000.0,
+            peak_resident_set_bytes=4 * 1024**3,
+            memory_headroom_bytes=2 * 1024**3,
+            output_sanity_label="ok",
+            owlops_observation_path="files/evidence/owlmlx/model-release-candidates/test",
+            verdict="needs_optimization",
+            blockers=("decode_speed_below_target",),
+            memory_peak_source="process_tree_rss",
+        )
+    )
+    client = TestClient(
+        create_app(
+            RuntimeKernel(FakeBackend(), profile=_profile()),
+            visibility_models_root=str(models_root),
+            visibility_registry=[RegisteredRuntimeVisibleModel("Qwen3.6-35B-A3B")],
+            model_release_candidate_ledger_path=str(ledger_path),
+        )
+    )
+
+    response = client.get(
+        "/v1/runtime/model-load-admission",
+        params={"model_id": "Qwen3.6-35B-A3B"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["surface"] == "owlmlx.model_load_admission"
+    assert payload["summary"]["ledger_status"] == "available"
+    assert payload["summary"]["target_model_id"] == "Qwen3.6-35B-A3B"
+    assert len(payload["entries"]) == 1
+    entry = payload["entries"][0]
+    assert entry["model_id"] == "Qwen3.6-35B-A3B"
+    assert entry["profile_id"] == "qwen3_6_moe"
+    assert entry["visibility_status"] == "visible"
+    assert entry["known_peak_resident_set_bytes"] == 4 * 1024**3
+    assert entry["budget_projection"] == "fits_warning"
+    assert entry["admission_decision"] == "unknown"
+    assert entry["reason_code"] == "host_pressure_sample_missing"
+
+
+def test_host_pressure_sample_route_updates_model_load_admission(tmp_path) -> None:
+    from owlmlx.model_release_candidate_ledger import ModelReleaseCandidateLedger
+    from owlmlx.model_release_candidate_record import build_model_release_candidate_record
+    from owlmlx.runtime_model_visibility import RegisteredRuntimeVisibleModel
+
+    models_root = tmp_path / "models"
+    model_dir = models_root / "Qwen3.6-35B-A3B"
+    model_dir.mkdir(parents=True)
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
+    ledger_path = tmp_path / "model-rc-ledger.jsonl"
+    ModelReleaseCandidateLedger(ledger_path).append(
+        build_model_release_candidate_record(
+            created_at="2026-05-05T00:00:00Z",
+            model_id="Qwen3.6-35B-A3B",
+            lane="mainline",
+            runtime_url="http://127.0.0.1:8066",
+            host_class="test-host",
+            artifact_path=str(model_dir),
+            visibility_status="visible",
+            load_result={"status": "pass", "detail": "loaded"},
+            generation_result={"status": "pass", "detail": "generated"},
+            unload_result={"status": "pass", "detail": "unloaded"},
+            reload_result={"status": "pass", "detail": "reloaded"},
+            repeat_count=2,
+            failure_count=0,
+            first_token_latency_ms=1000.0,
+            tokens_per_second=4.0,
+            wall_clock_ms=2000.0,
+            peak_resident_set_bytes=4 * 1024**3,
+            memory_headroom_bytes=2 * 1024**3,
+            output_sanity_label="ok",
+            owlops_observation_path="files/evidence/owlmlx/model-release-candidates/test",
+            verdict="needs_optimization",
+            blockers=("decode_speed_below_target",),
+            memory_peak_source="process_tree_rss",
+        )
+    )
+    runtime = RuntimeKernel(
+        FakeBackend(),
+        profile=_profile(),
+        host_pressure_sampler=lambda: {
+            "available": True,
+            "source": "memory_pressure",
+            "classification": "normal",
+            "reason_code": "free_percent_above_warning_threshold",
+            "reason_message": "Host free memory is above threshold.",
+            "free_percent": 94.0,
+        },
+    )
+    client = TestClient(
+        create_app(
+            runtime,
+            visibility_models_root=str(models_root),
+            visibility_registry=[RegisteredRuntimeVisibleModel("Qwen3.6-35B-A3B")],
+            model_release_candidate_ledger_path=str(ledger_path),
+        )
+    )
+
+    sample = client.post("/v1/runtime/host-pressure-sample")
+    admission = client.get(
+        "/v1/runtime/model-load-admission",
+        params={"model_id": "Qwen3.6-35B-A3B"},
+    )
+
+    assert sample.status_code == 200
+    assert sample.json()["surface"] == "owlmlx.host_pressure_sample"
+    assert sample.json()["snapshot"]["classification"] == "normal"
+    entry = admission.json()["entries"][0]
+    assert entry["host_pressure_classification"] == "normal"
+    assert entry["admission_decision"] == "warn"
+    assert entry["reason_code"] == "known_peak_leaves_low_headroom"

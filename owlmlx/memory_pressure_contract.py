@@ -12,6 +12,8 @@ PRESSURE_CLASSIFICATIONS = (
     "within_budget",
     "near_budget",
     "over_budget",
+    "cooldown_barrier",
+    "host_pressure_barrier",
     "unknown",
     "insufficient_signal",
 )
@@ -66,6 +68,14 @@ def _classification_support() -> dict[str, dict[str, Any]]:
         "over_budget": {
             "classification_status": "supported",
             "reason_code": "budget_snapshot_has_negative_headroom_or_utilization_above_one",
+        },
+        "cooldown_barrier": {
+            "classification_status": "supported",
+            "reason_code": "runtime_owned_metal_oom_cooldown_active",
+        },
+        "host_pressure_barrier": {
+            "classification_status": "supported",
+            "reason_code": "runtime_owned_host_pressure_sample_blocks_new_load",
         },
         "unknown": {
             "classification_status": "supported",
@@ -149,10 +159,35 @@ def build_memory_pressure_contract(
     inventory = _mapping(raw_status.get("inventory"))
     restart = _mapping(raw_status.get("restart"))
     governance_policy = _mapping(raw_status.get("governance_policy"))
+    cooldown = _mapping(raw_status.get("memory_pressure_cooldown"))
+    host_pressure = _mapping(raw_status.get("host_pressure"))
+    cooldown_active = cooldown.get("active") is True
+    host_pressure_blocks = host_pressure.get("classification") == "host_pressure_block"
 
-    classification, confidence, reason_code, reason_message = _classify_budget_pressure(
-        budget
-    )
+    if cooldown_active:
+        classification, confidence, reason_code, reason_message = (
+            "cooldown_barrier",
+            "high",
+            "metal_oom_cooldown_active",
+            (
+                "A runtime-owned memory-pressure cooldown is active after a "
+                "Metal insufficient-memory child-loss signal."
+            ),
+        )
+    elif host_pressure_blocks:
+        classification, confidence, reason_code, reason_message = (
+            "host_pressure_barrier",
+            "high",
+            "host_pressure_admission_barrier_active",
+            (
+                "A runtime-owned host-pressure sample is below the load-admission "
+                "free-memory threshold."
+            ),
+        )
+    else:
+        classification, confidence, reason_code, reason_message = _classify_budget_pressure(
+            budget
+        )
     ttl_expired_model_ids = _list_of_strings(governance_policy.get("ttl_expired_model_ids"))
     ttl_expired_pinned_model_ids = _list_of_strings(
         governance_policy.get("ttl_expired_pinned_model_ids")
@@ -197,19 +232,34 @@ def build_memory_pressure_contract(
             "restartable_models": list(restart.get("restartable_models", [])),
             "restart_exhausted_models": list(restart.get("restart_exhausted_models", [])),
             "auto_restart_dead_session": bool(restart.get("auto_restart_dead_session", False)),
-            "classification_status": "insufficient_signal",
-            "decision_impact": "not_a_recovery_barrier_decision",
+            "memory_pressure_cooldown": dict(cooldown),
+            "host_pressure": dict(host_pressure),
+            "classification_status": (
+                "supported" if cooldown_active or host_pressure_blocks else "insufficient_signal"
+            ),
+            "decision_impact": (
+                "metal_oom_cooldown_blocks_new_loads"
+                if cooldown_active
+                else (
+                    "host_pressure_sample_blocks_new_loads"
+                    if host_pressure_blocks
+                    else "not_a_recovery_barrier_decision"
+                )
+            ),
         },
         policy_boundaries={
-            "policy_scope": "budget_pressure_classification_only",
-            "runtime_owned_pressure_event_visible": False,
+            "policy_scope": "budget_and_admission_pressure_classification_only",
+            "runtime_owned_pressure_event_visible": cooldown_active or host_pressure_blocks,
             "runtime_owned_pressure_victim_selection": False,
             "runtime_owned_reclaim_barrier": False,
+            "runtime_owned_metal_oom_cooldown": cooldown_active,
+            "runtime_owned_host_pressure_sample": host_pressure.get("available") is True,
             "runtime_owned_reclaim_attempt_result_visibility": (
                 "owlmlx.reclaim_barrier_event_records_failed_unload_and_failed_reclaim_at_operation_boundary"
             ),
             "owned_actions_visible": [
                 "memory_budget_preflight_for_load",
+                "host_pressure_preflight_for_load",
                 "budget_snapshot_for_current_loaded_memory",
                 "ttl_sweep_candidate_visibility",
             ],
@@ -227,8 +277,8 @@ def build_memory_pressure_contract(
         missing_signals=(
             {
                 "layer": "pressure_event",
-                "signal": "runtime_owned_pressure_event_or_os_pressure_sample",
-                "reason": "budget utilization is not the same thing as a direct pressure event",
+                "signal": "runtime_owned_metal_allocator_or_command_queue_pressure",
+                "reason": "host free-percent sampling is visible, but private Metal allocator pressure is not",
             },
             {
                 "layer": "eviction",

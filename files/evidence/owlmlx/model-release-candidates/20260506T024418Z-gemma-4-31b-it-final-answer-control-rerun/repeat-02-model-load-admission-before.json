@@ -1,0 +1,97 @@
+{
+  "payload": {
+    "entries": [
+      {
+        "admission_decision": "admit",
+        "already_loaded": false,
+        "budget_projection": "fits",
+        "cooldown_active": false,
+        "current_budget_available_bytes": 124554051584,
+        "evidence": {
+          "dead_registered_models": [],
+          "host_pressure": {
+            "available": true,
+            "block_free_percent": 10.0,
+            "classification": "normal",
+            "compressor_gb": 29.561966,
+            "free_gb": 61.739563,
+            "free_percent": 72.0,
+            "raw_excerpt": "The system has 137438953472 (8388608 pages with a page size of 16384).\n\nStats: \nPages free: 4046164 \nPages purgeable: 1298 \nPages purged: 308496 \n\nSwap I/O:\nSwapins: 795537 \nSwapouts: 3113575 \n\nPage Q counts:\nPages active: 987281 \nPages inactive: 967787 \nPages speculative: 17344 \nPages throttled: 0 \nPages wired down: 309207 \n\nCompressor Stats:\nPages used by compressor: 1937373 \nPages decompressed: 8824637 \nPages compressed: 13441851 \n\nFile I/O:\nPageins: 23135696 \nPageouts: 1257 \n\nSystem-wide memory free percentage: 72%\n",
+            "reason_code": "free_percent_above_warning_threshold",
+            "reason_message": "Host free memory is above the runtime-owned warning threshold.",
+            "sampled_at_s": 5241.251877,
+            "source": "memory_pressure",
+            "total_gb": 128.0,
+            "warn_free_percent": 20.0,
+            "wired_gb": 4.718124
+          },
+          "latest_model_rc_failure_count": 0,
+          "latest_model_rc_record_created_at": "2026-05-06T02:13:52Z",
+          "latest_model_rc_verdict": "needs_optimization",
+          "memory_peak_source": "process_tree_rss",
+          "memory_pressure_cooldown": {
+            "active": false,
+            "cooldown_until_s": null,
+            "policy": "metal_oom_child_loss_cooldown",
+            "reason_code": null,
+            "reason_message": null,
+            "remaining_s": 0.0
+          },
+          "owlops_observation_path": "files/evidence/owlmlx/model-release-candidates/20260506T021105Z-gemma-4-31b-it-post-run-health-gate-rerun",
+          "visibility_block_reason": null
+        },
+        "host_pressure_classification": "normal",
+        "known_peak_resident_set_bytes": 50295062528,
+        "model_id": "gemma-4-31B-it",
+        "profile_family": "gemma4",
+        "profile_id": "gemma4_text",
+        "projected_headroom_bytes": 74258989056,
+        "reason_code": "known_peak_fits_current_budget",
+        "reason_message": "Visibility, host pressure, and known peak RSS allow a load attempt.",
+        "visibility_status": "visible"
+      }
+    ],
+    "policy_boundaries": {
+      "does_not_execute_load": true,
+      "does_not_run_eviction": true,
+      "does_not_sample_private_metal_allocator": true,
+      "runtime_owned_inputs": [
+        "runtime_status_budget",
+        "runtime_model_visibility",
+        "runtime_status_host_pressure",
+        "runtime_status_metal_oom_cooldown",
+        "model_profile",
+        "model_release_candidate_latest_peak_rss"
+      ],
+      "surface_scope": "model_load_admission_projection",
+      "unknown_when_host_pressure_not_sampled": true,
+      "warning_headroom_bytes": 8589934592
+    },
+    "summary": {
+      "decision_counts": {
+        "admit": 1
+      },
+      "entry_count": 1,
+      "ledger_status": "available",
+      "status": "partial",
+      "supported_budget_projections": [
+        "fits",
+        "fits_warning",
+        "exceeds",
+        "already_loaded",
+        "unknown"
+      ],
+      "supported_decisions": [
+        "admit",
+        "warn",
+        "blocked",
+        "already_loaded",
+        "unknown"
+      ],
+      "target_model_id": "gemma-4-31B-it"
+    },
+    "surface": "owlmlx.model_load_admission",
+    "version": "v1"
+  },
+  "status": 200
+}

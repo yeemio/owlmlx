@@ -5,6 +5,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from owlmlx.model_release_candidate_ledger import ModelReleaseCandidateLedger
+from owlmlx.model_release_candidate_record import build_dry_run_model_release_candidate_records
 from owlmlx.runtime.mlx_lm_subprocess_backend import MlxLmSubprocessBackend
 from owlmlx.runtime.technical_preview import (
     create_technical_preview_app,
@@ -98,3 +100,30 @@ def test_technical_preview_factory_exposes_real_backend_and_visibility(
     assert health.json()["backend_name"] == "mlx-lm-subprocess"
     assert visibility.status_code == 200
     assert "gemma-4-31B-it" in visibility.json()["visible_model_ids"]
+
+
+def test_technical_preview_factory_mounts_model_rc_ledger_env(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    ledger_path = tmp_path / "model-rc-ledger.jsonl"
+    ModelReleaseCandidateLedger(ledger_path).append_many(
+        list(
+            build_dry_run_model_release_candidate_records(
+                created_at="2026-05-05T00:00:00Z",
+            )
+        )
+    )
+    monkeypatch.setenv("OWLMLX_MODELS_ROOT", str(tmp_path))
+    monkeypatch.setenv("OWLMLX_RUNTIME_PYTHON", sys.executable)
+    monkeypatch.setenv("OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH", str(ledger_path))
+
+    client = TestClient(create_technical_preview_app())
+
+    latest = client.get("/v1/runtime/model-release-candidates")
+    history = client.get("/v1/runtime/model-release-candidates/history")
+
+    assert latest.status_code == 200
+    assert latest.json()["model_id"] == "DeepSeek-V4-Flash-2bit-DQ"
+    assert history.status_code == 200
+    assert len(history.json()["records"]) == 4

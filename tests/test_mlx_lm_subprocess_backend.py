@@ -9,6 +9,15 @@ from owlmlx.runtime import MlxLmSubprocessBackend, RuntimeErrorCode, RuntimeKern
 from owlmlx.runtime.types import ChatTurn
 
 
+def _clock_box(start: float = 100.0):
+    state = {"now": float(start)}
+
+    def clock() -> float:
+        return float(state["now"])
+
+    return state, clock
+
+
 def _write_runner(
     tmp_path: Path,
     *,
@@ -91,6 +100,34 @@ def _write_runner(
             ),
             encoding="utf-8",
         )
+    return module.stem
+
+
+def _write_metal_oom_runner(tmp_path: Path) -> str:
+    module = tmp_path / "metal_oom_runner.py"
+    module.write_text(
+        "\n".join(
+            [
+                "import json, os, sys",
+                "loaded = None",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        loaded = req['model_id']",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'generate':",
+                "        print('libc++abi: terminating due to uncaught exception of type std::runtime_error: [METAL] Command buffer execution failed: Insufficient Memory (00000008:kIOGPUCommandBufferCallbackErrorOutOfMemory)', file=sys.stderr, flush=True)",
+                "        raise SystemExit(134)",
+                "    elif action == 'ping':",
+                "        print(json.dumps({'ok': True, 'action': 'ping', 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                "        break",
+            ]
+        ),
+        encoding="utf-8",
+    )
     return module.stem
 
 
@@ -3841,6 +3878,26 @@ def test_subprocess_backend_unload_stops_persistent_child(tmp_path: Path) -> Non
     assert backend.status().detail["children"] == {}
 
 
+def test_subprocess_backend_successful_unload_clears_prior_latched_error(
+    tmp_path: Path,
+) -> None:
+    runner = _write_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+    backend._last_error = "prior transport parse error"  # noqa: SLF001
+
+    result = backend.unload("model-a")
+
+    assert result.ok is True
+    status = backend.status()
+    assert status.healthy is True
+    assert status.detail["last_error"] is None
+    assert status.detail["last_subprocess"]["ok"] is True
+
+
 def test_runtime_kernel_can_use_subprocess_backend(tmp_path: Path) -> None:
     runner = _write_runner(tmp_path)
     backend = MlxLmSubprocessBackend(
@@ -3951,6 +4008,133 @@ def test_subprocess_backend_status_reports_restartable_model_after_dead_child(tm
     status = backend.status()
     assert status.detail["recoverability"]["restartable_models"] == ["model-a"]
     assert status.detail["recoverability"]["restart_exhausted_models"] == []
+    assert status.detail["dead_registered_models"] == ["model-a"]
+
+
+def test_subprocess_backend_unload_clears_stale_registration_after_dead_child(
+    tmp_path: Path,
+) -> None:
+    runner = _write_runner(tmp_path, crash_on_generate=True)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+        max_restart_attempts=2,
+    )
+    loaded = backend.load("model-a", memory_gb=1.0)
+    assert loaded.ok is True
+
+    result = backend.generate("model-a", "hello")
+    assert result.ok is False
+    ghost_status = backend.status()
+    assert ghost_status.healthy is False
+    assert ghost_status.loaded_models[0].model_id == "model-a"
+    assert ghost_status.detail["children"] == {}
+    assert ghost_status.detail["dead_registered_models"] == ["model-a"]
+
+    unloaded = backend.unload("model-a")
+
+    assert unloaded.ok is True
+    assert unloaded.message == "cleared stale subprocess registration: model-a"
+    assert unloaded.freed_gb == 1.0
+    assert unloaded.detail["stale_registration_cleared"] is True
+    recovered_status = backend.status()
+    assert recovered_status.healthy is True
+    assert recovered_status.loaded_models == ()
+    assert recovered_status.detail["dead_registered_models"] == []
+    assert recovered_status.detail["recoverability"]["restartable_models"] == []
+
+
+def test_subprocess_backend_classifies_metal_oom_child_loss(tmp_path: Path) -> None:
+    runner = _write_metal_oom_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+        max_restart_attempts=2,
+    )
+    loaded = backend.load("model-a", memory_gb=1.0)
+    assert loaded.ok is True
+
+    result = backend.generate("model-a", "hello")
+
+    assert result.ok is False
+    status = backend.status()
+    assert status.detail["last_failure_class"] == "metal_oom"
+    assert status.detail["dead_registered_models"] == ["model-a"]
+    unloaded = backend.unload("model-a")
+    assert unloaded.ok is True
+    assert unloaded.detail["previous_failure_class"] == "metal_oom"
+
+
+def test_kernel_unload_clears_active_model_after_dead_subprocess_registration(
+    tmp_path: Path,
+) -> None:
+    runner = _write_runner(tmp_path, crash_on_generate=True)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+        max_restart_attempts=2,
+    )
+    kernel = RuntimeKernel(backend)
+    loaded = kernel.load_model("model-a", memory_gb=1.0)
+    assert loaded.ok is True
+    assert kernel.active_model_id == "model-a"
+
+    failed = asyncio.run(kernel.generate("hello"))
+    assert failed.ok is False
+    ghost_status = kernel.status_dict()
+    assert ghost_status["backend"]["detail"]["dead_registered_models"] == ["model-a"]
+    assert ghost_status["active_model_id"] == "model-a"
+
+    unloaded = kernel.unload_model("model-a")
+
+    assert unloaded.ok is True
+    assert unloaded.detail["stale_registration_cleared"] is True
+    assert kernel.active_model_id is None
+    recovered_status = kernel.status_dict()
+    assert recovered_status["backend"]["loaded_models"] == []
+    assert recovered_status["backend"]["detail"]["dead_registered_models"] == []
+    assert recovered_status["summary"]["readiness"] != "blocked"
+
+
+def test_kernel_blocks_new_load_during_metal_oom_cooldown(tmp_path: Path) -> None:
+    clock_state, clock = _clock_box()
+    runner = _write_metal_oom_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+        max_restart_attempts=2,
+    )
+    kernel = RuntimeKernel(backend, clock=clock)
+    loaded = kernel.load_model("model-a", memory_gb=1.0)
+    assert loaded.ok is True
+
+    failed = asyncio.run(kernel.generate("hello"))
+    assert failed.ok is False
+    assert kernel.status_dict()["backend"]["detail"]["dead_registered_models"] == ["model-a"]
+    stale_blocked = kernel.load_model("model-b", memory_gb=1.0)
+    assert stale_blocked.ok is False
+    assert (
+        stale_blocked.detail["recovery_barrier"]["reason_code"]
+        == "dead_registered_models_require_unload"
+    )
+
+    cleared = kernel.unload_model("model-a")
+    assert cleared.ok is True
+    cooldown_blocked = kernel.load_model("model-b", memory_gb=1.0)
+
+    assert cooldown_blocked.ok is False
+    assert cooldown_blocked.error_code is RuntimeErrorCode.backend_error
+    cooldown = cooldown_blocked.detail["memory_pressure_cooldown"]
+    assert cooldown["active"] is True
+    assert cooldown["reason_code"] == "metal_oom_child_loss_cooldown"
+    assert kernel.status_dict()["memory_pressure_cooldown"]["active"] is True
+
+    clock_state["now"] += 121.0
+    ok_after_cooldown = kernel.load_model("model-b", memory_gb=1.0)
+
+    assert ok_after_cooldown.ok is True
+    assert kernel.status_dict()["memory_pressure_cooldown"]["active"] is False
+    kernel.unload_model("model-b")
 
 
 def test_subprocess_backend_status_reports_restart_exhausted_model(tmp_path: Path) -> None:

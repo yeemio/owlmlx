@@ -81,31 +81,31 @@ path-level contracts Kimi validated, but Kimi itself stays in lab.
 
 ---
 
-### 3.3 gpt-oss-120b (MXFP4-Q4) — Platform Heavy Synthesis
+### 3.3 gpt-oss-120b (MXFP4-Q4) — Retired Local Heavy Synthesis
 
 | Dimension | Placement |
 |---|---|
-| Runtime path | Standard MLX serving path (oMLX) |
-| Serving posture | On-demand heavy (58 GB, loaded for deep work sessions) |
+| Runtime path | Removed from active owlmlx visibility |
+| Serving posture | Deleted local base artifact; historical evidence only |
 | Training relationship | None — not an owlmlx training target |
-| Lifecycle state | `stable` on platform |
-| Product role | Heavy synthesis, deep reasoning (11/12 upgrade gate) |
-| Routing treatment | Standard oMLX backend, model-id routing |
+| Lifecycle state | Retired from active Model RC gate |
+| Product role | None in current owlmlx Model RC program |
+| Routing treatment | No active owlmlx model-id routing |
 
-**Unique position:** gpt-oss-120b is the platform's verified heavy reasoning
-model. It is stable, production-tested, and fully integrated. It does not need
-owlmlx-specific treatment beyond conforming to the general runtime truth schema
-(R17) and lineage schema (R16).
+**Current position:** gpt-oss-120b was intentionally removed from the active
+local model set on 2026-05-05. It is not a mainline capability target and is no
+longer the heavyweight pressure canary.
 
-**What owlmlx owns:** Runtime truth schema it must conform to, lifecycle state
-definitions, lineage schema, memory budget truth that determines if it fits.
+**What owlmlx owns:** The runtime visibility registry now excludes this model.
+Historical evidence remains historical and must not be used as current
+visibility truth.
 
-**What platform owns:** Catalog placement, product routing, work-type
-assignment, lifecycle gate execution, user-facing model selection.
+**What replaces it:** DeepSeek-V4-Flash-2bit-DQ is the current pressure and
+adapter-optimization lane. DeepSeek-V4-Flash-4bit remains experimental-only.
 
-**owlmlx boundary:** gpt-oss-120b is a platform-managed model that happens to
-run on the MLX substrate owlmlx governs. owlmlx does not own its identity or
-product role — only the runtime substrate contracts it must honor.
+**owlmlx boundary:** do not reintroduce gpt-oss-120b as a supported, visible,
+or pressure-gate model without a new coordinator decision and fresh local
+artifact proof.
 
 ---
 
@@ -176,7 +176,7 @@ Standard platform model. No owlmlx-specific treatment needed.
 |---|---|---|---|---|---|
 | **Gemma** | Standard MLX | On-demand | **owlmlx-native** | supported | Production mainline |
 | **Kimi 1T** | Large-weight | Background-heavy | None | experimental | Path validator |
-| **gpt-oss-120b** | Standard MLX | On-demand heavy | None | stable | Heavy synthesis |
+| **gpt-oss-120b** | Retired | Deleted local artifact | None | removed | Historical only |
 | **Distilled-27B** | Standard MLX + llama.cpp | Resident | None | stable + backup | Platform default |
 | **Qwen3.5-35B-A3B** | Standard MLX | On-demand | None | stable | Fast general |
 | **Mistral-Large** | Standard MLX | On-demand | None | stable | Alternate |
@@ -187,8 +187,8 @@ Standard platform model. No owlmlx-specific treatment needed.
 
 The unified architecture has exactly two runtime path classes:
 
-1. **Standard MLX serving path** — Gemma, gpt-oss-120b, Distilled-27B,
-   Qwen3.5, Mistral-Large all use this. owlmlx owns the general contracts
+1. **Standard MLX serving path** — Gemma, Distilled-27B, Qwen3.5,
+   Mistral-Large all use this. owlmlx owns the general contracts
    (health semantics, concurrency policy, memory budget, lineage). Models
    are fungible on this path.
 

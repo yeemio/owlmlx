@@ -1,0 +1,16 @@
+# final stale process and port check
+2026-05-05T07:43:38Z
+## process scan
+38009 71136   9776 /Applications/Codex.app/Contents/Resources/node_repl
+39874 71136   2544 /bin/zsh -c EVIDENCE_DIR="files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it"\012{\012  echo "# final stale process and port check"\012  date -u +%Y-%m-%dT%H:%M:%SZ\012  echo "## process scan"\012  ps -axo pid,ppid,rss,command | rg 'runtime_model_release_candidate|runtime_technical_preview_server|mlx_lm|8066|8001|8009|Qwen3.6|gemma-4-31B|owlmlx-model-rc-heavy' || true\012  echo "## ports"\012  lsof -nP -iTCP:8001 -sTCP:LISTEN || true\012  lsof -nP -iTCP:8009 -sTCP:LISTEN || true\012  lsof -nP -iTCP:8066 -sTCP:LISTEN || true\012  echo "## lock"\012  ls -ld /tmp/owlmlx-model-rc-heavy.lock 2>/dev/null || true\012} > "$EVIDENCE_DIR/final-stale-and-port-check.txt"\012sed -n '1,220p' "$EVIDENCE_DIR/final-stale-and-port-check.txt"
+39879 39874    192 rg runtime_model_release_candidate|runtime_technical_preview_server|mlx_lm|8066|8001|8009|Qwen3.6|gemma-4-31B|owlmlx-model-rc-heavy
+20329   877  46080 /opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python -m omlx.cli serve --model-dir /Users/yeemio/AI/Agent/models --port 8001 --paged-ssd-cache-dir /Users/yeemio/AI/Agent/.omlx-cache --hot-cache-max-size 8GB
+12342   877  37840 /opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python /Users/yeemio/AI/gitrep/owlmlx/scripts/runtime_technical_preview_server.py --host 127.0.0.1 --port 8066 --models-root /Users/yeemio/AI/Agent/models --backend-timeout-s 900 --model-release-candidate-ledger-path /Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/ledger.jsonl --log-level warning
+## ports
+COMMAND   PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  20329 yeemio    8u  IPv4 0x1c59a10a79faf1d0      0t0  TCP 127.0.0.1:8001 (LISTEN)
+COMMAND   PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  31815 yeemio   10u  IPv4 0x1c3a17705faffea1      0t0  TCP *:8009 (LISTEN)
+COMMAND   PID   USER   FD   TYPE            DEVICE SIZE/OFF NODE NAME
+Python  12342 yeemio   10u  IPv4 0xa44c23903836c4c      0t0  TCP 127.0.0.1:8066 (LISTEN)
+## lock

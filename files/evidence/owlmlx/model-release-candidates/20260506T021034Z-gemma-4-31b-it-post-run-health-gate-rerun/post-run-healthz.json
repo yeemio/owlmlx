@@ -1,0 +1,18 @@
+{
+  "payload": {
+    "active_model_id": "gemma-4-31B-it",
+    "backend_error": null,
+    "backend_name": "mlx-lm-subprocess",
+    "child_health": {},
+    "contract": {
+      "surface": "owlmlx.healthz",
+      "version": "stabilization1"
+    },
+    "model_count": 0,
+    "ok": true,
+    "persistent_child": true,
+    "readiness": "unknown",
+    "runtime": "owlmlx"
+  },
+  "status": 200
+}

@@ -1,0 +1,23 @@
+Local
+ AI
+ is
+ artificial
+ intelligence
+ that
+ runs
+ directly
+ on
+ a
+ user
+'
+s
+ own
+ hardware
+ rather
+ than
+ on
+ a
+ remote
+ cloud
+ server
+.

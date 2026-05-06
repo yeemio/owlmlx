@@ -1,0 +1,9 @@
+lock_exists_after=yes
+current_deepseek_generate_processes:
+ports_after:
+COMMAND   PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  20329 yeemio    8u  IPv4 0x1c59a10a79faf1d0      0t0  TCP 127.0.0.1:8001 (LISTEN)
+COMMAND   PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  18904 yeemio   10u  IPv4 0xeeec8f691aab8967      0t0  TCP *:8009 (LISTEN)
+COMMAND   PID   USER   FD   TYPE            DEVICE SIZE/OFF NODE NAME
+Python  12342 yeemio   10u  IPv4 0xa44c23903836c4c      0t0  TCP 127.0.0.1:8066 (LISTEN)

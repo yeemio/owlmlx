@@ -1,0 +1,12 @@
+{
+  "elapsed_ms": 1.124,
+  "payload": {
+    "detail": {},
+    "error_code": "model_not_loaded",
+    "freed_gb": 0.0,
+    "message": "model not loaded: gemma-4-31B-it",
+    "model_id": "gemma-4-31B-it",
+    "ok": false
+  },
+  "status_code": 200
+}

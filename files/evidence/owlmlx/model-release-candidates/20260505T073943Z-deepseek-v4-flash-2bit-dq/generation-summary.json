@@ -1,0 +1,15 @@
+{
+  "exit_code": 0,
+  "generated_text_preview": "Local AI refers to artificial intelligence systems deployed on local devices, enabling real-time, privacy-focused, and low-l latency processing without relying on centralized cloud servers.",
+  "generation_tokens": 32,
+  "generation_tokens_per_second": 31.804,
+  "host_memory_bytes": 137438953472,
+  "mlx_reported_peak_memory_gb": 96.574,
+  "prompt_tokens": 12,
+  "prompt_tokens_per_second": 0.478,
+  "sampled_process_tree_memory_headroom_bytes": 79268331520,
+  "sampled_process_tree_memory_headroom_gib": 73.824,
+  "sampled_process_tree_peak_rss_bytes": 58170621952,
+  "sampled_process_tree_peak_rss_gib": 54.176,
+  "wall_clock_ms": 43665
+}

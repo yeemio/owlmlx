@@ -1,0 +1,8 @@
+$ ps clean lane-owned runtime process check
+
+$ test ! -e /tmp/owlmlx-model-rc-heavy.lock
+lock_absent=true
+
+$ git status --short -- "$EVIDENCE_DIR" files/execution-prompts/owlmlx/owlmlx-qwen27-direct-mlx-lm-baseline-handoff.md
+?? files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/
+?? files/execution-prompts/owlmlx/owlmlx-qwen27-direct-mlx-lm-baseline-handoff.md

@@ -1,0 +1,25 @@
+{
+  "completion_tokens": 16,
+  "done": {
+    "completion_tokens": 16,
+    "detail": {
+      "generation_count": 1,
+      "pid": 81593
+    },
+    "error_code": null,
+    "event": "done",
+    "execution_time_s": null,
+    "finish_reason": "length",
+    "model_id": "Qwen3.6-27B",
+    "prompt_tokens": 8,
+    "sequence": 16,
+    "text": "",
+    "wait_time_s": 0.0733,
+    "was_queued": false
+  },
+  "elapsed_ms": 2840.892,
+  "event_count": 17,
+  "first_token_latency_ms": 1021.867,
+  "status_code": 200,
+  "text_preview": "\n\n<think>\nThinking Process:\n\n1.  **Deconstruct the user's"
+}

@@ -1,0 +1,14 @@
+$ mkdir /tmp/owlmlx-model-rc-heavy.lock
+lock_acquired=true
+owner_pid=93069
+2026-05-05T14:05:03Z
+
+$ lsof -n -iTCP:8001 -sTCP:LISTEN
+COMMAND   PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  20329 yeemio    8u  IPv4 0x1c59a10a79faf1d0      0t0  TCP 127.0.0.1:vcom-tunnel (LISTEN)
+
+$ lsof -n -iTCP:8009 -sTCP:LISTEN
+COMMAND   PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  89863 yeemio   10u  IPv4 0x430b22d621031fb1      0t0  TCP *:8009 (LISTEN)
+
+$ ps existing mlx_lm/qwen processes

@@ -1,0 +1,1 @@
+76114 Ss+  590096 /opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python -m omlx.cli serve --model-dir /Users/yeemio/AI/Agent/models --port 8001 --paged-ssd-cache-dir /Users/yeemio/AI/Agent/.omlx-cache --hot-cache-max-size 8GB

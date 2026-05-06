@@ -1,0 +1,11 @@
+$ pytest -q tests/test_model_release_candidate_surface.py
+.................                                                        [100%]
+17 passed in 1.92s
+$ pytest -q tests/test_runtime_technical_preview_server.py
+....                                                                     [100%]
+4 passed in 0.29s
+$ pytest -q tests/test_runtime_server.py -k "model_release_candidate or runtime_status"
+.                                                                        [100%]
+1 passed, 40 deselected in 0.38s
+$ python3 -m py_compile ...
+$ git diff --check

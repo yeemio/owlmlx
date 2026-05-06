@@ -1,0 +1,17 @@
+{
+  "first_shards": [
+    "model-00001-of-00019.safetensors",
+    "model-00002-of-00019.safetensors",
+    "model-00003-of-00019.safetensors"
+  ],
+  "last_shards": [
+    "model-00017-of-00019.safetensors",
+    "model-00018-of-00019.safetensors",
+    "model-00019-of-00019.safetensors"
+  ],
+  "metadata": {
+    "total_parameters": 284333146519,
+    "total_size": 96520315996
+  },
+  "shard_count": 19
+}

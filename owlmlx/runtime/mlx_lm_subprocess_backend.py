@@ -80,6 +80,56 @@ def _drain_stderr(pipe: Any, buffer: deque[str]) -> None:
         return
 
 
+def _classify_failure_text(text: str) -> str | None:
+    lowered = text.lower()
+    if (
+        "[metal]" in lowered
+        and (
+            "insufficient memory" in lowered
+            or "outofmemory" in lowered
+            or "out of memory" in lowered
+        )
+    ):
+        return "metal_oom"
+    if "broken pipe" in lowered:
+        return "broken_pipe_child_lost"
+    if "child process produced no output" in lowered:
+        return "child_lost_no_output"
+    if "child process exited unexpectedly" in lowered:
+        return "child_lost"
+    return None
+
+
+def _classify_last_subprocess_failure(
+    *,
+    last_error: str | None,
+    last_result: MlxLmSubprocessResult | None,
+) -> str | None:
+    parts: list[str] = []
+    if last_error:
+        parts.append(last_error)
+    if last_result is not None:
+        parts.extend(
+            [
+                last_result.stderr,
+                last_result.stdout,
+                json.dumps(last_result.payload, sort_keys=True),
+            ]
+        )
+    for part in parts:
+        if _classify_failure_text(part) == "metal_oom":
+            return "metal_oom"
+    for part in parts:
+        classified = _classify_failure_text(part)
+        if classified is not None:
+            return classified
+    if last_error:
+        return "backend_error"
+    if last_result is not None and not last_result.ok:
+        return "backend_error"
+    return None
+
+
 _STREAM_TERMINAL_RECORD_PREFIXES = (
     '{"ok": true, "action": "stream_done"',
     '{"ok":true,"action":"stream_done"',
@@ -2244,6 +2294,32 @@ class MlxLmSubprocessBackend:
     def unload(self, model_id: str) -> UnloadResult:
         session = self._sessions.pop(model_id, None)
         if session is None:
+            stale_model = self._registrations.pop(model_id, None)
+            self._restart_counts.pop(model_id, None)
+            if stale_model is not None:
+                previous_error = self._last_error
+                previous_failure_class = _classify_last_subprocess_failure(
+                    last_error=self._last_error,
+                    last_result=self._last_result,
+                )
+                registered_without_session = [
+                    registered_model_id
+                    for registered_model_id in self._registrations
+                    if registered_model_id not in self._sessions
+                ]
+                if not registered_without_session:
+                    self._last_error = None
+                return UnloadResult(
+                    ok=True,
+                    message=f"cleared stale subprocess registration: {model_id}",
+                    model_id=model_id,
+                    freed_gb=stale_model.memory_gb,
+                    detail={
+                        "stale_registration_cleared": True,
+                        "previous_error": previous_error,
+                        "previous_failure_class": previous_failure_class,
+                    },
+                )
             return UnloadResult(
                 ok=False,
                 message=f"model not loaded: {model_id}",
@@ -2259,6 +2335,7 @@ class MlxLmSubprocessBackend:
                 "model_id": self._runner_model_id(model_id),
             },
         )
+        self._last_result = result
         if session.proc.poll() is None:
             self._terminate_session(session)
         if not result.ok:
@@ -2275,6 +2352,8 @@ class MlxLmSubprocessBackend:
                     "payload": result.payload,
                 },
             )
+        if not self._registrations:
+            self._last_error = None
         return UnloadResult(
             ok=True,
             message=f"unloaded {model_id}",
@@ -2296,6 +2375,11 @@ class MlxLmSubprocessBackend:
         child_health = {}
         for model_id, session in list(self._sessions.items()):
             child_health[model_id] = self._probe_session(model_id, session)
+        registered_without_session = sorted(
+            model_id
+            for model_id in self._registrations
+            if model_id not in self._sessions
+        )
         restartable_models: list[str] = []
         restart_exhausted_models: list[str] = []
         for model_id in self._registrations:
@@ -2342,9 +2426,13 @@ class MlxLmSubprocessBackend:
             ),
             default=0,
         )
+        last_failure_class = _classify_last_subprocess_failure(
+            last_error=self._last_error,
+            last_result=self._last_result,
+        )
         return BackendStatus(
             backend_name=self.name,
-            healthy=self._last_error is None,
+            healthy=self._last_error is None and not registered_without_session,
             loaded_models=tuple(
                 self._registrations[model_id]
                 for model_id in self._registrations
@@ -2353,6 +2441,8 @@ class MlxLmSubprocessBackend:
                 "model_count": len(self._registrations),
                 "persistent_child": True,
                 "last_error": self._last_error,
+                "last_failure_class": last_failure_class,
+                "dead_registered_models": registered_without_session,
                 "auto_restart_dead_session": self.auto_restart_dead_session,
                 "max_restart_attempts": self.max_restart_attempts,
                 "children": children,

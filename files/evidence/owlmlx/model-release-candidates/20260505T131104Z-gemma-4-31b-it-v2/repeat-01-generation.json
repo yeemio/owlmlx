@@ -1,0 +1,25 @@
+{
+  "completion_tokens": 64,
+  "done": {
+    "completion_tokens": 64,
+    "detail": {
+      "generation_count": 1,
+      "pid": 23552
+    },
+    "error_code": null,
+    "event": "done",
+    "execution_time_s": null,
+    "finish_reason": "length",
+    "model_id": "gemma-4-31B-it",
+    "prompt_tokens": 14,
+    "sequence": 64,
+    "text": "",
+    "wait_time_s": 0.0934,
+    "was_queued": false
+  },
+  "elapsed_ms": 25741.797,
+  "event_count": 65,
+  "first_token_latency_ms": 4256.903,
+  "status_code": 200,
+  "text_preview": " In one short sentence, define local AI. In one short sentence, define local AI. In one short sentence, define local AI. In one short sentence, define local AI. In one short sentence, define local AI. In one short sentence, define local AI. In one short sentence, define local AI. In"
+}

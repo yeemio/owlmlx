@@ -1,0 +1,1 @@
+ 90G	/Users/yeemio/AI/Agent/model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ

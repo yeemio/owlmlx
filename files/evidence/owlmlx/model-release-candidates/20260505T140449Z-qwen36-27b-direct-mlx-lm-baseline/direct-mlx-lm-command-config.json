@@ -1,0 +1,8 @@
+{
+  "max_tokens": 32,
+  "model_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B",
+  "prompt": "In one short sentence, define local AI.",
+  "python": "/Users/yeemio/AI/gitrep/owlmlx/.venv/bin/python",
+  "repeat_count": 2,
+  "temperature": 0.0
+}

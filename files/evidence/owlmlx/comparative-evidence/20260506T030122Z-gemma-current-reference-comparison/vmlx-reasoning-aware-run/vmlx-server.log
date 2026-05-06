@@ -1,0 +1,14 @@
+COMMAND /Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/bin/python -m vmlx_engine.cli serve /Users/yeemio/AI/Agent/models/gemma-4-31B-it --served-model-name gemma-4-31B-it --host 127.0.0.1 --port 8064 --max-tokens 64 --default-temperature 0.0 --log-level WARNING
+INFO:vmlx_engine.model_config_registry:Model config: matched text_config.model_type='gemma4_text' (wrapper='gemma4') → gemma4_text
+INFO:__main__:Auto-configured tool parser from registry: gemma4
+INFO:__main__:Auto-configured reasoning parser from registry: gemma4
+/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/lib/python3.14/site-packages/transformers/audio_utils.py:538: UserWarning: At least one mel filter has all zero values. The value for `num_mel_filters` (128) may be set too high. Or, the value for `num_frequency_bins` (257) may be set too low.
+  warnings.warn(
+WARNING:vmlx_engine.server:SECURITY WARNING: Server running without API key authentication. Anyone can access the API. Use --api-key to enable authentication.
+COMMAND /Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/bin/python -m vmlx_engine.cli serve /Users/yeemio/AI/Agent/models/gemma-4-31B-it --served-model-name gemma-4-31B-it --host 127.0.0.1 --port 8064 --max-tokens 64 --default-temperature 0.0 --log-level WARNING
+INFO:vmlx_engine.model_config_registry:Model config: matched text_config.model_type='gemma4_text' (wrapper='gemma4') → gemma4_text
+INFO:__main__:Auto-configured tool parser from registry: gemma4
+INFO:__main__:Auto-configured reasoning parser from registry: gemma4
+/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/lib/python3.14/site-packages/transformers/audio_utils.py:538: UserWarning: At least one mel filter has all zero values. The value for `num_mel_filters` (128) may be set too high. Or, the value for `num_frequency_bins` (257) may be set too low.
+  warnings.warn(
+WARNING:vmlx_engine.server:SECURITY WARNING: Server running without API key authentication. Anyone can access the API. Use --api-key to enable authentication.

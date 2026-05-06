@@ -1,0 +1,47 @@
+{
+  "artifact_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B",
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "max_tokens": 32,
+  "model_id": "Qwen3.6-27B",
+  "model_profile": {
+    "cache_policy": {
+      "cache_caveat": "profile does not prove cache acceleration safety",
+      "prefix_cache": "allowed_with_runtime_evidence"
+    },
+    "chat_template_kwargs": {
+      "enable_thinking": true
+    },
+    "model_id_patterns": [
+      "\\bqwen3[._-]?6\\b.*\\b27b\\b"
+    ],
+    "profile_caveats": [
+      "Qwen text profile carries thinking-template defaults only.",
+      "Decode-speed diagnosis still needs direct same-prompt comparison evidence."
+    ],
+    "profile_family": "qwen3.6",
+    "profile_id": "qwen3_6_text",
+    "reasoning_parser_family": "qwen",
+    "sampler_defaults": {
+      "temperature": 0.0,
+      "top_p": 1.0
+    },
+    "source_basis": [
+      "docs/source-of-truth/peer-reference-mechanism-audit-for-model-profiles.md",
+      "docs/source-of-truth/model-release-candidate-program.md"
+    ],
+    "stop_token_strings": [
+      "<|im_end|>"
+    ],
+    "surface": "owlmlx.model_profile",
+    "thinking_policy": {
+      "budget_policy": "unbounded_until_live_profile_evidence",
+      "default_mode": "enabled_by_template"
+    },
+    "version": "v1"
+  },
+  "prompt": "In one short sentence, define local AI.",
+  "prompt_template_id": "operator_prompt_raw",
+  "repeats": 2,
+  "request_mode": "raw_generate_stream",
+  "runtime_url": "http://127.0.0.1:8066"
+}

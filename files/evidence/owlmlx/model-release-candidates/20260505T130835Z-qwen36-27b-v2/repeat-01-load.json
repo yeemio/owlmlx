@@ -1,0 +1,11 @@
+{
+  "elapsed_ms": 3.851,
+  "payload": {
+    "detail": {},
+    "error_code": "invalid_request",
+    "message": "memory_gb is required when backend has no default memory estimate",
+    "model": null,
+    "ok": false
+  },
+  "status_code": 200
+}

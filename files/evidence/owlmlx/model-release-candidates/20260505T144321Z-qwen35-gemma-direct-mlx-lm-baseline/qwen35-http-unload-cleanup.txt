@@ -1,0 +1,4 @@
+$ curl unload Qwen3.6-35B-A3B
+{"ok":false,"message":"model not loaded: Qwen3.6-35B-A3B","error_code":"model_not_loaded","detail":{},"model_id":"Qwen3.6-35B-A3B","freed_gb":0.0}
+$ healthz after unload
+{"contract":{"surface":"owlmlx.healthz","version":"stabilization1"},"runtime":"owlmlx","ok":false,"readiness":"blocked","active_model_id":"Qwen3.6-35B-A3B","model_count":1,"backend_name":"mlx-lm-subprocess","backend_error":"[Errno 32] Broken pipe","persistent_child":true,"child_health":{}}

@@ -1,7 +1,7 @@
 # owlmlx Runtime Status Schema
 
 > Status: authoritative
-> Updated: 2026-04-16
+> Updated: 2026-05-05
 
 ## 1. Purpose
 
@@ -101,9 +101,30 @@ From Stabilization-1 onward, `/v1/runtime/status` is split into:
   - `governance_observations`
   - `governance_policy`
   - `generation_gate`
+  - `reclaim_barrier`
+  - `load_failure`
+  - `memory_pressure_cooldown`
+  - `host_pressure`
 
 The stable sections are intended for long-lived `owlcoda` / `owlops` consumption.
 The diagnostic sections remain useful, but upper layers must treat them as best-effort detail rather than field-stable compatibility promises.
+
+`backend.detail.dead_registered_models` is a diagnostic recovery signal for
+subprocess-backed runtimes. It lists model ids whose runtime registration still
+exists after the child process/session is gone. Operators may use it to surface
+ghost-state recovery needs, but product layers must not treat those entries as
+live loaded models.
+
+`memory_pressure_cooldown` is a diagnostic admission signal. It is active when
+the kernel has observed backend evidence of a Metal insufficient-memory
+child-loss failure and is refusing new model loads for a bounded cooldown
+window. It is not a full operating-system pressure oracle.
+
+`host_pressure` is a diagnostic load-admission sample. It is taken before model
+load attempts from host-visible macOS memory-pressure output and cached into
+status. It may block a new load when free host memory crosses the runtime-owned
+threshold, but it is not private Metal allocator or command-queue pressure
+truth.
 
 `GET /healthz` is also frozen as a smaller liveness contract in Stabilization-1:
 
@@ -458,11 +479,14 @@ classification:
 
 - `owlmlx.memory_pressure_contract`
   - direct runtime-owned answer for whether the current budget snapshot is
-    `within_budget`, `near_budget`, `over_budget`, or `unknown`
+    `within_budget`, `near_budget`, `over_budget`, `cooldown_barrier`,
+    `host_pressure_barrier`, or `unknown`
   - keeps reclaim, pressure-ranked eviction, and restart-barrier semantics at
     `insufficient_signal`
   - may surface TTL-sweep evictable model context from residency truth, but does
     not treat that as pressure victim selection
+  - may surface host-visible load-admission pressure samples, but does not
+    claim private Metal allocator visibility
 
 This surface sits alongside the admission and residency policy surfaces.
 
@@ -585,3 +609,56 @@ Load-failure events are recorded inside `RuntimeKernel.load_model` at
 the operation boundary (excluding `invalid_request` preflight and
 `model_already_loaded` redundant-request paths). Auto-resolution rules
 are documented in `termination-recovery-policy.md` §6.
+
+## 19. Model Release-Candidate Evidence Surface
+
+A separate runtime-owned HTTP surface exposes the post-technical-preview model
+release-candidate evidence contract defined by
+`model-release-candidate-program.md`. It sits alongside `/v1/runtime/status`
+and is not part of the core status payload.
+
+- `GET /v1/runtime/model-release-candidates`
+  - 200: latest validated `model_release_candidate_record` v1
+  - 503: explicit `still_blocked` payload when the ledger is not connected or
+    empty
+- `GET /v1/runtime/model-release-candidates/history`
+  - 200: stable `model_release_candidate_record_history` v1 envelope with
+    `records`, `ledger_status`
+  - 503: explicit `still_blocked` payload when the ledger is not connected or
+    empty
+
+The surface is backed by
+`owlmlx.model_release_candidate_ledger.ModelReleaseCandidateLedger`. The ledger
+path is connected at `create_app(...)` construction time
+(`model_release_candidate_ledger_path`); `create_fake_app()` honors the
+`OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH` environment variable for live
+operator checks.
+
+This surface does not mark any model as application-ready. It only gives
+OwlOps and upper layers a shared evidence schema for the model RC gate.
+
+## 20. Model Load-Admission Projection Surface
+
+A separate runtime-owned HTTP surface exposes model-specific load-admission
+projection defined by `model-load-admission.md`. It sits alongside
+`/v1/runtime/status` and is not part of the core status payload.
+
+- `GET /v1/runtime/model-load-admission`
+  - optional query: `model_id=<id>`
+  - 200: `owlmlx.model_load_admission` v1 payload with per-model entries
+- `POST /v1/runtime/host-pressure-sample`
+  - 200: `owlmlx.host_pressure_sample` v1 payload and a refreshed cached
+    `/v1/runtime/status.host_pressure` diagnostic section
+
+The surface combines:
+
+- runtime budget headroom
+- runtime model visibility
+- cached host-pressure diagnostic sample
+- Metal-OOM cooldown and stale-registration barriers
+- latest Model RC peak RSS for each model id
+- model profile id / family
+
+It does not run a model load, sample private Metal allocator state, or execute
+pressure-ranked eviction. When host pressure has not been sampled, the
+admission decision remains `unknown` even if the budget projection fits.

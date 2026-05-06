@@ -1,0 +1,20 @@
+$ pwd
+/Users/yeemio/AI/gitrep/owlmlx
+
+$ .venv/bin/python dependency check
+/Users/yeemio/AI/gitrep/owlmlx/.venv/bin/python
+mlx True
+mlx_lm True
+
+$ curl -s http://127.0.0.1:8066/healthz
+{"contract":{"surface":"owlmlx.healthz","version":"stabilization1"},"runtime":"owlmlx","ok":true,"readiness":"degraded","active_model_id":null,"model_count":0,"backend_name":"mlx-lm-subprocess","backend_error":null,"persistent_child":true,"child_health":{}}
+
+$ curl -s http://127.0.0.1:8066/v1/openai/models
+{"object":"list","data":[{"id":"Qwen3.6-27B","object":"model","owned_by":"owlmlx"},{"id":"Qwen3.6-35B-A3B","object":"model","owned_by":"owlmlx"},{"id":"gemma-4-31B-it","object":"model","owned_by":"owlmlx"}]}
+
+$ lsof -n -iTCP:8066 -sTCP:LISTEN
+COMMAND  PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  4348 yeemio   10u  IPv4 0x6af15da21e067a88      0t0  TCP 127.0.0.1:8066 (LISTEN)
+
+$ test ! -e /tmp/owlmlx-model-rc-heavy.lock
+lock_absent=true

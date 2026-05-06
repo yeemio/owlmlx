@@ -1,0 +1,527 @@
+Fatal Python error: Aborted
+
+Thread 0x000000805841f000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000008057413000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/paged_ssd_cache.py", line 854 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x000000069db0b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x000000069bf0b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/paged_ssd_cache.py", line 854 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000007300237000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000072ff22b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/paged_ssd_cache.py", line 854 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000000628c5f000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x000000017011f000 (most recent call first):
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 616 in _process_prompts
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/mlx_lm/generate.py", line 1257 in _next
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/mlx_lm/generate.py", line 1329 in next
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 4222 in step
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 58 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 83 in _worker
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000001f28418c0 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/selectors.py", line 566 in select
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 1898 in _run_once
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 608 in run_forever
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 641 in run_until_complete
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/runners.py", line 118 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/uvicorn/_compat.py", line 30 in asyncio_run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/uvicorn/server.py", line 75 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/uvicorn/main.py", line 606 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cli.py", line 239 in serve_command
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cli.py", line 564 in main
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cli.py", line 573 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 198 in _run_module_as_main
+
+Extension modules: yaml._yaml, regex._regex, numpy._core._multiarray_umath, numpy.linalg._umath_linalg, markupsafe._speedups, PIL._imaging, sentencepiece._sentencepiece, psutil._psutil_osx, charset_normalizer.md, charset_normalizer.cd, requests.packages.charset_normalizer.md, requests.packages.chardet.md, requests.packages.charset_normalizer.cd, requests.packages.chardet.cd, _cffi_backend (total: 15)
+Fatal Python error: Aborted
+
+Thread 0x00000005fa0c3000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000005f88c3000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/paged_ssd_cache.py", line 854 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000074ace2b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000074a7137000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/paged_ssd_cache.py", line 854 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000000620213000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Current thread 0x000000016e2f3000 (most recent call first):
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 748 in _process_prompts
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/mlx_lm/generate.py", line 1257 in _next
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/mlx_lm/generate.py", line 1329 in next
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 4222 in step
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 58 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 83 in _worker
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000001f28418c0 (most recent call first):
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/mlx_lm/generate.py", line 991 in close
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/mlx_lm/generate.py", line 996 in __del__
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/engine_core.py", line 244 in _engine_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/events.py", line 84 in _run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 1936 in _run_once
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 608 in run_forever
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 641 in run_until_complete
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/runners.py", line 118 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/uvicorn/_compat.py", line 30 in asyncio_run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/uvicorn/server.py", line 75 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/uvicorn/main.py", line 606 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cli.py", line 239 in serve_command
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cli.py", line 564 in main
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cli.py", line 573 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 198 in _run_module_as_main
+
+Extension modules: yaml._yaml, regex._regex, numpy._core._multiarray_umath, numpy.linalg._umath_linalg, markupsafe._speedups, PIL._imaging, sentencepiece._sentencepiece, psutil._psutil_osx, charset_normalizer.md, charset_normalizer.cd, requests.packages.charset_normalizer.md, requests.packages.chardet.md, requests.packages.charset_normalizer.cd, requests.packages.chardet.cd, _cffi_backend, numpy.random._common, numpy.random.bit_generator, numpy.random._bounded_integers, numpy.random._pcg64, numpy.random._mt19937, numpy.random._generator, numpy.random._philox, numpy.random._sfc64, numpy.random.mtrand (total: 24)
+Fatal Python error: Aborted
+
+Thread 0x0000000c16737000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000000c1572b000 (most recent call first):
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/paged_ssd_cache.py", line 229 in _write_safetensors_no_mx
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/paged_ssd_cache.py", line 873 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000080b83bf000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000007bdc03f000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000000c4e497000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000007f7d567000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000007ac1227000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000007fc088b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000000c23057000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000000c48807000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000000c2bc6b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Current thread 0x000000016ecdb000 (most recent call first):
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/mlx_lm/generate.py", line 1283 in _next
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/mlx_lm/generate.py", line 1329 in next
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 4222 in step
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 58 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 83 in _worker
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000001f28418c0 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/shutil.py", line 701 in _rmtree_safe_fd
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/shutil.py", line 672 in _rmtree_safe_fd
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/shutil.py", line 752 in rmtree
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 286 in cleanup_all
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 4363 in reset
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 4387 in deep_reset
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/engine_core.py", line 646 in close
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/engine/vlm.py", line 345 in stop
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/engine_pool.py", line 471 in _unload_engine
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/engine_pool.py", line 436 in _ensure_memory_available
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/engine_pool.py", line 358 in get_engine
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/server.py", line 611 in get_engine
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/server.py", line 686 in get_engine_for_model
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/server.py", line 1834 in create_chat_completion
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 328 in run_endpoint_function
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 674 in app
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 120 in app
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42 in wrapped_app
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 134 in app
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/starlette/routing.py", line 276 in handle
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/starlette/routing.py", line 680 in app
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/starlette/routing.py", line 660 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py", line 18 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42 in wrapped_app
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 63 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/server.py", line 530 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/starlette/middleware/cors.py", line 88 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/starlette/middleware/errors.py", line 164 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/starlette/applications.py", line 90 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/fastapi/applications.py", line 1163 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/uvicorn/protocols/http/h11_impl.py", line 415 in run_asgi
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/events.py", line 84 in _run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 1936 in _run_once
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 608 in run_forever
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 641 in run_until_complete
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/runners.py", line 118 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/uvicorn/_compat.py", line 30 in asyncio_run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/uvicorn/server.py", line 75 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/uvicorn/main.py", line 606 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cli.py", line 239 in serve_command
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cli.py", line 564 in main
+  File "/opt/homebrew/Cellar/omlx/0.3.2/libexec/lib/python3.11/site-packages/omlx/cli.py", line 573 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 198 in _run_module_as_main
+
+Extension modules: yaml._yaml, regex._regex, numpy._core._multiarray_umath, numpy.linalg._umath_linalg, markupsafe._speedups, PIL._imaging, sentencepiece._sentencepiece, psutil._psutil_osx, charset_normalizer.md, charset_normalizer.cd, requests.packages.charset_normalizer.md, requests.packages.chardet.md, requests.packages.charset_normalizer.cd, requests.packages.chardet.cd, _cffi_backend, numpy.random._common, numpy.random.bit_generator, numpy.random._bounded_integers, numpy.random._pcg64, numpy.random._mt19937, numpy.random._generator, numpy.random._philox, numpy.random._sfc64, numpy.random.mtrand (total: 24)
+Fatal Python error: Aborted
+
+Thread 0x00000076a9e2b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000072a4717000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/paged_ssd_cache.py", line 854 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000072a370b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/vision_feature_cache.py", line 451 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000077edf0b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000076ace43000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000007c80c07000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000000bf7527000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000007233c07000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x000000724ae8b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000007249897000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/paged_ssd_cache.py", line 854 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x000000724888b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/vision_feature_cache.py", line 451 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x0000000d783b3000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Current thread 0x000000017009b000 (most recent call first):
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 1104 in _do_external_prefill
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 2977 in _schedule_waiting
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 3521 in step
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 58 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 83 in _worker
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000001f51d98c0 (most recent call first):
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_lm/models/cache.py", line 995 in filter
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_lm/generate.py", line 1382 in filter
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_lm/generate.py", line 1693 in remove
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 2452 in _remove_uid_from_active_batch
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 2528 in _do_abort_request
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 3661 in reset
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 3697 in deep_reset
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine_core.py", line 646 in close
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine/batched.py", line 287 in stop
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine_pool.py", line 655 in _unload_engine
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine_pool.py", line 948 in shutdown
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/server.py", line 371 in lifespan
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/contextlib.py", line 217 in __aexit__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 216 in merged_lifespan
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/contextlib.py", line 217 in __aexit__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 216 in merged_lifespan
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/contextlib.py", line 217 in __aexit__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/routing.py", line 216 in merged_lifespan
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/contextlib.py", line 217 in __aexit__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/routing.py", line 638 in lifespan
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/routing.py", line 669 in app
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/routing.py", line 660 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py", line 18 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 49 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/server.py", line 530 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/middleware/cors.py", line 80 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/middleware/errors.py", line 151 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/starlette/applications.py", line 90 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/fastapi/applications.py", line 1163 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 29 in __call__
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/lifespan/on.py", line 86 in main
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/events.py", line 84 in _run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 1936 in _run_once
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 608 in run_forever
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 641 in run_until_complete
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/runners.py", line 118 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/_compat.py", line 30 in asyncio_run
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/server.py", line 75 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/main.py", line 606 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cli.py", line 239 in serve_command
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cli.py", line 564 in main
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cli.py", line 573 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 198 in _run_module_as_main
+
+Extension modules: yaml._yaml, regex._regex, numpy._core._multiarray_umath, numpy.linalg._umath_linalg, markupsafe._speedups, PIL._imaging, sentencepiece._sentencepiece, psutil._psutil_osx, charset_normalizer.md, charset_normalizer.cd, requests.packages.charset_normalizer.md, requests.packages.chardet.md, requests.packages.charset_normalizer.cd, requests.packages.chardet.cd, _cffi_backend (total: 15)
+Fatal Python error: Aborted
+
+Thread 0x00000084471cb000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000084461bf000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/paged_ssd_cache.py", line 854 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000084451b3000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/vision_feature_cache.py", line 451 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x000000776af5f000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/boundary_snapshot_store.py", line 311 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x000000776544b000 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 331 in wait
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/queue.py", line 180 in get
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cache/paged_ssd_cache.py", line 854 in _writer_loop
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x000000016c973000 (most recent call first):
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_vlm/utils.py", line 326 in load_model
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/mlx_vlm/utils.py", line 403 in load
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/engine/vlm.py", line 586 in _load_vlm_sync
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 58 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/concurrent/futures/thread.py", line 83 in _worker
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 982 in run
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1045 in _bootstrap_inner
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/threading.py", line 1002 in _bootstrap
+
+Thread 0x00000001fa3558c0 (most recent call first):
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/selectors.py", line 566 in select
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 1936 in _run_once
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 608 in run_forever
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py", line 641 in run_until_complete
+  File "/opt/homebrew/Cellar/python@3.11/3.11.15/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/runners.py", line 118 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/_compat.py", line 30 in asyncio_run
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/server.py", line 75 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/uvicorn/main.py", line 606 in run
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cli.py", line 239 in serve_command
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cli.py", line 564 in main
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/cli.py", line 573 in <module>
+  File "<frozen runpy>", line 88 in _run_code
+  File "<frozen runpy>", line 198 in _run_module_as_main
+
+Extension modules: yaml._yaml, regex._regex, numpy._core._multiarray_umath, numpy.linalg._umath_linalg, markupsafe._speedups, PIL._imaging, sentencepiece._sentencepiece, charset_normalizer.md, charset_normalizer.cd, requests.packages.charset_normalizer.md, requests.packages.chardet.md, requests.packages.charset_normalizer.cd, requests.packages.chardet.cd, _cffi_backend (total: 14)

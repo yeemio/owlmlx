@@ -206,6 +206,50 @@ be partially absorbed under Gap 8 (lineage schema) where they inform
 
 ---
 
+### Gap 7b: Runtime Model Visibility Contract — **INTRODUCED (narrow, runtime-only)**
+
+**What owlmlx now owns:**
+`owlmlx/runtime_model_visibility.py` defines runtime-owned rule
+`runtime_gate_required_before_visible`. The rule no longer equates
+loaded inventory with visibility. Instead it derives visibility from:
+
+- owlmlx visibility registration
+- base-model directory presence under `$MODELS_ROOT/{model-id}/`
+- `config.json` presence in that base-model directory
+
+The formal list surface is `GET /v1/openai/models`, the diagnostic
+surface is `GET /v1/runtime/model-visibility`, and `GET /v1/models`
+embeds the same contract block while remaining a loaded-inventory
+surface.
+
+**What the platform retains:**
+`llm_router/models.py` keeps rule `gate_required_before_visible` at
+router `:8009/v1/models`, which additionally requires
+`model_fleet/status.json` curation, lifecycle classification filtering
+(`stable` / `preview`), and extreme-experiment exclusion. That rule is
+strictly **not** equivalent to the runtime rule.
+
+**Honest boundary:**
+- R15 lifecycle classification stays deferred — not absorbed here.
+- Extreme-experiment safety classification stays platform-owned.
+- The runtime rule is a narrower, pure-runtime answer to "which
+  models are runnable through owlmlx right now?"; it is not a
+  replacement for the platform's curated product visibility.
+
+**Consumer guidance:**
+`owlcoda` should prefer `owlmlx /v1/runtime/model-visibility` for
+runtime reachability truth; it should continue to consult the old
+router for product-lifecycle-curated visibility until a separate
+honest decision promotes those classifications.
+
+**Current owlmlx source files:**
+- `owlmlx/runtime_model_visibility.py`
+- `owlmlx/runtime/server.py` (endpoints + `/v1/models` embed)
+- `tests/test_runtime_model_visibility.py`
+- `docs/source-of-truth/runtime-model-visibility-contract.md`
+
+---
+
 ### Gap 7: Per-Model Runtime Truth Exposure — **PARTIALLY ABSORBED + CONSUMED**
 
 **What owlmlx now owns:**
@@ -337,9 +381,10 @@ have since been resolved or superseded:
    Proposal: owlmlx owns the mutation contract (what it means to unload);
    platform owns the endpoint (how the request arrives).
 
-4. **Model-line placement (provisional):** Round 2 must give provisional
-   placement for Gemma, Kimi 1T, and gpt-oss-120b within the unified
-   boundary. This feeds Round 3 finalization.
+4. **Model-line placement (provisional):** Round 2 gave provisional placement
+   for Gemma, Kimi 1T, and gpt-oss-120b within the unified boundary. As of
+   2026-05-05, gpt-oss-120b is retired from the active local model set and no
+   longer participates in current visibility or pressure gates.
 
 ### For Round 4 (First Absorption Target)
 

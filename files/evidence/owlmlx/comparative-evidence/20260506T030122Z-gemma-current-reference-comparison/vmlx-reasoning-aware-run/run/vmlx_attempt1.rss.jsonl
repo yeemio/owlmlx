@@ -1,0 +1,281 @@
+{"per_pid_rss_bytes": {"43633": 131072}, "t_s": 7644.399546, "tick_total_rss_bytes": 131072, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 28737536, "43634": 12156928}, "t_s": 7644.458533, "tick_total_rss_bytes": 40894464, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 35192832}, "t_s": 7644.513215, "tick_total_rss_bytes": 65142784, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 53624832}, "t_s": 7644.572186, "tick_total_rss_bytes": 83574784, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 62701568}, "t_s": 7644.628374, "tick_total_rss_bytes": 92651520, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 71565312}, "t_s": 7644.687611, "tick_total_rss_bytes": 101515264, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 81100800}, "t_s": 7644.746663, "tick_total_rss_bytes": 111050752, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 83853312}, "t_s": 7644.805761, "tick_total_rss_bytes": 113803264, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 88834048}, "t_s": 7644.865167, "tick_total_rss_bytes": 118784000, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 89145344}, "t_s": 7644.924416, "tick_total_rss_bytes": 119095296, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 89505792}, "t_s": 7644.983866, "tick_total_rss_bytes": 119455744, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 89767936}, "t_s": 7645.043097, "tick_total_rss_bytes": 119717888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 90259456}, "t_s": 7645.102585, "tick_total_rss_bytes": 120209408, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 91340800}, "t_s": 7645.160466, "tick_total_rss_bytes": 121290752, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 91602944}, "t_s": 7645.219457, "tick_total_rss_bytes": 121552896, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 92143616}, "t_s": 7645.278227, "tick_total_rss_bytes": 122093568, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 103448576}, "t_s": 7645.337137, "tick_total_rss_bytes": 133398528, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 107905024}, "t_s": 7645.396172, "tick_total_rss_bytes": 137854976, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 117080064}, "t_s": 7645.45515, "tick_total_rss_bytes": 147030016, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 124420096}, "t_s": 7645.514066, "tick_total_rss_bytes": 154370048, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 132546560}, "t_s": 7645.573038, "tick_total_rss_bytes": 162496512, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 136953856}, "t_s": 7645.632094, "tick_total_rss_bytes": 166903808, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 151879680}, "t_s": 7645.691155, "tick_total_rss_bytes": 181829632, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 676593664}, "t_s": 7645.750863, "tick_total_rss_bytes": 706543616, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 1462124544}, "t_s": 7645.810296, "tick_total_rss_bytes": 1492074496, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 2223538176}, "t_s": 7645.866278, "tick_total_rss_bytes": 2253488128, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 3064791040}, "t_s": 7645.92585, "tick_total_rss_bytes": 3094740992, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 4885872640}, "t_s": 7645.985525, "tick_total_rss_bytes": 4915822592, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 6315327488}, "t_s": 7646.046457, "tick_total_rss_bytes": 6345277440, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 7144046592}, "t_s": 7646.106411, "tick_total_rss_bytes": 7173996544, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 8849604608}, "t_s": 7646.166656, "tick_total_rss_bytes": 8879554560, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 9626157056}, "t_s": 7646.223858, "tick_total_rss_bytes": 9656107008, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 10451714048}, "t_s": 7646.283928, "tick_total_rss_bytes": 10481664000, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 11271749632}, "t_s": 7646.343484, "tick_total_rss_bytes": 11301699584, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 13156679680}, "t_s": 7646.405023, "tick_total_rss_bytes": 13186629632, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29949952, "43634": 15260221440}, "t_s": 7646.464733, "tick_total_rss_bytes": 15290171392, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 17218207744}, "t_s": 7646.519793, "tick_total_rss_bytes": 17248190464, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 19332530176}, "t_s": 7646.57924, "tick_total_rss_bytes": 19362512896, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 21477031936}, "t_s": 7646.639032, "tick_total_rss_bytes": 21507014656, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 23555637248}, "t_s": 7646.698418, "tick_total_rss_bytes": 23585619968, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 25617776640}, "t_s": 7646.759577, "tick_total_rss_bytes": 25647759360, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 27459305472}, "t_s": 7646.821588, "tick_total_rss_bytes": 27489288192, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 29152444416}, "t_s": 7646.879557, "tick_total_rss_bytes": 29182427136, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 31039127552}, "t_s": 7646.938046, "tick_total_rss_bytes": 31069110272, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 33070972928}, "t_s": 7646.998186, "tick_total_rss_bytes": 33100955648, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 35125460992}, "t_s": 7647.057333, "tick_total_rss_bytes": 35155443712, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 37209227264}, "t_s": 7647.116834, "tick_total_rss_bytes": 37239209984, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 39205519360}, "t_s": 7647.177155, "tick_total_rss_bytes": 39235502080, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 41229680640}, "t_s": 7647.236779, "tick_total_rss_bytes": 41259663360, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 43195105280}, "t_s": 7647.296926, "tick_total_rss_bytes": 43225088000, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 45123633152}, "t_s": 7647.356979, "tick_total_rss_bytes": 45153615872, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 46393098240}, "t_s": 7647.416129, "tick_total_rss_bytes": 46423080960, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 47219064832}, "t_s": 7647.475916, "tick_total_rss_bytes": 47249047552, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 47986180096}, "t_s": 7647.531893, "tick_total_rss_bytes": 48016162816, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 48923787264}, "t_s": 7647.591033, "tick_total_rss_bytes": 48953769984, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 50198609920}, "t_s": 7647.650951, "tick_total_rss_bytes": 50228592640, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 51118489600}, "t_s": 7647.707884, "tick_total_rss_bytes": 51148472320, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 52253491200}, "t_s": 7647.763422, "tick_total_rss_bytes": 52283473920, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 52433059840}, "t_s": 7647.819341, "tick_total_rss_bytes": 52463042560, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 52729692160}, "t_s": 7647.874802, "tick_total_rss_bytes": 52759674880, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 52996653056}, "t_s": 7647.93074, "tick_total_rss_bytes": 53026635776, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 53168963584}, "t_s": 7647.986248, "tick_total_rss_bytes": 53198946304, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 53437825024}, "t_s": 7648.043029, "tick_total_rss_bytes": 53467807744, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 53482078208}, "t_s": 7648.098791, "tick_total_rss_bytes": 53512060928, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 53500510208}, "t_s": 7648.154085, "tick_total_rss_bytes": 53530492928, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 53630664704}, "t_s": 7648.209501, "tick_total_rss_bytes": 53660647424, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 53784379392}, "t_s": 7648.267653, "tick_total_rss_bytes": 53814362112, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 53805481984}, "t_s": 7648.323834, "tick_total_rss_bytes": 53835464704, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 54058680320}, "t_s": 7648.379915, "tick_total_rss_bytes": 54088663040, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 54137339904}, "t_s": 7648.436305, "tick_total_rss_bytes": 54167322624, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 54238904320}, "t_s": 7648.492837, "tick_total_rss_bytes": 54268903424, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 54353444864}, "t_s": 7648.548691, "tick_total_rss_bytes": 54383443968, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 54480224256}, "t_s": 7648.60394, "tick_total_rss_bytes": 54510223360, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 54687596544}, "t_s": 7648.659961, "tick_total_rss_bytes": 54717595648, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55016226816}, "t_s": 7648.71847, "tick_total_rss_bytes": 55046225920, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55245963264}, "t_s": 7648.77856, "tick_total_rss_bytes": 55275962368, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55330406400}, "t_s": 7648.834148, "tick_total_rss_bytes": 55360405504, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55512449024}, "t_s": 7648.893633, "tick_total_rss_bytes": 55542448128, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55621468160}, "t_s": 7648.950348, "tick_total_rss_bytes": 55651467264, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55675977728}, "t_s": 7649.010704, "tick_total_rss_bytes": 55705976832, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55594909696}, "t_s": 7649.065578, "tick_total_rss_bytes": 55624908800, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55544872960}, "t_s": 7649.125158, "tick_total_rss_bytes": 55574872064, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55467032576}, "t_s": 7649.184395, "tick_total_rss_bytes": 55497031680, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55394910208}, "t_s": 7649.239356, "tick_total_rss_bytes": 55424909312, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55376461824}, "t_s": 7649.296886, "tick_total_rss_bytes": 55406460928, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55350050816}, "t_s": 7649.35589, "tick_total_rss_bytes": 55380049920, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55388061696}, "t_s": 7649.414863, "tick_total_rss_bytes": 55418060800, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55348854784}, "t_s": 7649.473922, "tick_total_rss_bytes": 55378853888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55346003968}, "t_s": 7649.533132, "tick_total_rss_bytes": 55376003072, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 54984278016}, "t_s": 7649.592166, "tick_total_rss_bytes": 55014277120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29999104, "43634": 55032496128}, "t_s": 7649.651438, "tick_total_rss_bytes": 55062495232, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55135109120}, "t_s": 7649.710532, "tick_total_rss_bytes": 55165091840, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55164403712}, "t_s": 7649.769828, "tick_total_rss_bytes": 55194386432, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55136059392}, "t_s": 7649.82891, "tick_total_rss_bytes": 55166042112, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55137730560}, "t_s": 7649.887919, "tick_total_rss_bytes": 55167713280, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55138861056}, "t_s": 7649.947032, "tick_total_rss_bytes": 55168843776, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55140827136}, "t_s": 7650.006077, "tick_total_rss_bytes": 55170809856, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55140827136, "44417": 3407872}, "t_s": 7650.065126, "tick_total_rss_bytes": 55174217728, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55140827136, "44417": 3407872}, "t_s": 7650.120937, "tick_total_rss_bytes": 55174217728, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55140827136, "44417": 3407872}, "t_s": 7650.179921, "tick_total_rss_bytes": 55174217728, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55140827136, "44417": 3407872}, "t_s": 7650.242661, "tick_total_rss_bytes": 55174217728, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55140827136, "44417": 3407872}, "t_s": 7650.306169, "tick_total_rss_bytes": 55174217728, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55140827136, "44417": 3407872}, "t_s": 7650.365449, "tick_total_rss_bytes": 55174217728, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55140827136, "44417": 3407872}, "t_s": 7650.424389, "tick_total_rss_bytes": 55174217728, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 29982720, "43634": 55140843520, "44417": 3407872}, "t_s": 7650.487701, "tick_total_rss_bytes": 55174234112, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 55141007360, "44417": 3407872, "44454": 24084480}, "t_s": 7650.547455, "tick_total_rss_bytes": 55198547968, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 55149756416, "44417": 3407872, "44454": 28590080}, "t_s": 7650.606579, "tick_total_rss_bytes": 55211802624, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 55149756416, "44417": 3407872, "44454": 28590080}, "t_s": 7650.665699, "tick_total_rss_bytes": 55211802624, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 55149756416, "44417": 3407872, "44454": 28590080}, "t_s": 7650.725143, "tick_total_rss_bytes": 55211802624, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 55149756416, "44417": 3407872, "44454": 28590080}, "t_s": 7650.780283, "tick_total_rss_bytes": 55211802624, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 55116234752, "44417": 3407872, "44454": 28590080}, "t_s": 7650.839455, "tick_total_rss_bytes": 55178280960, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 55101652992, "44417": 3407872, "44454": 28590080}, "t_s": 7650.898746, "tick_total_rss_bytes": 55163699200, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 55065296896, "44417": 3407872, "44454": 28590080}, "t_s": 7650.95791, "tick_total_rss_bytes": 55127343104, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 55015260160, "44417": 3407872, "44454": 28590080}, "t_s": 7651.017481, "tick_total_rss_bytes": 55077306368, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54941024256, "44417": 3407872, "44454": 28590080}, "t_s": 7651.076694, "tick_total_rss_bytes": 55003070464, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54941024256, "44417": 3407872, "44454": 28590080}, "t_s": 7651.136027, "tick_total_rss_bytes": 55003070464, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54921969664, "44417": 3407872, "44454": 28590080}, "t_s": 7651.195256, "tick_total_rss_bytes": 54984015872, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54891986944, "44417": 3407872, "44454": 28590080}, "t_s": 7651.254446, "tick_total_rss_bytes": 54954033152, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54832922624, "44417": 3407872, "44454": 28590080}, "t_s": 7651.313843, "tick_total_rss_bytes": 54894968832, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54817554432, "44417": 3407872, "44454": 28590080}, "t_s": 7651.372986, "tick_total_rss_bytes": 54879600640, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54817554432, "44417": 3407872, "44454": 28590080}, "t_s": 7651.432401, "tick_total_rss_bytes": 54879600640, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54783705088, "44417": 3407872, "44454": 28590080}, "t_s": 7651.491544, "tick_total_rss_bytes": 54845751296, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54783705088, "44417": 3407872, "44454": 28590080}, "t_s": 7651.550948, "tick_total_rss_bytes": 54845751296, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54783705088, "44417": 3407872, "44454": 28590080}, "t_s": 7651.605929, "tick_total_rss_bytes": 54845751296, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54783705088, "44417": 3407872, "44454": 28590080}, "t_s": 7651.664289, "tick_total_rss_bytes": 54845751296, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54783721472, "44417": 3407872, "44454": 28590080}, "t_s": 7651.723428, "tick_total_rss_bytes": 54845767680, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54784049152, "44417": 3407872, "44454": 28590080}, "t_s": 7651.782876, "tick_total_rss_bytes": 54846095360, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54785146880, "44417": 3407872, "44454": 28590080}, "t_s": 7651.84244, "tick_total_rss_bytes": 54847193088, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54785163264, "44417": 3407872, "44454": 28590080}, "t_s": 7651.902979, "tick_total_rss_bytes": 54847209472, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54785196032, "44417": 3407872, "44454": 28590080}, "t_s": 7651.96319, "tick_total_rss_bytes": 54847242240, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54785982464, "44417": 3407872, "44454": 28590080}, "t_s": 7652.022892, "tick_total_rss_bytes": 54848028672, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786031616, "44417": 3407872, "44454": 28590080}, "t_s": 7652.082254, "tick_total_rss_bytes": 54848077824, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786113536, "44417": 3407872, "44454": 28590080}, "t_s": 7652.141932, "tick_total_rss_bytes": 54848159744, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786162688, "44417": 3407872, "44454": 28590080}, "t_s": 7652.201547, "tick_total_rss_bytes": 54848208896, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786211840, "44417": 3407872, "44454": 28590080}, "t_s": 7652.261018, "tick_total_rss_bytes": 54848258048, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786211840, "44417": 3407872, "44454": 28590080}, "t_s": 7652.317576, "tick_total_rss_bytes": 54848258048, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786211840, "44417": 3407872, "44454": 28590080}, "t_s": 7652.377491, "tick_total_rss_bytes": 54848258048, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786277376, "44417": 3407872, "44454": 28590080}, "t_s": 7652.437067, "tick_total_rss_bytes": 54848323584, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786277376, "44417": 3407872, "44454": 28590080}, "t_s": 7652.494238, "tick_total_rss_bytes": 54848323584, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786277376, "44417": 3407872, "44454": 28606464}, "t_s": 7652.553964, "tick_total_rss_bytes": 54848339968, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786277376, "44417": 3407872, "44454": 28606464}, "t_s": 7652.608551, "tick_total_rss_bytes": 54848339968, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786277376, "44417": 3407872, "44454": 28606464}, "t_s": 7652.668258, "tick_total_rss_bytes": 54848339968, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786277376, "44417": 3407872, "44454": 28606464}, "t_s": 7652.727733, "tick_total_rss_bytes": 54848339968, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786277376, "44417": 3407872, "44454": 28606464}, "t_s": 7652.787253, "tick_total_rss_bytes": 54848339968, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786277376, "44417": 3407872, "44454": 28606464}, "t_s": 7652.843159, "tick_total_rss_bytes": 54848339968, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786277376, "44417": 3407872, "44454": 28606464}, "t_s": 7652.902806, "tick_total_rss_bytes": 54848339968, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786277376, "44417": 3407872, "44454": 28606464}, "t_s": 7652.962167, "tick_total_rss_bytes": 54848339968, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.021939, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.078967, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.13897, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.198402, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.257606, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.31692, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.376199, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.435401, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.494156, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.551578, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.61078, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.670299, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.729409, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.787271, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.844376, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.902777, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7653.961152, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7654.019604, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7654.079095, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7654.138315, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786293760, "44417": 3407872, "44454": 28606464}, "t_s": 7654.197966, "tick_total_rss_bytes": 54848356352, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.25728, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.316859, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.376231, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.435485, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.494596, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.553781, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.61294, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.668504, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.72334, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.782433, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.842032, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.901268, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786326528, "44417": 3407872, "44454": 28606464}, "t_s": 7654.960617, "tick_total_rss_bytes": 54848389120, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786359296, "44417": 3407872, "44454": 28606464}, "t_s": 7655.017482, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786359296, "44417": 3407872, "44454": 28606464}, "t_s": 7655.075999, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786359296, "44417": 3407872, "44454": 28606464}, "t_s": 7655.132335, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786359296, "44417": 3407872, "44454": 28606464}, "t_s": 7655.191697, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786359296, "44417": 3407872, "44454": 28606464}, "t_s": 7655.250918, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786359296, "44417": 3407872, "44454": 28606464}, "t_s": 7655.305754, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786359296, "44417": 3407872, "44454": 28606464}, "t_s": 7655.36511, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28606464}, "t_s": 7655.424377, "tick_total_rss_bytes": 54848438272, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28606464}, "t_s": 7655.480033, "tick_total_rss_bytes": 54848438272, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28606464}, "t_s": 7655.53761, "tick_total_rss_bytes": 54848438272, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7655.597147, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7655.654833, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7655.709106, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7655.768204, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7655.827598, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7655.88538, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7655.944575, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.003726, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.062917, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.122191, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.180631, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.239855, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.29935, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.358636, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.4182, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.477478, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.536856, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.593058, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.65218, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.711308, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.768408, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.825785, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.885451, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7656.945075, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.003867, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.063286, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.117993, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.177381, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.236795, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.292964, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.352161, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.407489, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.466927, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.526118, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.58539, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.644733, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.70412, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.763512, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.822845, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.882187, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7657.941637, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.000873, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.060204, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.119326, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.178364, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.235399, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.293964, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.353354, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.411184, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.470733, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.527396, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.586692, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.64622, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.705663, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.765183, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.824479, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.883973, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7658.941879, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.001832, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.059657, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.119124, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.176538, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.231176, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.287486, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.346844, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.407114, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.466528, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.526032, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.585338, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.643821, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.703147, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.762605, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.821841, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.881081, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.940438, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7659.998169, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7660.057031, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7660.116439, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7660.173664, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786375680, "44417": 3407872, "44454": 28590080}, "t_s": 7660.232871, "tick_total_rss_bytes": 54848421888, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786408448, "44417": 3407872}, "t_s": 7660.291896, "tick_total_rss_bytes": 54819864576, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786408448, "44417": 3407872}, "t_s": 7660.348019, "tick_total_rss_bytes": 54819864576, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256, "43634": 54786408448, "44417": 3407872}, "t_s": 7660.410887, "tick_total_rss_bytes": 54819864576, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256}, "t_s": 7660.470655, "tick_total_rss_bytes": 30048256, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256}, "t_s": 7660.530023, "tick_total_rss_bytes": 30048256, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256}, "t_s": 7660.58919, "tick_total_rss_bytes": 30048256, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256}, "t_s": 7660.648402, "tick_total_rss_bytes": 30048256, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256}, "t_s": 7660.707452, "tick_total_rss_bytes": 30048256, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256}, "t_s": 7660.766494, "tick_total_rss_bytes": 30048256, "tracked_root_pids": [43633]}
+{"per_pid_rss_bytes": {"43633": 30048256}, "t_s": 7660.825644, "tick_total_rss_bytes": 30048256, "tracked_root_pids": [43633]}

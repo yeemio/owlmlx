@@ -1,0 +1,51 @@
+{
+  "rerun_python": "/opt/homebrew/opt/python@3.14/bin/python3.14",
+  "runtime_argv": [
+    {
+      "argv": [
+        "python3",
+        "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/openai_stream_client.py",
+        "http://127.0.0.1:8066",
+        "gemma-4-31B-it",
+        "In one short sentence, define local AI.",
+        "64",
+        "0.0"
+      ],
+      "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+      "env": {
+        "OPENAI_STREAM_CLIENT_MEMORY_GB": "80",
+        "OPENAI_STREAM_CLIENT_PRELOAD_MODE": "owlmlx_v1_load",
+        "OPENAI_STREAM_CLIENT_UNLOAD_MODE": "owlmlx_v1_unload"
+      },
+      "external_pid_file": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/omlx-livepid-run/owlmlx-8066.pid",
+      "external_pids": [],
+      "first_token_strategy": "first_nonempty_chunk",
+      "runtime_id": "owlmlx",
+      "runtime_version": "3e14497-dirty-current-8066",
+      "timeout_s": 900.0,
+      "tokens_method": "max_tokens"
+    },
+    {
+      "argv": [
+        "python3",
+        "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/openai_stream_client.py",
+        "http://127.0.0.1:8001",
+        "gemma-4-31B-it",
+        "In one short sentence, define local AI.",
+        "64",
+        "0.0"
+      ],
+      "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+      "env": {
+        "OPENAI_STREAM_CLIENT_UNLOAD_MODE": "omlx_v1_model_unload"
+      },
+      "external_pid_file": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/omlx-livepid-run/omlx-server.pid",
+      "external_pids": [],
+      "first_token_strategy": "first_nonempty_chunk",
+      "runtime_id": "omlx",
+      "runtime_version": "0.3.5-probe-venv-d3c328f",
+      "timeout_s": 900.0,
+      "tokens_method": "max_tokens"
+    }
+  ]
+}

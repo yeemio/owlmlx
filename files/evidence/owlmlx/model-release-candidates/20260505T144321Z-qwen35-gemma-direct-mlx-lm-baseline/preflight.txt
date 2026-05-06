@@ -1,0 +1,399 @@
+# preflight
+created_at=2026-05-05T14:43:21Z
+repo=/Users/yeemio/AI/gitrep/owlmlx
+evidence_dir=files/evidence/owlmlx/model-release-candidates/20260505T144321Z-qwen35-gemma-direct-mlx-lm-baseline
+
+$ git status --short --branch
+## main...origin/main [ahead 4]
+ M README.md
+M  docs/source-of-truth/capability-absorption-inventory.md
+A  docs/source-of-truth/deepseek-v4-flash-adapter-optimization-candidate.md
+M  docs/source-of-truth/master-outline.md
+M  docs/source-of-truth/model-line-placement.md
+A  docs/source-of-truth/model-release-candidate-program.md
+M  docs/source-of-truth/ownership-boundary.md
+A  docs/source-of-truth/peer-reference-mechanism-audit-for-model-profiles.md
+A  docs/source-of-truth/peer-reference-vendor-provenance-audit.md
+ M docs/source-of-truth/phase45-heavy-weight-repeatability-status.md
+ M docs/source-of-truth/phase45-host-stable-execution-status.md
+M  docs/source-of-truth/public-surface.md
+M  docs/source-of-truth/release-readiness-execution-plan.md
+M  docs/source-of-truth/roadmap.md
+M  docs/source-of-truth/runtime-capability-matrix.md
+M  docs/source-of-truth/runtime-model-visibility-contract.md
+M  docs/source-of-truth/runtime-status-schema.md
+ M docs/source-of-truth/system-architecture.md
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/ledger.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/openai-models.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/repeat-01-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/repeat-01-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/repeat-01-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/repeat-01-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/repeat-02-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/repeat-02-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/repeat-02-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/repeat-02-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/runner-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/openai-models.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/repeat-01-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/repeat-01-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/repeat-01-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/repeat-01-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/repeat-02-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/repeat-02-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/repeat-02-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/repeat-02-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-rerun/runner-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/http-history.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/http-latest.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/ledger.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/openai-models.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/operator-output.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/repeat-01-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/repeat-01-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/repeat-01-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/repeat-01-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/repeat-02-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/repeat-02-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/repeat-02-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/repeat-02-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/runner-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/evidence-dir.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/http-history-current-mounted-ledger.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/http-latest-current-mounted-ledger.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/ledger.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/local-ledger-history.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/local-ledger-latest.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/openai-models.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/operator-output.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/post-run-runtime-status.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/repeat-01-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/repeat-01-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/repeat-01-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/repeat-01-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/repeat-02-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/repeat-02-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/repeat-02-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/repeat-02-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/runner-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/test-output.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/append-record-output.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/append-record-stderr.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/final-stale-and-port-check.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/generate-metrics.env
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/generate.pid
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/generate.stderr
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/generate.stdout
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/generation-summary.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/git-diff-check.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/host-memsize.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/ledger.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/lock-after-investigation.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/lock.log
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/model-du.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/model-index-summary.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/model-ls.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/port-8001-before.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/port-8009-before.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/port-8066-before.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/post-generate-processes.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/pre-stale-processes.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/preflight.env
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/py-compile-runtime-model-release-candidate.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/pytest-model-release-candidate-surface.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/python-version.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/runtime-packages.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/vm-stat-after-generate.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/vm-stat-before.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/evidence-dir.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/final-stale-and-port-check.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/http-history.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/http-latest.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/ledger.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/local-ledger-history.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/local-ledger-latest.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/openai-models.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/operator-output.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/post-run-healthz.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/post-run-process-check.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/repeat-01-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/repeat-01-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/repeat-01-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/repeat-01-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/repeat-02-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/repeat-02-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/repeat-02-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/repeat-02-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/runner-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130835Z-qwen36-27b-v2/ledger.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T130835Z-qwen36-27b-v2/openai-models.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130835Z-qwen36-27b-v2/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T130835Z-qwen36-27b-v2/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130835Z-qwen36-27b-v2/repeat-01-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130835Z-qwen36-27b-v2/runner-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/ledger.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/openai-models.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/operator-output.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/repeat-01-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/repeat-01-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/repeat-01-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/repeat-01-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/repeat-02-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/repeat-02-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/repeat-02-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/repeat-02-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T130906Z-qwen36-27b-v2-rerun/runner-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/ledger.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/openai-models.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/operator-output.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/repeat-01-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/repeat-01-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/repeat-01-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/repeat-01-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/repeat-02-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/repeat-02-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/repeat-02-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/repeat-02-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131002Z-qwen36-35b-a3b-v2/runner-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/ledger.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/openai-models.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/operator-output.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/repeat-01-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/repeat-01-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/repeat-01-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/repeat-01-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/repeat-02-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/repeat-02-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/repeat-02-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/repeat-02-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131104Z-gemma-4-31b-it-v2/runner-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/ledger.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/openai-models.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/operator-output.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/repeat-01-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/repeat-01-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/repeat-01-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/repeat-01-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/repeat-02-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/repeat-02-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/repeat-02-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/repeat-02-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T131334Z-gemma-4-31b-it-v2-rerun/runner-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/comparison-summary.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/direct-mlx-lm-command-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/direct-mlx-lm.stdout-stderr.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/direct-process-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/direct-repeat-01-stream.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/direct-repeat-01-summary.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/direct-repeat-02-stream.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/direct-repeat-02-summary.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/direct-summary.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/final-cleanup-check.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/final-process-check-clean.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/http-ledger.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/lock-and-port-baseline.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/mlx-lm-api-introspection.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/openai-models.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/owlmlx-http-command-output.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/preflight.txt
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/process-tree-rss.jsonl
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/record.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/repeat-01-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/repeat-01-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/repeat-01-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/repeat-01-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/repeat-02-generation.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/repeat-02-load.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/repeat-02-stream.ndjson
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/repeat-02-unload.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/runner-config.json
+A  files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/verification.txt
+A  files/evidence/owlmlx/model-release-candidates/cumulative-ledger.jsonl
+A  files/execution-prompts/owlmlx/owlcoda-direct-owlmlx-model-visibility-cutover.md
+A  files/execution-prompts/owlmlx/owlmlx-mlx-lm-generation-path-static-triage.md
+A  files/execution-prompts/owlmlx/owlmlx-model-profile-operational-wiring.md
+A  files/execution-prompts/owlmlx/owlmlx-model-profile-resolver-p0-gemma-qwen-mainline-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-model-profile-resolver-p0-gemma-qwen-mainline.md
+A  files/execution-prompts/owlmlx/owlmlx-model-rc-parallel-profile-baseline-provenance-coordinator-packet.md
+A  files/execution-prompts/owlmlx/owlmlx-model-rc-profile-aware-parallel-coordinator-packet.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-a0-evidence-schema-and-runner-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-a0-evidence-schema-and-runner.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-a1-live-mainline-qwen36-27b.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-a1-qwen36-27b-live-record-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-a2-a3-d1-parallel-closeout-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-a2-live-mainline-qwen36-35b-a3b.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-a2-qwen36-35b-a3b-live-record-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-a3-gemma-4-31b-it-live-record-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-a3-live-mainline-gemma-4-31b-it.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-d1-deepseek-v4-flash-2bit-dq-pressure-adapter-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-d1-deepseek-v4-flash-2bit-dq-pressure-adapter.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-gemma-chat-template-probe-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-goal-contract.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-gpt-oss-120b-retirement-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-observability-v2-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-parallel-a1-b1-coordinator-packet.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-remaining-lanes-coordinator-packet.md
+A  files/execution-prompts/owlmlx/owlmlx-model-release-candidate-v2-mainline-rerun-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-owlcoda-model-visibility-truth-cutover-contract.md
+A  files/execution-prompts/owlmlx/owlmlx-peer-reference-mechanism-audit-for-model-profiles-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-peer-reference-mechanism-audit-for-model-profiles.md
+A  files/execution-prompts/owlmlx/owlmlx-peer-reference-vendor-provenance-audit-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-peer-reference-vendor-provenance-audit.md
+A  files/execution-prompts/owlmlx/owlmlx-qwen27-direct-mlx-lm-baseline-handoff.md
+A  files/execution-prompts/owlmlx/owlmlx-qwen27-direct-mlx-lm-baseline.md
+A  files/execution-prompts/owlmlx/owlmlx-qwen35-gemma-direct-mlx-lm-baseline.md
+A  files/execution-prompts/owlmlx/owlops-model-rc-observability-v2-consumer-workspace.md
+A  files/execution-prompts/owlmlx/owlops-model-rc-profile-aware-observability-r167.md
+A  files/execution-prompts/owlmlx/owlops-model-release-candidate-b1-consumer-workspace.md
+ M files/execution-prompts/owlmlx/phase-45-local-baseline-reentry-after-revalidation.md
+ M owlmlx/__init__.py
+ M owlmlx/cache_pre_claim_inert_state_semantics.py
+ M owlmlx/cache_pre_gate_admission_hook_exactness.py
+ M owlmlx/cache_pre_gate_admission_hook_harness.py
+ M owlmlx/cache_pre_gate_admission_window_seam.py
+ M owlmlx/cache_pre_gate_cohort_window_feasibility.py
+ M owlmlx/cache_request_aggregation_active_seam.py
+ M owlmlx/customer_runtime_evidence.py
+ M owlmlx/dominant_gap_reselection.py
+ M owlmlx/heavy_weight_repeatability_status.py
+A  owlmlx/model_profile.py
+A  owlmlx/model_release_candidate_ledger.py
+A  owlmlx/model_release_candidate_record.py
+A  owlmlx/model_release_candidate_schema.py
+ M owlmlx/runtime/mlx_environment.py
+M  owlmlx/runtime/server.py
+M  owlmlx/runtime/technical_preview.py
+M  owlmlx/runtime_model_visibility.py
+ M owlmlx/serving.py
+ M scripts/runtime_cache_pre_gate_admission_hook_exactness.py
+ M scripts/runtime_cache_pre_gate_admission_window_seam.py
+ M scripts/runtime_cache_request_aggregation_active_seam.py
+ M scripts/runtime_dominant_gap_reselection.py
+ M scripts/runtime_heavy_weight_repeatability_status.py
+A  scripts/runtime_model_release_candidate.py
+M  scripts/runtime_technical_preview_server.py
+ M tests/test_cache_pre_claim_inert_state_semantics.py
+ M tests/test_cache_pre_gate_admission_hook_exactness.py
+ M tests/test_cache_pre_gate_admission_hook_harness.py
+ M tests/test_cache_pre_gate_cohort_window_feasibility.py
+ M tests/test_cache_request_aggregation_active_seam.py
+ M tests/test_customer_runtime_evidence.py
+ M tests/test_dominant_gap_reselection.py
+ M tests/test_heavy_weight_repeatability_status.py
+ M tests/test_memory_pressure_contract.py
+ M tests/test_mlx_environment.py
+A  tests/test_model_profile.py
+A  tests/test_model_release_candidate_surface.py
+ M tests/test_runtime_kernel.py
+M  tests/test_runtime_model_visibility.py
+M  tests/test_runtime_technical_preview_server.py
+?? docs/source-of-truth/phase45-current-host-heavy-boundary-budget-blocker.md
+?? docs/source-of-truth/phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-first-unique-boundary-exactness.md
+?? docs/source-of-truth/single-host-orchestration-architecture.md
+?? files/evidence/owlmlx/model-release-candidates/20260505T144321Z-qwen35-gemma-direct-mlx-lm-baseline/
+?? files/execution-prompts/.DS_Store
+?? files/execution-prompts/owlmlx/owlcoda-runtime-model-visibility-truth-source-cutover.md
+?? files/execution-prompts/owlmlx/owlmlx-release-floor-3-4A-termination-recovery-policy-handoff.md
+?? files/execution-prompts/owlmlx/owlmlx-single-host-scheduler-admission-contract.md
+?? files/execution-prompts/owlmlx/owlops-orchestration-bottleneck-observability-service.md
+?? files/execution-prompts/owlmlx/phase-45-authorized-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-earlier-runtime-owned-boundary-dependency.md
+?? files/execution-prompts/owlmlx/phase-45-authorized-narrow-repeated-heavy-weight-validation.md
+?? files/execution-prompts/owlmlx/phase-45-authorized-pre-gate-request-aggregation-window.md
+?? files/execution-prompts/owlmlx/phase-45-child-exchange-closeout-repair.md
+?? files/execution-prompts/owlmlx/phase-45-coordinator-checkpoint-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-discriminant-still-blocked.md
+?? files/execution-prompts/owlmlx/phase-45-coordinator-checkpoint-budget-fit-heavy-boundary.md
+?? files/execution-prompts/owlmlx/phase-45-coordinator-checkpoint-current-host-heavy-boundary.md
+?? files/execution-prompts/owlmlx/phase-45-coordinator-checkpoint-current-host-supported-candidate-baseline.md
+?? files/execution-prompts/owlmlx/phase-45-coordinator-checkpoint-narrow-repeated-heavy-weight-validation.md
+?? files/execution-prompts/owlmlx/phase-45-coordinator-packet-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-stem-dependency.md
+?? files/execution-prompts/owlmlx/phase-45-current-host-stronger-baseline-validation-and-heavy-weight-boundary-check.md
+?? files/execution-prompts/owlmlx/phase-45-current-host-supported-candidate-baseline-establishment.md
+?? files/execution-prompts/owlmlx/phase-45-fit-within-budget-heavy-boundary-retarget.md
+?? files/execution-prompts/owlmlx/phase-45-gpt-5-4-executor-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-stem-dependency.md
+?? files/execution-prompts/owlmlx/phase-45-opus-4-7-scoped-review-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-stem-dependency.md
+?? files/execution-prompts/owlmlx/phase-45-opus-4-7-scoped-review-handoff-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-stem-still-blocked.md
+?? owlmlx/cache_stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness.py
+?? owlmlx/cache_stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_harness.py
+?? scripts/runtime_cache_stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness.py
+?? tests/test_cache_stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness.py
+?? tests/test_cache_stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_harness.py
+?? uv.lock
+
+$ .venv/bin/python dependency check
+/Users/yeemio/AI/gitrep/owlmlx/.venv/bin/python
+mlx True None
+mlx_lm True /Users/yeemio/AI/gitrep/owlmlx/.venv/lib/python3.11/site-packages/mlx_lm/__init__.py
+
+$ model sizes
+ 67G	/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B
+ 58G	/Users/yeemio/AI/Agent/models/gemma-4-31B-it
+
+$ listeners 8001 8009 8066
+--- port 8001 ---
+COMMAND   PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  20329 yeemio    8u  IPv4 0x1c59a10a79faf1d0      0t0  TCP 127.0.0.1:vcom-tunnel (LISTEN)
+--- port 8009 ---
+COMMAND   PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  73368 yeemio   10u  IPv4 0xa58b9588c01c6880      0t0  TCP *:8009 (LISTEN)
+--- port 8066 ---
+COMMAND  PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  4348 yeemio   10u  IPv4 0x6af15da21e067a88      0t0  TCP 127.0.0.1:8066 (LISTEN)
+
+$ host memory
+hw.memsize: 137438953472
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                             2943909.
+Pages active:                           1736518.
+Pages inactive:                         3060482.
+Pages speculative:                        53300.
+Pages throttled:                              0.
+Pages wired down:                        296783.
+Pages purgeable:                          25205.
+"Translation faults":                1746850032.
+Pages copy-on-write:                   61958872.
+Pages zero filled:                   1444182306.
+Pages reactivated:                      4636972.
+Pages purged:                           3157369.
+File-backed pages:                      3302330.
+Anonymous pages:                        1547970.
+Pages stored in compressor:             4510622.
+Pages occupied by compressor:            193137.
+Decompressions:                        41034677.
+Compressions:                          52675593.
+Pageins:                               95593029.
+Pageouts:                                  8123.
+Swapins:                                1587350.
+Swapouts:                               6653445.
+
+$ 8066 read-only probes
+{"contract":{"surface":"owlmlx.healthz","version":"stabilization1"},"runtime":"owlmlx","ok":true,"readiness":"degraded","active_model_id":null,"model_count":0,"backend_name":"mlx-lm-subprocess","backend_error":null,"persistent_child":true,"child_health":{}}
+{"object":"list","data":[{"id":"Qwen3.6-27B","object":"model","owned_by":"owlmlx"},{"id":"Qwen3.6-35B-A3B","object":"model","owned_by":"owlmlx"},{"id":"gemma-4-31B-it","object":"model","owned_by":"owlmlx"}]}
+$ heavy lock
+total 8
+drwxr-xr-x@   3 yeemio  wheel    96 May  5 22:43 .
+drwxrwxrwt  147 root    wheel  4704 May  5 22:43 ..
+-rw-r--r--@   1 yeemio  wheel   138 May  5 22:43 owner.txt
+owner=Executor C owlmlx-qwen35-gemma-direct-mlx-lm-baseline
+repo=/Users/yeemio/AI/gitrep/owlmlx
+pid=81975
+created_at=2026-05-05T14:43:06Z

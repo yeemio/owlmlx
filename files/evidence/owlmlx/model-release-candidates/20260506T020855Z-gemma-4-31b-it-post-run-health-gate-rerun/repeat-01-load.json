@@ -1,0 +1,21 @@
+{
+  "elapsed_ms": 9.13,
+  "payload": {
+    "detail": {
+      "budget": {
+        "budget_gb": 116.0,
+        "currently_loaded_gb": 0.0,
+        "headroom_gb": -12.0,
+        "message": "loading 128.0G would exceed serving budget: 0.0G loaded + 128.0G requested = 128.0G > 116.0G limit",
+        "projected_gb": 128.0,
+        "requested_gb": 128.0,
+        "verdict": "exceeds"
+      }
+    },
+    "error_code": "memory_budget_exceeded",
+    "message": "loading 128.0G would exceed serving budget: 0.0G loaded + 128.0G requested = 128.0G > 116.0G limit",
+    "model": null,
+    "ok": false
+  },
+  "status_code": 200
+}

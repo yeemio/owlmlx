@@ -1,0 +1,205 @@
+{
+  "appended_record": {
+    "evidence_pointer": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/manifest.json",
+    "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+    "recorded_at": "2026-05-06T03:22:48Z",
+    "runtimes": [
+      {
+        "measurement": {
+          "completed_request_count": 2,
+          "failure_count": 0,
+          "first_token_latency_ms": 8421.27570799994,
+          "peak_resident_set_bytes": 52920385536,
+          "throughput_tokens_per_second": 3.739836774739193,
+          "wall_clock_ms": 17115.366270500544
+        },
+        "runtime_id": "owlmlx",
+        "runtime_version": "3e14497-dirty-current-8066"
+      },
+      {
+        "measurement": {
+          "completed_request_count": 0,
+          "failure_causes": [
+            "first_token_latency_unobservable"
+          ],
+          "failure_count": 2,
+          "first_token_latency_ms": 0.0,
+          "peak_resident_set_bytes": 54904782848,
+          "throughput_tokens_per_second": 0.0,
+          "wall_clock_ms": 0.0
+        },
+        "runtime_id": "vmlx",
+        "runtime_version": "vmlx-engine-probe-venv-9fe1bb7"
+      }
+    ],
+    "surface": "owlmlx.comparative_evidence_record",
+    "verdict_grade": "rejected",
+    "verdict_text": "rejected: vmlx_runtime_invocation_failed:first_token_latency_unobservable on host_class=Mac17,6-arm64-macOS-26.4.1-128GB, workload_class=single_prompt_short",
+    "version": "v1",
+    "workload_class": "single_prompt_short",
+    "workload_invariants": {
+      "decode_max_tokens": 64,
+      "decode_temperature": 0.0,
+      "model_id": "gemma-4-31B-it",
+      "model_quantization": "full_precision_unquantized",
+      "prompt_set_hash": "sha256:d394e1ea7857e2ca0bb2859ed62a4fc7782534cbbab9aca64c9f7f9fd38090e4",
+      "serving_budget_bytes": 85899345920
+    }
+  },
+  "completed_at": "2026-05-06T03:22:48Z",
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "ledger_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/live-ledger.jsonl",
+  "repeats": 2,
+  "runtimes": [
+    {
+      "attempts": [
+        {
+          "attempt_index": 1,
+          "command_argv": [
+            "python3",
+            "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/openai_stream_client.py",
+            "http://127.0.0.1:8066",
+            "gemma-4-31B-it",
+            "In one short sentence, define local AI.",
+            "64",
+            "0.0"
+          ],
+          "completed_at_iso": "2026-05-06T03:21:57Z",
+          "failure_cause": null,
+          "first_token_latency_ms": 8592.602540999906,
+          "generated_token_count": 64,
+          "ok": true,
+          "peak_resident_set_bytes": 52458045440,
+          "return_code": 0,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/owlmlx_attempt1.rss.jsonl",
+          "runtime_id": "owlmlx",
+          "started_at_iso": "2026-05-06T03:21:39Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/owlmlx_attempt1.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/owlmlx_attempt1.stdout.txt",
+          "throughput_tokens_per_second": 3.6962958357206506,
+          "wall_clock_ms": 17314.63141600034
+        },
+        {
+          "attempt_index": 2,
+          "command_argv": [
+            "python3",
+            "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/openai_stream_client.py",
+            "http://127.0.0.1:8066",
+            "gemma-4-31B-it",
+            "In one short sentence, define local AI.",
+            "64",
+            "0.0"
+          ],
+          "completed_at_iso": "2026-05-06T03:22:13Z",
+          "failure_cause": null,
+          "first_token_latency_ms": 8249.948874999973,
+          "generated_token_count": 64,
+          "ok": true,
+          "peak_resident_set_bytes": 52920385536,
+          "return_code": 0,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/owlmlx_attempt2.rss.jsonl",
+          "runtime_id": "owlmlx",
+          "started_at_iso": "2026-05-06T03:21:57Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/owlmlx_attempt2.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/owlmlx_attempt2.stdout.txt",
+          "throughput_tokens_per_second": 3.783377713757736,
+          "wall_clock_ms": 16916.10112500075
+        }
+      ],
+      "completed_request_count": 2,
+      "failure_causes": [],
+      "failure_count": 0,
+      "first_token_latency_ms": 8421.27570799994,
+      "peak_resident_set_bytes": 52920385536,
+      "runtime_id": "owlmlx",
+      "runtime_version": "3e14497-dirty-current-8066",
+      "throughput_tokens_per_second": 3.739836774739193,
+      "wall_clock_ms": 17115.366270500544
+    },
+    {
+      "attempts": [
+        {
+          "attempt_index": 1,
+          "command_argv": [
+            "python3",
+            "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx_serve_once_client.py",
+            "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+            "gemma-4-31B-it",
+            "8064",
+            "In one short sentence, define local AI.",
+            "64",
+            "0.0",
+            "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/vmlx-server.log"
+          ],
+          "completed_at_iso": "2026-05-06T03:22:30Z",
+          "failure_cause": "first_token_latency_unobservable",
+          "first_token_latency_ms": null,
+          "generated_token_count": 0,
+          "ok": false,
+          "peak_resident_set_bytes": 54904782848,
+          "return_code": 0,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/vmlx_attempt1.rss.jsonl",
+          "runtime_id": "vmlx",
+          "started_at_iso": "2026-05-06T03:22:13Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/vmlx_attempt1.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/vmlx_attempt1.stdout.txt",
+          "throughput_tokens_per_second": null,
+          "wall_clock_ms": 16679.697791999388
+        },
+        {
+          "attempt_index": 2,
+          "command_argv": [
+            "python3",
+            "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx_serve_once_client.py",
+            "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+            "gemma-4-31B-it",
+            "8064",
+            "In one short sentence, define local AI.",
+            "64",
+            "0.0",
+            "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/vmlx-server.log"
+          ],
+          "completed_at_iso": "2026-05-06T03:22:48Z",
+          "failure_cause": "first_token_latency_unobservable",
+          "first_token_latency_ms": null,
+          "generated_token_count": 0,
+          "ok": false,
+          "peak_resident_set_bytes": 52864761856,
+          "return_code": 0,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/vmlx_attempt2.rss.jsonl",
+          "runtime_id": "vmlx",
+          "started_at_iso": "2026-05-06T03:22:30Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/vmlx_attempt2.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-controlled-run/run/vmlx_attempt2.stdout.txt",
+          "throughput_tokens_per_second": null,
+          "wall_clock_ms": 18065.30862499949
+        }
+      ],
+      "completed_request_count": 0,
+      "failure_causes": [
+        "first_token_latency_unobservable"
+      ],
+      "failure_count": 2,
+      "first_token_latency_ms": 0.0,
+      "peak_resident_set_bytes": 54904782848,
+      "runtime_id": "vmlx",
+      "runtime_version": "vmlx-engine-probe-venv-9fe1bb7",
+      "throughput_tokens_per_second": 0.0,
+      "wall_clock_ms": 0.0
+    }
+  ],
+  "started_at": "2026-05-06T03:21:39Z",
+  "verdict_grade": "rejected",
+  "verdict_text": "rejected: vmlx_runtime_invocation_failed:first_token_latency_unobservable on host_class=Mac17,6-arm64-macOS-26.4.1-128GB, workload_class=single_prompt_short",
+  "workload": {
+    "decode_max_tokens": 64,
+    "decode_temperature": 0.0,
+    "model_id": "gemma-4-31B-it",
+    "model_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+    "model_quantization": "full_precision_unquantized",
+    "prompt": "In one short sentence, define local AI.",
+    "prompt_set_hash": "sha256:d394e1ea7857e2ca0bb2859ed62a4fc7782534cbbab9aca64c9f7f9fd38090e4",
+    "serving_budget_bytes": 85899345920,
+    "workload_class": "single_prompt_short"
+  }
+}

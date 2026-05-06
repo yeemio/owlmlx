@@ -1,0 +1,17 @@
+2026-05-06 11:08:15,978 - omlx.engine_pool - WARNING - [-] - [swap-safe] Settle barrier timed out for 'gemma-4-31B-it': freed=58.25GB (need>=59.16GB), pre_unload=58.25GB, active_now=32.00B
+2026-05-06 11:08:39,106 - omlx.engine_pool - WARNING - [-] - [swap-safe] Settle barrier timed out for 'gemma-4-31B-it': freed=58.25GB (need>=59.16GB), pre_unload=58.25GB, active_now=32.00B
+2026-05-06 11:10:06,037 - omlx.engine_pool - WARNING - [-] - [swap-safe] Settle barrier timed out for 'gemma-4-31B-it': freed=58.25GB (need>=59.16GB), pre_unload=58.25GB, active_now=32.00B
+2026-05-06 11:12:54,821 - omlx.scheduler - ERROR - [-] - Error in batch generation step: 514266128592
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 3521, in step
+    scheduled, rejected = self._schedule_waiting()
+                          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/omlx/0.3.4/libexec/lib/python3.11/site-packages/omlx/scheduler.py", line 2985, in _schedule_waiting
+    del self.uid_to_request_id[temp_uid]
+        ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+KeyError: 514266128592
+
+2026-05-06 11:13:00,169 - omlx.engine_pool - WARNING - [-] - [swap-safe] Settle barrier timed out for 'gemma-4-31B-it': freed=58.27GB (need>=59.16GB), pre_unload=58.27GB, active_now=32.00B
+2026-05-06 11:14:49,915 - omlx.engine_pool - WARNING - [-] - [swap-safe] Settle barrier timed out for 'gemma-4-31B-it': freed=58.25GB (need>=59.16GB), pre_unload=58.25GB, active_now=32.00B
+2026-05-06 11:15:10,627 - omlx.engine_pool - WARNING - [-] - [swap-safe] Settle barrier timed out for 'gemma-4-31B-it': freed=58.25GB (need>=59.16GB), pre_unload=58.25GB, active_now=32.00B
+2026-05-06 11:19:10,846 - omlx.engine_pool - WARNING - [-] - [swap-safe] Settle barrier timed out for 'gemma-4-31B-it': freed=58.25GB (need>=59.16GB), pre_unload=58.25GB, active_now=32.00B

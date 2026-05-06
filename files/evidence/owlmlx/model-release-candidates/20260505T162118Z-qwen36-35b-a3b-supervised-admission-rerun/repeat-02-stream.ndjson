@@ -1,0 +1,63 @@
+{"completion_tokens": 1, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "Here"}
+{"completion_tokens": 2, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "'s"}
+{"completion_tokens": 3, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " a"}
+{"completion_tokens": 4, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " thinking"}
+{"completion_tokens": 5, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " process"}
+{"completion_tokens": 6, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": ":"}
+{"completion_tokens": 7, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "\n\n"}
+{"completion_tokens": 8, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "1"}
+{"completion_tokens": 9, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "."}
+{"completion_tokens": 10, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "  **"}
+{"completion_tokens": 11, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "An"}
+{"completion_tokens": 12, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "alyze"}
+{"completion_tokens": 13, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " User"}
+{"completion_tokens": 14, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " Input"}
+{"completion_tokens": 15, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": ":**"}
+{"completion_tokens": 16, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "\n"}
+{"completion_tokens": 17, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "  "}
+{"completion_tokens": 18, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " -"}
+{"completion_tokens": 19, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " **"}
+{"completion_tokens": 20, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "Topic"}
+{"completion_tokens": 21, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": ":**"}
+{"completion_tokens": 22, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " Local"}
+{"completion_tokens": 23, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " AI"}
+{"completion_tokens": 24, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "\n"}
+{"completion_tokens": 25, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "  "}
+{"completion_tokens": 26, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " -"}
+{"completion_tokens": 27, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " **"}
+{"completion_tokens": 28, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "Requirement"}
+{"completion_tokens": 29, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": ":**"}
+{"completion_tokens": 30, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " Define"}
+{"completion_tokens": 31, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " it"}
+{"completion_tokens": 32, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " in"}
+{"completion_tokens": 33, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " one"}
+{"completion_tokens": 34, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " short"}
+{"completion_tokens": 35, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " sentence"}
+{"completion_tokens": 36, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "."}
+{"completion_tokens": 37, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "\n\n"}
+{"completion_tokens": 38, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "2"}
+{"completion_tokens": 39, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "."}
+{"completion_tokens": 40, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "  **"}
+{"completion_tokens": 41, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "Ident"}
+{"completion_tokens": 42, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "ify"}
+{"completion_tokens": 43, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " Key"}
+{"completion_tokens": 44, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " Concepts"}
+{"completion_tokens": 45, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " of"}
+{"completion_tokens": 46, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " \""}
+{"completion_tokens": 47, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "Local"}
+{"completion_tokens": 48, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " AI"}
+{"completion_tokens": 49, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "\":"}
+{"completion_tokens": 50, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "**"}
+{"completion_tokens": 51, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "\n"}
+{"completion_tokens": 52, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "  "}
+{"completion_tokens": 53, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " -"}
+{"completion_tokens": 54, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " Runs"}
+{"completion_tokens": 55, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " on"}
+{"completion_tokens": 56, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " personal"}
+{"completion_tokens": 57, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " devices"}
+{"completion_tokens": 58, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " ("}
+{"completion_tokens": 59, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "l"}
+{"completion_tokens": 60, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": "aptops"}
+{"completion_tokens": 61, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": ","}
+{"completion_tokens": 62, "event": "token", "model_id": "Qwen3.6-35B-A3B", "text": " desktop"}
+{"completion_tokens": 62, "event": "done", "finish_reason": "length", "model_id": "Qwen3.6-35B-A3B"}

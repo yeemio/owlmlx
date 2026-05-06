@@ -1,0 +1,11 @@
+{
+  "last": {
+    "decode_tokens_per_second": 31.1,
+    "failure_count": 0,
+    "model_id": "Qwen3.6-35B-A3B",
+    "owlops_observation_path": "files/evidence/owlmlx/model-release-candidates/20260505T162118Z-qwen36-35b-a3b-supervised-admission-rerun",
+    "peak_resident_set_bytes": 62626299904,
+    "verdict": "needs_optimization"
+  },
+  "record_count": 9
+}

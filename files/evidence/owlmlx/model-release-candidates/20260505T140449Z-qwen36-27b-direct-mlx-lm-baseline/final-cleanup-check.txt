@@ -1,0 +1,18 @@
+$ rm -rf /tmp/owlmlx-model-rc-heavy.lock
+lock_exists_after_cleanup=false
+
+$ curl -s http://127.0.0.1:8066/healthz
+{"contract":{"surface":"owlmlx.healthz","version":"stabilization1"},"runtime":"owlmlx","ok":true,"readiness":"degraded","active_model_id":null,"model_count":0,"backend_name":"mlx-lm-subprocess","backend_error":null,"persistent_child":true,"child_health":{}}
+
+$ lsof -n -iTCP:8066 -sTCP:LISTEN
+COMMAND  PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  4348 yeemio   10u  IPv4 0x6af15da21e067a88      0t0  TCP 127.0.0.1:8066 (LISTEN)
+
+$ lane-owned process check
+20971 20968   1248 tee files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/final-cleanup-check.txt
+
+$ legacy port check
+COMMAND   PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  20329 yeemio    8u  IPv4 0x1c59a10a79faf1d0      0t0  TCP 127.0.0.1:vcom-tunnel (LISTEN)
+COMMAND   PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+Python  15770 yeemio   10u  IPv4 0x992a26ec2a9c8992      0t0  TCP *:8009 (LISTEN)

@@ -1,0 +1,217 @@
+{
+    "contract": {
+        "surface": "owlmlx.runtime.status",
+        "version": "stabilization1",
+        "stable_sections": [
+            "summary",
+            "health",
+            "inventory",
+            "budget",
+            "restart"
+        ],
+        "diagnostic_sections": [
+            "backend.detail",
+            "governance_observations",
+            "governance_policy",
+            "generation_gate",
+            "reclaim_barrier",
+            "load_failure",
+            "memory_pressure_cooldown",
+            "host_pressure"
+        ]
+    },
+    "summary": {
+        "runtime": "owlmlx",
+        "backend_name": "mlx-lm-subprocess",
+        "backend_healthy": true,
+        "readiness": "degraded",
+        "block_reason": null,
+        "active_model_id": null,
+        "model_count": 0,
+        "persistent_child": true
+    },
+    "backend": {
+        "backend_name": "mlx-lm-subprocess",
+        "healthy": true,
+        "loaded_models": [],
+        "detail": {
+            "model_count": 0,
+            "persistent_child": true,
+            "last_error": null,
+            "last_failure_class": null,
+            "dead_registered_models": [],
+            "auto_restart_dead_session": true,
+            "max_restart_attempts": 1,
+            "children": {},
+            "child_health": {},
+            "cache_runtime_observations": {
+                "persistent_child_reuse_visible": false,
+                "total_generation_count": 0,
+                "reuse_counter": 0,
+                "repeated_generation_models": [],
+                "child_exchange_mode": "single_request_per_child_exchange",
+                "aggregated_child_exchange_visible": false,
+                "aggregated_child_exchange_batch_count": 0,
+                "aggregated_child_exchange_request_count": 0,
+                "max_aggregated_child_batch_size": 0,
+                "cache_counter_visibility": {
+                    "residency": false,
+                    "reuse": false,
+                    "eviction": false
+                }
+            },
+            "recoverability": {
+                "restartable_models": [],
+                "restart_exhausted_models": []
+            },
+            "last_subprocess": null
+        }
+    },
+    "inventory": {
+        "entries": [],
+        "total_loaded_gb": 0.0,
+        "model_count": 0,
+        "loaded_count": 0,
+        "timestamp": null
+    },
+    "budget": {
+        "system_memory_gb": 128.0,
+        "system_reserve_gb": 12.0,
+        "serving_budget_gb": 116.0,
+        "warning_threshold_gb": 100.0,
+        "currently_loaded_gb": 0.0,
+        "available_gb": 116.0,
+        "utilization": 0.0
+    },
+    "health": {
+        "load_state": "cold",
+        "inference_health": "reachable_not_serving",
+        "truth_level": "unavailable",
+        "readiness": "degraded",
+        "wait_tier": "short_wait",
+        "is_ready": false,
+        "block_reason": null
+    },
+    "restart": {
+        "active_model_id": null,
+        "restartable_models": [],
+        "restart_exhausted_models": [],
+        "auto_restart_dead_session": true
+    },
+    "governance_observations": {
+        "transition_count": 0,
+        "recent_window_runs": 0,
+        "active_reassignment_visible": false,
+        "restart_restore_visible": false,
+        "explicit_targeting_evidence_visible": false,
+        "pinning_events_visible": false,
+        "ttl_events_visible": false,
+        "ttl_expiry_visible": false,
+        "eviction_history_events_visible": false
+    },
+    "governance_policy": {
+        "pinning_supported": true,
+        "ttl_supported": true,
+        "eviction_history_visible": false,
+        "backend_ttl_visible": false,
+        "ttl_policy_mode": "kernel_explicit_sweep",
+        "pinned_model_ids": [],
+        "pinned_model_count": 0,
+        "ttl_model_ids": [],
+        "ttl_policy_count": 0,
+        "ttl_expired_model_ids": [],
+        "ttl_expired_pinned_model_ids": [],
+        "eviction_history_count": 0,
+        "recent_eviction_history": []
+    },
+    "generation_gate": {
+        "generation_gate": "idle",
+        "max_concurrent": 1,
+        "queue_discipline": "serial",
+        "queue_policy": "ticketed_fifo",
+        "waiters": 0,
+        "total_served": 0,
+        "total_queued": 0,
+        "total_wait_s": 0.0,
+        "total_exec_s": 0.0,
+        "longest_wait_s": 0.0,
+        "longest_exec_s": 0.0,
+        "pre_gate_admission": {
+            "hook_status": "present",
+            "hook_boundary": "before_whole_request_gate_claim",
+            "hook_mode": "bounded_runtime_owned_cohort_window",
+            "capacity": 32,
+            "window_ms": 20,
+            "cohort_window_status": "idle",
+            "cohort_count": 0,
+            "open_cohort_size": 0,
+            "peak_cohort_size": 0,
+            "total_cohorts_formed": 0,
+            "total_window_wait_s": 0.0,
+            "longest_window_wait_s": 0.0,
+            "cohort_handoff_status": "not_visible",
+            "active_handoff_request_count": 0,
+            "last_handoff_request_count": 0,
+            "total_handoffs": 0,
+            "aggregation_scope": "pre_claim_window_only",
+            "staged_count": 0,
+            "peak_staged_count": 0,
+            "total_staged": 0,
+            "total_claimed": 0,
+            "total_discarded": 0,
+            "staging_units": [
+                "immutable_request_metadata_snapshot",
+                "ticket_reservation_without_gate_claim",
+                "bounded_pre_claim_cohort_window_membership",
+                "pre_claim_bounded_admission_bookkeeping"
+            ],
+            "preserved_post_claim_invariants": [
+                "max_concurrent_1_after_gate_claim",
+                "ticketed_fifo_after_gate_claim",
+                "serial_safety_validated_only_after_gate_claim"
+            ],
+            "forbidden_expansions": [
+                "no_bypass_of_whole_request_gate_claim",
+                "no_post_claim_reordering",
+                "no_post_claim_parallel_generation",
+                "no_child_exchange_from_pre_claim_hook",
+                "no_stream_rewrite_from_pre_claim_hook"
+            ]
+        }
+    },
+    "reclaim_barrier": {
+        "events": [],
+        "total_event_count": 0,
+        "unresolved_event_count": 0
+    },
+    "load_failure": {
+        "events": [],
+        "total_event_count": 0,
+        "unresolved_event_count": 0
+    },
+    "memory_pressure_cooldown": {
+        "active": false,
+        "reason_code": null,
+        "reason_message": null,
+        "remaining_s": 0.0,
+        "cooldown_until_s": null,
+        "policy": "metal_oom_child_loss_cooldown"
+    },
+    "host_pressure": {
+        "available": false,
+        "source": "not_sampled",
+        "classification": "unknown",
+        "reason_code": "not_sampled",
+        "reason_message": "Host pressure is sampled at load admission, not on status reads.",
+        "free_percent": null,
+        "free_gb": null,
+        "wired_gb": null,
+        "compressor_gb": null,
+        "total_gb": null,
+        "sampled_at_s": null,
+        "block_free_percent": 10.0,
+        "warn_free_percent": 20.0,
+        "raw_excerpt": ""
+    },
+    "active_model_id": null
+}

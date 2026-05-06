@@ -1,0 +1,66 @@
+{"completion_tokens": 1, "event": "token", "model_id": "gemma-4-31B-it", "text": "<|ch"}
+{"completion_tokens": 2, "event": "token", "model_id": "gemma-4-31B-it", "text": "annel>t"}
+{"completion_tokens": 3, "event": "token", "model_id": "gemma-4-31B-it", "text": "h"}
+{"completion_tokens": 4, "event": "token", "model_id": "gemma-4-31B-it", "text": "o"}
+{"completion_tokens": 5, "event": "token", "model_id": "gemma-4-31B-it", "text": "ugh"}
+{"completion_tokens": 6, "event": "token", "model_id": "gemma-4-31B-it", "text": "t\n* "}
+{"completion_tokens": 7, "event": "token", "model_id": "gemma-4-31B-it", "text": " "}
+{"completion_tokens": 8, "event": "token", "model_id": "gemma-4-31B-it", "text": " Task: "}
+{"completion_tokens": 9, "event": "token", "model_id": "gemma-4-31B-it", "text": "De"}
+{"completion_tokens": 10, "event": "token", "model_id": "gemma-4-31B-it", "text": "fine "}
+{"completion_tokens": 11, "event": "token", "model_id": "gemma-4-31B-it", "text": "\"lo"}
+{"completion_tokens": 12, "event": "token", "model_id": "gemma-4-31B-it", "text": "ca"}
+{"completion_tokens": 13, "event": "token", "model_id": "gemma-4-31B-it", "text": "l"}
+{"completion_tokens": 14, "event": "token", "model_id": "gemma-4-31B-it", "text": " AI\""}
+{"completion_tokens": 15, "event": "token", "model_id": "gemma-4-31B-it", "text": "."}
+{"completion_tokens": 16, "event": "token", "model_id": "gemma-4-31B-it", "text": "\n  "}
+{"completion_tokens": 17, "event": "token", "model_id": "gemma-4-31B-it", "text": "  *   Cons"}
+{"completion_tokens": 18, "event": "token", "model_id": "gemma-4-31B-it", "text": "t"}
+{"completion_tokens": 19, "event": "token", "model_id": "gemma-4-31B-it", "text": "r"}
+{"completion_tokens": 20, "event": "token", "model_id": "gemma-4-31B-it", "text": "a"}
+{"completion_tokens": 21, "event": "token", "model_id": "gemma-4-31B-it", "text": "int "}
+{"completion_tokens": 22, "event": "token", "model_id": "gemma-4-31B-it", "text": "1: One"}
+{"completion_tokens": 23, "event": "token", "model_id": "gemma-4-31B-it", "text": " short se"}
+{"completion_tokens": 24, "event": "token", "model_id": "gemma-4-31B-it", "text": "n"}
+{"completion_tokens": 25, "event": "token", "model_id": "gemma-4-31B-it", "text": "t"}
+{"completion_tokens": 26, "event": "token", "model_id": "gemma-4-31B-it", "text": "ence"}
+{"completion_tokens": 27, "event": "token", "model_id": "gemma-4-31B-it", "text": "."}
+{"completion_tokens": 28, "event": "token", "model_id": "gemma-4-31B-it", "text": "\n  "}
+{"completion_tokens": 29, "event": "token", "model_id": "gemma-4-31B-it", "text": "  *   Cons"}
+{"completion_tokens": 30, "event": "token", "model_id": "gemma-4-31B-it", "text": "t"}
+{"completion_tokens": 31, "event": "token", "model_id": "gemma-4-31B-it", "text": "r"}
+{"completion_tokens": 32, "event": "token", "model_id": "gemma-4-31B-it", "text": "a"}
+{"completion_tokens": 33, "event": "token", "model_id": "gemma-4-31B-it", "text": "int 2:"}
+{"completion_tokens": 34, "event": "token", "model_id": "gemma-4-31B-it", "text": " Final "}
+{"completion_tokens": 35, "event": "token", "model_id": "gemma-4-31B-it", "text": "answe"}
+{"completion_tokens": 36, "event": "token", "model_id": "gemma-4-31B-it", "text": "r "}
+{"completion_tokens": 37, "event": "token", "model_id": "gemma-4-31B-it", "text": "on"}
+{"completion_tokens": 38, "event": "token", "model_id": "gemma-4-31B-it", "text": "ly (no rea"}
+{"completion_tokens": 39, "event": "token", "model_id": "gemma-4-31B-it", "text": "s"}
+{"completion_tokens": 40, "event": "token", "model_id": "gemma-4-31B-it", "text": "oning, an"}
+{"completion_tokens": 41, "event": "token", "model_id": "gemma-4-31B-it", "text": "a"}
+{"completion_tokens": 42, "event": "token", "model_id": "gemma-4-31B-it", "text": "lysi"}
+{"completion_tokens": 43, "event": "token", "model_id": "gemma-4-31B-it", "text": "s, "}
+{"completion_tokens": 44, "event": "token", "model_id": "gemma-4-31B-it", "text": "et"}
+{"completion_tokens": 45, "event": "token", "model_id": "gemma-4-31B-it", "text": "c.)."}
+{"completion_tokens": 46, "event": "token", "model_id": "gemma-4-31B-it", "text": "\n"}
+{"completion_tokens": 47, "event": "token", "model_id": "gemma-4-31B-it", "text": "\n  "}
+{"completion_tokens": 48, "event": "token", "model_id": "gemma-4-31B-it", "text": "  *  "}
+{"completion_tokens": 49, "event": "token", "model_id": "gemma-4-31B-it", "text": " Lo"}
+{"completion_tokens": 50, "event": "token", "model_id": "gemma-4-31B-it", "text": "cal AI "}
+{"completion_tokens": 51, "event": "token", "model_id": "gemma-4-31B-it", "text": "ref"}
+{"completion_tokens": 52, "event": "token", "model_id": "gemma-4-31B-it", "text": "ers to arti"}
+{"completion_tokens": 53, "event": "token", "model_id": "gemma-4-31B-it", "text": "ficial intell"}
+{"completion_tokens": 54, "event": "token", "model_id": "gemma-4-31B-it", "text": "igence "}
+{"completion_tokens": 55, "event": "token", "model_id": "gemma-4-31B-it", "text": "model"}
+{"completion_tokens": 56, "event": "token", "model_id": "gemma-4-31B-it", "text": "s th"}
+{"completion_tokens": 57, "event": "token", "model_id": "gemma-4-31B-it", "text": "at "}
+{"completion_tokens": 58, "event": "token", "model_id": "gemma-4-31B-it", "text": "ru"}
+{"completion_tokens": 59, "event": "token", "model_id": "gemma-4-31B-it", "text": "n on "}
+{"completion_tokens": 60, "event": "token", "model_id": "gemma-4-31B-it", "text": "a"}
+{"completion_tokens": 61, "event": "token", "model_id": "gemma-4-31B-it", "text": " "}
+{"completion_tokens": 62, "event": "token", "model_id": "gemma-4-31B-it", "text": "user"}
+{"completion_tokens": 63, "event": "token", "model_id": "gemma-4-31B-it", "text": "'s own ha"}
+{"completion_tokens": 64, "event": "token", "model_id": "gemma-4-31B-it", "text": "rd"}
+{"completion_tokens": 65, "event": "token", "model_id": "gemma-4-31B-it", "text": "ware ("}
+{"completion_tokens": 65, "event": "done", "finish_reason": "length", "model_id": "gemma-4-31B-it"}

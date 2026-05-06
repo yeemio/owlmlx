@@ -1,0 +1,25 @@
+{
+  "completion_tokens": 64,
+  "done": {
+    "completion_tokens": 64,
+    "detail": {
+      "generation_count": 1,
+      "pid": 22286
+    },
+    "error_code": null,
+    "event": "done",
+    "execution_time_s": null,
+    "finish_reason": "length",
+    "model_id": "gemma-4-31B-it",
+    "prompt_tokens": 8,
+    "sequence": 64,
+    "text": "",
+    "wait_time_s": 0.053,
+    "was_queued": false
+  },
+  "elapsed_ms": 10579.276,
+  "event_count": 65,
+  "first_token_latency_ms": 2632.846,
+  "status_code": 200,
+  "text_preview": " la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la la"
+}

@@ -1,0 +1,5 @@
+<frozen runpy>:128: RuntimeWarning: 'mlx_lm.generate' found in sys.modules after import of package 'mlx_lm', but prior to execution of 'mlx_lm.generate'; this may result in unpredictable behaviour
+[transformers] You are using a model of type `deepseek_v4` to instantiate a model of type ``. This may be expected if you are loading a checkpoint that shares a subset of the architecture (e.g., loading a `sam2_video` checkpoint into `Sam2Model`), but is otherwise not supported and can yield errors. Please verify that the checkpoint is compatible with the model you are instantiating.
+[transformers] PreTrainedConfig got `key=rope_scaling` in kwargs but hasn't set it as attribute. For RoPE standardization you need to set `self.rope_parameters` in model's config.
+/private/tmp/deepseek-v4-mlx-pr/mlx_lm/utils.py:507: RuntimeWarning: Falling back to generic tokenizer config because Transformers does not recognize this model config: 'PreTrainedConfig' object has no attribute 'max_position_embeddings'
+  return _load_tokenizer(

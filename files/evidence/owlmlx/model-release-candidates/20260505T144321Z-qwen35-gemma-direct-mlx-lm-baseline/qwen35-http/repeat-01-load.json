@@ -1,0 +1,20 @@
+{
+  "elapsed_ms": 22858.572,
+  "payload": {
+    "detail": {
+      "load_time_s": 22.8427,
+      "pid": 27901,
+      "runner_model_id": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B"
+    },
+    "error_code": null,
+    "message": "loaded Qwen3.6-35B-A3B in persistent child pid=27901",
+    "model": {
+      "backend": "mlx-lm-subprocess",
+      "loaded_at": 1777992524.6705012,
+      "memory_gb": 67.0,
+      "model_id": "Qwen3.6-35B-A3B"
+    },
+    "ok": true
+  },
+  "status_code": 200
+}

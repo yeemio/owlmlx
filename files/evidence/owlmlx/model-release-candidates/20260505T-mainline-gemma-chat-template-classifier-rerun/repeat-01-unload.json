@@ -1,0 +1,14 @@
+{
+  "elapsed_ms": 823.931,
+  "payload": {
+    "detail": {
+      "pid": 49510
+    },
+    "error_code": null,
+    "freed_gb": 58.0,
+    "message": "unloaded gemma-4-31B-it",
+    "model_id": "gemma-4-31B-it",
+    "ok": true
+  },
+  "status_code": 200
+}

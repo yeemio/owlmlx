@@ -1,0 +1,25 @@
+{
+  "completion_tokens": 33,
+  "done": {
+    "completion_tokens": 33,
+    "detail": {
+      "generation_count": 1,
+      "pid": 9448
+    },
+    "error_code": null,
+    "event": "done",
+    "execution_time_s": null,
+    "finish_reason": "stop",
+    "model_id": "Qwen3.6-27B",
+    "prompt_tokens": 14,
+    "sequence": 33,
+    "text": "",
+    "wait_time_s": 0.0532,
+    "was_queued": false
+  },
+  "elapsed_ms": 9732.065,
+  "event_count": 34,
+  "first_token_latency_ms": 1975.056,
+  "status_code": 200,
+  "text_preview": "\n\n<think>\n\n</think>\n\nLocal AI refers to artificial intelligence models that are installed and run directly on a user's personal device rather than relying on external cloud servers."
+}

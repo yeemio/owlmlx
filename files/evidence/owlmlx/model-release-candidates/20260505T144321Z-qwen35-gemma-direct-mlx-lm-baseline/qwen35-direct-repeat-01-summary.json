@@ -1,0 +1,34 @@
+{
+  "completion_token_events": 62,
+  "decode_tokens_per_second": 24.81,
+  "end_to_end_tokens_per_second": 2.385,
+  "finish_reason": "length",
+  "first_token_latency_ms": 23492.583,
+  "generated_text": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - **Topic:** Local AI\n   - **Requirement:** Define it in one short sentence.\n\n2.  **Identify Key Concepts of \"Local AI\":**\n   - Runs on personal devices (laptops, desktop",
+  "generated_text_preview": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - **Topic:** Local AI\n   - **Requirement:** Define it in one short sentence.\n\n2.  **Identify Key Concepts of \"Local AI\":**\n   - Runs on personal devices (laptops, desktop",
+  "last_response_attrs": {
+    "finish_reason": "length",
+    "from_draft": false,
+    "generation_tokens": 64,
+    "generation_tps": 25.976694541716288,
+    "peak_memory": 69.422056184,
+    "prompt_tokens": 19,
+    "prompt_tps": 0.8139485288401305,
+    "text": " desktop",
+    "token": 16985
+  },
+  "load_wall_ms_shared": 16215.09,
+  "repeat": 1,
+  "response_attr_keys_seen": [
+    "finish_reason",
+    "from_draft",
+    "generation_tokens",
+    "generation_tps",
+    "peak_memory",
+    "prompt_tokens",
+    "prompt_tps",
+    "text",
+    "token"
+  ],
+  "wall_clock_ms": 25991.567
+}

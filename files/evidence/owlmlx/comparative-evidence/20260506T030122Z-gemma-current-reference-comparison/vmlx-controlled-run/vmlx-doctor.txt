@@ -1,0 +1,35 @@
+INFO:vmlx_engine.utils.tokenizer:config.json model_type='gemma4' is standard — skipping tokenizer fallback for /Users/yeemio/AI/Agent/models/gemma-4-31B-it
+Examining: /Users/yeemio/AI/Agent/models/gemma-4-31B-it
+
+Model: /Users/yeemio/AI/Agent/models/gemma-4-31B-it
+Architecture: Gemma4ForConditionalGeneration (gemma4)
+Parameters: 30.1B total
+Layers: 60
+Hidden size: 5376
+Vocab size: 262,144
+Quantization: None (full precision)
+Multimodal: Yes (vision)
+Weight files: 2 (58.3 GB)
+
+Estimated memory for inference:
+   2-bit:    9.4 GB  [OK]
+   3-bit:   14.1 GB  [OK]
+   4-bit:   18.8 GB  [OK]
+   8-bit:   37.7 GB  [OK]
+  16-bit:   75.4 GB  [OK]
+  System: 128 GB unified memory
+
+Checking config...
+  Config: OK
+Checking weights...
+  Found 1188 tensors across 2 files
+  Weights: OK
+Checking architecture...
+  Architecture: OK
+Running inference test...
+  Inference: PASS - Generated 10 tokens: 'world! world! world! world! world!'
+
+============================================================
+ALL CHECKS PASSED
+Model appears healthy.
+============================================================

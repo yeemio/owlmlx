@@ -1,0 +1,11 @@
+{
+  "artifact_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "max_tokens": 32,
+  "model_id": "gemma-4-31B-it",
+  "prompt": "In one short sentence, define local AI.",
+  "prompt_template_id": "gemma_openai_chat_template_v1",
+  "repeats": 2,
+  "request_mode": "openai_chat_stream",
+  "runtime_url": "http://127.0.0.1:8066"
+}

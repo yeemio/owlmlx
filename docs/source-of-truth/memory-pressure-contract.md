@@ -1,8 +1,8 @@
 # owlmlx Memory Pressure Contract
 
 > Status: authoritative
-> Updated: 2026-04-24
-> Scope: runtime-only budget-pressure classification without reclaim closure
+> Updated: 2026-05-05
+> Scope: runtime-only budget-pressure classification plus Metal-OOM cooldown and host-pressure admission visibility without reclaim closure
 
 ## 1. Purpose
 
@@ -14,8 +14,9 @@ can `owlmlx` honestly report, and which reclaim / eviction / recovery decisions
 remain unsupported?**
 
 This is not a reclaim engine.
-It is the narrow pressure layer that converts budget truth into conservative
-classification while refusing to invent pressure events or victim selection.
+It is the narrow pressure layer that converts budget truth and host-visible
+load-admission samples into conservative classification while refusing to invent
+pressure victim selection or private Metal allocator visibility.
 
 ## 2. Owned Contract
 
@@ -57,9 +58,12 @@ The current contract builds only from runtime-owned truth already visible in
 - loaded-model count
 - TTL-sweep candidate context from residency/governance truth
 - restart visibility as non-decisive context
+- runtime-owned Metal-OOM cooldown state when a subprocess-backed generation
+  fails with Metal insufficient-memory child-loss evidence
+- runtime-owned host-pressure sample from load admission
 
-It does not treat those signals as direct operating-system memory pressure or
-as evidence that reclaim policy is complete.
+It does not treat those signals as private Metal allocator pressure or as
+evidence that reclaim policy is complete.
 
 ## 4. Pressure Classification Semantics
 
@@ -73,6 +77,12 @@ Current classification vocabulary is:
 - `over_budget`
   - budget headroom is negative, utilization is above 1.0, or loaded memory
     exceeds the serving budget
+- `cooldown_barrier`
+  - the runtime has direct child-loss evidence of a Metal insufficient-memory
+    failure and is blocking new model loads for a bounded cooldown window
+- `host_pressure_barrier`
+  - the runtime has a host-visible memory-pressure sample below the
+    runtime-owned load-admission free-memory threshold
 - `unknown`
   - required budget fields are missing
 - `insufficient_signal`
@@ -109,6 +119,9 @@ It does not claim:
 
 - memory pressure closure is complete
 - budget utilization is a direct pressure event
+- Metal-OOM cooldown is a full operating-system pressure oracle
+- host-pressure sampling is private Metal allocator or command-queue pressure
+  truth
 - pressure-ranked eviction execution is closed in this contract — the
   decision and runtime-owned execution path now live in the adjacent
   `memory-pressure-eviction-policy.md` and
@@ -128,4 +141,5 @@ It only claims:
 
 - `owlmlx` now owns one budget-pressure classification surface
 - budget truth is machine-readable without shell-side guessing
+- host-visible pressure samples can block new loads before the first Metal OOM
 - reclaim, eviction ranking, and recovery remain explicit missing signals

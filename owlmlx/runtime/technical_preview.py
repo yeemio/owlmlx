@@ -62,6 +62,8 @@ def create_technical_preview_app():
       visibility contract root.
     - ``OWLMLX_COMPARATIVE_EVIDENCE_LEDGER_PATH``: optional comparative
       evidence JSONL ledger for the read-only evidence routes.
+    - ``OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH``: optional Model RC JSONL
+      ledger for the read-only Model RC routes.
     - ``OWLMLX_BACKEND_TIMEOUT_S``: child request timeout in seconds.
     - ``OWLMLX_BACKEND_RUNNER_MODULE``: child runner module override.
     - ``OWLMLX_FORCE_CPU``: when ``1``, propagated to child processes.
@@ -93,5 +95,8 @@ def create_technical_preview_app():
         visibility_models_root=str(models_root),
         comparative_evidence_ledger_path=os.environ.get(
             "OWLMLX_COMPARATIVE_EVIDENCE_LEDGER_PATH"
+        ),
+        model_release_candidate_ledger_path=os.environ.get(
+            "OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH"
         ),
     )

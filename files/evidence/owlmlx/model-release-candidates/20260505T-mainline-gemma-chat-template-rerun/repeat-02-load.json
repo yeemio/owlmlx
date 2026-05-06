@@ -1,0 +1,20 @@
+{
+  "elapsed_ms": 26564.19,
+  "payload": {
+    "detail": {
+      "load_time_s": 26.5031,
+      "pid": 12465,
+      "runner_model_id": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it"
+    },
+    "error_code": null,
+    "message": "loaded gemma-4-31B-it in persistent child pid=12465",
+    "model": {
+      "backend": "mlx-lm-subprocess",
+      "loaded_at": 1777988417.676626,
+      "memory_gb": 58.0,
+      "model_id": "gemma-4-31B-it"
+    },
+    "ok": true
+  },
+  "status_code": 200
+}

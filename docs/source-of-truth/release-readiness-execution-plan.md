@@ -1,7 +1,8 @@
 # owlmlx Release-Readiness Execution Plan
 
 > Status: authoritative
-> Updated: 2026-04-28 (3.6B / 3.7B final closeout closed floors 3.6 and 3.7 in one batch; release-floor count moved from `5 / 7` to `7 / 7`)
+> Updated: 2026-05-05 (post-7/7 release-floor closure now moves to the model
+> release-candidate program before any user-facing application release)
 > Scope: execution plan for closing `release-readiness-backlog.md` floors
 
 ## 1. Purpose
@@ -81,14 +82,406 @@ Current floor status:
 - the comparative-evidence HTTP surface remains available for upper-layer
   consumers through `/v1/runtime/comparative-evidence` plus
   `/v1/runtime/comparative-evidence/history`
+- the next active delivery phase is the model release-candidate program
+  described in `model-release-candidate-program.md`; it must validate the
+  selected mainline model set with OwlOps performance observation before
+  OwlCoda or any other upper-layer application is treated as release-ready
+- `DeepSeek-V4-Flash-2bit-DQ` is included only as the flagship experimental
+  adapter-optimization lane; it is not part of the mainline release-candidate
+  pass/fail gate
 
 The immediate correction is:
 
-- stop treating new narrow exactness or side contracts as release progress by
-  default
-- require every active round to name one release floor
-- require each round to either close, progress, or hard-block that floor with
-  tests or live/runtime evidence
+- stop treating `7 / 7` release-floor closure as an application release
+- require every active round to name one model release-candidate lane or the
+  DeepSeek experimental lane
+- require each round to either close, progress, or hard-block that lane with
+  live runtime evidence and OwlOps-consumable observation data
+
+Model RC A0 result (2026-05-05,
+`owlmlx_model_release_candidate_a0_evidence_schema_introduced_pending_live_runs`):
+
+- goal contract archived at
+  `files/execution-prompts/owlmlx/owlmlx-model-release-candidate-goal-contract.md`
+- runtime-owned schema / record / ledger modules added:
+  `owlmlx.model_release_candidate_schema`,
+  `owlmlx.model_release_candidate_record`, and
+  `owlmlx.model_release_candidate_ledger`
+- operator entry added at `scripts/runtime_model_release_candidate.py` with
+  `dry-run-matrix`, `append-dry-run-matrix`, `latest`, and `history`
+- read-only HTTP surfaces added:
+  `GET /v1/runtime/model-release-candidates` and
+  `GET /v1/runtime/model-release-candidates/history`
+- A0 dry-run matrix emits four records: three mainline candidates with
+  `verdict = "needs_optimization"` and DeepSeek V4 with
+  `verdict = "experimental_only"`; no model is marked `pass`
+- `gpt-oss-120b-MXFP4-Q4` is deleted from local model assets, removed from
+  runtime visibility, and outside the active Model RC gate; it no longer
+  serves as the heavyweight pressure canary
+- focused verification passed:
+  `tests/test_model_release_candidate_surface.py` (13 passed),
+  `tests/test_runtime_server.py -k "model_release_candidate or runtime_status"`
+  (1 passed, 40 deselected), `tests/test_public_surface_contract.py`
+  (12 passed), py_compile for new modules / script / server, operator
+  append/latest/history smoke, and `git diff --check`
+
+Interim next dominant gap at that point, later refined by the live
+profile-control proof below:
+
+- run the first live mainline Model RC candidate through repeated
+  `load -> generate -> unload -> reload`, append a real record, and hand the
+  same ledger surface to OwlOps for observation rendering
+
+Parallel execution allocation (2026-05-05):
+
+- Lane A is the only memory-exclusive lane. It runs `Qwen3.6-27B` live through
+  repeated load / generate / unload / reload and appends the first non-dry-run
+  Model RC record.
+- Lane B is a non-loading consumer lane. It runs in OwlOps and builds the Model
+  RC observation workspace against the current owlmlx latest/history surfaces
+  and JSONL ledger. It must not start or load models.
+- DeepSeek pressure work waits until Lane A finishes the first mainline live
+  record. This prevents unified-memory pressure from being misread as a
+  model-specific failure.
+- The active prompt archive for this split is
+  `files/execution-prompts/owlmlx/owlmlx-model-release-candidate-parallel-a1-b1-coordinator-packet.md`.
+
+Model RC A1 result (2026-05-05,
+`owlmlx_model_release_candidate_a1_qwen36_27b_live_record_introduced`):
+
+- `Qwen3.6-27B` completed two live repeated HTTP runs through
+  `load -> stream generate -> unload -> reload -> stream generate -> unload`.
+- A schema-valid `owlmlx.model_release_candidate_record` was appended at
+  `files/evidence/owlmlx/model-release-candidates/20260505T071836Z-qwen36-27b/ledger.jsonl`.
+- `GET /v1/runtime/model-release-candidates` and
+  `GET /v1/runtime/model-release-candidates/history` on `127.0.0.1:8066`
+  serve that live ledger.
+- The record verdict is `needs_optimization`, not `pass`, because OwlOps
+  observation and same-host reference comparison remain open.
+- Measured values: `repeat_count = 2`, `failure_count = 0`,
+  `first_token_latency_ms = 1145.8`, `tokens_per_second = 5.395`,
+  `wall_clock_ms = 19759.742`,
+  `peak_resident_set_bytes = 54348431360`, and
+  `memory_headroom_bytes = 83090522112`.
+- Output was valid text but short generation was length-truncated inside a
+  reasoning trace, so no model-quality claim is made from this record.
+
+Next dominant gap:
+
+- let OwlOps B1 consume and render the A1 live record, then run the next
+  memory-exclusive owlmlx mainline lane for `Qwen3.6-35B-A3B`.
+
+Remaining lane packet (2026-05-05,
+`owlmlx_model_release_candidate_remaining_lanes_packet_ready`):
+
+- A2 prompt archived for `Qwen3.6-35B-A3B` live mainline evidence.
+- A3 prompt archived for `gemma-4-31B-it` live mainline evidence.
+- D1 prompt archived for `DeepSeek-V4-Flash-2bit-DQ` pressure/adaptation
+  evidence.
+- Coordinator packet archived at
+  `files/execution-prompts/owlmlx/owlmlx-model-release-candidate-remaining-lanes-coordinator-packet.md`.
+- Execution rule remains: one heavyweight live model lane at a time; OwlOps may
+  run only read-only consumer work in parallel.
+
+Model RC A2 / A3 / D1 integrated result (2026-05-05,
+`owlmlx_model_release_candidate_a2_a3_d1_parallel_lanes_integrated`):
+
+- A2 `Qwen3.6-35B-A3B` completed two live repeated HTTP runs through
+  `load -> stream generate -> unload -> reload -> stream generate -> unload`.
+  The schema-valid record lives at
+  `files/evidence/owlmlx/model-release-candidates/20260505T073902Z-qwen36-35b-a3b/record.json`.
+  Verdict remains `needs_optimization`, with `repeat_count = 2`,
+  `failure_count = 0`, `first_token_latency_ms = 3315.486`,
+  `tokens_per_second = 14.666`, `wall_clock_ms = 37299.247`,
+  `peak_resident_set_bytes = 54570254336`, and
+  `memory_headroom_bytes = 82868699136`. Output sanity is
+  `reasoning_trace_truncated`, so short-generation quality remains
+  inconclusive.
+- A3 `gemma-4-31B-it` completed two live repeated HTTP runs through the same
+  mainline sequence. The schema-valid record lives at
+  `files/evidence/owlmlx/model-release-candidates/20260505T074135Z-gemma-4-31b-it/record.json`.
+  Verdict remains `needs_optimization`, with `repeat_count = 2`,
+  `failure_count = 0`, `first_token_latency_ms = 2179.717`,
+  `tokens_per_second = 6.178`, `wall_clock_ms = 36577.866`,
+  `peak_resident_set_bytes = 56211668992`, and
+  `memory_headroom_bytes = 81227284480`.
+- D1 `DeepSeek-V4-Flash-2bit-DQ` completed one isolated
+  `.runtime-deepseek-v4-mlx` / `mlx_lm.generate` pressure run, not an owlmlx
+  HTTP adapter run. The schema-valid record lives at
+  `files/evidence/owlmlx/model-release-candidates/20260505T073943Z-deepseek-v4-flash-2bit-dq/record.json`.
+  Verdict is `experimental_only`, with `repeat_count = 1`,
+  `failure_count = 0`, `tokens_per_second = 31.804`,
+  `wall_clock_ms = 43665`, sampled `peak_resident_set_bytes = 58170621952`,
+  and sampled `memory_headroom_bytes = 79268331520`. The runtime stdout also
+  reported `96.574 GB` peak memory; this discrepancy is preserved as pressure
+  lane evidence, not normalized away.
+- The cumulative model RC ledger now has four records at
+  `files/evidence/owlmlx/model-release-candidates/cumulative-ledger.jsonl`:
+  A1, A2, A3, and D1. `history.records` is the authoritative matrix view.
+  Because D1 is the newest appended record, `latest` now returns the
+  experimental DeepSeek record; OwlOps and OwlCoda must not treat `latest` as
+  the mainline matrix verdict.
+- Current mainline status: all three selected mainline models have live
+  repeated operation evidence and remain `needs_optimization`; none is
+  `pass`. The common blockers are OwlOps matrix observation and same-host
+  reference runtime comparison. `Qwen3.6-35B-A3B` also has the short generation
+  quality caveat above.
+
+Next dominant gap:
+
+- OwlOps should consume the cumulative `history.records` matrix and render all
+  three mainline records plus the DeepSeek experimental record without
+  upgrading any verdict.
+- The next owlmlx runtime-owned lane should reduce
+  `reference_runtime_comparison_missing` for the mainline models, starting
+  with the available same-host oMLX / vMLX comparison path that can be run
+  without changing model visibility truth.
+
+Model RC observability v2 result (2026-05-05,
+`owlmlx_model_release_candidate_observability_v2_contract_introduced`):
+
+- owlmlx now supports optional runtime-owned observability fields on
+  `owlmlx.model_release_candidate_record` without requiring migration of old
+  v1 rows: `load_time_ms`, `reload_time_ms`, `unload_time_ms`,
+  `queue_wait_ms`, `ttft_ms`, `decode_tokens_per_second`,
+  `end_to_end_tokens_per_second`, `resident_mode`, `prompt_template_id`,
+  `quality_caveats`, and `memory_peak_source`
+- the HTTP runner computes `decode_tokens_per_second` after first token and
+  keeps `end_to_end_tokens_per_second` aligned with the legacy
+  `tokens_per_second` meaning, so OwlOps can distinguish TTFT-heavy runs from
+  genuinely slow decode
+- memory peak provenance is explicit through `memory_peak_source`; missing
+  sources remain absent or `null` and must not be synthesized
+- output sanity caveats remain runtime-owned and are derived from
+  `output_sanity_label` plus blockers, without creating model-quality claims
+- DeepSeek remains `flagship_experimental` / `experimental_only`; isolated CLI
+  pressure evidence must not be normalized into an owlmlx HTTP adapter pass
+- legacy cumulative-ledger rows remain valid; no historical record is
+  backfilled or normalized into a stronger claim
+- OwlOps follow-up prompt archived at
+  `files/execution-prompts/owlmlx/owlops-model-rc-observability-v2-consumer-workspace.md`
+
+Next dominant gap:
+
+- OwlOps consumes the optional observability v2 fields when present and labels
+  them `upstream_missing` when absent; OwlOps must not compute decode speed or
+  phase timings locally from legacy rows.
+- After OwlOps renders the fields, owlmlx should rerun one mainline model with
+  the v2 runner to prove the full ops-observable path before repeating the
+  whole matrix.
+
+Model RC v2 mainline rerun result (2026-05-05,
+`owlmlx_model_release_candidate_v2_mainline_records_published`):
+
+- three new mainline records with observability v2 fields were appended to the
+  cumulative ledger; `GET /v1/runtime/model-release-candidates/history` now
+  returns seven records: the original four baseline records plus v2 records
+  for `Qwen3.6-27B`, `Qwen3.6-35B-A3B`, and `gemma-4-31B-it`
+- `Qwen3.6-27B`: `needs_optimization`, `repeat_count = 2`,
+  `failure_count = 0`, `load_time_ms = 10188.202`,
+  `reload_time_ms = 9435.728`, `unload_time_ms = 530.493`,
+  `ttft_ms = 2890.414`, `decode_tokens_per_second = 4.135`,
+  `end_to_end_tokens_per_second = 3.105`,
+  `memory_peak_source = process_tree_rss`, `output_sanity_label = valid_text`
+- `Qwen3.6-35B-A3B`: `needs_optimization`, `repeat_count = 2`,
+  `failure_count = 0`, `load_time_ms = 15680.213`,
+  `reload_time_ms = 17496.333`, `unload_time_ms = 818.888`,
+  `ttft_ms = 6187.685`, `decode_tokens_per_second = 29.941`,
+  `end_to_end_tokens_per_second = 7.718`,
+  `memory_peak_source = process_tree_rss`,
+  `output_sanity_label = reasoning_trace_truncated`; this shows decode is
+  materially faster than end-to-end throughput, while TTFT and reasoning-trace
+  truncation remain the dominant visible bottlenecks
+- `gemma-4-31B-it`: `needs_optimization`, `repeat_count = 2`,
+  `failure_count = 0`, `load_time_ms = 10957.576`,
+  `reload_time_ms = 10946.711`, `unload_time_ms = 705.492`,
+  `ttft_ms = 4220.365`, `decode_tokens_per_second = 3.009`,
+  `end_to_end_tokens_per_second = 2.544`,
+  `memory_peak_source = process_tree_rss`,
+  `output_sanity_label = repetitive_output`; the first Gemma v2 run exposed a
+  prompt-echo repetition that the classifier initially missed, so the runner
+  was narrowed and Gemma was rerun instead of mutating the old record
+- the failed `Qwen3.6-27B` v2 preflight without `--memory-gb` is preserved as
+  local evidence but is not included in the cumulative ledger
+- all three v2 records keep `verdict = needs_optimization`; no `pass`,
+  release-ready, parity, replacement, or production-grade claim is made
+
+Next dominant gap:
+
+- OwlOps R166 should render the seven-record history and confirm that v2
+  fields appear for the three newest mainline rows while old rows remain
+  `upstream_missing`.
+- owlmlx should start model-specific optimization lanes from this evidence:
+  Qwen3.6-27B decode speed, Qwen3.6-35B TTFT / reasoning-template behavior,
+  and Gemma prompt-template repetition.
+
+OwlOps R166 / owlmlx Gemma mainline return (2026-05-05,
+`owlmlx_model_release_candidate_gemma_chat_template_probe_narrowed`):
+
+- OwlOps R166 consumed the seven-record v2 history and confirmed that the
+  current matrix uses the newest record per `model_id`, old v1 rows render as
+  `upstream_missing`, and DeepSeek remains `experimental_only` /
+  `not_registered` outside the mainline summary.
+- owlmlx returned to the mainline by adding an `openai_chat_stream` request
+  mode to `scripts/runtime_model_release_candidate.py`; this lets Model RC
+  evidence route through `/v1/chat/completions` so tokenizer chat templates
+  apply instead of forcing every model through raw `/v1/generate/stream`.
+- The runner now records `request_mode` and `prompt_template_id` in
+  `runner-config.json`; new records can distinguish `operator_prompt_raw`
+  from `gemma_openai_chat_template_v1` or other family-profile paths.
+- The output sanity classifier was tightened after a live Gemma probe exposed
+  `<|channel>thought` content that the old classifier would have mislabeled as
+  `valid_text`. Both `<think>` and `<|channel>thought` traces now map to
+  `reasoning_trace_truncated` or `reasoning_trace_visible` instead of a
+  healthy-text label.
+- The corrected Gemma chat-template rerun appended the eighth cumulative
+  record at
+  `files/evidence/owlmlx/model-release-candidates/20260505T-mainline-gemma-chat-template-classifier-rerun/record.json`.
+  It completed two live HTTP runs with `failure_count = 0`,
+  `output_sanity_label = reasoning_trace_truncated`,
+  `prompt_template_id = gemma_openai_chat_template_v1`,
+  `ttft_ms = 12294.993`, `decode_tokens_per_second = 2.309`,
+  `end_to_end_tokens_per_second = 1.617`,
+  `peak_resident_set_bytes = 35297640448`, and
+  `verdict = needs_optimization`.
+- The previous chat-template probe that produced a `valid_text` label was
+  excluded from the cumulative ledger after the classifier bug was found. Its
+  evidence directory remains local forensic evidence, but `GET
+  /v1/runtime/model-release-candidates/history` now exposes eight records and
+  the current Gemma row is the corrected `reasoning_trace_truncated` record.
+
+Next dominant gap:
+
+- Gemma is no longer primarily a raw-prompt repetition problem. The next
+  Gemma lane should test family-profile controls that suppress visible
+  reasoning/channel traces or force final-answer-only output without hiding
+  failures.
+- Qwen3.6-35B-A3B shares a reasoning-trace / high-TTFT shape and should be
+  paired with the same template/thinking-control investigation after Gemma's
+  smallest profile experiment is selected.
+- Qwen3.6-27B remains the decode-speed lane because its output is valid but
+  its `decode_tokens_per_second` remains low.
+
+owlmlx Gemma post-run health gate return (2026-05-06,
+`owlmlx_model_rc_gemma_post_run_health_gate_clean_latest_row`):
+
+- `8066` was restarted persistently in tmux session
+  `owlmlx-8066-model-rc-20260506`; post-run `healthz` after the current
+  latest Gemma row is clean (`ok=true`, `backend_error=null`,
+  `active_model_id=null`, `model_count=0`).
+- The runner now bridges model-load admission to `/v1/load` by deriving
+  `memory_gb` from `known_peak_resident_set_bytes` when no explicit
+  `--memory-gb` is provided, and writes the actual load request payload into
+  repeat evidence.
+- The previous clean Gemma row was
+  `files/evidence/owlmlx/model-release-candidates/20260506T021105Z-gemma-4-31b-it-post-run-health-gate-rerun/record.json`.
+  It used explicit `--memory-gb 60`, completed two repeats, and appended to
+  `cumulative-ledger.jsonl` with `verdict = needs_optimization`,
+  `failure_count = 0`, `repeat_count = 2`,
+  `output_sanity_label = reasoning_trace_truncated`,
+  `ttft_ms = 51229.148`, `decode_tokens_per_second = 14.744`, and
+  `peak_resident_set_bytes = 50295062528`.
+- Earlier 2026-05-06 Gemma blocked attempts remain honest local evidence; the
+  cumulative ledger includes the unload-failed attempt before the latest clean
+  row. The current latest-per-model truth is no longer
+  `post_run_backend_unhealthy`.
+
+Next dominant gap:
+
+- Gemma post-run backend health should not be reopened unless a new row
+  reproduces `post_run_backend_unhealthy`.
+- The next owlmlx-owned closure round should target
+  `gemma_reasoning_trace_profile_control_and_ttft_variance`: suppress or route
+  visible `<|channel>thought` traces without hiding failures, and track TTFT
+  variance separately from output-sanity labels.
+
+Parallel closure setup (2026-05-06,
+`owlmlx_model_rc_gemma_trace_policy_and_ttft_observability`):
+
+- `owlmlx.reasoning_trace_policy:v1` now makes visible Gemma-style reasoning
+  traces a runtime-owned evidence contract rather than an ad hoc classifier
+  branch. It can expose a final-text candidate only when the candidate is
+  safely outside the visible trace boundary.
+- The Model RC runner now writes per-generation `reasoning_trace_policy` and
+  `timing_breakdown` evidence. This prepares the next live Gemma proof to
+  answer two separate questions: whether output control is platform-handled,
+  and whether TTFT is concentrated before first token or after it.
+- The current claim remains conservative: output dirtiness is now being handled
+  as a platform profile/serving-contract gap first; model fine-tuning should
+  not be blamed until the platform applies the family trace policy in live
+  evidence and still fails to produce usable final-answer text.
+
+Live profile-control return (2026-05-06,
+`owlmlx_model_rc_gemma_final_answer_control_live_proof`):
+
+- The first fresh heavy Gemma row with live `reasoning_trace_policy` and
+  `timing_breakdown` evidence is
+  `files/evidence/owlmlx/model-release-candidates/20260506T024418Z-gemma-4-31b-it-final-answer-control-rerun/record.json`.
+- It applied `--apply-model-profile-defaults` plus Gemma's experimental
+  final-answer-only user-message prompt-control, completed two repeats, appended
+  to `cumulative-ledger.jsonl`, and left post-run health clean (`ok=true`,
+  `backend_error=null`, `active_model_id=null`, `model_count=0`).
+- Current latest Gemma values are `verdict = needs_optimization`,
+  `failure_count = 0`, `repeat_count = 2`,
+  `output_sanity_label = reasoning_trace_truncated`,
+  `ttft_ms = 5104.511`, `decode_tokens_per_second = 7.203`, and
+  `peak_resident_set_bytes = 38314049536`.
+- The final-answer-only prompt-control did not suppress visible
+  `<|channel>thought`; the trace policy recorded `trace_status=truncated`,
+  `visible_reasoning_trace=true`, and `final_text=null`.
+- TTFT remains not root-caused. The prior clean row averaged `51229.148ms`, but
+  the latest row showed repeat-level first-token latencies around `4.6s-5.6s`
+  and post-first-token decode wall time around `8.5s-9.0s`.
+
+Next dominant gap:
+
+- Retire the old dirty post-run backend gap unless a future row records
+  `post_run_backend_unhealthy`.
+- Do not repeat the same final-answer-only user-message prompt-control as if it
+  were untested. The next closure round is
+  `gemma_final_channel_template_control_and_ttft_repro_boundary`: test stronger
+  template-level final-channel framing, stop-token application in the HTTP
+  surface, or a serving path that can separate thought/final channels while
+  preserving failure visibility.
+
+Stop-token-control return (2026-05-06,
+`owlmlx_model_rc_gemma_stop_token_control_live_proof`):
+
+- `owlmlx` now accepts OpenAI-compatible `stop` on `/v1/chat/completions` and
+  `/v1/completions`, forwards it into the child runner params, strips it before
+  calling `mlx_lm`, and enforces stop strings on both non-streaming and
+  streaming outputs.
+- The Model RC runner now records the actual per-repeat generation
+  `request_payload`, so profile-applied `stop` is visible in
+  `repeat-XX-generation.json` instead of only inferred from runner config.
+- The latest Gemma row is
+  `files/evidence/owlmlx/model-release-candidates/20260506T-mainline-gemma-stop-request-payload-rerun/record.json`.
+  It applied profile stop tokens as `stop = ["<eos>", "<turn|>"]`, completed
+  two repeats, recorded the actual generation `request_payload`, appended to
+  `cumulative-ledger.jsonl`, and left post-run health clean.
+- Current latest Gemma values are `verdict = needs_optimization`,
+  `failure_count = 0`, `repeat_count = 2`,
+  `output_sanity_label = reasoning_trace_truncated`,
+  `ttft_ms = 24322.913`, `decode_tokens_per_second = 7.688`, and
+  `peak_resident_set_bytes = 33050263552`.
+- Stop-token application did not suppress visible `<|channel>thought`; both
+  repeats reached `finish_reason = length` with no safe final channel. That
+  narrows the active output-cleanliness gap from "did the platform apply
+  family controls?" to "which template/final-channel/serving control can
+  produce or extract a safe final channel without hiding visible trace
+  failures?"
+- TTFT variance is now reproduced enough to separate the immediate spike from
+  decode speed. The latest repeats showed first-token latency around `41.9s`
+  and `6.7s`, while post-first-token decode wall time stayed near `8.2s-8.5s`.
+  The current evidence therefore points at volatile pre-first-token work for
+  the spike, plus a stable slower decode component around `7.7` tok/s.
+
+Next dominant gap:
+
+- Continue from
+  `gemma_final_channel_template_or_serving_boundary_and_ttft_repro`: do not
+  repeat final-answer-only prompt-control or stop-token-control as if either
+  were untested.
 
 ## 3. Ownership Model
 

@@ -1,0 +1,87 @@
+{
+  "cleanup": {
+    "heavy_lock_removed": true,
+    "lane_owned_processes_remaining": false,
+    "legacy_listeners_observed_not_killed": [
+      "8001",
+      "8009"
+    ],
+    "preexisting_8066_listener": "PID 4348 remained present; not killed or restarted",
+    "residual_shared_runtime_state": "8066 healthz remained blocked with active_model_id=Qwen3.6-35B-A3B and backend_error=[Errno 32] Broken pipe after HTTP unload returned model_not_loaded"
+  },
+  "cumulative_ledger_updated": false,
+  "evidence_dir": "files/evidence/owlmlx/model-release-candidates/20260505T144321Z-qwen35-gemma-direct-mlx-lm-baseline",
+  "external_repo_edit": false,
+  "max_tokens": 64,
+  "models": {
+    "Qwen3.6-35B-A3B": {
+      "classification": "live_run_incomplete",
+      "classification_basis": "direct mlx_lm completed with chat template, but owlmlx HTTP openai_chat_stream loaded the model then produced no stream events and timed out; shared 8066 remained blocked with Broken pipe, so no complete direct-vs-HTTP comparison can be claimed.",
+      "deltas": null,
+      "direct_mlx_lm": {
+        "chat_template": {
+          "applied": true,
+          "attempted": true,
+          "error": null,
+          "method": "apply_chat_template(tokenize=False, add_generation_prompt=True)"
+        },
+        "failure_count": 0,
+        "load_wall_ms": 16215.09,
+        "mean_decode_tokens_per_second": 26.412,
+        "mean_end_to_end_tokens_per_second": 13.068,
+        "mean_generation_wall_ms": 14301.007,
+        "mean_ttft_ms": 11944.939,
+        "output_sanity_label": "valid_text",
+        "peak_process_tree_rss_bytes": 35254009856,
+        "raw_text_preview": [
+          "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - **Topic:** Local AI\n   - **Requirement:** Define it in one short sentence.\n\n2.  **Identify Key Concepts of \"Local AI\":**\n   - Runs on personal devices (laptops, desktop",
+          "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - **Topic:** Local AI\n   - **Requirement:** Define it in one short sentence.\n\n2.  **Identify Key Concepts of \"Local AI\":**\n   - Runs on personal devices (laptops, desktop"
+        ],
+        "status": "completed"
+      },
+      "owlmlx_http": {
+        "error": "TimeoutError while reading chunked SSE response; healthz after timeout reported active_model_id=Qwen3.6-35B-A3B, readiness=blocked, backend_error=[Errno 32] Broken pipe",
+        "failure_count": 1,
+        "load_elapsed_ms": 22858.572,
+        "load_ok": true,
+        "status": "incomplete_timeout_after_load",
+        "stream_artifact": "qwen35-http/repeat-01-stream.ndjson",
+        "stream_event_count": 0
+      }
+    },
+    "gemma-4-31B-it": {
+      "classification": "live_run_incomplete",
+      "classification_basis": "direct mlx_lm completed with chat template, but Gemma HTTP run was not started because the prior Qwen35 HTTP run left shared 8066 blocked; starting another HTTP model load was unsafe under lane rules.",
+      "deltas": null,
+      "direct_mlx_lm": {
+        "chat_template": {
+          "applied": true,
+          "attempted": true,
+          "error": null,
+          "method": "apply_chat_template(tokenize=False, add_generation_prompt=True)"
+        },
+        "failure_count": 0,
+        "load_wall_ms": 11982.283,
+        "mean_decode_tokens_per_second": 3.247,
+        "mean_end_to_end_tokens_per_second": 1.956,
+        "mean_generation_wall_ms": 12882.066,
+        "mean_ttft_ms": 5750.583,
+        "output_sanity_label": "valid_text",
+        "peak_process_tree_rss_bytes": 41497346048,
+        "raw_text_preview": [
+          "Local AI is artificial intelligence that runs directly on a user's own hardware rather than on a remote cloud server.",
+          "Local AI is artificial intelligence that runs directly on a user's own hardware rather than on a remote cloud server."
+        ],
+        "status": "completed"
+      },
+      "owlmlx_http": {
+        "failure_count": 1,
+        "status": "not_started_shared_8066_blocked_after_qwen35_http_timeout"
+      }
+    }
+  },
+  "outcome_label": "owlmlx_qwen35_gemma_direct_mlx_lm_baseline_live_run_incomplete",
+  "prompt": "In one short sentence, define local AI.",
+  "temperature": 0,
+  "temperature_method": "direct used mlx_lm.sample_utils.make_sampler(temp=0.0) after installed API rejected temp kwarg"
+}

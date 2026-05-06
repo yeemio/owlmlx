@@ -1,0 +1,15 @@
+{
+    "contract": {
+        "surface": "owlmlx.healthz",
+        "version": "stabilization1"
+    },
+    "runtime": "owlmlx",
+    "ok": false,
+    "readiness": "blocked",
+    "active_model_id": null,
+    "model_count": 0,
+    "backend_name": "mlx-lm-subprocess",
+    "backend_error": "Expecting ':' delimiter: line 1 column 37 (char 36)",
+    "persistent_child": true,
+    "child_health": {}
+}

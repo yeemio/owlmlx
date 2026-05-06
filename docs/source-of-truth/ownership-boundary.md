@@ -47,6 +47,7 @@ runtime truth must have exactly one truth owner.
 | R17 | Per-model runtime truth schema | R | `owlmlx/model_inventory.py` | **Absorbed + consumed** — model inventory schema + pure budget/health derivation; platform fills snapshots and keeps transport/probes |
 | R18 | Cache truth contract | R | `owlmlx/cache_truth.py` | **Absorbed + consumed** — cache profile labels, flag schema, restart-required derivation, and TurboQuant cache-safety rules; platform keeps env mutation, process probing, Distilled assets, and endpoints |
 | R19 | Gemma production mainline identity | R | owlmlx docs | Already owned |
+| R20 | Runtime model visibility contract | R | `owlmlx/runtime_model_visibility.py` | **Introduced** — owlmlx owns rule `runtime_gate_required_before_visible`; formal visibility list now lives at `GET /v1/openai/models`, diagnostics at `GET /v1/runtime/model-visibility`, and `/v1/models` stays loaded inventory; gate is owlmlx registry plus base-model `config.json` presence, while lifecycle curation and extreme-experiment classification remain platform-owned |
 
 ### 3.2 Control-Plane (platform-owned)
 
@@ -156,20 +157,20 @@ Kimi is the first validated specimen on the large-weight path. It already
 bridges into owlmlx (GenerationGate, serving status). It is NOT a production
 mainline — it is a lab/experimental specimen that proved path-level truths.
 
-### 5.3 gpt-oss-120b (heavy synthesis)
+### 5.3 gpt-oss-120b (retired local heavy synthesis)
 
 | Aspect | Placement | Owner |
 |---|---|---|
-| Model identity | Platform stable line | Platform-owned |
-| Runtime | oMLX (standard serving) | Shell-hosted (S2) |
-| Runtime truth | owlmlx schema (R17) consumed via router (T6) | Split: schema R, transport T |
-| Lifecycle state | Stable | Platform (C1, C7) |
-| Memory budget | owlmlx defines (R13); platform enforces (C5) | Split |
+| Model identity | Retired from local active set | Platform-owned historical line |
+| Runtime | None in active owlmlx visibility | Not active |
+| Runtime truth | Historical evidence only | Not a current gate |
+| Lifecycle state | Removed from active RC and visibility | Coordinator-owned decision |
+| Memory budget | No longer used as pressure canary | Replaced by DeepSeek 2bit-DQ lane |
 
-gpt-oss-120b is a platform-mature stable model. It does not need owlmlx-
-specific contracts beyond what the general per-model runtime truth schema
-provides. It runs on oMLX like any other model. Its lifecycle is platform-
-managed.
+gpt-oss-120b was removed from the active local model set on 2026-05-05. It no
+longer blocks the Model RC gate, no longer appears in the runtime-owned
+visibility registry, and no longer serves as the heavyweight pressure canary.
+DeepSeek-V4-Flash-2bit-DQ owns the pressure/adaptation lane instead.
 
 ### 5.4 Other Platform Models
 

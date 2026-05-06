@@ -1,0 +1,36 @@
+{
+  "completion_tokens": 64,
+  "done": {
+    "completion_tokens": 64,
+    "event": "done",
+    "finish_reason": "length",
+    "model_id": "gemma-4-31B-it"
+  },
+  "elapsed_ms": 14592.79,
+  "event_count": 65,
+  "first_token_latency_ms": 5608.875,
+  "reasoning_trace_policy": {
+    "caveats": [
+      "visible channel thought trace has no safe final channel"
+    ],
+    "final_text": null,
+    "final_text_source": null,
+    "output_sanity_label": "reasoning_trace_truncated",
+    "surface": "owlmlx.reasoning_trace_policy",
+    "trace_marker_family": "channel",
+    "trace_status": "truncated",
+    "version": "v1",
+    "visible_reasoning_trace": true
+  },
+  "status_code": 200,
+  "text_preview": "<|channel>thought\n*   Task: Define \"local AI\".\n    *   Constraint 1: One short sentence.\n    *   Constraint 2: Final answer only (no reasoning, analysis, etc.).\n\n    *   Local AI refers to artificial intelligence models that run on a user's own hardware (",
+  "timing_breakdown": {
+    "completion_tokens": 64,
+    "first_token_latency_ms": 5608.875,
+    "load_elapsed_ms": 14405.556,
+    "post_first_token_decode_tokens": 63,
+    "post_first_token_decode_wall_ms": 8983.915,
+    "queue_wait_ms": null,
+    "stream_request_wall_ms": 14592.79
+  }
+}

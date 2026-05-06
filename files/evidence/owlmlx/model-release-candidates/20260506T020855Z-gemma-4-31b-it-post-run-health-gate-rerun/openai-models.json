@@ -1,0 +1,23 @@
+{
+  "payload": {
+    "data": [
+      {
+        "id": "Qwen3.6-27B",
+        "object": "model",
+        "owned_by": "owlmlx"
+      },
+      {
+        "id": "Qwen3.6-35B-A3B",
+        "object": "model",
+        "owned_by": "owlmlx"
+      },
+      {
+        "id": "gemma-4-31B-it",
+        "object": "model",
+        "owned_by": "owlmlx"
+      }
+    ],
+    "object": "list"
+  },
+  "status": 200
+}

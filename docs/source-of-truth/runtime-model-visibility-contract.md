@@ -1,7 +1,7 @@
 # owlmlx Runtime Model Visibility Contract
 
 > Status: authoritative
-> Updated: 2026-04-23
+> Updated: 2026-05-05
 > Scope: runtime-owned answer to "which local models should be visible?"
 > Verdict: `owlmlx_visibility_truth_source_introduced`
 
@@ -87,11 +87,15 @@ The initial owlmlx-owned visibility registry includes:
 - `Qwen3.6-27B`
 - `Qwen3.6-35B-A3B`
 - `gemma-4-31B-it`
-- `gpt-oss-120b-MXFP4-Q4`
 - `gpt-oss-20b-MXFP4-Q4`
 - `Qwen3-Embedding-8B-4bit-DWQ`
 
-The first seven are the required OwlCoda-facing coverage set for this round.
+`gpt-oss-120b-MXFP4-Q4` was removed from this registry on 2026-05-05 after its
+local base artifact was intentionally deleted from
+`/Users/yeemio/AI/Agent/models`. It is no longer a runtime-visible model, a
+Model RC gate member, or a heavyweight pressure canary.
+
+The first six are the current OwlCoda-facing coverage set for this round.
 The embedding model is included to preserve current local visibility behavior.
 
 ## 6. Relationship To The Old Platform Rule

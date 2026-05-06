@@ -1,7 +1,7 @@
 # owlmlx Master Outline
 
 > Status: authoritative outline
-> Updated: 2026-04-28
+> Updated: 2026-05-05
 
 ## 1. What `owlmlx` Is
 
@@ -177,6 +177,12 @@ These are runtime-level goals, not temporary integration work.
 132. `reclaim-barrier-event.md`
 133. `termination-recovery-policy.md`
 134. `public-surface.md`
+135. `model-release-candidate-program.md`
+136. `deepseek-v4-flash-adapter-optimization-candidate.md`
+137. `peer-reference-mechanism-audit-for-model-profiles.md`
+138. `peer-reference-vendor-provenance-audit.md`
+139. `mlx-lm-generation-baseline-triage.md`
+140. `model-load-admission.md`
 
 ## 6. Adoption Model
 

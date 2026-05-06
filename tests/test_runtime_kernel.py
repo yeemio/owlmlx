@@ -49,6 +49,74 @@ def test_kernel_rejects_model_that_exceeds_budget() -> None:
     assert kernel.status_dict()["inventory"]["model_count"] == 0
 
 
+def test_kernel_blocks_load_when_host_pressure_sample_crosses_threshold() -> None:
+    backend = FakeBackend(default_memory_gb=1.0)
+    kernel = RuntimeKernel(
+        backend,
+        profile=_small_profile(),
+        host_pressure_sampler=lambda: {
+            "available": True,
+            "source": "memory_pressure",
+            "classification": "host_pressure_block",
+            "reason_code": "free_percent_at_or_below_block_threshold",
+            "reason_message": "Host free memory is below threshold.",
+            "free_percent": 8.0,
+        },
+    )
+
+    result = kernel.load_model("blocked-model")
+
+    assert result.ok is False
+    assert result.error_code is RuntimeErrorCode.backend_error
+    assert result.detail["host_pressure"]["classification"] == "host_pressure_block"
+    assert backend.status().loaded_models == ()
+    status = kernel.status_dict()
+    assert status["host_pressure"]["free_percent"] == 8.0
+    assert status["inventory"]["model_count"] == 0
+
+
+def test_kernel_allows_load_when_host_pressure_sample_is_normal() -> None:
+    kernel = RuntimeKernel(
+        FakeBackend(default_memory_gb=1.0),
+        profile=_small_profile(),
+        host_pressure_sampler=lambda: {
+            "available": True,
+            "source": "memory_pressure",
+            "classification": "normal",
+            "reason_code": "free_percent_above_warning_threshold",
+            "reason_message": "Host free memory is above threshold.",
+            "free_percent": 95.0,
+        },
+    )
+
+    result = kernel.load_model("safe-model")
+
+    assert result.ok is True
+    assert kernel.status_dict()["host_pressure"]["classification"] == "normal"
+
+
+def test_kernel_explicit_host_pressure_sample_updates_status_without_loading() -> None:
+    kernel = RuntimeKernel(
+        FakeBackend(default_memory_gb=1.0),
+        profile=_small_profile(),
+        host_pressure_sampler=lambda: {
+            "available": True,
+            "source": "memory_pressure",
+            "classification": "normal",
+            "reason_code": "free_percent_above_warning_threshold",
+            "reason_message": "Host free memory is above threshold.",
+            "free_percent": 91.0,
+        },
+    )
+
+    sample = kernel.sample_host_pressure()
+
+    assert sample["classification"] == "normal"
+    status = kernel.status_dict()
+    assert status["host_pressure"]["free_percent"] == 91.0
+    assert status["inventory"]["model_count"] == 0
+
+
 def test_kernel_budget_counts_already_loaded_models() -> None:
     kernel = RuntimeKernel(FakeBackend(default_memory_gb=4.0), profile=_small_profile())
 
@@ -431,6 +499,10 @@ def test_status_dict_exposes_governance_observations() -> None:
         "governance_observations",
         "governance_policy",
         "generation_gate",
+        "reclaim_barrier",
+        "load_failure",
+        "memory_pressure_cooldown",
+        "host_pressure",
     ]
     assert status["governance_observations"] == {
         "transition_count": 4,

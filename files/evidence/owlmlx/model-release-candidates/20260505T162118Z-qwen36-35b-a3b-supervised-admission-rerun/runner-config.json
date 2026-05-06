@@ -1,0 +1,71 @@
+{
+  "artifact_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B",
+  "effective_generation_policy": {
+    "chat_template_kwargs": {
+      "enable_thinking": true
+    },
+    "decision_source": "profile_default",
+    "profile_applied": true,
+    "profile_family": "qwen3.6_moe",
+    "profile_id": "qwen3_6_moe",
+    "prompt_template_id": "openai_chat_completions_apply_chat_template",
+    "prompt_template_id_source": "profile_default",
+    "quality_caveats": [
+      "model_profile:Qwen MoE profile keeps think-in-template behavior explicit.",
+      "model_profile:Short responses can be dominated by reasoning trace tokens.",
+      "model_profile:profile_stop_tokens_not_applied"
+    ],
+    "request_mode": "openai_chat_stream",
+    "request_mode_source": "profile_default",
+    "stop_token_strings": [
+      "<|im_end|>"
+    ],
+    "stop_token_strings_applied": false,
+    "unknown_model_conservative": false
+  },
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "max_tokens": 64,
+  "model_id": "Qwen3.6-35B-A3B",
+  "model_profile": {
+    "cache_policy": {
+      "prefill_caveat": "high TTFT must be measured separately from decode",
+      "prefix_cache": "allowed_with_runtime_evidence"
+    },
+    "chat_template_kwargs": {
+      "enable_thinking": true
+    },
+    "model_id_patterns": [
+      "\\bqwen3[._-]?6\\b.*\\b35b\\b.*\\ba3b\\b"
+    ],
+    "profile_caveats": [
+      "Qwen MoE profile keeps think-in-template behavior explicit.",
+      "Short responses can be dominated by reasoning trace tokens."
+    ],
+    "profile_family": "qwen3.6_moe",
+    "profile_id": "qwen3_6_moe",
+    "reasoning_parser_family": "qwen",
+    "sampler_defaults": {
+      "temperature": 0.0,
+      "top_p": 1.0
+    },
+    "source_basis": [
+      "docs/source-of-truth/peer-reference-mechanism-audit-for-model-profiles.md",
+      "docs/source-of-truth/release-readiness-execution-plan.md"
+    ],
+    "stop_token_strings": [
+      "<|im_end|>"
+    ],
+    "surface": "owlmlx.model_profile",
+    "thinking_policy": {
+      "budget_policy": "needs_bounded_budget_experiment",
+      "default_mode": "enabled_by_template",
+      "template_caveat": "thinking tokens may consume short generation budget"
+    },
+    "version": "v1"
+  },
+  "prompt": "In one short sentence, define local AI.",
+  "prompt_template_id": null,
+  "repeats": 2,
+  "request_mode": "openai_chat_stream",
+  "runtime_url": "http://127.0.0.1:8066"
+}

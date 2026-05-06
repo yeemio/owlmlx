@@ -1,0 +1,51 @@
+*
+   Topic
+:
+ Local
+ AI
+.
+
+    *
+   Constraint
+ 1
+:
+ One
+ short
+ sentence
+.
+
+    *
+   Constraint
+ 2
+:
+ Define
+ it
+.
+
+
+    *
+   What
+ is
+ it
+?
+ AI
+ models
+ running
+ on
+ a
+ user
+'
+s
+ own
+ hardware
+.
+
+    *
+   Key
+ characteristics
+:
+ No
+ cloud
+,
+ privacy
+,

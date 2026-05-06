@@ -80,6 +80,11 @@ documents linked below.
   `visibility_contract` block; see `runtime-model-visibility-contract.md`
 - `GET /v1/runtime/model-visibility` — `supported` — diagnostic visibility
   contract surface
+- `GET /v1/runtime/model-load-admission` — `supported` — model-specific
+  load-admission projection; see `model-load-admission.md`
+- `POST /v1/runtime/host-pressure-sample` — `supported` — explicit
+  operator action that refreshes cached host-pressure admission truth without
+  loading a model; see `model-load-admission.md`
 
 ### 3.4 Release-Floor Contract Surfaces
 
@@ -115,6 +120,11 @@ documented in its source-of-truth file.
   `comparative-evidence-harness-contract.md`
 - `GET /v1/runtime/comparative-evidence/history` — `supported` — stable
   `comparative_evidence_record_history` v1 envelope
+- `GET /v1/runtime/model-release-candidates` — `supported` — latest
+  validated `model_release_candidate_record` v1 (or explicit
+  `still_blocked` 503); see `model-release-candidate-program.md`
+- `GET /v1/runtime/model-release-candidates/history` — `supported` — stable
+  `model_release_candidate_record_history` v1 envelope
 
 ## 4. Supported Runtime Modules / Python APIs
 
@@ -157,6 +167,18 @@ inside a supported module.
   `load_runner_config_file(...)`); the public shape is the JSON runner-config
   surface frozen in `comparative-evidence-harness-contract.md` §3 and the
   3.5D handoff
+- `owlmlx.model_release_candidate_schema` — `supported` — frozen schema
+  constants and `validate_model_release_candidate_record(...)`
+- `owlmlx.model_release_candidate_record` — `supported` —
+  `build_model_release_candidate_record(...)`,
+  `build_dry_run_model_release_candidate_records(...)`, and
+  `model_release_candidate_record_to_dict(...)`
+- `owlmlx.model_release_candidate_ledger` — `supported` —
+  `ModelReleaseCandidateLedger`, `model_release_candidate_still_blocked_payload(...)`,
+  and `model_release_candidate_history_envelope(...)`
+- `owlmlx.model_load_admission` — `supported` —
+  `build_model_load_admission(...)` and
+  `model_load_admission_to_dict(...)`
 - `owlmlx.memory_pressure_eviction_policy` — `supported` —
   `build_memory_pressure_eviction_policy(...)`
 - `owlmlx.nonresident_model_admission_policy` — `supported`
@@ -182,6 +204,10 @@ Their CLIs are stable; their internal helpers are not.
   for the comparative-evidence record surface; subcommands
   `append-rejected-record`, `run-measured-short-prompt`, `latest`,
   `history`. See `comparative-evidence-harness-contract.md`
+- `scripts/runtime_model_release_candidate.py` — `supported` — operator entry
+  for the model release-candidate evidence surface; subcommands
+  `dry-run-matrix`, `append-dry-run-matrix`, `latest`, `history`. See
+  `model-release-candidate-program.md`
 - `scripts/runtime_mlx_environment_readiness.py` — `supported`
 - `scripts/runtime_mlx_blocker_report.py` — `supported`
 - `scripts/runtime_mlx_host_forensics.py` — `supported`
@@ -207,12 +233,15 @@ under `docs/source-of-truth/` are owlmlx-internal truth and may change.
 - `docs/source-of-truth/hazardous-operations.md`
 - `docs/source-of-truth/comparative-evidence-harness-contract.md`
 - `docs/source-of-truth/comparative-evidence-schema-stub.md`
+- `docs/source-of-truth/model-release-candidate-program.md`
+- `docs/source-of-truth/deepseek-v4-flash-adapter-optimization-candidate.md`
 - `docs/source-of-truth/release-readiness-backlog.md`
 - `docs/source-of-truth/release-readiness-execution-plan.md`
 - `docs/source-of-truth/orchestration-status-surface.md`
 - `docs/source-of-truth/scheduler-admission-contract.md`
 - `docs/source-of-truth/model-residency-policy.md`
 - `docs/source-of-truth/memory-pressure-contract.md`
+- `docs/source-of-truth/model-load-admission.md`
 - `docs/source-of-truth/memory-pressure-eviction-policy.md`
 - `docs/source-of-truth/recovery-supervisor-contract.md`
 - `docs/source-of-truth/termination-recovery-policy.md`

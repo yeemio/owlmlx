@@ -1,0 +1,5 @@
+lock_stat:
+stat: /tmp/owlmlx-model-rc-heavy.lock: stat: No such file or directory
+lock_contents:
+ls: /tmp/owlmlx-model-rc-heavy.lock: No such file or directory
+heavy_processes:

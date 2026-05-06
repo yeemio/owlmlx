@@ -1,0 +1,30 @@
+{
+  "payload": {
+    "policy_boundaries": {
+      "action_scope": "explicit_operator_sample",
+      "does_not_load_model": true,
+      "does_not_run_eviction": true,
+      "does_not_sample_private_metal_allocator": true,
+      "updates_runtime_status_host_pressure_cache": true
+    },
+    "snapshot": {
+      "available": true,
+      "block_free_percent": 10.0,
+      "classification": "normal",
+      "compressor_gb": 3.576157,
+      "free_gb": 0.19989,
+      "free_percent": 53.0,
+      "raw_excerpt": "The system has 137438953472 (8388608 pages with a page size of 16384).\n\nStats: \nPages free: 13100 \nPages purgeable: 9253 \nPages purged: 102871 \n\nSwap I/O:\nSwapins: 0 \nSwapouts: 0 \n\nPage Q counts:\nPages active: 1774172 \nPages inactive: 2630518 \nPages speculative: 10565 \nPages throttled: 0 \nPages wired down: 3583539 \n\nCompressor Stats:\nPages used by compressor: 234367 \nPages decompressed: 375883 \nPages compressed: 924601 \n\nFile I/O:\nPageins: 9207758 \nPageouts: 311 \n\nSystem-wide memory free percentage: 53%\n",
+      "reason_code": "free_percent_above_warning_threshold",
+      "reason_message": "Host free memory is above the runtime-owned warning threshold.",
+      "sampled_at_s": 3228.240556,
+      "source": "memory_pressure",
+      "total_gb": 128.0,
+      "warn_free_percent": 20.0,
+      "wired_gb": 54.680466
+    },
+    "surface": "owlmlx.host_pressure_sample",
+    "version": "v1"
+  },
+  "status": 200
+}

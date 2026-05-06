@@ -10,6 +10,7 @@ from owlmlx.memory_budget import MachineMemoryProfile
 from owlmlx.runtime import FakeBackend, RuntimeKernel
 from owlmlx.runtime.server import create_app
 from owlmlx.runtime_model_visibility import (
+    DEFAULT_REGISTERED_RUNTIME_VISIBLE_MODELS,
     RUNTIME_MODEL_VISIBILITY_CONTRACT_VERSION,
     RUNTIME_MODEL_VISIBILITY_RULE,
     RegisteredRuntimeVisibleModel,
@@ -49,6 +50,12 @@ def _client(
             visibility_registry=registry,
         )
     )
+
+
+def test_default_registry_excludes_retired_gpt_oss_120b() -> None:
+    model_ids = {entry.model_id for entry in DEFAULT_REGISTERED_RUNTIME_VISIBLE_MODELS}
+
+    assert "gpt-oss-120b-MXFP4-Q4" not in model_ids
 
 
 def test_registered_models_require_base_dir_and_config(tmp_path: Path) -> None:
@@ -135,4 +142,3 @@ def test_v1_models_embeds_visibility_contract_without_overwriting_inventory(
         "currently_loaded_inventory_only"
     )
     assert contract["distinct_from_loaded_inventory"]["loaded_model_ids"] == ["fake-a"]
-

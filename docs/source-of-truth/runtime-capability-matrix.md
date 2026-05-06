@@ -72,6 +72,7 @@ Capability labels:
 | Generalized foreground-interactive runtime | experimental | Not yet established as current truth |
 | Additional runtime paths beyond large-weight | experimental | Future only when real capability truth exists |
 | Real MLX model load/generate through owlmlx | supported | `MlxLmSubprocessBackend` has real successful local smokes through the clean `.runtime1-mlx` environment on `gpt-oss-20b-MXFP4-Q4`, `Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit`, and `Qwen3.5-35B-A3B-4bit`; Runtime-2 further proves persistent child reuse on `gpt-oss-20b` and `Qwen3.5-27B` and has a steady-state benchmark script |
+| DeepSeek V4 Flash 2bit-DQ adapter optimization | experimental | `DeepSeek-V4-Flash-2bit-DQ` is a 284.3B-parameter, about-90G local MLX artifact with a first short generation smoke through an isolated DeepSeek V4 PR runtime; it is not yet visible on the technical-preview `GET /v1/openai/models` surface and is tracked by `deepseek-v4-flash-adapter-optimization-candidate.md` plus `model-release-candidate-program.md` |
 | Persistent child health probe | supported | Backend `status()` actively issues `ping` to live child sessions and surfaces `child_health` in status detail |
 | Dead child restart policy | supported | Registration survives child death; the next generation request can restart the child session within configured restart-attempt limits |
 | Explicit runtime restart surface | supported | `POST /v1/runtime/restart` restarts one loaded model through `RuntimeKernel.restart_model()` |

@@ -8,7 +8,7 @@ import uuid
 from dataclasses import asdict
 from typing import Any
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse
 from starlette.responses import StreamingResponse
@@ -17,6 +17,11 @@ from owlmlx.runtime_model_visibility import (
     RegisteredRuntimeVisibleModel,
     build_runtime_model_visibility,
     derive_runtime_model_visibility_contract,
+    runtime_model_visibility_contract,
+)
+from owlmlx.model_load_admission import (
+    build_model_load_admission,
+    model_load_admission_to_dict,
 )
 from owlmlx.nonresident_loadability_lineage import (
     build_nonresident_loadability_lineage,
@@ -63,9 +68,27 @@ from owlmlx.comparative_evidence_ledger import (
     history_envelope as comparative_evidence_history_envelope,
     still_blocked_payload as comparative_evidence_still_blocked_payload,
 )
+from owlmlx.model_release_candidate_ledger import (
+    ModelReleaseCandidateLedger,
+    model_release_candidate_history_envelope,
+    model_release_candidate_still_blocked_payload,
+)
 from owlmlx.request_context_length_truth import (
     build_request_context_length_truth,
     request_context_length_truth_to_dict,
+)
+from owlmlx.runtime_monitor_test_console import (
+    MONITOR_EVENT_SURFACE,
+    RuntimeTestRunRegistry,
+    TEST_RUN_ABORT_SURFACE,
+    TEST_RUN_EVENT_SURFACE,
+    TEST_RUN_LAUNCH_SURFACE,
+    build_monitor_snapshot,
+    build_test_run_events,
+    build_test_run_index,
+    build_test_run_preflight,
+    build_test_run_status,
+    unsupported_operation_payload,
 )
 
 from .backends import FakeBackend, RuntimeBackend
@@ -129,6 +152,7 @@ class CompletionRequest(BaseModel):
     prompt: str = Field(min_length=1)
     max_tokens: int | None = Field(default=None, ge=1)
     temperature: float | None = None
+    stop: str | list[str] | None = None
     stream: bool = False
 
 
@@ -137,6 +161,7 @@ class ChatCompletionRequest(BaseModel):
     messages: list[ChatMessage]
     max_tokens: int | None = Field(default=None, ge=1)
     temperature: float | None = None
+    stop: str | list[str] | None = None
     stream: bool = False
 
 
@@ -167,6 +192,16 @@ class MemoryPressureEvictionRequest(BaseModel):
     """HTTP request body for explicit runtime-owned memory-pressure eviction."""
 
     protect_active: bool = Field(default=True)
+
+
+class TestRunRequest(BaseModel):
+    """HTTP request body for runtime-owned test-run preflight or launch."""
+
+    model_id: str = Field(min_length=1)
+    test_profile_id: str = Field(min_length=1)
+    mode: str = Field(default="dry_run")
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    operator: dict[str, Any] = Field(default_factory=dict)
 
 
 def _result_to_dict(result: Any) -> dict[str, Any]:
@@ -386,6 +421,8 @@ def create_app(
     visibility_registry: list[Any] | tuple[Any, ...] | None = None,
     loadability_lineage_records: dict[str, Any] | None = None,
     comparative_evidence_ledger_path: str | None = None,
+    model_release_candidate_ledger_path: str | None = None,
+    runtime_test_run_ledger_path: str | None = None,
 ) -> FastAPI:
     """Create a minimal owlmlx runtime HTTP app.
 
@@ -400,6 +437,15 @@ def create_app(
     `/v1/runtime/comparative-evidence/history`. It is connected at app
     construction time. When ``None``, both endpoints fail visibly as
     ``still_blocked``.
+
+    `model_release_candidate_ledger_path` is the runtime-owned JSONL ledger
+    that backs `/v1/runtime/model-release-candidates` and
+    `/v1/runtime/model-release-candidates/history`.
+
+    `runtime_test_run_ledger_path` is the runtime-owned JSONL audit ledger
+    that backs Runtime Monitor test-run index/status/event replay surfaces.
+    When absent, launch remains structured `unsupported` without writing a
+    persisted registry row.
     """
 
     runtime = kernel if kernel is not None else RuntimeKernel(FakeBackend())
@@ -417,6 +463,90 @@ def create_app(
         if comparative_evidence_ledger_path is not None
         else None
     )
+    app.state.model_release_candidate_ledger = (
+        ModelReleaseCandidateLedger(model_release_candidate_ledger_path)
+        if model_release_candidate_ledger_path is not None
+        else None
+    )
+    app.state.runtime_test_run_registry = (
+        RuntimeTestRunRegistry(runtime_test_run_ledger_path)
+        if runtime_test_run_ledger_path is not None
+        else None
+    )
+    app.state.runtime_test_runs = {}
+
+    def _request_runtime_url(request: Request) -> str:
+        return str(request.base_url).rstrip("/")
+
+    def _runtime_model_visibility_contract() -> dict[str, Any]:
+        return derive_runtime_model_visibility_contract(
+            runtime.inventory_snapshot(),
+            models_root=visibility_models_root,
+            registry=visibility_registry,
+        )
+
+    def _model_release_candidate_records_and_status() -> tuple[
+        list[dict[str, Any]],
+        str,
+        str | None,
+    ]:
+        ledger = app.state.model_release_candidate_ledger
+        if ledger is None:
+            return [], "not_connected", None
+        records = ledger.history()
+        return records, "available" if records else "empty", str(ledger.path)
+
+    def _runtime_test_run_records() -> list[dict[str, Any]]:
+        registry = app.state.runtime_test_run_registry
+        records: list[dict[str, Any]] = []
+        if registry is not None:
+            records.extend(registry.history())
+        records_by_id = {
+            str(record.get("run_id")): record
+            for record in records
+            if record.get("run_id")
+        }
+        for run_id, run in app.state.runtime_test_runs.items():
+            records_by_id[str(run_id)] = dict(run)
+        return list(records_by_id.values())
+
+    def _runtime_test_run_ledger_status() -> tuple[str, str | None]:
+        registry = app.state.runtime_test_run_registry
+        if registry is None:
+            return "not_connected", None
+        return "available", str(registry.path)
+
+    def _sse_replay_response(events: list[dict[str, Any]]) -> StreamingResponse:
+        def event_stream():
+            for event in events:
+                yield f"event: {event.get('type', 'runtime_test_run_event')}\n"
+                yield f"id: {event.get('event_id', '')}\n"
+                yield f"data: {json.dumps(event, sort_keys=True)}\n\n"
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+    def _runtime_model_load_admission_contract(
+        target_model_id: str | None = None,
+    ) -> dict[str, Any]:
+        visibility_gate = build_runtime_model_visibility(
+            runtime.inventory_snapshot(),
+            models_root=visibility_models_root,
+            registry=visibility_registry,
+        )
+        (
+            records,
+            ledger_status,
+            _ledger_path,
+        ) = _model_release_candidate_records_and_status()
+        return model_load_admission_to_dict(
+            build_model_load_admission(
+                runtime_status=runtime.status_dict(),
+                visibility_contract=runtime_model_visibility_contract(visibility_gate),
+                model_release_candidate_records=records,
+                target_model_id=target_model_id,
+                ledger_status=ledger_status,
+            )
+        )
 
     @app.get("/healthz")
     def healthz() -> dict[str, Any]:
@@ -482,6 +612,8 @@ def create_app(
             params["max_tokens"] = payload.max_tokens
         if payload.temperature is not None:
             params["temperature"] = payload.temperature
+        if payload.stop is not None:
+            params["stop"] = payload.stop
 
         if not payload.stream:
             result = await runtime.generate_messages(messages, model_id=target_model, **params)
@@ -714,6 +846,8 @@ def create_app(
             params["max_tokens"] = payload.max_tokens
         if payload.temperature is not None:
             params["temperature"] = payload.temperature
+        if payload.stop is not None:
+            params["stop"] = payload.stop
 
         if not payload.stream:
             result = await runtime.generate(payload.prompt, model_id=target_model, **params)
@@ -836,15 +970,175 @@ def create_app(
 
     @app.get("/v1/runtime/model-visibility")
     def runtime_model_visibility() -> dict[str, Any]:
-        return derive_runtime_model_visibility_contract(
-            runtime.inventory_snapshot(),
-            models_root=visibility_models_root,
-            registry=visibility_registry,
-        )
+        return _runtime_model_visibility_contract()
+
+    @app.get("/v1/runtime/model-load-admission")
+    def runtime_model_load_admission(model_id: str | None = None) -> dict[str, Any]:
+        return _runtime_model_load_admission_contract(model_id)
+
+    @app.post("/v1/runtime/host-pressure-sample")
+    def runtime_host_pressure_sample() -> dict[str, Any]:
+        snapshot = runtime.sample_host_pressure()
+        return {
+            "surface": "owlmlx.host_pressure_sample",
+            "version": "v1",
+            "snapshot": snapshot,
+            "policy_boundaries": {
+                "action_scope": "explicit_operator_sample",
+                "updates_runtime_status_host_pressure_cache": True,
+                "does_not_load_model": True,
+                "does_not_sample_private_metal_allocator": True,
+                "does_not_run_eviction": True,
+            },
+        }
 
     @app.get("/v1/runtime/status")
     def runtime_status() -> dict[str, Any]:
         return runtime.status_dict()
+
+    @app.get("/v1/runtime/monitor/snapshot")
+    def runtime_monitor_snapshot(request: Request) -> dict[str, Any]:
+        (
+            records,
+            ledger_status,
+            ledger_path,
+        ) = _model_release_candidate_records_and_status()
+        test_run_ledger_status, test_run_ledger_path = _runtime_test_run_ledger_status()
+        return build_monitor_snapshot(
+            runtime_status=runtime.status_dict(),
+            runtime_url=_request_runtime_url(request),
+            visibility_contract=_runtime_model_visibility_contract(),
+            model_load_admission=_runtime_model_load_admission_contract(),
+            model_release_candidate_records=records,
+            model_release_candidate_ledger_status=ledger_status,
+            model_release_candidate_ledger_path=ledger_path,
+            test_runs=_runtime_test_run_records(),
+            test_run_audit_ledger_status=test_run_ledger_status,
+            test_run_audit_ledger_path=test_run_ledger_path,
+        )
+
+    @app.get("/v1/runtime/monitor/events")
+    def runtime_monitor_events() -> JSONResponse:
+        return JSONResponse(
+            status_code=501,
+            content=unsupported_operation_payload(
+                surface=MONITOR_EVENT_SURFACE,
+                unsupported_feature="monitor_sse_stream",
+                reason="monitor_event_stream_worker_not_implemented",
+            ),
+        )
+
+    @app.post("/v1/runtime/test-runs/preflight")
+    def runtime_test_runs_preflight(
+        payload: TestRunRequest,
+        request: Request,
+    ) -> dict[str, Any]:
+        return build_test_run_preflight(
+            request_payload=payload.model_dump(),
+            runtime_status=runtime.status_dict(),
+            runtime_url=_request_runtime_url(request),
+            visibility_contract=_runtime_model_visibility_contract(),
+            model_load_admission=_runtime_model_load_admission_contract(payload.model_id),
+            test_runs=_runtime_test_run_records(),
+        )
+
+    @app.get("/v1/runtime/test-runs")
+    def runtime_test_runs() -> dict[str, Any]:
+        ledger_status, ledger_path = _runtime_test_run_ledger_status()
+        return build_test_run_index(
+            test_runs=_runtime_test_run_records(),
+            audit_ledger_status=ledger_status,
+            audit_ledger_path=ledger_path,
+        )
+
+    @app.post("/v1/runtime/test-runs")
+    def runtime_test_runs_launch(
+        payload: TestRunRequest,
+        request: Request,
+    ) -> JSONResponse:
+        preflight = build_test_run_preflight(
+            request_payload=payload.model_dump(),
+            runtime_status=runtime.status_dict(),
+            runtime_url=_request_runtime_url(request),
+            visibility_contract=_runtime_model_visibility_contract(),
+            model_load_admission=_runtime_model_load_admission_contract(payload.model_id),
+            test_runs=_runtime_test_run_records(),
+        )
+        registry = app.state.runtime_test_run_registry
+        audit_row = None
+        if registry is not None:
+            audit_row = registry.append_unsupported_launch(
+                request_payload=payload.model_dump(),
+                preflight=preflight,
+            )
+        response = unsupported_operation_payload(
+            surface=TEST_RUN_LAUNCH_SURFACE,
+            unsupported_feature="audited_live_launch_worker",
+            reason="test_run_launch_worker_not_implemented",
+        )
+        response["launch_decision"] = "unsupported"
+        response["preflight"] = preflight
+        response["audit_ledger_status"] = "available" if registry is not None else "not_connected"
+        response["audit_ledger_path"] = str(registry.path) if registry is not None else None
+        if audit_row is not None:
+            response["run_id"] = audit_row["run_id"]
+            response["run"] = audit_row
+        return JSONResponse(status_code=501, content=response)
+
+    @app.get("/v1/runtime/test-runs/{run_id}/events")
+    def runtime_test_run_events(run_id: str):
+        payload = build_test_run_events(
+            run_id=run_id,
+            test_runs=_runtime_test_run_records(),
+        )
+        if payload.get("status") == "not_found":
+            return JSONResponse(status_code=404, content=payload)
+        return _sse_replay_response(payload["events"])
+
+    @app.post("/v1/runtime/test-runs/{run_id}/abort")
+    def runtime_test_run_abort(run_id: str) -> JSONResponse:
+        known_run_ids = {
+            str(run.get("run_id"))
+            for run in _runtime_test_run_records()
+            if run.get("run_id")
+        }
+        if run_id not in known_run_ids:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "contract": {
+                        "surface": TEST_RUN_ABORT_SURFACE,
+                        "version": "v1",
+                    },
+                    "status": "not_found",
+                    "run_id": run_id,
+                    "reason": "runtime_test_run_not_found",
+                    "policy_boundaries": {
+                        "does_not_abort_process": True,
+                        "does_not_touch_legacy_listeners": ["8001", "8009"],
+                    },
+                },
+            )
+        return JSONResponse(
+            status_code=501,
+            content=unsupported_operation_payload(
+                surface=TEST_RUN_ABORT_SURFACE,
+                unsupported_feature="audited_abort_worker",
+                reason="test_run_abort_worker_not_implemented",
+                run_id=run_id,
+            ),
+        )
+
+    @app.get("/v1/runtime/test-runs/{run_id}")
+    def runtime_test_run_status(run_id: str) -> JSONResponse:
+        payload = build_test_run_status(
+            run_id=run_id,
+            test_runs=_runtime_test_run_records(),
+        )
+        return JSONResponse(
+            status_code=404 if payload.get("status") == "not_found" else 200,
+            content=payload,
+        )
 
     @app.get("/v1/runtime/orchestration-status")
     def runtime_orchestration_status() -> dict[str, Any]:
@@ -1088,6 +1382,56 @@ def create_app(
             ),
         )
 
+    @app.get("/v1/runtime/model-release-candidates")
+    def runtime_model_release_candidates() -> JSONResponse:
+        ledger = app.state.model_release_candidate_ledger
+        if ledger is None:
+            return JSONResponse(
+                status_code=503,
+                content=model_release_candidate_still_blocked_payload(
+                    missing_signal="model_release_candidate_ledger_not_connected",
+                    ledger_path=None,
+                ),
+            )
+        latest = ledger.latest()
+        if latest is None:
+            return JSONResponse(
+                status_code=503,
+                content=model_release_candidate_still_blocked_payload(
+                    missing_signal="no_model_release_candidate_record_appended",
+                    ledger_path=str(ledger.path),
+                ),
+            )
+        return JSONResponse(status_code=200, content=latest)
+
+    @app.get("/v1/runtime/model-release-candidates/history")
+    def runtime_model_release_candidates_history() -> JSONResponse:
+        ledger = app.state.model_release_candidate_ledger
+        if ledger is None:
+            return JSONResponse(
+                status_code=503,
+                content=model_release_candidate_still_blocked_payload(
+                    missing_signal="model_release_candidate_ledger_not_connected",
+                    ledger_path=None,
+                ),
+            )
+        records = ledger.history()
+        if not records:
+            return JSONResponse(
+                status_code=503,
+                content=model_release_candidate_still_blocked_payload(
+                    missing_signal="no_model_release_candidate_record_appended",
+                    ledger_path=str(ledger.path),
+                ),
+            )
+        return JSONResponse(
+            status_code=200,
+            content=model_release_candidate_history_envelope(
+                records=records,
+                ledger_status="available",
+            ),
+        )
+
     @app.post("/v1/runtime/restart")
     def restart_model(payload: RestartRequest) -> dict[str, Any]:
         result = runtime.restart_model(payload.model_id)
@@ -1115,6 +1459,9 @@ def create_fake_app() -> FastAPI:
         RuntimeKernel(FakeBackend()),
         comparative_evidence_ledger_path=os.environ.get(
             "OWLMLX_COMPARATIVE_EVIDENCE_LEDGER_PATH"
+        ),
+        model_release_candidate_ledger_path=os.environ.get(
+            "OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH"
         ),
     )
 

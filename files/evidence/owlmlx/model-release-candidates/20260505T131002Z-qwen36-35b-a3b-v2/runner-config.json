@@ -1,0 +1,9 @@
+{
+  "artifact_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B",
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "max_tokens": 64,
+  "model_id": "Qwen3.6-35B-A3B",
+  "prompt": "Answer directly without reasoning. In one short sentence, define local AI.",
+  "repeats": 2,
+  "runtime_url": "http://127.0.0.1:8066"
+}

@@ -1,0 +1,102 @@
+{
+  "chat_template": {
+    "applied": true,
+    "attempted": true,
+    "error": null,
+    "method": "apply_chat_template(tokenize=False, add_generation_prompt=True)"
+  },
+  "completed_repeats": 2,
+  "decode_tokens_per_second_mean": 3.247,
+  "end_to_end_tokens_per_second_mean": 1.956,
+  "error": null,
+  "failure_count": 0,
+  "first_token_latency_ms_mean": 5750.583,
+  "load_wall_ms": 11982.283,
+  "max_tokens": 64,
+  "model_id": "gemma-4-31B-it",
+  "model_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+  "output_sanity_label": "valid_text",
+  "path": "direct_mlx_lm_stream_generate",
+  "peak_resident_set_bytes": 41497346048,
+  "prompt": "In one short sentence, define local AI.",
+  "raw_text_preview": [
+    "Local AI is artificial intelligence that runs directly on a user's own hardware rather than on a remote cloud server.",
+    "Local AI is artificial intelligence that runs directly on a user's own hardware rather than on a remote cloud server."
+  ],
+  "repeat_count": 2,
+  "rerun_note": "initial direct call with temp kwarg failed; this summary reflects sampler rerun",
+  "results": [
+    {
+      "completion_token_events": 23,
+      "decode_tokens_per_second": 3.518,
+      "end_to_end_tokens_per_second": 1.378,
+      "finish_reason": "stop",
+      "first_token_latency_ms": 10148.101,
+      "generated_text": "Local AI is artificial intelligence that runs directly on a user's own hardware rather than on a remote cloud server.",
+      "generated_text_preview": "Local AI is artificial intelligence that runs directly on a user's own hardware rather than on a remote cloud server.",
+      "last_response_attrs": {
+        "finish_reason": "stop",
+        "from_draft": false,
+        "generation_tokens": 24,
+        "generation_tps": 3.695460868170742,
+        "peak_memory": 69.422830564,
+        "prompt_tokens": 22,
+        "prompt_tps": 2.2034632748927017,
+        "text": "",
+        "token": 106
+      },
+      "load_wall_ms_shared": 11982.283,
+      "repeat": 1,
+      "response_attr_keys_seen": [
+        "finish_reason",
+        "from_draft",
+        "generation_tokens",
+        "generation_tps",
+        "peak_memory",
+        "prompt_tokens",
+        "prompt_tps",
+        "text",
+        "token"
+      ],
+      "wall_clock_ms": 16686.37
+    },
+    {
+      "completion_token_events": 23,
+      "decode_tokens_per_second": 2.977,
+      "end_to_end_tokens_per_second": 2.534,
+      "finish_reason": "stop",
+      "first_token_latency_ms": 1353.064,
+      "generated_text": "Local AI is artificial intelligence that runs directly on a user's own hardware rather than on a remote cloud server.",
+      "generated_text_preview": "Local AI is artificial intelligence that runs directly on a user's own hardware rather than on a remote cloud server.",
+      "last_response_attrs": {
+        "finish_reason": "stop",
+        "from_draft": false,
+        "generation_tokens": 24,
+        "generation_tps": 3.122977688960355,
+        "peak_memory": 69.422830564,
+        "prompt_tokens": 22,
+        "prompt_tps": 20.771544048080305,
+        "text": "",
+        "token": 106
+      },
+      "load_wall_ms_shared": 11982.283,
+      "repeat": 2,
+      "response_attr_keys_seen": [
+        "finish_reason",
+        "from_draft",
+        "generation_tokens",
+        "generation_tps",
+        "peak_memory",
+        "prompt_tokens",
+        "prompt_tps",
+        "text",
+        "token"
+      ],
+      "wall_clock_ms": 9077.761
+    }
+  ],
+  "status": "completed",
+  "temperature": 0.0,
+  "temperature_method": "sampler=make_sampler(temp=0.0)",
+  "wall_clock_ms_mean": 12882.066
+}

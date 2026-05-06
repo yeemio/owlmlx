@@ -1,0 +1,34 @@
+{
+  "completion_token_events": 23,
+  "decode_tokens_per_second": 2.977,
+  "end_to_end_tokens_per_second": 2.534,
+  "finish_reason": "stop",
+  "first_token_latency_ms": 1353.064,
+  "generated_text": "Local AI is artificial intelligence that runs directly on a user's own hardware rather than on a remote cloud server.",
+  "generated_text_preview": "Local AI is artificial intelligence that runs directly on a user's own hardware rather than on a remote cloud server.",
+  "last_response_attrs": {
+    "finish_reason": "stop",
+    "from_draft": false,
+    "generation_tokens": 24,
+    "generation_tps": 3.122977688960355,
+    "peak_memory": 69.422830564,
+    "prompt_tokens": 22,
+    "prompt_tps": 20.771544048080305,
+    "text": "",
+    "token": 106
+  },
+  "load_wall_ms_shared": 11982.283,
+  "repeat": 2,
+  "response_attr_keys_seen": [
+    "finish_reason",
+    "from_draft",
+    "generation_tokens",
+    "generation_tps",
+    "peak_memory",
+    "prompt_tokens",
+    "prompt_tps",
+    "text",
+    "token"
+  ],
+  "wall_clock_ms": 9077.761
+}

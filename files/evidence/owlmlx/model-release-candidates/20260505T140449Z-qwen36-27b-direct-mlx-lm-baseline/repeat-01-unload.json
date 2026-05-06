@@ -1,0 +1,14 @@
+{
+  "elapsed_ms": 605.884,
+  "payload": {
+    "detail": {
+      "pid": 9967
+    },
+    "error_code": null,
+    "freed_gb": 56.0,
+    "message": "unloaded Qwen3.6-27B",
+    "model_id": "Qwen3.6-27B",
+    "ok": true
+  },
+  "status_code": 200
+}

@@ -28,6 +28,70 @@ _SAMPLER_PARAM_NAMES = (
 )
 
 
+def _stop_strings_from_params(params: dict[str, Any]) -> tuple[str, ...]:
+    raw_stop = params.get("stop")
+    if raw_stop is None:
+        return ()
+    if isinstance(raw_stop, str):
+        candidates = (raw_stop,)
+    elif isinstance(raw_stop, list):
+        candidates = tuple(item for item in raw_stop if isinstance(item, str))
+    else:
+        return ()
+    return tuple(dict.fromkeys(item for item in candidates if item))
+
+
+def _truncate_at_stop_strings(
+    text: str,
+    stop_strings: tuple[str, ...],
+) -> tuple[str, bool]:
+    if not stop_strings:
+        return text, False
+    earliest: int | None = None
+    for marker in stop_strings:
+        index = text.find(marker)
+        if index >= 0:
+            earliest = index if earliest is None else min(earliest, index)
+    if earliest is None:
+        return text, False
+    return text[:earliest], True
+
+
+class _StopStringStreamFilter:
+    def __init__(self, stop_strings: tuple[str, ...]) -> None:
+        self.stop_strings = stop_strings
+        self.max_marker_len = max((len(marker) for marker in stop_strings), default=0)
+        self.buffer = ""
+        self.stopped = False
+
+    def feed(self, text: str) -> tuple[str, bool]:
+        if self.stopped or not text:
+            return "", self.stopped
+        if not self.stop_strings:
+            return text, False
+
+        self.buffer += text
+        truncated, found = _truncate_at_stop_strings(self.buffer, self.stop_strings)
+        if found:
+            self.stopped = True
+            self.buffer = ""
+            return truncated, True
+
+        retain = max(self.max_marker_len - 1, 0)
+        if retain == 0 or len(self.buffer) <= retain:
+            return "", False
+        emit = self.buffer[:-retain]
+        self.buffer = self.buffer[-retain:]
+        return emit, False
+
+    def flush(self) -> str:
+        if self.stopped or not self.buffer:
+            return ""
+        text = self.buffer
+        self.buffer = ""
+        return text
+
+
 def _prepare_generation_params(params: dict[str, Any]) -> dict[str, Any]:
     """Adapt API-facing sampling params to the installed ``mlx_lm`` API.
 
@@ -38,6 +102,7 @@ def _prepare_generation_params(params: dict[str, Any]) -> dict[str, Any]:
     """
 
     prepared = dict(params)
+    prepared.pop("stop", None)
     sampler_kwargs: dict[str, Any] = {}
 
     if "temperature" in prepared:
@@ -157,6 +222,7 @@ def main() -> int:
 
                 import mlx_lm  # noqa: PLC0415
 
+                stop_strings = _stop_strings_from_params(params)
                 with redirect_stdout(sys.stderr):
                     text = mlx_lm.generate(
                         model,
@@ -164,13 +230,15 @@ def main() -> int:
                         prompt=str(prompt),
                         **_prepare_generation_params(params),
                     )
+                text, stop_hit = _truncate_at_stop_strings(str(text), stop_strings)
                 generation_count += 1
                 _emit(
                     {
                         "ok": True,
                         "action": "generate",
                         "model_id": current_model_id,
-                        "text": str(text),
+                        "text": text,
+                        "finish_reason": "stop" if stop_hit else "stop",
                         "pid": os.getpid(),
                         "generation_count": generation_count,
                     }
@@ -200,19 +268,25 @@ def main() -> int:
                 with redirect_stdout(sys.stderr):
                     for item in requests:
                         payload = item if isinstance(item, dict) else {}
+                        payload_params = dict(payload.get("params") or {})
+                        stop_strings = _stop_strings_from_params(payload_params)
                         text = mlx_lm.generate(
                             model,
                             tokenizer,
                             prompt=str(payload.get("prompt", "")),
                             **_prepare_generation_params(
-                                dict(payload.get("params") or {})
+                                payload_params
                             ),
+                        )
+                        text, stop_hit = _truncate_at_stop_strings(
+                            str(text),
+                            stop_strings,
                         )
                         results.append(
                             {
                                 "ok": True,
-                                "text": str(text),
-                                "finish_reason": "stop",
+                                "text": text,
+                                "finish_reason": "stop" if stop_hit else "stop",
                             }
                         )
                 generation_count += 1
@@ -248,6 +322,7 @@ def main() -> int:
                 import mlx_lm  # noqa: PLC0415
 
                 rendered_prompt = _prompt_from_messages(tokenizer, messages)
+                stop_strings = _stop_strings_from_params(params)
                 with redirect_stdout(sys.stderr):
                     text = mlx_lm.generate(
                         model,
@@ -255,13 +330,15 @@ def main() -> int:
                         prompt=rendered_prompt,
                         **_prepare_generation_params(params),
                     )
+                text, stop_hit = _truncate_at_stop_strings(str(text), stop_strings)
                 generation_count += 1
                 _emit(
                     {
                         "ok": True,
                         "action": "generate_messages",
                         "model_id": current_model_id,
-                        "text": str(text),
+                        "text": text,
+                        "finish_reason": "stop" if stop_hit else "stop",
                         "pid": os.getpid(),
                         "generation_count": generation_count,
                         "message_count": len(messages),
@@ -291,6 +368,8 @@ def main() -> int:
                 prompt_tokens = None
                 completion_tokens = 0
                 finish_reason = "stop"
+                stop_strings = _stop_strings_from_params(params)
+                stop_filter = _StopStringStreamFilter(stop_strings)
                 with redirect_stdout(sys.stderr):
                     for response in mlx_lm.stream_generate(
                         model,
@@ -298,7 +377,6 @@ def main() -> int:
                         prompt=str(prompt),
                         **_prepare_generation_params(params),
                     ):
-                        sequence += 1
                         prompt_tokens = getattr(response, "prompt_tokens", prompt_tokens)
                         completion_tokens = int(
                             getattr(response, "generation_tokens", completion_tokens) or 0
@@ -306,13 +384,41 @@ def main() -> int:
                         finish_reason = str(
                             getattr(response, "finish_reason", finish_reason) or finish_reason
                         )
+                        text, stop_hit = stop_filter.feed(
+                            str(getattr(response, "text", "") or "")
+                        )
+                        if stop_hit:
+                            finish_reason = "stop"
+                        if not text and not stop_hit:
+                            continue
+                        if text:
+                            sequence += 1
+                            _emit(
+                                {
+                                    "ok": True,
+                                    "action": "stream_event",
+                                    "event": "token",
+                                    "model_id": current_model_id,
+                                    "text": text,
+                                    "pid": os.getpid(),
+                                    "sequence": sequence,
+                                    "prompt_tokens": prompt_tokens,
+                                    "completion_tokens": completion_tokens,
+                                    "finish_reason": finish_reason,
+                                }
+                            )
+                        if stop_hit:
+                            break
+                    tail = stop_filter.flush()
+                    if tail:
+                        sequence += 1
                         _emit(
                             {
                                 "ok": True,
                                 "action": "stream_event",
                                 "event": "token",
                                 "model_id": current_model_id,
-                                "text": str(getattr(response, "text", "") or ""),
+                                "text": tail,
                                 "pid": os.getpid(),
                                 "sequence": sequence,
                                 "prompt_tokens": prompt_tokens,
@@ -415,6 +521,8 @@ def main() -> int:
                 prompt_tokens = None
                 completion_tokens = 0
                 finish_reason = "stop"
+                stop_strings = _stop_strings_from_params(params)
+                stop_filter = _StopStringStreamFilter(stop_strings)
                 with redirect_stdout(sys.stderr):
                     for response in mlx_lm.stream_generate(
                         model,
@@ -422,7 +530,6 @@ def main() -> int:
                         prompt=rendered_prompt,
                         **_prepare_generation_params(params),
                     ):
-                        sequence += 1
                         prompt_tokens = getattr(response, "prompt_tokens", prompt_tokens)
                         completion_tokens = int(
                             getattr(response, "generation_tokens", completion_tokens) or 0
@@ -430,13 +537,42 @@ def main() -> int:
                         finish_reason = str(
                             getattr(response, "finish_reason", finish_reason) or finish_reason
                         )
+                        text, stop_hit = stop_filter.feed(
+                            str(getattr(response, "text", "") or "")
+                        )
+                        if stop_hit:
+                            finish_reason = "stop"
+                        if not text and not stop_hit:
+                            continue
+                        if text:
+                            sequence += 1
+                            _emit(
+                                {
+                                    "ok": True,
+                                    "action": "stream_message_event",
+                                    "event": "token",
+                                    "model_id": current_model_id,
+                                    "text": text,
+                                    "pid": os.getpid(),
+                                    "sequence": sequence,
+                                    "prompt_tokens": prompt_tokens,
+                                    "completion_tokens": completion_tokens,
+                                    "finish_reason": finish_reason,
+                                    "message_count": len(messages),
+                                }
+                            )
+                        if stop_hit:
+                            break
+                    tail = stop_filter.flush()
+                    if tail:
+                        sequence += 1
                         _emit(
                             {
                                 "ok": True,
                                 "action": "stream_message_event",
                                 "event": "token",
                                 "model_id": current_model_id,
-                                "text": str(getattr(response, "text", "") or ""),
+                                "text": tail,
                                 "pid": os.getpid(),
                                 "sequence": sequence,
                                 "prompt_tokens": prompt_tokens,

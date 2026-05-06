@@ -1,0 +1,14 @@
+{
+  "completion_tokens": 0,
+  "done": {
+    "completion_tokens": 0,
+    "event": "done",
+    "finish_reason": "stop",
+    "model_id": "gemma-4-31B-it"
+  },
+  "elapsed_ms": 98383.999,
+  "event_count": 1,
+  "first_token_latency_ms": null,
+  "status_code": 200,
+  "text_preview": ""
+}

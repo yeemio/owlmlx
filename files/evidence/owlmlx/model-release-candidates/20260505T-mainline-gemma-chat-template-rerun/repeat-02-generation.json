@@ -1,0 +1,14 @@
+{
+  "completion_tokens": 32,
+  "done": {
+    "completion_tokens": 32,
+    "event": "done",
+    "finish_reason": "length",
+    "model_id": "gemma-4-31B-it"
+  },
+  "elapsed_ms": 34679.273,
+  "event_count": 33,
+  "first_token_latency_ms": 14751.818,
+  "status_code": 200,
+  "text_preview": "<|channel>thought\n*   Topic: Local AI.\n    *   Constraint 1: One short sentence.\n    *   Constraint 2: Define it"
+}

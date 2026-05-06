@@ -1,0 +1,16 @@
+{
+  "base_prompt": "In one short sentence, define local AI.",
+  "chat_template": {
+    "applied": true,
+    "attempted": true,
+    "error": null,
+    "method": "apply_chat_template(tokenize=False, add_generation_prompt=True)"
+  },
+  "max_tokens": 64,
+  "model_id": "Qwen3.6-35B-A3B",
+  "prior_api_error": "stream_generate temp kwarg unsupported; rerun used sampler",
+  "prompt_used_preview": "<|im_start|>user\nIn one short sentence, define local AI.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+  "repeats": 2,
+  "temperature": 0.0,
+  "temperature_method": "sampler=make_sampler(temp=0.0)"
+}
