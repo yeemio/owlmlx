@@ -410,6 +410,27 @@ Parser replay follow-up on 2026-05-06:
   replay. The next live Gemma proof must test the newly wired
   `enable_thinking=false` template kwargs before any clean-output claim.
 
+Gemma `enable_thinking=false` live proof on 2026-05-06:
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-enable-thinking-false-live-proof/record.json`.
+- This is the first live Gemma row after profile `chat_template_kwargs` became
+  an actual HTTP / child-runner control instead of metadata only.
+- The request payload for both repeats included
+  `chat_template_kwargs = {"enable_thinking": false}`,
+  `stop = ["<eos>", "<turn|>"]`, and the OpenAI chat-completions template path.
+- Both repeats emitted plain final text with
+  `visible_reasoning_trace=false`, `trace_status=none`,
+  `final_text_source=plain_text`, and `output_sanity_label=valid_text`.
+- The row completed `load -> generate -> unload -> reload -> generate ->
+  unload` with `failure_count=0`, `ttft_ms=2061.827`,
+  `decode_tokens_per_second=8.11`, `peak_resident_set_bytes=62678777856`,
+  and clean post-run health.
+- This closes the short-prompt Gemma final-answer channel blocker as a
+  platform/profile issue for this workload. It does not make Gemma `pass`:
+  OwlOps observation, same-host reference comparison closure, longer prompts,
+  multi-turn behavior, and cache safety remain separate gates.
+
 ## 9. Non-Goals
 
 This phase does not:

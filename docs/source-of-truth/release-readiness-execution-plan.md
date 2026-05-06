@@ -490,12 +490,36 @@ Stop-token-control return (2026-05-06,
   The current evidence therefore points at volatile pre-first-token work for
   the spike, plus a stable slower decode component around `7.7` tok/s.
 
+Gemma `enable_thinking=false` live proof return (2026-05-06,
+`owlmlx_model_rc_gemma_enable_thinking_false_live_proof`):
+
+- The latest Gemma row is now
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-enable-thinking-false-live-proof/record.json`.
+- It applied `chat_template_kwargs.enable_thinking=false` through the real
+  `/v1/chat/completions` payload and child `mlx_lm` chat-template renderer.
+- Both repeats returned the same clean final text without visible reasoning
+  markers. Per-repeat `reasoning_trace_policy` is
+  `visible_reasoning_trace=false`, `trace_status=none`,
+  `final_text_source=plain_text`, and `output_sanity_label=valid_text`.
+- Lifecycle completed cleanly across two repeats:
+  `failure_count=0`, `load_result=pass`, `generation_result=pass`,
+  `unload_result=pass`, `reload_result=pass`, and post-run health remained
+  clean idle.
+- Current latest Gemma values are `verdict = needs_optimization`,
+  `repeat_count = 2`, `ttft_ms = 2061.827`,
+  `decode_tokens_per_second = 8.11`, and
+  `peak_resident_set_bytes = 62678777856`.
+- This resolves the short-prompt Gemma final-answer blocker as a
+  platform/profile/template issue for this workload. Keep the verdict at
+  `needs_optimization` until OwlOps observation, reference-runtime comparison,
+  longer prompt / multi-turn output quality, and cache-safety gates are closed.
+
 Next dominant gap:
 
-- Continue from
-  `gemma_final_channel_template_or_serving_boundary_and_ttft_repro`: do not
-  repeat final-answer-only prompt-control or stop-token-control as if either
-  were untested.
+- Carry the same `enable_thinking=false` final-answer proof into
+  `Qwen3.6-35B-A3B`, because its last supervised row exposed prose reasoning
+  trace and high TTFT. Gemma should not be reopened as dirty-output blocked
+  unless a future live row regresses.
 
 ## 3. Ownership Model
 

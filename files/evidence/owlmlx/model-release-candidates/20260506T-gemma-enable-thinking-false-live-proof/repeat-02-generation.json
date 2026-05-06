@@ -1,0 +1,53 @@
+{
+  "completion_tokens": 25,
+  "done": {
+    "completion_tokens": 25,
+    "event": "done",
+    "finish_reason": "stop",
+    "model_id": "gemma-4-31B-it"
+  },
+  "elapsed_ms": 5695.133,
+  "event_count": 26,
+  "first_token_latency_ms": 2681.8,
+  "reasoning_trace_policy": {
+    "caveats": [],
+    "final_text": "Local AI refers to artificial intelligence models that run directly on a user's own hardware rather than on a remote cloud server.",
+    "final_text_source": "plain_text",
+    "output_sanity_label": "valid_text",
+    "surface": "owlmlx.reasoning_trace_policy",
+    "trace_marker_family": null,
+    "trace_status": "none",
+    "version": "v1",
+    "visible_reasoning_trace": false
+  },
+  "request_payload": {
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "max_tokens": 64,
+    "messages": [
+      {
+        "content": "Answer with the final answer only. Do not include reasoning, analysis, hidden thoughts, or channel markers such as <|channel>thought or <think>.\n\nUser request:\nIn one short sentence, define local AI.",
+        "role": "user"
+      }
+    ],
+    "model": "gemma-4-31B-it",
+    "stop": [
+      "<eos>",
+      "<turn|>"
+    ],
+    "stream": true,
+    "temperature": 0.0
+  },
+  "status_code": 200,
+  "text_preview": "Local AI refers to artificial intelligence models that run directly on a user's own hardware rather than on a remote cloud server.",
+  "timing_breakdown": {
+    "completion_tokens": 25,
+    "first_token_latency_ms": 2681.8,
+    "load_elapsed_ms": 8202.863,
+    "post_first_token_decode_tokens": 24,
+    "post_first_token_decode_wall_ms": 3013.333,
+    "queue_wait_ms": null,
+    "stream_request_wall_ms": 5695.133
+  }
+}

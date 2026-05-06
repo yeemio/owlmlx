@@ -44,13 +44,16 @@ Current live evidence:
   OpenAI chat surface and child `mlx_lm` runner, and records parser replay
   evidence at
   `files/evidence/owlmlx/model-release-candidates/20260506T064509Z-final-answer-parser-replay/manifest.json`.
-  This is only a platform-control closure step; Gemma clean final-answer output
-  still needs a fresh live proof.
+  The subsequent live Gemma proof at
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-enable-thinking-false-live-proof/record.json`
+  completed two repeats with clean final text and clean post-run health.
+  This improves Gemma short-prompt output quality but is still not a full
+  parity or replacement claim.
 
 This improves the Gemma, Qwen27, and Qwen35 reference evidence floor, but it is
 still not a parity claim and does not cover measured DeepSeek generation,
 longer prompts, multi-turn behavior, concurrent workloads, cache reuse, or
-final-answer quality.
+final-answer quality across all mainline model families.
 
 ## 1. Purpose
 

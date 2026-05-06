@@ -1,0 +1,59 @@
+{
+  "artifact_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+  "blockers": [
+    "owlops_observation_pending",
+    "reference_runtime_comparison_missing"
+  ],
+  "created_at": "2026-05-06T06:58:58Z",
+  "decode_tokens_per_second": 8.11,
+  "end_to_end_tokens_per_second": 4.979,
+  "failure_count": 0,
+  "first_token_latency_ms": 2061.827,
+  "generation_result": {
+    "detail": "2 stream generations completed",
+    "status": "pass"
+  },
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "lane": "mainline",
+  "load_result": {
+    "detail": "initial load completed for gemma-4-31B-it",
+    "status": "pass"
+  },
+  "load_time_ms": 8968.253,
+  "memory_headroom_bytes": 74760175616,
+  "memory_peak_source": "process_tree_rss",
+  "model_id": "gemma-4-31B-it",
+  "output_sanity_label": "valid_text",
+  "owlops_observation_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/model-release-candidates/20260506T-gemma-enable-thinking-false-live-proof",
+  "peak_resident_set_bytes": 62678777856,
+  "prompt_template_id": "openai_chat_completions_apply_chat_template",
+  "quality_caveats": [
+    "model_profile:gemma_final_answer_only_prompt_control",
+    "model_profile:Gemma profile includes stop-token and channel-cleanup caveats.",
+    "model_profile:Mixed-attention cache reuse can cause repetitive output without proof.",
+    "model_profile:profile_stop_tokens_applied_experimental",
+    "blocker:owlops_observation_pending",
+    "blocker:reference_runtime_comparison_missing"
+  ],
+  "queue_wait_ms": null,
+  "reload_result": {
+    "detail": "1 reload operations completed",
+    "status": "pass"
+  },
+  "reload_time_ms": 8202.863,
+  "repeat_count": 2,
+  "resident_mode": "load_unload_per_repeat",
+  "runtime_url": "http://127.0.0.1:8066",
+  "surface": "owlmlx.model_release_candidate_record",
+  "tokens_per_second": 4.979,
+  "ttft_ms": 2061.827,
+  "unload_result": {
+    "detail": "2 unload operations completed",
+    "status": "pass"
+  },
+  "unload_time_ms": 552.367,
+  "verdict": "needs_optimization",
+  "version": "v1",
+  "visibility_status": "visible",
+  "wall_clock_ms": 28347.608
+}
