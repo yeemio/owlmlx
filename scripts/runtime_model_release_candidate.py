@@ -17,6 +17,7 @@ import socket
 from pathlib import Path
 from typing import Any
 
+from owlmlx.comparative_evidence_ledger import ComparativeEvidenceLedger
 from owlmlx.model_profile import model_profile_to_dict, resolve_model_profile
 from owlmlx.reasoning_trace_policy import apply_reasoning_trace_policy
 from owlmlx.model_release_candidate_ledger import (
@@ -529,6 +530,111 @@ def _derive_quality_caveats(
     return list(dict.fromkeys(caveats))
 
 
+def _runtime_completed_cleanly(runtime: dict[str, Any]) -> bool:
+    measurement = runtime.get("measurement")
+    if not isinstance(measurement, dict):
+        return False
+    return (
+        isinstance(measurement.get("completed_request_count"), int)
+        and measurement["completed_request_count"] > 0
+        and measurement.get("failure_count") == 0
+    )
+
+
+def _summarize_reference_comparison_status(
+    *,
+    model_id: str,
+    ledger_path: str | None,
+) -> dict[str, Any]:
+    if not ledger_path:
+        return {
+            "status": "not_connected",
+            "model_id": model_id,
+            "ledger_path": None,
+            "clears_reference_runtime_comparison_missing": False,
+        }
+
+    ledger = ComparativeEvidenceLedger(ledger_path)
+    if not ledger.exists():
+        return {
+            "status": "not_connected",
+            "model_id": model_id,
+            "ledger_path": str(ledger.path),
+            "clears_reference_runtime_comparison_missing": False,
+        }
+
+    model_records = [
+        record
+        for record in ledger.history()
+        if (
+            isinstance(record.get("workload_invariants"), dict)
+            and record["workload_invariants"].get("model_id") == model_id
+        )
+    ]
+    if not model_records:
+        return {
+            "status": "missing",
+            "model_id": model_id,
+            "ledger_path": str(ledger.path),
+            "clears_reference_runtime_comparison_missing": False,
+        }
+
+    measured_record: dict[str, Any] | None = None
+    for record in reversed(model_records):
+        runtimes = record.get("runtimes")
+        if record.get("verdict_grade") != "measured" or not isinstance(
+            runtimes,
+            list,
+        ):
+            continue
+        owlmlx_runtime = next(
+            (
+                runtime
+                for runtime in runtimes
+                if isinstance(runtime, dict) and runtime.get("runtime_id") == "owlmlx"
+            ),
+            None,
+        )
+        reference_runtime = next(
+            (
+                runtime
+                for runtime in runtimes
+                if isinstance(runtime, dict) and runtime.get("runtime_id") != "owlmlx"
+            ),
+            None,
+        )
+        if (
+            isinstance(owlmlx_runtime, dict)
+            and isinstance(reference_runtime, dict)
+            and _runtime_completed_cleanly(owlmlx_runtime)
+            and _runtime_completed_cleanly(reference_runtime)
+        ):
+            measured_record = record
+            break
+
+    selected = measured_record or model_records[-1]
+    selected_runtimes = [
+        str(runtime.get("runtime_id"))
+        for runtime in selected.get("runtimes", [])
+        if isinstance(runtime, dict) and runtime.get("runtime_id")
+    ]
+    status = (
+        "measured"
+        if measured_record is not None
+        else str(selected.get("verdict_grade") or "missing")
+    )
+    return {
+        "status": status,
+        "model_id": model_id,
+        "ledger_path": str(ledger.path),
+        "recorded_at": selected.get("recorded_at"),
+        "evidence_pointer": selected.get("evidence_pointer"),
+        "verdict_grade": selected.get("verdict_grade"),
+        "runtime_ids": selected_runtimes,
+        "clears_reference_runtime_comparison_missing": measured_record is not None,
+    }
+
+
 def _effective_generation_policy(args: argparse.Namespace) -> dict[str, Any]:
     model_profile = resolve_model_profile(args.model_id)
     explicit_request_mode = args.request_mode is not None
@@ -687,9 +793,21 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         runner_config["experimental_prefill_warmup_prompt"] = (
             args.experimental_prefill_warmup_prompt or args.prompt
         )
+    reference_comparison_status = _summarize_reference_comparison_status(
+        model_id=args.model_id,
+        ledger_path=args.comparative_evidence_ledger_path,
+    )
+    if args.comparative_evidence_ledger_path:
+        runner_config["comparative_evidence_ledger_path"] = (
+            args.comparative_evidence_ledger_path
+        )
     _write_json(
         evidence_dir / "runner-config.json",
         runner_config,
+    )
+    _write_json(
+        evidence_dir / "reference-comparison-status.json",
+        reference_comparison_status,
     )
 
     status, visibility = _http_json(
@@ -727,10 +845,9 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
     resident_generation_results: list[dict[str, Any]] = []
     unload_results: list[dict[str, Any]] = []
 
-    blockers: list[str] = [
-        "owlops_observation_pending",
-        "reference_runtime_comparison_missing",
-    ]
+    blockers: list[str] = ["owlops_observation_pending"]
+    if not reference_comparison_status["clears_reference_runtime_comparison_missing"]:
+        blockers.append("reference_runtime_comparison_missing")
 
     with _RssSampler(
         root_pid=root_pid,
@@ -1494,6 +1611,13 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         experimental_prefill_warmup_included_in_metrics=timing_gate_summary.get(
             "experimental_prefill_warmup_included_in_metrics"
         ),
+        reference_comparison_status=reference_comparison_status["status"],
+        reference_comparison_evidence_pointer=reference_comparison_status.get(
+            "evidence_pointer"
+        ),
+        reference_comparison_runtime_ids=reference_comparison_status.get(
+            "runtime_ids"
+        ),
     )
     payload = model_release_candidate_record_to_dict(record)
     _write_json(evidence_dir / "record.json", payload)
@@ -1607,6 +1731,16 @@ def main() -> int:
     live.add_argument("--http-timeout-s", type=float, default=900.0)
     live.add_argument("--rss-root-pid", type=int, default=None)
     live.add_argument("--rss-sample-interval-s", type=float, default=0.5)
+    live.add_argument(
+        "--comparative-evidence-ledger-path",
+        default=None,
+        help=(
+            "Optional comparative-evidence JSONL ledger. When it contains a "
+            "same-model measured record with clean owlmlx and reference "
+            "runtime attempts, the live Model RC row clears "
+            "reference_runtime_comparison_missing."
+        ),
+    )
     live.add_argument(
         "--timing-gate-resident-repeat",
         action="store_true",

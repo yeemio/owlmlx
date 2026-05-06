@@ -173,6 +173,12 @@ v1 cumulative-ledger rows stay readable:
   for an explicitly requested post-load, pre-measured warmup generation;
   warmup generations are excluded from primary TTFT/TPS and lifecycle repeat
   metrics
+- `reference_comparison_status`, `reference_comparison_evidence_pointer`, and
+  `reference_comparison_runtime_ids`: optional consumption of the
+  runtime-owned comparative-evidence ledger. A Model RC row may clear
+  `reference_runtime_comparison_missing` only when the referenced ledger has a
+  same-model `measured` record where both `owlmlx` and at least one reference
+  runtime completed cleanly.
 
 Missing or unmeasured v2 signals must be represented as absent, `null`, or by
 a blocking/caveat string such as `process_tree_rss_missing`. They must not be
@@ -533,6 +539,29 @@ Qwen35 experimental prefill-warmup proof on 2026-05-06:
   `needs_optimization` because OwlOps observation, same-host reference
   comparison, broader workload coverage, and production warmup semantics remain
   separate gates.
+
+Qwen27 / Qwen35 comparative-ledger consumption proof on 2026-05-06:
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen27-reference-comparison-consumption-live-proof/record.json`
+  and
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-reference-comparison-consumption-live-proof/record.json`.
+- The live Model RC runner now accepts
+  `--comparative-evidence-ledger-path`. When the comparative ledger contains a
+  same-model clean `measured` record, the Model RC row writes
+  `reference_comparison_status = measured`, preserves the referenced
+  `evidence_pointer`, records `reference_comparison_runtime_ids`, and removes
+  `reference_runtime_comparison_missing` from blockers.
+- Qwen27 consumed the measured oMLX comparison at
+  `files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/manifest.json`.
+  Its new blockers are only `owlops_observation_pending`.
+- Qwen35 consumed the measured oMLX comparison at
+  `files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen35-omlx-run/run/manifest.json`.
+  Its new blockers are only `owlops_observation_pending`.
+- This closes the stale generic `reference_runtime_comparison_missing` blocker
+  for Qwen27 and Qwen35 Model RC rows. It does not make either model `pass`,
+  because OwlOps observation, broader workload coverage, and product-level
+  release criteria remain open.
 
 ## 9. Non-Goals
 

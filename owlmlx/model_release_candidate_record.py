@@ -106,6 +106,9 @@ class ModelReleaseCandidateRecord:
     experimental_prefill_warmup_mode: str | None = None
     experimental_prefill_warmup_ms: float | None = None
     experimental_prefill_warmup_included_in_metrics: bool | None = None
+    reference_comparison_status: str | None = None
+    reference_comparison_evidence_pointer: str | None = None
+    reference_comparison_runtime_ids: tuple[str, ...] | None = None
 
 
 def _now_iso_utc() -> str:
@@ -195,6 +198,15 @@ def model_release_candidate_record_to_dict(
         "experimental_prefill_warmup_included_in_metrics": (
             record.experimental_prefill_warmup_included_in_metrics
         ),
+        "reference_comparison_status": record.reference_comparison_status,
+        "reference_comparison_evidence_pointer": (
+            record.reference_comparison_evidence_pointer
+        ),
+        "reference_comparison_runtime_ids": (
+            list(record.reference_comparison_runtime_ids)
+            if record.reference_comparison_runtime_ids is not None
+            else None
+        ),
     }
     validate_model_release_candidate_record(payload)
     return payload
@@ -245,6 +257,9 @@ def build_model_release_candidate_record(
     experimental_prefill_warmup_mode: str | None = None,
     experimental_prefill_warmup_ms: float | None = None,
     experimental_prefill_warmup_included_in_metrics: bool | None = None,
+    reference_comparison_status: str | None = None,
+    reference_comparison_evidence_pointer: str | None = None,
+    reference_comparison_runtime_ids: tuple[str, ...] | list[str] | None = None,
 ) -> ModelReleaseCandidateRecord:
     """Build and validate one model RC v1 record with optional observability v2 fields."""
 
@@ -295,6 +310,13 @@ def build_model_release_candidate_record(
         experimental_prefill_warmup_ms=experimental_prefill_warmup_ms,
         experimental_prefill_warmup_included_in_metrics=(
             experimental_prefill_warmup_included_in_metrics
+        ),
+        reference_comparison_status=reference_comparison_status,
+        reference_comparison_evidence_pointer=reference_comparison_evidence_pointer,
+        reference_comparison_runtime_ids=(
+            tuple(reference_comparison_runtime_ids)
+            if reference_comparison_runtime_ids is not None
+            else None
         ),
     )
     model_release_candidate_record_to_dict(record)
@@ -379,6 +401,9 @@ def build_dry_run_model_release_candidate_records(
                 experimental_prefill_warmup_mode=None,
                 experimental_prefill_warmup_ms=None,
                 experimental_prefill_warmup_included_in_metrics=None,
+                reference_comparison_status="not_connected",
+                reference_comparison_evidence_pointer=None,
+                reference_comparison_runtime_ids=None,
             )
         )
     return tuple(records)

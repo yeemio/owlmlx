@@ -631,6 +631,29 @@ Next dominant gap:
   using the hardened runner expectations for PID drift, runtime disconnects,
   reasoning-aware stream consumption, and lifecycle health classification.
 
+Qwen27 / Qwen35 reference-comparison consumption return (2026-05-06,
+`owlmlx_qwen27_qwen35_model_rc_reference_consumption_live_proof`):
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen27-reference-comparison-consumption-live-proof/record.json`
+  and
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-reference-comparison-consumption-live-proof/record.json`.
+- The Model RC runner now reads an optional comparative-evidence ledger via
+  `--comparative-evidence-ledger-path` and writes
+  `reference-comparison-status.json` into each evidence directory.
+- Qwen27 and Qwen35 both consumed their same-host oMLX `measured` comparative
+  records from
+  `files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/`.
+- Both new Model RC rows removed `reference_runtime_comparison_missing`; their
+  blocker set is now only `owlops_observation_pending`.
+- Post-run `/healthz` stayed clean idle after both runs.
+
+Next dominant gap:
+
+- Hand the latest Model RC rows back to OwlOps / consumer surfaces so
+  `owlops_observation_pending` is resolved without inventing runtime
+  optimization semantics.
+
 ## 3. Ownership Model
 
 Coordinator:

@@ -12,6 +12,12 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from owlmlx.comparative_evidence_ledger import ComparativeEvidenceLedger
+from owlmlx.comparative_evidence_record import (
+    ComparativeEvidenceMeasurement,
+    ComparativeEvidenceRuntime,
+    build_comparative_evidence_record,
+)
 from owlmlx.model_release_candidate_ledger import (
     ModelReleaseCandidateLedger,
     model_release_candidate_history_envelope,
@@ -40,6 +46,7 @@ from scripts.runtime_model_release_candidate import (
     _chat_messages_for_prompt,
     _classify_output_sanity,
     _effective_generation_policy,
+    _summarize_reference_comparison_status,
 )
 
 
@@ -70,6 +77,61 @@ def _policy_args(
             "prompt_template_id": prompt_template_id,
         },
     )()
+
+
+def _append_measured_comparative_record(
+    ledger_path: Path,
+    *,
+    model_id: str = "Qwen3.6-27B",
+) -> dict[str, object]:
+    ledger = ComparativeEvidenceLedger(ledger_path)
+    record = build_comparative_evidence_record(
+        recorded_at="2026-05-06T00:00:00Z",
+        evidence_pointer=f"files/evidence/test/{model_id}/manifest.json",
+        host_class="darwin-arm64-test-host",
+        workload_class="single_prompt_short",
+        workload_invariants={
+            "model_id": model_id,
+            "model_quantization": "full_precision_unquantized",
+            "decode_max_tokens": 64,
+            "decode_temperature": 0.0,
+            "prompt_set_hash": "sha256:test",
+            "serving_budget_bytes": 1,
+        },
+        runtimes=(
+            ComparativeEvidenceRuntime(
+                runtime_id="owlmlx",
+                runtime_version="test-owlmlx",
+                measurement=ComparativeEvidenceMeasurement(
+                    throughput_tokens_per_second=5.0,
+                    first_token_latency_ms=100.0,
+                    peak_resident_set_bytes=1,
+                    wall_clock_ms=1000.0,
+                    completed_request_count=2,
+                    failure_count=0,
+                ),
+            ),
+            ComparativeEvidenceRuntime(
+                runtime_id="omlx",
+                runtime_version="test-omlx",
+                measurement=ComparativeEvidenceMeasurement(
+                    throughput_tokens_per_second=4.0,
+                    first_token_latency_ms=120.0,
+                    peak_resident_set_bytes=2,
+                    wall_clock_ms=1200.0,
+                    completed_request_count=2,
+                    failure_count=0,
+                ),
+            ),
+        ),
+        verdict_text=(
+            "measured: owlmlx tokens_per_second 5.0000 vs omlx "
+            "tokens_per_second 4.0000 on host_class=darwin-arm64-test-host, "
+            "workload_class=single_prompt_short"
+        ),
+        verdict_grade="measured",
+    )
+    return ledger.append(record)
 
 
 def test_schema_constants_are_frozen() -> None:
@@ -306,6 +368,9 @@ def test_build_model_release_candidate_record_accepts_live_like_metrics() -> Non
         experimental_prefill_warmup_mode="post_load_pre_measured_stream",
         experimental_prefill_warmup_ms=8.0,
         experimental_prefill_warmup_included_in_metrics=False,
+        reference_comparison_status="measured",
+        reference_comparison_evidence_pointer="files/evidence/test/manifest.json",
+        reference_comparison_runtime_ids=("owlmlx", "omlx"),
     )
     payload = model_release_candidate_record_to_dict(record)
     assert payload["verdict"] == "pass"
@@ -321,6 +386,11 @@ def test_build_model_release_candidate_record_accepts_live_like_metrics() -> Non
     assert payload["experimental_prefill_warmup_mode"] == "post_load_pre_measured_stream"
     assert payload["experimental_prefill_warmup_ms"] == 8.0
     assert payload["experimental_prefill_warmup_included_in_metrics"] is False
+    assert payload["reference_comparison_status"] == "measured"
+    assert payload["reference_comparison_evidence_pointer"] == (
+        "files/evidence/test/manifest.json"
+    )
+    assert payload["reference_comparison_runtime_ids"] == ["owlmlx", "omlx"]
 
 
 def test_validate_accepts_legacy_v1_record_without_observability_v2_fields() -> None:
@@ -347,6 +417,9 @@ def test_validate_accepts_legacy_v1_record_without_observability_v2_fields() -> 
         "experimental_prefill_warmup_mode",
         "experimental_prefill_warmup_ms",
         "experimental_prefill_warmup_included_in_metrics",
+        "reference_comparison_status",
+        "reference_comparison_evidence_pointer",
+        "reference_comparison_runtime_ids",
     ):
         payload.pop(field, None)
 
@@ -378,6 +451,49 @@ def test_validate_rejects_invalid_observability_v2_fields() -> None:
     payload["experimental_prefill_warmup_included_in_metrics"] = "false"
     with pytest.raises(ModelReleaseCandidateSchemaError):
         validate_model_release_candidate_record(payload)
+
+    payload = _record_dicts()[0]
+    payload["reference_comparison_status"] = "maybe"
+    with pytest.raises(ModelReleaseCandidateSchemaError):
+        validate_model_release_candidate_record(payload)
+
+    payload = _record_dicts()[0]
+    payload["reference_comparison_runtime_ids"] = ["owlmlx", ""]
+    with pytest.raises(ModelReleaseCandidateSchemaError):
+        validate_model_release_candidate_record(payload)
+
+
+def test_reference_comparison_status_uses_same_model_measured_record(tmp_path) -> None:
+    ledger_path = tmp_path / "comparative-ledger.jsonl"
+    appended = _append_measured_comparative_record(
+        ledger_path,
+        model_id="Qwen3.6-27B",
+    )
+
+    status = _summarize_reference_comparison_status(
+        model_id="Qwen3.6-27B",
+        ledger_path=str(ledger_path),
+    )
+
+    assert status["status"] == "measured"
+    assert status["clears_reference_runtime_comparison_missing"] is True
+    assert status["evidence_pointer"] == appended["evidence_pointer"]
+    assert status["runtime_ids"] == ["owlmlx", "omlx"]
+
+
+def test_reference_comparison_status_stays_missing_without_same_model_record(
+    tmp_path,
+) -> None:
+    ledger_path = tmp_path / "comparative-ledger.jsonl"
+    _append_measured_comparative_record(ledger_path, model_id="Qwen3.6-27B")
+
+    status = _summarize_reference_comparison_status(
+        model_id="Qwen3.6-35B-A3B",
+        ledger_path=str(ledger_path),
+    )
+
+    assert status["status"] == "missing"
+    assert status["clears_reference_runtime_comparison_missing"] is False
 
 
 def test_ledger_missing_latest_history_and_append_many(tmp_path) -> None:
@@ -658,6 +774,8 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     thread.start()
     try:
         ledger = tmp_path / "ledger.jsonl"
+        comparative_ledger = tmp_path / "comparative-ledger.jsonl"
+        comparative_record = _append_measured_comparative_record(comparative_ledger)
         evidence_dir = tmp_path / "evidence"
         result = subprocess.run(
             [
@@ -686,6 +804,8 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
                 str(os.getpid()),
                 "--rss-sample-interval-s",
                 "0.05",
+                "--comparative-evidence-ledger-path",
+                str(comparative_ledger),
                 "--timing-gate-resident-repeat",
                 "--experimental-prefill-warmup",
                 "--experimental-prefill-warmup-max-tokens",
@@ -724,7 +844,6 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     assert payload["prompt_template_id"] == "operator_prompt_raw"
     assert payload["quality_caveats"] == [
         "blocker:owlops_observation_pending",
-        "blocker:reference_runtime_comparison_missing",
     ]
     assert payload["memory_peak_source"] == "process_tree_rss"
     assert payload["runtime_stream_wall_ms"] == 13.0
@@ -737,6 +856,12 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     assert payload["experimental_prefill_warmup_mode"] == "post_load_pre_measured_stream"
     assert payload["experimental_prefill_warmup_ms"] == 13.0
     assert payload["experimental_prefill_warmup_included_in_metrics"] is False
+    assert payload["reference_comparison_status"] == "measured"
+    assert payload["reference_comparison_evidence_pointer"] == (
+        comparative_record["evidence_pointer"]
+    )
+    assert payload["reference_comparison_runtime_ids"] == ["owlmlx", "omlx"]
+    assert "reference_runtime_comparison_missing" not in payload["blockers"]
     assert payload["peak_resident_set_bytes"] is not None
     runner_config = json.loads((evidence_dir / "runner-config.json").read_text())
     assert runner_config["model_profile"]["profile_id"] == "qwen3_6_text"
@@ -744,6 +869,14 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     assert runner_config["experimental_prefill_warmup"] is True
     assert runner_config["experimental_prefill_warmup_max_tokens"] == 1
     assert runner_config["experimental_prefill_warmup_prompt"] == "hello"
+    assert runner_config["comparative_evidence_ledger_path"] == str(comparative_ledger)
+    reference_status = json.loads(
+        (evidence_dir / "reference-comparison-status.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert reference_status["status"] == "measured"
+    assert reference_status["clears_reference_runtime_comparison_missing"] is True
     assert (evidence_dir / "repeat-01-host-pressure-sample.json").exists()
     assert (evidence_dir / "repeat-01-model-load-admission-before.json").exists()
     warmup_generation = json.loads(

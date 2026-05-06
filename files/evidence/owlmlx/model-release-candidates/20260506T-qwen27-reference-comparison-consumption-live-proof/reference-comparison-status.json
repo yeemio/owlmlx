@@ -1,0 +1,13 @@
+{
+  "clears_reference_runtime_comparison_missing": true,
+  "evidence_pointer": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/manifest.json",
+  "ledger_path": "files/evidence/owlmlx/comparative-evidence/cumulative-ledger.jsonl",
+  "model_id": "Qwen3.6-27B",
+  "recorded_at": "2026-05-06T04:07:43Z",
+  "runtime_ids": [
+    "owlmlx",
+    "omlx"
+  ],
+  "status": "measured",
+  "verdict_grade": "measured"
+}

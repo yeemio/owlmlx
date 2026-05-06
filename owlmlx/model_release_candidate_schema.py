@@ -103,6 +103,9 @@ OPTIONAL_MODEL_RELEASE_CANDIDATE_OBSERVABILITY_FIELDS: tuple[str, ...] = (
     "experimental_prefill_warmup_mode",
     "experimental_prefill_warmup_ms",
     "experimental_prefill_warmup_included_in_metrics",
+    "reference_comparison_status",
+    "reference_comparison_evidence_pointer",
+    "reference_comparison_runtime_ids",
 )
 
 
@@ -280,6 +283,39 @@ def validate_model_release_candidate_record(record: Mapping[str, Any]) -> None:
 
     if "quality_caveats" in record:
         _validate_string_list(record["quality_caveats"], field="record.quality_caveats")
+
+    if (
+        "reference_comparison_status" in record
+        and record["reference_comparison_status"] is not None
+    ):
+        status = record["reference_comparison_status"]
+        if status not in (
+            "not_connected",
+            "missing",
+            "measured",
+            "inconclusive",
+            "rejected",
+        ):
+            raise ModelReleaseCandidateSchemaError(
+                "record.reference_comparison_status must be not_connected, missing, measured, inconclusive, or rejected"
+            )
+
+    if (
+        "reference_comparison_evidence_pointer" in record
+        and record["reference_comparison_evidence_pointer"] is not None
+    ):
+        _validate_non_empty_string(
+            record["reference_comparison_evidence_pointer"],
+            field="record.reference_comparison_evidence_pointer",
+        )
+
+    if "reference_comparison_runtime_ids" in record:
+        value = record["reference_comparison_runtime_ids"]
+        if value is not None:
+            _validate_string_list(
+                value,
+                field="record.reference_comparison_runtime_ids",
+            )
 
     if "runtime_timing_repeat_count" in record and record["runtime_timing_repeat_count"] is not None:
         value = record["runtime_timing_repeat_count"]

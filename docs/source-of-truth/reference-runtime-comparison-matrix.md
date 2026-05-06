@@ -71,6 +71,12 @@ Current live evidence:
   Warmup first response was `3198.552ms`; the measured post-warmup first
   response was `210.355ms`; the row stayed `needs_optimization` and does not
   make warmup a default serving behavior.
+- Model RC now consumes comparative-evidence rows directly. Qwen27 and Qwen35
+  both read their same-model oMLX `measured` records and removed
+  `reference_runtime_comparison_missing` from the latest Model RC rows:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen27-reference-comparison-consumption-live-proof/record.json`
+  and
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-reference-comparison-consumption-live-proof/record.json`.
 
 This improves the Gemma, Qwen27, and Qwen35 reference evidence floor, but it is
 still not a parity claim and does not cover measured DeepSeek generation,
