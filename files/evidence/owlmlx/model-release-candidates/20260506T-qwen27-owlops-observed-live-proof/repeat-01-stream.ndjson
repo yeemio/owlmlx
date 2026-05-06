@@ -1,0 +1,16 @@
+{"completion_tokens": 1, "event": "token", "model_id": "Qwen3.6-27B", "text": "Local "}
+{"completion_tokens": 2, "event": "token", "model_id": "Qwen3.6-27B", "text": "AI "}
+{"completion_tokens": 3, "event": "token", "model_id": "Qwen3.6-27B", "text": "refers to a"}
+{"completion_tokens": 4, "event": "token", "model_id": "Qwen3.6-27B", "text": "rtificial int"}
+{"completion_tokens": 5, "event": "token", "model_id": "Qwen3.6-27B", "text": "elligen"}
+{"completion_tokens": 6, "event": "token", "model_id": "Qwen3.6-27B", "text": "ce mo"}
+{"completion_tokens": 7, "event": "token", "model_id": "Qwen3.6-27B", "text": "dels"}
+{"completion_tokens": 8, "event": "token", "model_id": "Qwen3.6-27B", "text": " that are "}
+{"completion_tokens": 9, "event": "token", "model_id": "Qwen3.6-27B", "text": "inst"}
+{"completion_tokens": 10, "event": "token", "model_id": "Qwen3.6-27B", "text": "alle"}
+{"completion_tokens": 11, "event": "token", "model_id": "Qwen3.6-27B", "text": "d and run"}
+{"completion_tokens": 12, "event": "token", "model_id": "Qwen3.6-27B", "text": " di"}
+{"completion_tokens": 13, "event": "token", "model_id": "Qwen3.6-27B", "text": "re"}
+{"completion_tokens": 14, "event": "token", "model_id": "Qwen3.6-27B", "text": "ctly "}
+{"completion_tokens": 15, "event": "token", "model_id": "Qwen3.6-27B", "text": "on a user"}
+{"completion_tokens": 15, "event": "done", "finish_reason": "length", "model_id": "Qwen3.6-27B"}

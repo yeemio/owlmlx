@@ -109,6 +109,8 @@ class ModelReleaseCandidateRecord:
     reference_comparison_status: str | None = None
     reference_comparison_evidence_pointer: str | None = None
     reference_comparison_runtime_ids: tuple[str, ...] | None = None
+    owlops_observation_status: str | None = None
+    owlops_observation_evidence_pointer: str | None = None
 
 
 def _now_iso_utc() -> str:
@@ -207,6 +209,10 @@ def model_release_candidate_record_to_dict(
             if record.reference_comparison_runtime_ids is not None
             else None
         ),
+        "owlops_observation_status": record.owlops_observation_status,
+        "owlops_observation_evidence_pointer": (
+            record.owlops_observation_evidence_pointer
+        ),
     }
     validate_model_release_candidate_record(payload)
     return payload
@@ -260,6 +266,8 @@ def build_model_release_candidate_record(
     reference_comparison_status: str | None = None,
     reference_comparison_evidence_pointer: str | None = None,
     reference_comparison_runtime_ids: tuple[str, ...] | list[str] | None = None,
+    owlops_observation_status: str | None = None,
+    owlops_observation_evidence_pointer: str | None = None,
 ) -> ModelReleaseCandidateRecord:
     """Build and validate one model RC v1 record with optional observability v2 fields."""
 
@@ -318,6 +326,8 @@ def build_model_release_candidate_record(
             if reference_comparison_runtime_ids is not None
             else None
         ),
+        owlops_observation_status=owlops_observation_status,
+        owlops_observation_evidence_pointer=owlops_observation_evidence_pointer,
     )
     model_release_candidate_record_to_dict(record)
     return record

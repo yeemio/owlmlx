@@ -106,6 +106,8 @@ OPTIONAL_MODEL_RELEASE_CANDIDATE_OBSERVABILITY_FIELDS: tuple[str, ...] = (
     "reference_comparison_status",
     "reference_comparison_evidence_pointer",
     "reference_comparison_runtime_ids",
+    "owlops_observation_status",
+    "owlops_observation_evidence_pointer",
 )
 
 
@@ -316,6 +318,32 @@ def validate_model_release_candidate_record(record: Mapping[str, Any]) -> None:
                 value,
                 field="record.reference_comparison_runtime_ids",
             )
+
+    if (
+        "owlops_observation_status" in record
+        and record["owlops_observation_status"] is not None
+    ):
+        status = record["owlops_observation_status"]
+        if status not in ("pending", "observed", "rejected"):
+            raise ModelReleaseCandidateSchemaError(
+                "record.owlops_observation_status must be pending, observed, or rejected"
+            )
+
+    if (
+        "owlops_observation_evidence_pointer" in record
+        and record["owlops_observation_evidence_pointer"] is not None
+    ):
+        _validate_non_empty_string(
+            record["owlops_observation_evidence_pointer"],
+            field="record.owlops_observation_evidence_pointer",
+        )
+
+    if record.get("owlops_observation_status") == "observed" and not record.get(
+        "owlops_observation_evidence_pointer"
+    ):
+        raise ModelReleaseCandidateSchemaError(
+            "record.owlops_observation_evidence_pointer is required when owlops_observation_status is observed"
+        )
 
     if "runtime_timing_repeat_count" in record and record["runtime_timing_repeat_count"] is not None:
         value = record["runtime_timing_repeat_count"]

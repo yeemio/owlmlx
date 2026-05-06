@@ -46,6 +46,7 @@ from scripts.runtime_model_release_candidate import (
     _chat_messages_for_prompt,
     _classify_output_sanity,
     _effective_generation_policy,
+    _summarize_owlops_observation_status,
     _summarize_reference_comparison_status,
 )
 
@@ -426,6 +427,8 @@ def test_validate_accepts_legacy_v1_record_without_observability_v2_fields() -> 
         "reference_comparison_status",
         "reference_comparison_evidence_pointer",
         "reference_comparison_runtime_ids",
+        "owlops_observation_status",
+        "owlops_observation_evidence_pointer",
     ):
         payload.pop(field, None)
 
@@ -468,6 +471,22 @@ def test_validate_rejects_invalid_observability_v2_fields() -> None:
     with pytest.raises(ModelReleaseCandidateSchemaError):
         validate_model_release_candidate_record(payload)
 
+    payload = _record_dicts()[0]
+    payload["owlops_observation_status"] = "maybe"
+    with pytest.raises(ModelReleaseCandidateSchemaError):
+        validate_model_release_candidate_record(payload)
+
+    payload = _record_dicts()[0]
+    payload["owlops_observation_status"] = "observed"
+    payload["owlops_observation_evidence_pointer"] = None
+    with pytest.raises(ModelReleaseCandidateSchemaError):
+        validate_model_release_candidate_record(payload)
+
+    payload = _record_dicts()[0]
+    payload["owlops_observation_evidence_pointer"] = ""
+    with pytest.raises(ModelReleaseCandidateSchemaError):
+        validate_model_release_candidate_record(payload)
+
 
 def test_reference_comparison_status_uses_same_model_measured_record(tmp_path) -> None:
     ledger_path = tmp_path / "comparative-ledger.jsonl"
@@ -485,6 +504,29 @@ def test_reference_comparison_status_uses_same_model_measured_record(tmp_path) -
     assert status["clears_reference_runtime_comparison_missing"] is True
     assert status["evidence_pointer"] == appended["evidence_pointer"]
     assert status["runtime_ids"] == ["owlmlx", "omlx"]
+
+
+def test_owlops_observation_status_requires_explicit_observed_pointer() -> None:
+    pending = _summarize_owlops_observation_status(
+        status="pending",
+        evidence_pointer=None,
+    )
+    assert pending["blocker"] == "owlops_observation_pending"
+    assert pending["clears_owlops_observation_pending"] is False
+
+    rejected = _summarize_owlops_observation_status(
+        status="rejected",
+        evidence_pointer="files/evidence/owlops/model-rc/rejected.json",
+    )
+    assert rejected["blocker"] == "owlops_observation_rejected"
+    assert rejected["clears_owlops_observation_pending"] is False
+
+    observed = _summarize_owlops_observation_status(
+        status="observed",
+        evidence_pointer="files/evidence/owlops/model-rc/live-consumption-proof.json",
+    )
+    assert observed["blocker"] is None
+    assert observed["clears_owlops_observation_pending"] is True
 
 
 def test_reference_comparison_status_stays_missing_without_same_model_record(
@@ -812,6 +854,10 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
                 "0.05",
                 "--comparative-evidence-ledger-path",
                 str(comparative_ledger),
+                "--owlops-observation-status",
+                "observed",
+                "--owlops-observation-evidence-pointer",
+                "files/evidence/owlops/model-rc/live-consumption-proof.json",
                 "--timing-gate-resident-repeat",
                 "--experimental-prefill-warmup",
                 "--experimental-prefill-warmup-max-tokens",
@@ -848,9 +894,12 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     assert payload["queue_wait_ms"] == 12.0
     assert payload["resident_mode"] == "load_unload_per_repeat"
     assert payload["prompt_template_id"] == "operator_prompt_raw"
-    assert payload["quality_caveats"] == [
-        "blocker:owlops_observation_pending",
-    ]
+    assert payload["blockers"] == []
+    assert payload["quality_caveats"] == []
+    assert payload["owlops_observation_status"] == "observed"
+    assert payload["owlops_observation_evidence_pointer"] == (
+        "files/evidence/owlops/model-rc/live-consumption-proof.json"
+    )
     assert payload["memory_peak_source"] == "process_tree_rss"
     assert payload["runtime_stream_wall_ms"] == 13.0
     assert payload["runtime_first_response_ms"] == 11.0
@@ -868,6 +917,7 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     )
     assert payload["reference_comparison_runtime_ids"] == ["owlmlx", "omlx"]
     assert "reference_runtime_comparison_missing" not in payload["blockers"]
+    assert "owlops_observation_pending" not in payload["blockers"]
     assert payload["peak_resident_set_bytes"] is not None
     runner_config = json.loads((evidence_dir / "runner-config.json").read_text())
     assert runner_config["model_profile"]["profile_id"] == "qwen3_6_text"
@@ -883,6 +933,13 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     )
     assert reference_status["status"] == "measured"
     assert reference_status["clears_reference_runtime_comparison_missing"] is True
+    owlops_status = json.loads(
+        (evidence_dir / "owlops-observation-status.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert owlops_status["status"] == "observed"
+    assert owlops_status["clears_owlops_observation_pending"] is True
     assert (evidence_dir / "repeat-01-host-pressure-sample.json").exists()
     assert (evidence_dir / "repeat-01-model-load-admission-before.json").exists()
     warmup_generation = json.loads(

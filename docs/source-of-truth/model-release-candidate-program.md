@@ -179,6 +179,11 @@ v1 cumulative-ledger rows stay readable:
   `reference_runtime_comparison_missing` only when the referenced ledger has a
   same-model `measured` record where both `owlmlx` and at least one reference
   runtime completed cleanly.
+- `owlops_observation_status` and `owlops_observation_evidence_pointer`:
+  optional consumer-observation handshake fields. A row may clear
+  `owlops_observation_pending` only when status is `observed` and the pointer
+  names a concrete OwlOps-side consumption proof. This does not change
+  runtime optimization verdicts.
 
 Missing or unmeasured v2 signals must be represented as absent, `null`, or by
 a blocking/caveat string such as `process_tree_rss_missing`. They must not be
@@ -505,6 +510,31 @@ Gemma comparative-ledger consumption proof on 2026-05-06:
 - That row still returns `verdict=needs_optimization` because
   `owlops_observation_pending` remains open. This is reference-comparison
   consumption closure, not parity or replacement-grade signoff.
+
+OwlOps observation closure proof on 2026-05-06:
+
+- OwlOps proof:
+  `/Users/yeemio/AI/gitrep/owlops/docs/source-of-truth/generated/model-rc-live-consumption-proof-20260506T0927Z.json`.
+  The proof was produced by the OwlOps `ModelReleaseCandidateLive8066SmokeTests`
+  live path against `127.0.0.1:8066`; it fetched latest/history, normalized the
+  payload, and built the app-facing matrix from cumulative history without
+  changing upstream verdicts.
+- The Model RC runner now accepts explicit
+  `--owlops-observation-status {pending,observed,rejected}` and
+  `--owlops-observation-evidence-pointer`. The default remains `pending`; only
+  `observed` with a non-empty pointer clears `owlops_observation_pending`.
+- New observed rows were appended for:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen27-owlops-observed-live-proof/record.json`,
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-owlops-observed-live-proof/record.json`,
+  and
+  `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-owlops-observed-live-proof/record.json`.
+- The current 8066 Model RC history has `ledger_status=available` and `27`
+  rows. The latest Qwen27, Qwen35, and Gemma rows all have
+  `blockers=[]`, `owlops_observation_status=observed`,
+  `reference_comparison_status=measured`, and `output_sanity_label=valid_text`.
+- These rows still return `verdict=needs_optimization`. OwlOps observation
+  closure means the consumer surface saw the upstream truth; it is not a
+  performance, parity, batching, or replacement-grade release signoff.
 
 Qwen35 `enable_thinking=false` live proof on 2026-05-06:
 

@@ -698,15 +698,34 @@ Qwen27 / Qwen35 reference-comparison consumption return (2026-05-06,
 - Qwen27 and Qwen35 both consumed their same-host oMLX `measured` comparative
   records from
   `files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/`.
-- Both new Model RC rows removed `reference_runtime_comparison_missing`; their
-  blocker set is now only `owlops_observation_pending`.
+- Both new Model RC rows removed `reference_runtime_comparison_missing`; at this
+  point their blocker set was only `owlops_observation_pending`.
 - Post-run `/healthz` stayed clean idle after both runs.
+
+OwlOps observation closure on 2026-05-06:
+
+- OwlOps live proof:
+  `/Users/yeemio/AI/gitrep/owlops/docs/source-of-truth/generated/model-rc-live-consumption-proof-20260506T0927Z.json`.
+  This proof confirms OwlOps consumed the live 8066 latest/history surfaces and
+  built the app-facing Model RC matrix from cumulative history without changing
+  upstream verdicts.
+- The Model RC runner now has an explicit observation handshake:
+  `--owlops-observation-status observed` plus
+  `--owlops-observation-evidence-pointer <proof>`. Default behavior remains
+  pending, so rows cannot clear this blocker by implication.
+- New Qwen27, Qwen35, and Gemma rows were appended to the 8066-mounted
+  cumulative ledger with `blockers=[]`, `owlops_observation_status=observed`,
+  `reference_comparison_status=measured`, and `output_sanity_label=valid_text`.
+- All three rows remain `verdict=needs_optimization`; this closes consumer
+  observation, not replacement-grade readiness.
 
 Next dominant gap:
 
-- Hand the latest Model RC rows back to OwlOps / consumer surfaces so
-  `owlops_observation_pending` is resolved without inventing runtime
-  optimization semantics.
+- Mainline Model RC is no longer blocked by generic OwlOps observation for
+  Qwen27, Qwen35, and Gemma. The remaining dominant release-readiness gap is
+  broader replacement-grade coverage: DeepSeek is still experimental/not
+  registered, and the mainline rows still need broader workloads around
+  batching, cache/warmup behavior, long prompts, and host pressure.
 
 ## 3. Ownership Model
 

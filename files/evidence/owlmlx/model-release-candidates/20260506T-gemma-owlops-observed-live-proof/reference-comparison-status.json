@@ -1,0 +1,13 @@
+{
+  "clears_reference_runtime_comparison_missing": true,
+  "evidence_pointer": "files/evidence/owlmlx/comparative-evidence/20260506T030122Z-gemma-current-reference-comparison/vmlx-reasoning-aware-run/run/manifest.json",
+  "ledger_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/comparative-evidence/cumulative-ledger.jsonl",
+  "model_id": "gemma-4-31B-it",
+  "recorded_at": "2026-05-06T03:25:25Z",
+  "runtime_ids": [
+    "owlmlx",
+    "vmlx"
+  ],
+  "status": "measured",
+  "verdict_grade": "measured"
+}

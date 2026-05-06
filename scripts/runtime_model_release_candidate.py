@@ -636,6 +636,27 @@ def _summarize_reference_comparison_status(
     }
 
 
+def _summarize_owlops_observation_status(
+    *,
+    status: str,
+    evidence_pointer: str | None,
+) -> dict[str, Any]:
+    pointer = str(evidence_pointer or "").strip() or None
+    clears = status == "observed" and pointer is not None
+    if clears:
+        blocker = None
+    elif status == "rejected":
+        blocker = "owlops_observation_rejected"
+    else:
+        blocker = "owlops_observation_pending"
+    return {
+        "status": status,
+        "evidence_pointer": pointer,
+        "clears_owlops_observation_pending": clears,
+        "blocker": blocker,
+    }
+
+
 def _effective_generation_policy(args: argparse.Namespace) -> dict[str, Any]:
     model_profile = resolve_model_profile(args.model_id)
     explicit_request_mode = args.request_mode is not None
@@ -802,9 +823,18 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         model_id=args.model_id,
         ledger_path=args.comparative_evidence_ledger_path,
     )
+    owlops_observation_status = _summarize_owlops_observation_status(
+        status=args.owlops_observation_status,
+        evidence_pointer=args.owlops_observation_evidence_pointer,
+    )
     if args.comparative_evidence_ledger_path:
         runner_config["comparative_evidence_ledger_path"] = (
             args.comparative_evidence_ledger_path
+        )
+    runner_config["owlops_observation_status"] = owlops_observation_status["status"]
+    if owlops_observation_status["evidence_pointer"] is not None:
+        runner_config["owlops_observation_evidence_pointer"] = (
+            owlops_observation_status["evidence_pointer"]
         )
     _write_json(
         evidence_dir / "runner-config.json",
@@ -813,6 +843,10 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
     _write_json(
         evidence_dir / "reference-comparison-status.json",
         reference_comparison_status,
+    )
+    _write_json(
+        evidence_dir / "owlops-observation-status.json",
+        owlops_observation_status,
     )
 
     status, visibility = _http_json(
@@ -850,7 +884,9 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
     resident_generation_results: list[dict[str, Any]] = []
     unload_results: list[dict[str, Any]] = []
 
-    blockers: list[str] = ["owlops_observation_pending"]
+    blockers: list[str] = []
+    if owlops_observation_status["blocker"] is not None:
+        blockers.append(str(owlops_observation_status["blocker"]))
     if not reference_comparison_status["clears_reference_runtime_comparison_missing"]:
         blockers.append("reference_runtime_comparison_missing")
 
@@ -1625,6 +1661,10 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
         reference_comparison_runtime_ids=reference_comparison_status.get(
             "runtime_ids"
         ),
+        owlops_observation_status=owlops_observation_status["status"],
+        owlops_observation_evidence_pointer=owlops_observation_status[
+            "evidence_pointer"
+        ],
     )
     payload = model_release_candidate_record_to_dict(record)
     _write_json(evidence_dir / "record.json", payload)
@@ -1749,6 +1789,24 @@ def main() -> int:
         ),
     )
     live.add_argument(
+        "--owlops-observation-status",
+        choices=("pending", "observed", "rejected"),
+        default="pending",
+        help=(
+            "Explicit OwlOps consumer observation status. The default keeps "
+            "owlops_observation_pending. Only observed with a non-empty "
+            "evidence pointer clears that blocker."
+        ),
+    )
+    live.add_argument(
+        "--owlops-observation-evidence-pointer",
+        default=None,
+        help=(
+            "Path or URL to OwlOps-side Model RC consumption proof. Required "
+            "when --owlops-observation-status observed."
+        ),
+    )
+    live.add_argument(
         "--timing-gate-resident-repeat",
         action="store_true",
         help=(
@@ -1812,6 +1870,15 @@ def main() -> int:
     sub.add_parser("history", help="Print the full history envelope")
 
     args = parser.parse_args()
+    if (
+        args.command == "run-live-http-mainline"
+        and args.owlops_observation_status == "observed"
+        and not str(args.owlops_observation_evidence_pointer or "").strip()
+    ):
+        parser.error(
+            "--owlops-observation-evidence-pointer is required when "
+            "--owlops-observation-status observed"
+        )
     ledger = ModelReleaseCandidateLedger(args.ledger_path)
 
     if args.command == "dry-run-matrix":

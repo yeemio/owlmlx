@@ -1,0 +1,27 @@
+{"elapsed_ms": 15.049, "pids": [{"pid": 55110, "rss_bytes": 68009984}], "root_pid": 55110, "rss_bytes": 68009984}
+{"elapsed_ms": 564.7, "pids": [{"pid": 31751, "rss_bytes": 79314944}, {"pid": 55110, "rss_bytes": 68009984}], "root_pid": 55110, "rss_bytes": 147324928}
+{"elapsed_ms": 1112.395, "pids": [{"pid": 31791, "rss_bytes": 63897600}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 131940352}
+{"elapsed_ms": 1671.989, "pids": [{"pid": 31791, "rss_bytes": 887963648}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 956006400}
+{"elapsed_ms": 2225.369, "pids": [{"pid": 31791, "rss_bytes": 15363735552}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 15431778304}
+{"elapsed_ms": 2780.9, "pids": [{"pid": 31791, "rss_bytes": 23628546048}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 23696588800}
+{"elapsed_ms": 3339.715, "pids": [{"pid": 31791, "rss_bytes": 34968797184}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 35036839936}
+{"elapsed_ms": 3901.126, "pids": [{"pid": 31791, "rss_bytes": 44792594432}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 44860637184}
+{"elapsed_ms": 4463.742, "pids": [{"pid": 31791, "rss_bytes": 46409236480}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 46477279232}
+{"elapsed_ms": 5037.213, "pids": [{"pid": 31791, "rss_bytes": 46357512192}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 46425554944}
+{"elapsed_ms": 5623.752, "pids": [{"pid": 31791, "rss_bytes": 45838368768}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 45906411520}
+{"elapsed_ms": 6197.242, "pids": [{"pid": 31791, "rss_bytes": 45317308416}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 45385351168}
+{"elapsed_ms": 6760.226, "pids": [{"pid": 31791, "rss_bytes": 45169098752}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 45237141504}
+{"elapsed_ms": 7324.554, "pids": [{"pid": 31791, "rss_bytes": 45057458176}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 45125500928}
+{"elapsed_ms": 7873.712, "pids": [{"pid": 31791, "rss_bytes": 45212909568}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 45280952320}
+{"elapsed_ms": 8431.282, "pids": [{"pid": 31791, "rss_bytes": 45076496384}, {"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 45144539136}
+{"elapsed_ms": 8980.091, "pids": [{"pid": 31791, "rss_bytes": 44517130240}, {"pid": 55110, "rss_bytes": 68075520}], "root_pid": 55110, "rss_bytes": 44585205760}
+{"elapsed_ms": 9529.537, "pids": [{"pid": 31791, "rss_bytes": 44538167296}, {"pid": 55110, "rss_bytes": 68075520}], "root_pid": 55110, "rss_bytes": 44606242816}
+{"elapsed_ms": 10075.012, "pids": [{"pid": 31791, "rss_bytes": 44538167296}, {"pid": 55110, "rss_bytes": 68075520}], "root_pid": 55110, "rss_bytes": 44606242816}
+{"elapsed_ms": 10621.5, "pids": [{"pid": 31791, "rss_bytes": 44538167296}, {"pid": 55110, "rss_bytes": 68075520}], "root_pid": 55110, "rss_bytes": 44606242816}
+{"elapsed_ms": 11175.498, "pids": [{"pid": 31791, "rss_bytes": 44539592704}, {"pid": 55110, "rss_bytes": 68075520}], "root_pid": 55110, "rss_bytes": 44607668224}
+{"elapsed_ms": 11731.217, "pids": [{"pid": 31791, "rss_bytes": 44540723200}, {"pid": 55110, "rss_bytes": 68075520}], "root_pid": 55110, "rss_bytes": 44608798720}
+{"elapsed_ms": 12291.19, "pids": [{"pid": 31791, "rss_bytes": 44540755968}, {"pid": 55110, "rss_bytes": 68075520}], "root_pid": 55110, "rss_bytes": 44608831488}
+{"elapsed_ms": 12844.195, "pids": [{"pid": 31791, "rss_bytes": 44540772352}, {"pid": 55110, "rss_bytes": 68075520}], "root_pid": 55110, "rss_bytes": 44608847872}
+{"elapsed_ms": 13399.932, "pids": [{"pid": 31791, "rss_bytes": 44540788736}, {"pid": 55110, "rss_bytes": 68075520}], "root_pid": 55110, "rss_bytes": 44608864256}
+{"elapsed_ms": 13957.894, "pids": [{"pid": 31791, "rss_bytes": 44540788736}, {"pid": 55110, "rss_bytes": 68075520}], "root_pid": 55110, "rss_bytes": 44608864256}
+{"elapsed_ms": 14481.485, "pids": [{"pid": 55110, "rss_bytes": 68042752}], "root_pid": 55110, "rss_bytes": 68042752}

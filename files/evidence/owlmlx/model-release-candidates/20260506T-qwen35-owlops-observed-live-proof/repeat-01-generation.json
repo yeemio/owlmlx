@@ -1,0 +1,53 @@
+{
+  "completion_tokens": 15,
+  "done": {
+    "completion_tokens": 15,
+    "event": "done",
+    "finish_reason": "length",
+    "model_id": "Qwen3.6-35B-A3B"
+  },
+  "elapsed_ms": 2786.633,
+  "event_count": 16,
+  "first_token_latency_ms": 2786.144,
+  "reasoning_trace_policy": {
+    "caveats": [],
+    "final_text": "Local AI refers to artificial intelligence models that run directly on a user's personal device",
+    "final_text_source": "plain_text",
+    "output_sanity_label": "valid_text",
+    "surface": "owlmlx.reasoning_trace_policy",
+    "trace_marker_family": null,
+    "trace_status": "none",
+    "version": "v1",
+    "visible_reasoning_trace": false
+  },
+  "request_payload": {
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "max_tokens": 16,
+    "messages": [
+      {
+        "content": "In one short sentence, define local AI.",
+        "role": "user"
+      }
+    ],
+    "model": "Qwen3.6-35B-A3B",
+    "stop": [
+      "<|im_end|>"
+    ],
+    "stream": true,
+    "temperature": 0.0
+  },
+  "runtime_stream_timing": null,
+  "status_code": 200,
+  "text_preview": "Local AI refers to artificial intelligence models that run directly on a user's personal device",
+  "timing_breakdown": {
+    "completion_tokens": 15,
+    "first_token_latency_ms": 2786.144,
+    "load_elapsed_ms": 14512.987,
+    "post_first_token_decode_tokens": 14,
+    "post_first_token_decode_wall_ms": 0.488,
+    "queue_wait_ms": null,
+    "stream_request_wall_ms": 2786.633
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "classification": "runtime_timing_unavailable",
+  "completed_generation_count": 1,
+  "experimental_prefill_warmup_enabled": false,
+  "experimental_prefill_warmup_status": "not_run",
+  "request_mode": "openai_chat_stream",
+  "resident_repeat_enabled": false,
+  "runtime_first_response_ms": null,
+  "runtime_first_visible_token_ms": null,
+  "runtime_prompt_render_ms": null,
+  "runtime_stream_wall_ms": null,
+  "runtime_timing_repeat_count": 0,
+  "status": "unsupported",
+  "surface": "owlmlx.model_rc_timing_gate",
+  "version": "v1"
+}
