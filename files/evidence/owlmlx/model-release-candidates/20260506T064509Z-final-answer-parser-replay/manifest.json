@@ -1,0 +1,84 @@
+{
+  "contract": {
+    "surface": "owlmlx.final_answer_parser_replay",
+    "version": "v1"
+  },
+  "created_at": "2026-05-06T06:45:09Z",
+  "policy_boundaries": {
+    "does_not_claim_clean_final_answer_for_gemma": true,
+    "does_not_hide_visible_reasoning_trace": true,
+    "does_not_rerun_model": true
+  },
+  "purpose": "replay existing live stream evidence through owlmlx.reasoning_trace_policy without loading models",
+  "records": [
+    {
+      "case_id": "qwen27_closed_think_final_candidate_length",
+      "event_count": 33,
+      "expected_boundary": "closed_think_trace_with_maybe_truncated_final_candidate",
+      "finish_reason": "length",
+      "policy": {
+        "caveats": [
+          "closed think trace left final text but finish_reason=length may be incomplete"
+        ],
+        "final_text": "Local AI refers to artificial intelligence models that are installed and run directly on a user's personal device, such as a computer or smartphone,",
+        "final_text_source": "post_think_text_maybe_truncated",
+        "output_sanity_label": "reasoning_trace_final_length",
+        "surface": "owlmlx.reasoning_trace_policy",
+        "trace_marker_family": "think_tag",
+        "trace_status": "final_candidate_maybe_truncated",
+        "version": "v1",
+        "visible_reasoning_trace": true
+      },
+      "source_path": "files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/repeat-01-stream.ndjson",
+      "text_preview": "\n\n<think>\n\n</think>\n\nLocal AI refers to artificial intelligence models that are installed and run directly on a user's personal device, such as a computer or smartphone,"
+    },
+    {
+      "case_id": "qwen35_prose_thinking_no_final_marker",
+      "event_count": 63,
+      "expected_boundary": "prose_thinking_trace_without_safe_final_marker",
+      "finish_reason": "length",
+      "policy": {
+        "caveats": [
+          "visible prose thinking process has no safe final-answer marker"
+        ],
+        "final_text": null,
+        "final_text_source": null,
+        "output_sanity_label": "reasoning_trace_truncated",
+        "surface": "owlmlx.reasoning_trace_policy",
+        "trace_marker_family": "prose_thinking_process",
+        "trace_status": "truncated",
+        "version": "v1",
+        "visible_reasoning_trace": true
+      },
+      "source_path": "files/evidence/owlmlx/model-release-candidates/20260505T162118Z-qwen36-35b-a3b-supervised-admission-rerun/repeat-01-stream.ndjson",
+      "text_preview": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - **Topic:** Local AI\n   - **Requirement:** Define it in one short sentence.\n\n2.  **Identify Key Concepts of \"Local AI\":**\n   - Runs on personal devices (laptops, desktop"
+    },
+    {
+      "case_id": "gemma_channel_thought_no_final_marker",
+      "event_count": 66,
+      "expected_boundary": "channel_thought_trace_without_safe_final_marker",
+      "finish_reason": "length",
+      "policy": {
+        "caveats": [
+          "visible channel thought trace has no safe final channel"
+        ],
+        "final_text": null,
+        "final_text_source": null,
+        "output_sanity_label": "reasoning_trace_truncated",
+        "surface": "owlmlx.reasoning_trace_policy",
+        "trace_marker_family": "channel",
+        "trace_status": "truncated",
+        "version": "v1",
+        "visible_reasoning_trace": true
+      },
+      "source_path": "files/evidence/owlmlx/model-release-candidates/20260506T-mainline-gemma-stop-request-payload-rerun/repeat-01-stream.ndjson",
+      "text_preview": "<|channel>thought\n*   Task: Define \"local AI\".\n    *   Constraint 1: One short sentence.\n    *   Constraint 2: Final answer only (no reasoning, analysis, etc.).\n\n    *   Local AI refers to artificial intelligence models that run on a user's own hardware ("
+    }
+  ],
+  "status": "measured_parser_replay",
+  "verdict": {
+    "gemma": "reasoning_trace_truncated_no_final_candidate",
+    "qwen27": "final_candidate_maybe_truncated_not_valid_text",
+    "qwen35": "reasoning_trace_truncated_no_final_candidate"
+  }
+}

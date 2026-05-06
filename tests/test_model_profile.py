@@ -76,6 +76,7 @@ def test_optional_config_fields_can_supply_family_hint() -> None:
 
 def test_gemma_profile_includes_stop_channel_and_cache_caveats() -> None:
     profile = get_model_profile("gemma4_text")
+    assert profile.chat_template_kwargs["enable_thinking"] is False
     assert "<eos>" in profile.stop_token_strings
     assert "<turn|>" in profile.stop_token_strings
     assert profile.reasoning_parser_family == "gemma4"
@@ -93,9 +94,20 @@ def test_gemma_profile_includes_stop_channel_and_cache_caveats() -> None:
 
 def test_qwen_moe_profile_carries_thinking_and_template_caveats() -> None:
     profile = get_model_profile("qwen3_6_moe")
-    assert profile.chat_template_kwargs["enable_thinking"] is True
+    assert profile.chat_template_kwargs["enable_thinking"] is False
     assert profile.reasoning_parser_family == "qwen"
     assert "thinking tokens" in profile.thinking_policy["template_caveat"]
+    assert (
+        profile.thinking_policy["default_mode"]
+        == "final_answer_default_disable_thinking"
+    )
+    assert profile.thinking_policy["reasoning_trace_policy"] == (
+        "owlmlx.reasoning_trace_policy:v1"
+    )
+    assert (
+        profile.thinking_policy["final_text_candidate_policy"]
+        == "closed_think_or_final_marker_only"
+    )
     assert any("think-in-template" in caveat for caveat in profile.profile_caveats)
 
 

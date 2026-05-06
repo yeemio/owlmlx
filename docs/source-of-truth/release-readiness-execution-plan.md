@@ -470,6 +470,20 @@ Stop-token-control return (2026-05-06,
   family controls?" to "which template/final-channel/serving control can
   produce or extract a safe final channel without hiding visible trace
   failures?"
+- The next implementation step has now moved from evidence-only profile
+  metadata into runtime-owned surface wiring: `/v1/chat/completions` accepts
+  top-level `chat_template_kwargs` and `extra_body.chat_template_kwargs`, the
+  child runner forwards those kwargs to `tokenizer.apply_chat_template`, and the
+  Model RC runner writes profile `chat_template_kwargs` into the actual request
+  payload.
+- The profile default for Gemma, Qwen27, and Qwen35 final-answer probes is now
+  `enable_thinking=false`. This is not a clean-output claim; it only makes the
+  model-family template control runnable in the next live proof.
+- Parser replay evidence was written at
+  `files/evidence/owlmlx/model-release-candidates/20260506T064509Z-final-answer-parser-replay/manifest.json`.
+  It shows Qwen27 can yield a maybe-truncated final candidate after closed
+  `<think></think>`, while Qwen35 prose thinking and Gemma channel thinking
+  still do not yield safe final text.
 - TTFT variance is now reproduced enough to separate the immediate spike from
   decode speed. The latest repeats showed first-token latency around `41.9s`
   and `6.7s`, while post-first-token decode wall time stayed near `8.2s-8.5s`.

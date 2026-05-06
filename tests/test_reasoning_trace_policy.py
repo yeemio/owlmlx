@@ -86,6 +86,21 @@ def test_closed_think_trace_can_yield_post_think_candidate() -> None:
     assert result.output_sanity_label == "reasoning_trace_visible"
 
 
+def test_closed_think_trace_with_length_keeps_final_candidate_with_caveat() -> None:
+    result = apply_reasoning_trace_policy(
+        "\n\n<think>\n\n</think>\n\nLocal AI runs on your own hardware,",
+        finish_reason="length",
+    )
+
+    assert result.visible_reasoning_trace is True
+    assert result.trace_marker_family == "think_tag"
+    assert result.trace_status == "final_candidate_maybe_truncated"
+    assert result.final_text == "Local AI runs on your own hardware,"
+    assert result.final_text_source == "post_think_text_maybe_truncated"
+    assert result.output_sanity_label == "reasoning_trace_final_length"
+    assert result.caveats
+
+
 def test_open_think_trace_is_truncated_not_stripped_to_valid_text() -> None:
     result = apply_reasoning_trace_policy(
         "\n\n<think>\nThinking Process:",
@@ -97,6 +112,33 @@ def test_open_think_trace_is_truncated_not_stripped_to_valid_text() -> None:
     assert result.trace_status == "truncated"
     assert result.final_text is None
     assert result.output_sanity_label == "reasoning_trace_truncated"
+
+
+def test_prose_thinking_process_without_final_marker_is_not_valid_text() -> None:
+    result = apply_reasoning_trace_policy(
+        "Here's a thinking process:\n\n1. Analyze the user request.",
+        finish_reason="length",
+    )
+
+    assert result.visible_reasoning_trace is True
+    assert result.trace_marker_family == "prose_thinking_process"
+    assert result.trace_status == "truncated"
+    assert result.final_text is None
+    assert result.output_sanity_label == "reasoning_trace_truncated"
+
+
+def test_prose_thinking_process_final_marker_yields_final_candidate() -> None:
+    result = apply_reasoning_trace_policy(
+        "Thinking Process:\nPlan.\n\nFinal answer: Local AI runs on your device.",
+        finish_reason="stop",
+    )
+
+    assert result.visible_reasoning_trace is True
+    assert result.trace_marker_family == "prose_thinking_process"
+    assert result.trace_status == "visible"
+    assert result.final_text == "Local AI runs on your device."
+    assert result.final_text_source == "prose_final_answer"
+    assert result.output_sanity_label == "reasoning_trace_visible"
 
 
 def test_serialized_result_preserves_contract_surface() -> None:

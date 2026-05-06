@@ -150,14 +150,38 @@ class MlxLmBackend:
         self._last_probe: MlxLmImportProbeResult | None = None
 
     @staticmethod
-    def _prompt_from_messages(tokenizer: Any, messages: list[ChatTurn]) -> str:
+    def _chat_template_kwargs(kwargs: dict[str, object]) -> dict[str, Any]:
+        raw_kwargs = kwargs.get("chat_template_kwargs")
+        if not isinstance(raw_kwargs, dict):
+            return {}
+        return {
+            str(key): value
+            for key, value in raw_kwargs.items()
+            if isinstance(key, str) and key
+        }
+
+    @staticmethod
+    def _generation_kwargs(kwargs: dict[str, object]) -> dict[str, object]:
+        prepared = dict(kwargs)
+        prepared.pop("chat_template_kwargs", None)
+        return prepared
+
+    @staticmethod
+    def _prompt_from_messages(
+        tokenizer: Any,
+        messages: list[ChatTurn],
+        *,
+        chat_template_kwargs: dict[str, Any] | None = None,
+    ) -> str:
         payload = [{"role": message.role, "content": message.content} for message in messages]
+        template_kwargs = dict(chat_template_kwargs or {})
         if hasattr(tokenizer, "apply_chat_template"):
             return str(
                 tokenizer.apply_chat_template(
                     payload,
                     tokenize=False,
                     add_generation_prompt=True,
+                    **template_kwargs,
                 )
             )
         return render_chat_messages(messages)
@@ -260,8 +284,17 @@ class MlxLmBackend:
         model, tokenizer, _info = loaded
         try:
             module = self._mlx_lm()
-            prompt = self._prompt_from_messages(tokenizer, messages)
-            text = module.generate(model, tokenizer, prompt=prompt, **kwargs)
+            prompt = self._prompt_from_messages(
+                tokenizer,
+                messages,
+                chat_template_kwargs=self._chat_template_kwargs(dict(kwargs)),
+            )
+            text = module.generate(
+                model,
+                tokenizer,
+                prompt=prompt,
+                **self._generation_kwargs(dict(kwargs)),
+            )
         except Exception as exc:
             self._last_error = str(exc)
             return GenerateResult(
@@ -339,9 +372,18 @@ class MlxLmBackend:
         model, tokenizer, _info = loaded
         try:
             module = self._mlx_lm()
-            prompt = self._prompt_from_messages(tokenizer, messages)
+            prompt = self._prompt_from_messages(
+                tokenizer,
+                messages,
+                chat_template_kwargs=self._chat_template_kwargs(dict(kwargs)),
+            )
             sequence = 0
-            for response in module.stream_generate(model, tokenizer, prompt=prompt, **kwargs):
+            for response in module.stream_generate(
+                model,
+                tokenizer,
+                prompt=prompt,
+                **self._generation_kwargs(dict(kwargs)),
+            ):
                 sequence += 1
                 yield StreamEvent(
                     event="token",

@@ -1,0 +1,21 @@
+{
+  "case_id": "qwen27_closed_think_final_candidate_length",
+  "event_count": 33,
+  "expected_boundary": "closed_think_trace_with_maybe_truncated_final_candidate",
+  "finish_reason": "length",
+  "policy": {
+    "caveats": [
+      "closed think trace left final text but finish_reason=length may be incomplete"
+    ],
+    "final_text": "Local AI refers to artificial intelligence models that are installed and run directly on a user's personal device, such as a computer or smartphone,",
+    "final_text_source": "post_think_text_maybe_truncated",
+    "output_sanity_label": "reasoning_trace_final_length",
+    "surface": "owlmlx.reasoning_trace_policy",
+    "trace_marker_family": "think_tag",
+    "trace_status": "final_candidate_maybe_truncated",
+    "version": "v1",
+    "visible_reasoning_trace": true
+  },
+  "source_path": "files/evidence/owlmlx/model-release-candidates/20260505T140449Z-qwen36-27b-direct-mlx-lm-baseline/repeat-01-stream.ndjson",
+  "text_preview": "\n\n<think>\n\n</think>\n\nLocal AI refers to artificial intelligence models that are installed and run directly on a user's personal device, such as a computer or smartphone,"
+}

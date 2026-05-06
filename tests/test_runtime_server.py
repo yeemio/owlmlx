@@ -195,6 +195,42 @@ def test_chat_completions_passes_stop_to_backend() -> None:
     assert backend.seen_kwargs[-1]["stop"] == ["<eos>", "<turn|>"]
 
 
+def test_chat_completions_passes_chat_template_kwargs_to_backend() -> None:
+    class RecordingBackend(FakeBackend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.seen_kwargs: list[dict[str, object]] = []
+
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            self.seen_kwargs.append(dict(kwargs))
+            return super().generate_messages(model_id, messages, **kwargs)
+
+    backend = RecordingBackend()
+    client = TestClient(create_app(RuntimeKernel(backend, profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-a",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+            "extra_body": {
+                "chat_template_kwargs": {
+                    "enable_thinking": True,
+                    "": "ignored",
+                }
+            },
+            "chat_template_kwargs": {"enable_thinking": False},
+        },
+    )
+
+    assert response.status_code == 200
+    assert backend.seen_kwargs[-1]["chat_template_kwargs"] == {
+        "enable_thinking": False
+    }
+
+
 def test_completions_non_stream_provides_openai_shape() -> None:
     client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
     client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})

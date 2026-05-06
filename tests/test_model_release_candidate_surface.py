@@ -132,7 +132,7 @@ def test_profile_policy_qwen_uses_chat_template_when_opted_in() -> None:
     assert policy["profile_id"] == "qwen3_6_text"
     assert policy["request_mode"] == "openai_chat_stream"
     assert policy["prompt_template_id"] == "openai_chat_completions_apply_chat_template"
-    assert policy["chat_template_kwargs"] == {"enable_thinking": True}
+    assert policy["chat_template_kwargs"] == {"enable_thinking": False}
     assert policy["stop_token_strings_applied"] is True
     assert policy["stop_token_application"]["target"] == "http_generation_params.stop"
     assert "model_profile:profile_stop_tokens_applied_experimental" in policy["quality_caveats"]
@@ -148,6 +148,7 @@ def test_profile_policy_gemma_records_channel_reasoning_caveats_when_opted_in() 
 
     assert policy["profile_id"] == "gemma4_text"
     assert policy["request_mode"] == "openai_chat_stream"
+    assert policy["chat_template_kwargs"] == {"enable_thinking": False}
     assert any(
         "channel-cleanup caveats" in caveat for caveat in policy["quality_caveats"]
     )
@@ -873,6 +874,7 @@ def test_operator_live_http_mainline_can_use_openai_chat_stream(tmp_path) -> Non
     assert seen_load_payloads[0]["memory_gb"] == 4.0
     assert seen_payloads[0]["stream"] is True
     assert seen_payloads[0]["stop"] == ["<eos>", "<turn|>"]
+    assert seen_payloads[0]["chat_template_kwargs"] == {"enable_thinking": False}
     assert seen_payloads[0]["messages"][0]["role"] == "user"
     assert GEMMA_FINAL_ANSWER_ONLY_INSTRUCTION in seen_payloads[0]["messages"][0]["content"]
     assert "User request:\nIn one short sentence, define local AI." in seen_payloads[0]["messages"][0]["content"]
@@ -898,6 +900,9 @@ def test_operator_live_http_mainline_can_use_openai_chat_stream(tmp_path) -> Non
     assert first_generation["request_payload"]["model"] == "gemma-4-31B-it"
     assert first_generation["request_payload"]["stream"] is True
     assert first_generation["request_payload"]["stop"] == ["<eos>", "<turn|>"]
+    assert first_generation["request_payload"]["chat_template_kwargs"] == {
+        "enable_thinking": False
+    }
     assert first_generation["request_payload"]["messages"] == seen_payloads[0]["messages"]
     first_timing = first_generation["timing_breakdown"]
     assert first_timing["load_elapsed_ms"] is not None
@@ -929,6 +934,7 @@ def test_operator_live_http_mainline_can_use_openai_chat_stream(tmp_path) -> Non
     assert effective_policy["request_mode_source"] == "explicit_cli"
     assert effective_policy["prompt_control"]["mode"] == "final_answer_only_user_prefix"
     assert effective_policy["stop_token_strings_applied"] is True
+    assert effective_policy["chat_template_kwargs"] == {"enable_thinking": False}
 
 
 def test_operator_live_http_mainline_blocks_dirty_post_run_backend_health(tmp_path) -> None:

@@ -372,12 +372,15 @@ The initial operational policy is conservative:
 
 - `Qwen3.6-27B` and `Qwen3.6-35B-A3B` select the OpenAI chat-completions stream
   path unless `--request-mode` is explicitly supplied, because template and
-  reasoning behavior are part of the current blocker.
+  reasoning behavior are part of the current blocker. Their default
+  `chat_template_kwargs` now set `enable_thinking=false` for final-answer
+  probes; reasoning diagnostics must opt in separately.
 - `gemma-4-31B-it` selects the OpenAI chat-completions stream path unless
-  overridden, records channel/reasoning cleanup caveats, and applies an
+  overridden, records channel/reasoning cleanup caveats, applies
+  `chat_template_kwargs.enable_thinking=false`, and still keeps the
   experimental final-answer-only user-message prompt-control. The live
-  `20260506T024418Z` row shows this minimal control is insufficient to suppress
-  visible thought-channel output.
+  `20260506T024418Z` and stop-payload rows show prompt wording and stop strings
+  alone are insufficient to suppress visible thought-channel output.
 - `DeepSeek-V4-Flash-2bit-DQ` keeps its experimental profile label and is not
   routed into the mainline runner by profile defaults.
 - unknown model ids keep the raw path and carry an explicit conservative
@@ -386,9 +389,26 @@ The initial operational policy is conservative:
 Explicit `--request-mode` and `--prompt-template-id` values win over profile
 defaults. Profile stop-token strings now pass through the HTTP generation
 params as `stop` when `--apply-model-profile-defaults` is used and the profile
-declares stop-token strings. This is still an experimental profile control, not
-a supported replacement-grade quality claim; evidence records
+declares stop-token strings. Profile `chat_template_kwargs` now pass through the
+OpenAI chat-completions HTTP surface and the child `mlx_lm` runner instead of
+staying as evidence-only metadata. This is still an experimental profile
+control, not a supported replacement-grade quality claim; evidence records
 `model_profile:profile_stop_tokens_applied_experimental`.
+
+Parser replay follow-up on 2026-05-06:
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T064509Z-final-answer-parser-replay/manifest.json`.
+- This replay did not load models. It replayed existing live stream artifacts
+  through `owlmlx.reasoning_trace_policy:v1`.
+- `Qwen3.6-27B` closed `<think></think>` and left a final-text candidate, but
+  `finish_reason=length` keeps it `reasoning_trace_final_length`, not
+  `valid_text`.
+- `Qwen3.6-35B-A3B` output beginning with prose "thinking process" is now
+  classified as `reasoning_trace_truncated` instead of clean final text.
+- Gemma remains `reasoning_trace_truncated` with no safe final candidate in the
+  replay. The next live Gemma proof must test the newly wired
+  `enable_thinking=false` template kwargs before any clean-output claim.
 
 ## 9. Non-Goals
 

@@ -735,6 +735,13 @@ def _build_live_http_payload(args: argparse.Namespace) -> dict[str, Any]:
                     break
 
                 params = {"max_tokens": args.max_tokens, "temperature": args.temperature}
+                chat_template_kwargs = effective_policy.get("chat_template_kwargs")
+                if (
+                    effective_policy["request_mode"] == "openai_chat_stream"
+                    and isinstance(chat_template_kwargs, dict)
+                    and chat_template_kwargs
+                ):
+                    params["chat_template_kwargs"] = dict(chat_template_kwargs)
                 if effective_policy.get("stop_token_strings_applied"):
                     params["stop"] = list(effective_policy["stop_token_strings"])
                 stream_artifact = evidence_dir / f"repeat-{index:02d}-stream.ndjson"

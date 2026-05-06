@@ -1,0 +1,21 @@
+{
+  "case_id": "gemma_channel_thought_no_final_marker",
+  "event_count": 66,
+  "expected_boundary": "channel_thought_trace_without_safe_final_marker",
+  "finish_reason": "length",
+  "policy": {
+    "caveats": [
+      "visible channel thought trace has no safe final channel"
+    ],
+    "final_text": null,
+    "final_text_source": null,
+    "output_sanity_label": "reasoning_trace_truncated",
+    "surface": "owlmlx.reasoning_trace_policy",
+    "trace_marker_family": "channel",
+    "trace_status": "truncated",
+    "version": "v1",
+    "visible_reasoning_trace": true
+  },
+  "source_path": "files/evidence/owlmlx/model-release-candidates/20260506T-mainline-gemma-stop-request-payload-rerun/repeat-01-stream.ndjson",
+  "text_preview": "<|channel>thought\n*   Task: Define \"local AI\".\n    *   Constraint 1: One short sentence.\n    *   Constraint 2: Final answer only (no reasoning, analysis, etc.).\n\n    *   Local AI refers to artificial intelligence models that run on a user's own hardware ("
+}

@@ -40,6 +40,12 @@ Current live evidence:
   `owlmlx` returns a clean pre-load `unsupported_model_family` response for
   missing `deepseek_v4` loader support without dirtying 8066 health or adding
   load-failure recovery noise.
+- Final-answer profile follow-up now wires `chat_template_kwargs` through the
+  OpenAI chat surface and child `mlx_lm` runner, and records parser replay
+  evidence at
+  `files/evidence/owlmlx/model-release-candidates/20260506T064509Z-final-answer-parser-replay/manifest.json`.
+  This is only a platform-control closure step; Gemma clean final-answer output
+  still needs a fresh live proof.
 
 This improves the Gemma, Qwen27, and Qwen35 reference evidence floor, but it is
 still not a parity claim and does not cover measured DeepSeek generation,

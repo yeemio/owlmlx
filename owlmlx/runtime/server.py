@@ -162,6 +162,8 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: int | None = Field(default=None, ge=1)
     temperature: float | None = None
     stop: str | list[str] | None = None
+    chat_template_kwargs: dict[str, Any] | None = None
+    extra_body: dict[str, Any] | None = None
     stream: bool = False
 
 
@@ -214,6 +216,25 @@ def _result_to_dict(result: Any) -> dict[str, Any]:
 
 def _messages_to_turns(messages: list[ChatMessage]) -> list[ChatTurn]:
     return [ChatTurn(role=message.role, content=message.content) for message in messages]
+
+
+def _chat_template_kwargs_from_openai_payload(
+    payload: ChatCompletionRequest,
+) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    if isinstance(payload.extra_body, dict):
+        raw_extra = payload.extra_body.get("chat_template_kwargs")
+        if isinstance(raw_extra, dict):
+            candidates.append(raw_extra)
+    if isinstance(payload.chat_template_kwargs, dict):
+        candidates.append(payload.chat_template_kwargs)
+
+    merged: dict[str, Any] = {}
+    for candidate in candidates:
+        for key, value in candidate.items():
+            if isinstance(key, str) and key:
+                merged[key] = value
+    return merged
 
 
 def _anthropic_messages_to_turns(
@@ -614,6 +635,9 @@ def create_app(
             params["temperature"] = payload.temperature
         if payload.stop is not None:
             params["stop"] = payload.stop
+        chat_template_kwargs = _chat_template_kwargs_from_openai_payload(payload)
+        if chat_template_kwargs:
+            params["chat_template_kwargs"] = chat_template_kwargs
 
         if not payload.stream:
             result = await runtime.generate_messages(messages, model_id=target_model, **params)

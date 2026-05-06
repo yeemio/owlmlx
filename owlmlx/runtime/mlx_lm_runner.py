@@ -41,6 +41,17 @@ def _stop_strings_from_params(params: dict[str, Any]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(item for item in candidates if item))
 
 
+def _chat_template_kwargs_from_params(params: dict[str, Any]) -> dict[str, Any]:
+    raw_kwargs = params.get("chat_template_kwargs")
+    if not isinstance(raw_kwargs, dict):
+        return {}
+    return {
+        str(key): value
+        for key, value in raw_kwargs.items()
+        if isinstance(key, str) and key
+    }
+
+
 def _truncate_at_stop_strings(
     text: str,
     stop_strings: tuple[str, ...],
@@ -103,6 +114,7 @@ def _prepare_generation_params(params: dict[str, Any]) -> dict[str, Any]:
 
     prepared = dict(params)
     prepared.pop("stop", None)
+    prepared.pop("chat_template_kwargs", None)
     sampler_kwargs: dict[str, Any] = {}
 
     if "temperature" in prepared:
@@ -129,13 +141,20 @@ def _fallback_prompt_from_messages(messages: list[dict[str, Any]]) -> str:
     )
 
 
-def _prompt_from_messages(tokenizer: Any, messages: list[dict[str, Any]]) -> str:
+def _prompt_from_messages(
+    tokenizer: Any,
+    messages: list[dict[str, Any]],
+    *,
+    chat_template_kwargs: dict[str, Any] | None = None,
+) -> str:
+    template_kwargs = dict(chat_template_kwargs or {})
     if hasattr(tokenizer, "apply_chat_template"):
         return str(
             tokenizer.apply_chat_template(
                 messages,
                 tokenize=False,
                 add_generation_prompt=True,
+                **template_kwargs,
             )
         )
     return _fallback_prompt_from_messages(messages)
@@ -321,7 +340,11 @@ def main() -> int:
 
                 import mlx_lm  # noqa: PLC0415
 
-                rendered_prompt = _prompt_from_messages(tokenizer, messages)
+                rendered_prompt = _prompt_from_messages(
+                    tokenizer,
+                    messages,
+                    chat_template_kwargs=_chat_template_kwargs_from_params(params),
+                )
                 stop_strings = _stop_strings_from_params(params)
                 with redirect_stdout(sys.stderr):
                     text = mlx_lm.generate(
@@ -516,7 +539,11 @@ def main() -> int:
 
                 import mlx_lm  # noqa: PLC0415
 
-                rendered_prompt = _prompt_from_messages(tokenizer, messages)
+                rendered_prompt = _prompt_from_messages(
+                    tokenizer,
+                    messages,
+                    chat_template_kwargs=_chat_template_kwargs_from_params(params),
+                )
                 sequence = 0
                 prompt_tokens = None
                 completion_tokens = 0

@@ -1,0 +1,21 @@
+{
+  "case_id": "qwen35_prose_thinking_no_final_marker",
+  "event_count": 63,
+  "expected_boundary": "prose_thinking_trace_without_safe_final_marker",
+  "finish_reason": "length",
+  "policy": {
+    "caveats": [
+      "visible prose thinking process has no safe final-answer marker"
+    ],
+    "final_text": null,
+    "final_text_source": null,
+    "output_sanity_label": "reasoning_trace_truncated",
+    "surface": "owlmlx.reasoning_trace_policy",
+    "trace_marker_family": "prose_thinking_process",
+    "trace_status": "truncated",
+    "version": "v1",
+    "visible_reasoning_trace": true
+  },
+  "source_path": "files/evidence/owlmlx/model-release-candidates/20260505T162118Z-qwen36-35b-a3b-supervised-admission-rerun/repeat-01-stream.ndjson",
+  "text_preview": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - **Topic:** Local AI\n   - **Requirement:** Define it in one short sentence.\n\n2.  **Identify Key Concepts of \"Local AI\":**\n   - Runs on personal devices (laptops, desktop"
+}

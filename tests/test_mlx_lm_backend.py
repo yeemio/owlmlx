@@ -5,6 +5,7 @@ import sys
 
 from owlmlx.runtime import MlxLmBackend, RuntimeErrorCode, RuntimeKernel
 from owlmlx.runtime.mlx_lm_backend import probe_mlx_lm_import
+from owlmlx.runtime.types import ChatTurn
 
 
 class FakeMlxLmModule:
@@ -26,6 +27,25 @@ class FakeMlxLmModule:
             }
         )
         return f"{prompt} :: mlx-lm"
+
+
+class ChatTemplateTokenizer:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def apply_chat_template(self, messages, **kwargs):  # type: ignore[no-untyped-def]
+        self.calls.append({"messages": messages, "kwargs": kwargs})
+        return "templated-chat"
+
+
+class ChatTemplateMlxLmModule(FakeMlxLmModule):
+    def __init__(self) -> None:
+        super().__init__()
+        self.tokenizer = ChatTemplateTokenizer()
+
+    def load(self, model_id: str):
+        self.load_calls.append(model_id)
+        return f"model:{model_id}", self.tokenizer
 
 
 def test_mlx_lm_backend_load_calls_mlx_lm_load() -> None:
@@ -67,6 +87,33 @@ def test_mlx_lm_backend_generate_requires_loaded_model() -> None:
 
     assert result.ok is False
     assert result.error_code is RuntimeErrorCode.model_not_loaded
+
+
+def test_mlx_lm_backend_generate_messages_forwards_chat_template_kwargs() -> None:
+    module = ChatTemplateMlxLmModule()
+    backend = MlxLmBackend(module=module)
+    backend.load("model-a", memory_gb=2.5)
+
+    result = backend.generate_messages(
+        "model-a",
+        [ChatTurn(role="user", content="hello")],
+        max_tokens=4,
+        chat_template_kwargs={"enable_thinking": False},
+    )
+
+    assert result.ok is True
+    assert module.tokenizer.calls == [
+        {
+            "messages": [{"role": "user", "content": "hello"}],
+            "kwargs": {
+                "tokenize": False,
+                "add_generation_prompt": True,
+                "enable_thinking": False,
+            },
+        }
+    ]
+    assert module.generate_calls[-1]["prompt"] == "templated-chat"
+    assert module.generate_calls[-1]["kwargs"] == {"max_tokens": 4}
 
 
 def test_mlx_lm_backend_status_reports_loaded_models() -> None:
