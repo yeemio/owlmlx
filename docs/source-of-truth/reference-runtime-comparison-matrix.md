@@ -47,8 +47,11 @@ Current live evidence:
   The subsequent live Gemma proof at
   `files/evidence/owlmlx/model-release-candidates/20260506T-gemma-enable-thinking-false-live-proof/record.json`
   completed two repeats with clean final text and clean post-run health.
-  This improves Gemma short-prompt output quality but is still not a full
-  parity or replacement claim.
+  The same profile control also produced clean short-prompt final text for
+  Qwen35 at
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-enable-thinking-false-live-proof/record.json`.
+  This improves Gemma and Qwen35 short-prompt output quality but is still not a
+  full parity or replacement claim.
 
 This improves the Gemma, Qwen27, and Qwen35 reference evidence floor, but it is
 still not a parity claim and does not cover measured DeepSeek generation,

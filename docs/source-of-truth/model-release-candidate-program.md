@@ -256,7 +256,7 @@ the first Gemma profile probe:
 - `Qwen3.6-27B` current mainline row remains `needs_optimization` with valid
   output and a decode-speed blocker.
 - `Qwen3.6-35B-A3B` current mainline row remains `needs_optimization` with a
-  high-TTFT / reasoning-trace blocker.
+  high-TTFT / reasoning-trace blocker in the earlier thinking-enabled path.
 - `gemma-4-31B-it` current mainline row moved from raw-prompt
   `repetitive_output` to chat-template `reasoning_trace_truncated`; the
   repetition blocker is narrowed, but final-answer quality and TTFT remain
@@ -430,6 +430,25 @@ Gemma `enable_thinking=false` live proof on 2026-05-06:
   platform/profile issue for this workload. It does not make Gemma `pass`:
   OwlOps observation, same-host reference comparison closure, longer prompts,
   multi-turn behavior, and cache safety remain separate gates.
+
+Qwen35 `enable_thinking=false` live proof on 2026-05-06:
+
+- Evidence:
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-enable-thinking-false-live-proof/record.json`.
+- The request payload for both repeats included
+  `chat_template_kwargs = {"enable_thinking": false}`,
+  `stop = ["<|im_end|>"]`, and the OpenAI chat-completions template path.
+- Both repeats emitted plain final text with
+  `visible_reasoning_trace=false`, `trace_status=none`,
+  `final_text_source=plain_text`, and `output_sanity_label=valid_text`.
+- The row completed `load -> generate -> unload -> reload -> generate ->
+  unload` with `failure_count=0`, `ttft_ms=3285.14`,
+  `decode_tokens_per_second=61.434`, `peak_resident_set_bytes=52908916736`,
+  and clean post-run health.
+- This closes the short-prompt Qwen35 prose-reasoning output blocker as a
+  template/profile issue for this workload. It leaves TTFT as a separate
+  pre-first-token optimization line: per-repeat first-token latency was about
+  `3.1s-3.5s`, while post-first-token decode took about `0.34s`.
 
 ## 9. Non-Goals
 

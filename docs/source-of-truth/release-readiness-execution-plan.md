@@ -521,6 +521,38 @@ Next dominant gap:
   trace and high TTFT. Gemma should not be reopened as dirty-output blocked
   unless a future live row regresses.
 
+Qwen35 `enable_thinking=false` live proof return (2026-05-06,
+`owlmlx_model_rc_qwen35_enable_thinking_false_live_proof`):
+
+- The latest Qwen35 row is now
+  `files/evidence/owlmlx/model-release-candidates/20260506T-qwen35-enable-thinking-false-live-proof/record.json`.
+- It applied `chat_template_kwargs.enable_thinking=false` through the real
+  `/v1/chat/completions` payload and child `mlx_lm` chat-template renderer.
+- Both repeats returned clean final text without visible reasoning markers.
+  Per-repeat `reasoning_trace_policy` is `visible_reasoning_trace=false`,
+  `trace_status=none`, `final_text_source=plain_text`, and
+  `output_sanity_label=valid_text`.
+- Lifecycle completed cleanly across two repeats:
+  `failure_count=0`, `load_result=pass`, `generation_result=pass`,
+  `unload_result=pass`, `reload_result=pass`, and post-run health remained
+  clean idle.
+- Current latest Qwen35 values are `verdict = needs_optimization`,
+  `repeat_count = 2`, `ttft_ms = 3285.14`,
+  `decode_tokens_per_second = 61.434`, and
+  `peak_resident_set_bytes = 52908916736`.
+- This resolves the short-prompt Qwen35 prose reasoning trace blocker as a
+  platform/profile/template issue for this workload. Keep the verdict at
+  `needs_optimization` until OwlOps observation, current reference comparison
+  consumption, longer prompt / multi-turn output quality, and TTFT optimization
+  are closed.
+
+Next dominant gap:
+
+- Move from final-answer channel control to TTFT/root-cause closure for Qwen35:
+  the clean row still spends about `3.1s-3.5s` before first token while
+  post-first-token decode takes only about `0.34s`, so the remaining latency
+  gap is pre-first-token work, not output parsing.
+
 ## 3. Ownership Model
 
 Coordinator:
