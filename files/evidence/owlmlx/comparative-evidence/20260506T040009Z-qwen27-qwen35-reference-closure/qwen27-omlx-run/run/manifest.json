@@ -1,0 +1,196 @@
+{
+  "appended_record": {
+    "evidence_pointer": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/manifest.json",
+    "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+    "recorded_at": "2026-05-06T04:07:43Z",
+    "runtimes": [
+      {
+        "measurement": {
+          "completed_request_count": 2,
+          "failure_count": 0,
+          "first_token_latency_ms": 4143.915562499387,
+          "peak_resident_set_bytes": 54420045824,
+          "throughput_tokens_per_second": 5.448156470877921,
+          "wall_clock_ms": 11767.53445850045
+        },
+        "runtime_id": "owlmlx",
+        "runtime_version": "12ee7b7-dirty-current-8066-comparative-ledger"
+      },
+      {
+        "measurement": {
+          "completed_request_count": 2,
+          "failure_count": 0,
+          "first_token_latency_ms": 4848.99535400109,
+          "peak_resident_set_bytes": 55013818368,
+          "throughput_tokens_per_second": 2.8126791670198887,
+          "wall_clock_ms": 22832.548812500136
+        },
+        "runtime_id": "omlx",
+        "runtime_version": "0.3.4-homebrew-jundot-omlx-livepid-portpid"
+      }
+    ],
+    "surface": "owlmlx.comparative_evidence_record",
+    "verdict_grade": "measured",
+    "verdict_text": "measured: owlmlx tokens_per_second 5.4482 vs omlx tokens_per_second 2.8127 on host_class=Mac17,6-arm64-macOS-26.4.1-128GB, workload_class=single_prompt_short",
+    "version": "v1",
+    "workload_class": "single_prompt_short",
+    "workload_invariants": {
+      "decode_max_tokens": 64,
+      "decode_temperature": 0.0,
+      "model_id": "Qwen3.6-27B",
+      "model_quantization": "full_precision_unquantized",
+      "prompt_set_hash": "sha256:d394e1ea7857e2ca0bb2859ed62a4fc7782534cbbab9aca64c9f7f9fd38090e4",
+      "serving_budget_bytes": 85899345920
+    }
+  },
+  "completed_at": "2026-05-06T04:07:43Z",
+  "host_class": "Mac17,6-arm64-macOS-26.4.1-128GB",
+  "ledger_path": "files/evidence/owlmlx/comparative-evidence/cumulative-ledger.jsonl",
+  "repeats": 2,
+  "runtimes": [
+    {
+      "attempts": [
+        {
+          "attempt_index": 1,
+          "command_argv": [
+            "python3",
+            "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/openai_stream_client.py",
+            "http://127.0.0.1:8066",
+            "Qwen3.6-27B",
+            "In one short sentence, define local AI.",
+            "64",
+            "0.0"
+          ],
+          "completed_at_iso": "2026-05-06T04:06:45Z",
+          "failure_cause": null,
+          "first_token_latency_ms": 4087.222791999011,
+          "generated_token_count": 64,
+          "ok": true,
+          "peak_resident_set_bytes": 54420045824,
+          "return_code": 0,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/owlmlx_attempt1.rss.jsonl",
+          "runtime_id": "owlmlx",
+          "started_at_iso": "2026-05-06T04:06:34Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/owlmlx_attempt1.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/owlmlx_attempt1.stdout.txt",
+          "throughput_tokens_per_second": 5.675228802335859,
+          "wall_clock_ms": 11277.078375000201
+        },
+        {
+          "attempt_index": 2,
+          "command_argv": [
+            "python3",
+            "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/openai_stream_client.py",
+            "http://127.0.0.1:8066",
+            "Qwen3.6-27B",
+            "In one short sentence, define local AI.",
+            "64",
+            "0.0"
+          ],
+          "completed_at_iso": "2026-05-06T04:06:57Z",
+          "failure_cause": null,
+          "first_token_latency_ms": 4200.608332999764,
+          "generated_token_count": 64,
+          "ok": true,
+          "peak_resident_set_bytes": 54007054336,
+          "return_code": 0,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/owlmlx_attempt2.rss.jsonl",
+          "runtime_id": "owlmlx",
+          "started_at_iso": "2026-05-06T04:06:45Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/owlmlx_attempt2.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/owlmlx_attempt2.stdout.txt",
+          "throughput_tokens_per_second": 5.2210841394199825,
+          "wall_clock_ms": 12257.990542000698
+        }
+      ],
+      "completed_request_count": 2,
+      "failure_causes": [],
+      "failure_count": 0,
+      "first_token_latency_ms": 4143.915562499387,
+      "peak_resident_set_bytes": 54420045824,
+      "runtime_id": "owlmlx",
+      "runtime_version": "12ee7b7-dirty-current-8066-comparative-ledger",
+      "throughput_tokens_per_second": 5.448156470877921,
+      "wall_clock_ms": 11767.53445850045
+    },
+    {
+      "attempts": [
+        {
+          "attempt_index": 1,
+          "command_argv": [
+            "python3",
+            "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/openai_stream_client.py",
+            "http://127.0.0.1:8001",
+            "Qwen3.6-27B",
+            "In one short sentence, define local AI.",
+            "64",
+            "0.0"
+          ],
+          "completed_at_iso": "2026-05-06T04:07:19Z",
+          "failure_cause": null,
+          "first_token_latency_ms": 5524.234875001639,
+          "generated_token_count": 64,
+          "ok": true,
+          "peak_resident_set_bytes": 54219898880,
+          "return_code": 0,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/omlx_attempt1.rss.jsonl",
+          "runtime_id": "omlx",
+          "started_at_iso": "2026-05-06T04:06:57Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/omlx_attempt1.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/omlx_attempt1.stdout.txt",
+          "throughput_tokens_per_second": 2.9775407589392877,
+          "wall_clock_ms": 21494.248167000478
+        },
+        {
+          "attempt_index": 2,
+          "command_argv": [
+            "python3",
+            "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/openai_stream_client.py",
+            "http://127.0.0.1:8001",
+            "Qwen3.6-27B",
+            "In one short sentence, define local AI.",
+            "64",
+            "0.0"
+          ],
+          "completed_at_iso": "2026-05-06T04:07:43Z",
+          "failure_cause": null,
+          "first_token_latency_ms": 4173.755833000541,
+          "generated_token_count": 64,
+          "ok": true,
+          "peak_resident_set_bytes": 55013818368,
+          "return_code": 0,
+          "rss_samples_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/omlx_attempt2.rss.jsonl",
+          "runtime_id": "omlx",
+          "started_at_iso": "2026-05-06T04:07:19Z",
+          "stderr_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/omlx_attempt2.stderr.txt",
+          "stdout_path": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-omlx-run/run/omlx_attempt2.stdout.txt",
+          "throughput_tokens_per_second": 2.6478175751004898,
+          "wall_clock_ms": 24170.849457999793
+        }
+      ],
+      "completed_request_count": 2,
+      "failure_causes": [],
+      "failure_count": 0,
+      "first_token_latency_ms": 4848.99535400109,
+      "peak_resident_set_bytes": 55013818368,
+      "runtime_id": "omlx",
+      "runtime_version": "0.3.4-homebrew-jundot-omlx-livepid-portpid",
+      "throughput_tokens_per_second": 2.8126791670198887,
+      "wall_clock_ms": 22832.548812500136
+    }
+  ],
+  "started_at": "2026-05-06T04:06:34Z",
+  "verdict_grade": "measured",
+  "verdict_text": "measured: owlmlx tokens_per_second 5.4482 vs omlx tokens_per_second 2.8127 on host_class=Mac17,6-arm64-macOS-26.4.1-128GB, workload_class=single_prompt_short",
+  "workload": {
+    "decode_max_tokens": 64,
+    "decode_temperature": 0.0,
+    "model_id": "Qwen3.6-27B",
+    "model_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B",
+    "model_quantization": "full_precision_unquantized",
+    "prompt": "In one short sentence, define local AI.",
+    "prompt_set_hash": "sha256:d394e1ea7857e2ca0bb2859ed62a4fc7782534cbbab9aca64c9f7f9fd38090e4",
+    "serving_budget_bytes": 85899345920,
+    "workload_class": "single_prompt_short"
+  }
+}

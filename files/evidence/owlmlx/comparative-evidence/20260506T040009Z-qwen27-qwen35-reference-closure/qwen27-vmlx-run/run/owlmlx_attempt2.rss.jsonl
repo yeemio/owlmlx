@@ -1,0 +1,1 @@
+{"dynamic_listener_ports": [8066], "dynamic_pid_files": ["files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen27-vmlx-run/owlmlx-8066.pid"], "per_pid_rss_bytes": {"35385": 65421312}, "resolved_root_pids": [55530, 35385], "t_s": 9883.905157, "tick_total_rss_bytes": 65421312, "tracked_root_pids": [55530, 35385]}

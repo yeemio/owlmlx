@@ -6,24 +6,32 @@
 
 ## 0. Latest Live Evidence Addendum
 
-The latest same-host live comparison note is:
+The latest same-host live comparison notes are:
 
 `docs/source-of-truth/reference-runtime-live-comparison-gemma-20260506.md`
 
-That run covers only `gemma-4-31B-it`, `single_prompt_short`, `max_tokens=64`,
-`temperature=0`, on `Mac17,6-arm64-macOS-26.4.1-128GB`.
+`docs/source-of-truth/reference-runtime-live-comparison-qwen27-qwen35-20260506.md`
 
-It produced:
+They cover only short-prompt, `max_tokens=64`, `temperature=0`, same-host runs
+on `Mac17,6-arm64-macOS-26.4.1-128GB`.
+
+Current live evidence:
 
 - `oMLX`: `rejected`, because oMLX generated visible text in attempt 1 but the
   service disconnected/restarted around lifecycle/unload, so no clean
-  two-repeat measured record exists.
+  two-repeat measured Gemma record exists.
+- `oMLX`: `measured` for `Qwen3.6-27B`, with `owlmlx` TPS `5.4482` vs `oMLX`
+  TPS `2.8127`.
+- `oMLX`: `measured` for `Qwen3.6-35B-A3B`, with `owlmlx` TPS `3.5349` vs
+  `oMLX` TPS `2.4400`.
 - `vMLX`: `measured`, with `owlmlx` TPS `3.7468` vs `vMLX` TPS `3.8304` under
-  a reasoning-aware stream consumer.
+  a reasoning-aware stream consumer for Gemma.
+- `vMLX`: `rejected` for both local Qwen directories because `vMLX serve`
+  selects the multimodal loader and the local reference venv lacks `mlx-vlm`.
 
-This improves the Gemma reference evidence floor, but it is still not a
-parity claim and does not cover Qwen27, Qwen35, DeepSeek, longer prompts,
-multi-turn behavior, or final-answer quality.
+This improves the Gemma, Qwen27, and Qwen35 reference evidence floor, but it is
+still not a parity claim and does not cover DeepSeek, longer prompts, multi-turn
+behavior, concurrent workloads, cache reuse, or final-answer quality.
 
 ## 1. Purpose
 

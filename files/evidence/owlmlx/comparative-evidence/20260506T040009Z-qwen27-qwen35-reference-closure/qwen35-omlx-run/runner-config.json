@@ -1,0 +1,47 @@
+{
+  "owlmlx": {
+    "runtime_version": "12ee7b7-dirty-current-8066-comparative-ledger",
+    "argv": [
+      "python3",
+      "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/openai_stream_client.py",
+      "http://127.0.0.1:8066",
+      "{model_id}",
+      "{prompt}",
+      "{max_tokens}",
+      "{temperature}"
+    ],
+    "env": {
+      "OPENAI_STREAM_CLIENT_PRELOAD_MODE": "owlmlx_v1_load",
+      "OPENAI_STREAM_CLIENT_UNLOAD_MODE": "owlmlx_v1_unload",
+      "OPENAI_STREAM_CLIENT_MEMORY_GB": "80"
+    },
+    "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+    "tokens_method": "max_tokens",
+    "first_token_strategy": "first_nonempty_chunk",
+    "external_pid_file": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen35-omlx-run/owlmlx-8066.pid",
+    "external_listener_ports": [8066],
+    "timeout_s": 1200.0
+  },
+  "reference": {
+    "runtime_id": "omlx",
+    "runtime_version": "0.3.4-homebrew-jundot-omlx-livepid-portpid",
+    "argv": [
+      "python3",
+      "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/openai_stream_client.py",
+      "http://127.0.0.1:8001",
+      "{model_id}",
+      "{prompt}",
+      "{max_tokens}",
+      "{temperature}"
+    ],
+    "env": {
+      "OPENAI_STREAM_CLIENT_UNLOAD_MODE": "omlx_v1_model_unload"
+    },
+    "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+    "tokens_method": "max_tokens",
+    "first_token_strategy": "first_nonempty_chunk",
+    "external_pid_file": "files/evidence/owlmlx/comparative-evidence/20260506T040009Z-qwen27-qwen35-reference-closure/qwen35-omlx-run/omlx-server.pid",
+    "external_listener_ports": [8001],
+    "timeout_s": 1200.0
+  }
+}

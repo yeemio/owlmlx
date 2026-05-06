@@ -1,0 +1,72 @@
+
+Here
+'s
+ a
+ thinking
+ process
+:
+
+
+
+1
+.
+ 
+ **
+An
+alyze
+ User
+ Input
+:**
+
+
+  
+ -
+ **
+Topic
+:**
+ Local
+ AI
+
+
+  
+ -
+ **
+Requirement
+:**
+ Define
+ it
+ in
+ one
+ short
+ sentence
+
+
+  
+ -
+ **
+Key
+ constraints
+:**
+ "
+one
+ short
+ sentence
+",
+ "
+define
+"
+
+
+
+2
+.
+ 
+ **
+Ident
+ify
+ Core
+ Concepts
+ of
+ Local
+ AI
+:**

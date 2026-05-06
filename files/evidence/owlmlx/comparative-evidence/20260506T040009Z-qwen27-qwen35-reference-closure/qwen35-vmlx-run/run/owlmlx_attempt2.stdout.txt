@@ -1,0 +1,69 @@
+Here
+'s
+ a
+ thinking
+ process
+:
+
+
+
+1
+.
+  **
+An
+alyze
+ User
+ Input
+:**
+
+
+  
+ -
+ **
+Topic
+:**
+ Local
+ AI
+
+
+  
+ -
+ **
+Requirement
+:**
+ Define
+ it
+ in
+ one
+ short
+ sentence
+.
+
+
+
+2
+.
+  **
+Ident
+ify
+ Key
+ Concepts
+ of
+ "
+Local
+ AI
+":
+**
+
+
+  
+ -
+ Runs
+ on
+ personal
+ devices
+ (
+l
+aptops
+,
+ desktop

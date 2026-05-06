@@ -8,8 +8,11 @@ same-host measured run is left to a downstream Codex review lane.
 from __future__ import annotations
 
 import json
+import socket
 import subprocess
 import sys
+import threading
+import time
 import textwrap
 from pathlib import Path
 
@@ -232,6 +235,136 @@ def test_execute_attempt_handles_spawn_failure(tmp_path) -> None:
     )
     assert result.ok is False
     assert result.failure_cause == "harness_runtime_invocation_error_spawn_failed"
+
+
+def test_execute_attempt_refreshes_external_pid_file_during_attempt(tmp_path) -> None:
+    pid_file = tmp_path / "external.pid"
+    pid_file.write_text("", encoding="utf-8")
+    external = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import time; payload = 'x' * 5_000_000; time.sleep(2)",
+        ]
+    )
+    try:
+        program = textwrap.dedent(
+            """
+            import sys, time
+            time.sleep(0.4)
+            print("OK", flush=True)
+            time.sleep(0.2)
+            sys.exit(0)
+            """
+        )
+        cfg = RuntimeRunnerConfig(
+            runtime_id="owlmlx",
+            runtime_version="0.0.0-runtime7",
+            argv=(sys.executable, "-c", program),
+            timeout_s=5.0,
+            tokens_method="max_tokens",
+            external_pid_file=str(pid_file),
+        )
+
+        def publish_pid() -> None:
+            time.sleep(0.1)
+            pid_file.write_text(f"{external.pid}\n", encoding="utf-8")
+
+        thread = threading.Thread(target=publish_pid)
+        thread.start()
+        result = execute_attempt(
+            runtime_config=cfg,
+            workload=_workload(),
+            attempt_index=1,
+            artifact_dir=tmp_path,
+        )
+        thread.join(timeout=2)
+
+        samples = [
+            json.loads(line)
+            for line in Path(result.rss_samples_path).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        assert result.ok is True
+        assert any(external.pid in sample.get("resolved_root_pids", []) for sample in samples)
+        assert any(str(external.pid) in sample.get("per_pid_rss_bytes", {}) for sample in samples)
+    finally:
+        external.terminate()
+        try:
+            external.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            external.kill()
+            external.wait(timeout=2)
+
+
+def test_execute_attempt_refreshes_external_listener_port_during_attempt(tmp_path) -> None:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = int(sock.getsockname()[1])
+
+    external_program = textwrap.dedent(
+        f"""
+        import socket, sys, time
+
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind(("127.0.0.1", {port}))
+        server.listen(1)
+        payload = "x" * 5_000_000
+        print("READY", flush=True)
+        time.sleep(2)
+        server.close()
+        """
+    )
+    external = subprocess.Popen(
+        [sys.executable, "-c", external_program],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert external.stdout is not None
+        assert external.stdout.readline().strip() == "READY"
+        program = textwrap.dedent(
+            """
+            import sys, time
+            time.sleep(0.4)
+            print("OK", flush=True)
+            time.sleep(0.2)
+            sys.exit(0)
+            """
+        )
+        cfg = RuntimeRunnerConfig(
+            runtime_id="vmlx",
+            runtime_version="0.0.0-runtime7",
+            argv=(sys.executable, "-c", program),
+            timeout_s=5.0,
+            tokens_method="max_tokens",
+            external_listener_ports=(port,),
+        )
+        result = execute_attempt(
+            runtime_config=cfg,
+            workload=_workload(),
+            attempt_index=1,
+            artifact_dir=tmp_path,
+        )
+
+        samples = [
+            json.loads(line)
+            for line in Path(result.rss_samples_path).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        assert result.ok is True
+        assert any(port in sample.get("dynamic_listener_ports", []) for sample in samples)
+        assert any(external.pid in sample.get("resolved_root_pids", []) for sample in samples)
+        assert any(str(external.pid) in sample.get("per_pid_rss_bytes", {}) for sample in samples)
+    finally:
+        external.terminate()
+        try:
+            external.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            external.kill()
+            external.wait(timeout=2)
 
 
 def test_aggregate_runtime_aggregates_two_successes(tmp_path) -> None:
@@ -458,6 +591,7 @@ def test_load_runner_config_file_round_trip(tmp_path) -> None:
                     "argv": ["python3", "-c", "print('owl')"],
                     "tokens_method": "max_tokens",
                     "timeout_s": 10.0,
+                    "external_listener_ports": [8066],
                 },
                 "reference": {
                     "runtime_id": "omlx",
@@ -465,6 +599,7 @@ def test_load_runner_config_file_round_trip(tmp_path) -> None:
                     "argv": ["python3", "-c", "print('ref')"],
                     "tokens_method": "max_tokens",
                     "timeout_s": 10.0,
+                    "external_listener_ports": [8001],
                 },
             }
         ),
@@ -473,8 +608,10 @@ def test_load_runner_config_file_round_trip(tmp_path) -> None:
     owl, ref = load_runner_config_file(config_path)
     assert owl.runtime_id == "owlmlx"
     assert owl.runtime_version == "0.0.0-runtime7"
+    assert owl.external_listener_ports == (8066,)
     assert ref.runtime_id == "omlx"
     assert ref.runtime_version == "0.3.5"
+    assert ref.external_listener_ports == (8001,)
 
 
 def test_load_runner_config_file_rejects_missing_argv(tmp_path) -> None:

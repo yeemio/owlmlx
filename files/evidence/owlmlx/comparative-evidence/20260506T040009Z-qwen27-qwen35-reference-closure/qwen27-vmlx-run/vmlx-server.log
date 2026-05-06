@@ -1,0 +1,268 @@
+COMMAND /Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/bin/python -m vmlx_engine.cli serve /Users/yeemio/AI/Agent/models/Qwen3.6-27B --served-model-name Qwen3.6-27B --host 127.0.0.1 --port 8064 --max-tokens 64 --default-temperature 0.0 --log-level WARNING
+INFO:__main__:Auto-configured tool parser from registry: qwen
+INFO:__main__:Auto-configured reasoning parser from registry: qwen3
+The `use_fast` parameter is deprecated and will be removed in a future version. Use `backend="torchvision"` instead of `use_fast=True`, or `backend="pil"` instead of `use_fast=False`.
+`Qwen2VLImageProcessor` requires torchvision (not installed); falling back to `Qwen2VLImageProcessorPil` for backward compatibility. Install torchvision to use the default backend, or import `Qwen2VLImageProcessorPil` directly to silence this warning.
+Traceback (most recent call last):
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1520, in load_model
+    asyncio.get_running_loop()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1750, in <module>
+    main()
+    ~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1727, in main
+    serve_command(args)
+    ~~~~~~~~~~~~~^^^^^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 524, in serve_command
+    load_model(
+    ~~~~~~~~~~^
+        args.model,
+        ^^^^^^^^^^^
+    ...<15 lines>...
+        flash_moe_io_split=getattr(args, 'flash_moe_io_split', 4),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1526, in load_model
+    asyncio.run(_engine.start())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/engine/simple.py", line 99, in start
+    self._model.load()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/models/mllm.py", line 781, in load
+    raise ImportError(
+    ...<2 lines>...
+    )
+ImportError: mlx-vlm is required for multimodal inference. Install with: pip install mlx-vlm
+============================================================
+SECURITY CONFIGURATION
+============================================================
+  Authentication: DISABLED - Use --api-key to enable
+  Rate limiting: DISABLED - Use --rate-limit to enable
+  Request timeout: 300.0s
+  Tool calling: Use --enable-auto-tool-choice to enable
+  Reasoning: ENABLED (parser: Qwen3ReasoningParser)
+  Speculative decoding: Use --speculative-model to enable
+============================================================
+Loading model: /Users/yeemio/AI/Agent/models/Qwen3.6-27B
+Served model name: Qwen3.6-27B
+Default max tokens: 64
+Mode: Simple (maximum throughput)
+  NOTE: These settings require --continuous-batching and will be ignored: --enable-prefix-cache
+COMMAND /Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/bin/python -m vmlx_engine.cli serve /Users/yeemio/AI/Agent/models/Qwen3.6-27B --served-model-name Qwen3.6-27B --host 127.0.0.1 --port 8064 --max-tokens 64 --default-temperature 0.0 --log-level WARNING
+INFO:__main__:Auto-configured tool parser from registry: qwen
+INFO:__main__:Auto-configured reasoning parser from registry: qwen3
+The `use_fast` parameter is deprecated and will be removed in a future version. Use `backend="torchvision"` instead of `use_fast=True`, or `backend="pil"` instead of `use_fast=False`.
+`Qwen2VLImageProcessor` requires torchvision (not installed); falling back to `Qwen2VLImageProcessorPil` for backward compatibility. Install torchvision to use the default backend, or import `Qwen2VLImageProcessorPil` directly to silence this warning.
+Traceback (most recent call last):
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1520, in load_model
+    asyncio.get_running_loop()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1750, in <module>
+    main()
+    ~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1727, in main
+    serve_command(args)
+    ~~~~~~~~~~~~~^^^^^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 524, in serve_command
+    load_model(
+    ~~~~~~~~~~^
+        args.model,
+        ^^^^^^^^^^^
+    ...<15 lines>...
+        flash_moe_io_split=getattr(args, 'flash_moe_io_split', 4),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1526, in load_model
+    asyncio.run(_engine.start())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/engine/simple.py", line 99, in start
+    self._model.load()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/models/mllm.py", line 781, in load
+    raise ImportError(
+    ...<2 lines>...
+    )
+ImportError: mlx-vlm is required for multimodal inference. Install with: pip install mlx-vlm
+============================================================
+SECURITY CONFIGURATION
+============================================================
+  Authentication: DISABLED - Use --api-key to enable
+  Rate limiting: DISABLED - Use --rate-limit to enable
+  Request timeout: 300.0s
+  Tool calling: Use --enable-auto-tool-choice to enable
+  Reasoning: ENABLED (parser: Qwen3ReasoningParser)
+  Speculative decoding: Use --speculative-model to enable
+============================================================
+Loading model: /Users/yeemio/AI/Agent/models/Qwen3.6-27B
+Served model name: Qwen3.6-27B
+Default max tokens: 64
+Mode: Simple (maximum throughput)
+  NOTE: These settings require --continuous-batching and will be ignored: --enable-prefix-cache
+COMMAND /Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/bin/python -m vmlx_engine.cli serve /Users/yeemio/AI/Agent/models/Qwen3.6-27B --served-model-name Qwen3.6-27B --host 127.0.0.1 --port 8064 --max-tokens 64 --default-temperature 0.0 --log-level WARNING
+INFO:__main__:Auto-configured tool parser from registry: qwen
+INFO:__main__:Auto-configured reasoning parser from registry: qwen3
+The `use_fast` parameter is deprecated and will be removed in a future version. Use `backend="torchvision"` instead of `use_fast=True`, or `backend="pil"` instead of `use_fast=False`.
+`Qwen2VLImageProcessor` requires torchvision (not installed); falling back to `Qwen2VLImageProcessorPil` for backward compatibility. Install torchvision to use the default backend, or import `Qwen2VLImageProcessorPil` directly to silence this warning.
+Traceback (most recent call last):
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1520, in load_model
+    asyncio.get_running_loop()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1750, in <module>
+    main()
+    ~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1727, in main
+    serve_command(args)
+    ~~~~~~~~~~~~~^^^^^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 524, in serve_command
+    load_model(
+    ~~~~~~~~~~^
+        args.model,
+        ^^^^^^^^^^^
+    ...<15 lines>...
+        flash_moe_io_split=getattr(args, 'flash_moe_io_split', 4),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1526, in load_model
+    asyncio.run(_engine.start())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/engine/simple.py", line 99, in start
+    self._model.load()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/models/mllm.py", line 781, in load
+    raise ImportError(
+    ...<2 lines>...
+    )
+ImportError: mlx-vlm is required for multimodal inference. Install with: pip install mlx-vlm
+============================================================
+SECURITY CONFIGURATION
+============================================================
+  Authentication: DISABLED - Use --api-key to enable
+  Rate limiting: DISABLED - Use --rate-limit to enable
+  Request timeout: 300.0s
+  Tool calling: Use --enable-auto-tool-choice to enable
+  Reasoning: ENABLED (parser: Qwen3ReasoningParser)
+  Speculative decoding: Use --speculative-model to enable
+============================================================
+Loading model: /Users/yeemio/AI/Agent/models/Qwen3.6-27B
+Served model name: Qwen3.6-27B
+Default max tokens: 64
+Mode: Simple (maximum throughput)
+  NOTE: These settings require --continuous-batching and will be ignored: --enable-prefix-cache
+COMMAND /Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/.venv/bin/python -m vmlx_engine.cli serve /Users/yeemio/AI/Agent/models/Qwen3.6-27B --served-model-name Qwen3.6-27B --host 127.0.0.1 --port 8064 --max-tokens 64 --default-temperature 0.0 --log-level WARNING
+INFO:__main__:Auto-configured tool parser from registry: qwen
+INFO:__main__:Auto-configured reasoning parser from registry: qwen3
+The `use_fast` parameter is deprecated and will be removed in a future version. Use `backend="torchvision"` instead of `use_fast=True`, or `backend="pil"` instead of `use_fast=False`.
+`Qwen2VLImageProcessor` requires torchvision (not installed); falling back to `Qwen2VLImageProcessorPil` for backward compatibility. Install torchvision to use the default backend, or import `Qwen2VLImageProcessorPil` directly to silence this warning.
+Traceback (most recent call last):
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1520, in load_model
+    asyncio.get_running_loop()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+RuntimeError: no running event loop
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1750, in <module>
+    main()
+    ~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 1727, in main
+    serve_command(args)
+    ~~~~~~~~~~~~~^^^^^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/cli.py", line 524, in serve_command
+    load_model(
+    ~~~~~~~~~~^
+        args.model,
+        ^^^^^^^^^^^
+    ...<15 lines>...
+        flash_moe_io_split=getattr(args, 'flash_moe_io_split', 4),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/server.py", line 1526, in load_model
+    asyncio.run(_engine.start())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 204, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/runners.py", line 127, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/asyncio/base_events.py", line 719, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/engine/simple.py", line 99, in start
+    self._model.load()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/vmlx_engine/models/mllm.py", line 781, in load
+    raise ImportError(
+    ...<2 lines>...
+    )
+ImportError: mlx-vlm is required for multimodal inference. Install with: pip install mlx-vlm
+============================================================
+SECURITY CONFIGURATION
+============================================================
+  Authentication: DISABLED - Use --api-key to enable
+  Rate limiting: DISABLED - Use --rate-limit to enable
+  Request timeout: 300.0s
+  Tool calling: Use --enable-auto-tool-choice to enable
+  Reasoning: ENABLED (parser: Qwen3ReasoningParser)
+  Speculative decoding: Use --speculative-model to enable
+============================================================
+Loading model: /Users/yeemio/AI/Agent/models/Qwen3.6-27B
+Served model name: Qwen3.6-27B
+Default max tokens: 64
+Mode: Simple (maximum throughput)
+  NOTE: These settings require --continuous-batching and will be ignored: --enable-prefix-cache

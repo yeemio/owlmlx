@@ -43,12 +43,14 @@ _RSS_SAMPLE_INTERVAL_S = 0.05
 class RuntimeRunnerConfig:
     """One runtime's invocation contract for the measured runner.
 
-    ``external_pids`` and ``external_pid_file`` declare process-tree roots that
-    the runner should also sample alongside the spawned wrapper PID. They exist
-    because some reference runtimes (notably ``omlx serve``) live in a
-    long-running server process that the runner must reach into for honest RSS
-    measurement. The wrapper subprocess (e.g. an HTTP client) is not where the
-    work happens for those topologies.
+    ``external_pids``, ``external_pid_file``, and ``external_listener_ports``
+    declare process-tree roots that the runner should also sample alongside the
+    spawned wrapper PID. They exist because some reference runtimes (notably
+    ``omlx serve``) live in a long-running server process that the runner must
+    reach into for honest RSS measurement. The wrapper subprocess (e.g. an HTTP
+    client) is not where the work happens for those topologies. Listener-port
+    discovery is refreshed during the attempt so service restarts and PID drift
+    remain visible in the RSS evidence.
 
     ``first_token_strategy`` accepts:
 
@@ -70,6 +72,7 @@ class RuntimeRunnerConfig:
     tokens_method: str = "max_tokens"
     external_pids: tuple[int, ...] = ()
     external_pid_file: str | None = None
+    external_listener_ports: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,13 +215,88 @@ def _resolve_external_pids(
                 resolved.append(int(line))
             except ValueError:
                 continue
+    return _dedupe_pids(resolved)
+
+
+def _dedupe_pids(pids: Sequence[int]) -> tuple[int, ...]:
     deduped: list[int] = []
     seen: set[int] = set()
-    for pid in resolved:
+    for raw_pid in pids:
+        pid = int(raw_pid)
         if pid not in seen:
             seen.add(pid)
             deduped.append(pid)
     return tuple(deduped)
+
+
+def _listen_port_for_connection(connection: Any) -> int | None:
+    try:
+        laddr = connection.laddr
+    except AttributeError:
+        return None
+    port = getattr(laddr, "port", None)
+    if port is not None:
+        return int(port)
+    try:
+        if len(laddr) >= 2:
+            return int(laddr[1])
+    except (TypeError, ValueError):
+        return None
+    return None
+
+
+def _resolve_listener_pids(*, ports: Sequence[int]) -> tuple[int, ...]:
+    """Resolve current LISTEN owner PIDs for local TCP ports.
+
+    The measured runner samples long-running reference services by process
+    tree. Static PIDs are useful for initial attribution, but live services can
+    restart behind the same port. Resolving listener owners on each RSS sample
+    keeps those PID changes represented in evidence artifacts.
+    """
+
+    wanted = {int(port) for port in ports if int(port) > 0}
+    if not wanted:
+        return ()
+    resolved: list[int] = []
+    try:
+        connections = psutil.net_connections(kind="tcp")
+    except (psutil.Error, OSError):
+        connections = []
+    for connection in connections:
+        if connection.pid is None:
+            continue
+        if connection.status != psutil.CONN_LISTEN:
+            continue
+        port = _listen_port_for_connection(connection)
+        if port in wanted:
+            resolved.append(int(connection.pid))
+    if not resolved:
+        resolved.extend(_resolve_listener_pids_with_lsof(ports=tuple(wanted)))
+    return _dedupe_pids(resolved)
+
+
+def _resolve_listener_pids_with_lsof(*, ports: Sequence[int]) -> tuple[int, ...]:
+    resolved: list[int] = []
+    for port in sorted({int(port) for port in ports if int(port) > 0}):
+        try:
+            completed = subprocess.run(
+                ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
+                capture_output=True,
+                text=True,
+                timeout=1.0,
+                check=False,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+            continue
+        for raw_line in completed.stdout.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                resolved.append(int(line))
+            except ValueError:
+                continue
+    return _dedupe_pids(resolved)
 
 
 class _RssSampler:
@@ -242,14 +320,22 @@ class _RssSampler:
         self,
         *,
         root_pids: Sequence[int],
+        dynamic_pid_files: Sequence[str] = (),
+        dynamic_listener_ports: Sequence[int] = (),
         output_path: Path,
     ) -> None:
         self._root_pids = list(int(pid) for pid in root_pids)
+        self._dynamic_pid_files = tuple(str(path) for path in dynamic_pid_files if path)
+        self._dynamic_listener_ports = tuple(
+            int(port) for port in dynamic_listener_ports if int(port) > 0
+        )
         self._output_path = output_path
         self._stop = threading.Event()
         self._peak = 0
         self._thread: threading.Thread | None = None
         self._samples: list[dict[str, Any]] = []
+        self._last_listener_pids: tuple[int, ...] = ()
+        self._last_listener_refresh_s: float = 0.0
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -269,11 +355,32 @@ class _RssSampler:
             pass
         return self._peak
 
-    def _collect_tree_rss(self) -> dict[str, int]:
+    def _resolved_root_pids(self) -> list[int]:
+        roots = list(self._root_pids)
+        for pid_file in self._dynamic_pid_files:
+            roots.extend(_resolve_external_pids(static_pids=(), pid_file=pid_file))
+        if self._dynamic_listener_ports:
+            now_s = time.monotonic()
+            if now_s - self._last_listener_refresh_s >= 0.5:
+                self._last_listener_pids = _resolve_listener_pids(
+                    ports=self._dynamic_listener_ports
+                )
+                self._last_listener_refresh_s = now_s
+            roots.extend(self._last_listener_pids)
+        deduped: list[int] = []
+        seen: set[int] = set()
+        for pid in roots:
+            if pid in seen:
+                continue
+            seen.add(pid)
+            deduped.append(pid)
+        return deduped
+
+    def _collect_tree_rss(self, root_pids: Sequence[int]) -> dict[str, int]:
         """Return ``{pid: rss_bytes}`` for live processes across all roots."""
 
         per_pid: dict[str, int] = {}
-        for root in self._root_pids:
+        for root in root_pids:
             try:
                 proc = psutil.Process(root)
             except psutil.Error:
@@ -297,7 +404,8 @@ class _RssSampler:
         if not self._root_pids:
             return
         while not self._stop.is_set():
-            per_pid = self._collect_tree_rss()
+            resolved_root_pids = self._resolved_root_pids()
+            per_pid = self._collect_tree_rss(resolved_root_pids)
             if not per_pid:
                 # All tracked processes have exited.
                 break
@@ -307,6 +415,9 @@ class _RssSampler:
                 {
                     "t_s": round(time.monotonic(), 6),
                     "tracked_root_pids": list(self._root_pids),
+                    "dynamic_pid_files": list(self._dynamic_pid_files),
+                    "dynamic_listener_ports": list(self._dynamic_listener_ports),
+                    "resolved_root_pids": list(resolved_root_pids),
                     "per_pid_rss_bytes": per_pid,
                     "tick_total_rss_bytes": tick_total,
                 }
@@ -451,8 +562,21 @@ def execute_attempt(
         static_pids=runtime_config.external_pids,
         pid_file=runtime_config.external_pid_file,
     )
-    root_pids: list[int] = [process.pid, *external_pids]
-    sampler = _RssSampler(root_pids=root_pids, output_path=rss_path)
+    listener_pids = _resolve_listener_pids(
+        ports=runtime_config.external_listener_ports,
+    )
+    root_pids: list[int] = [process.pid, *external_pids, *listener_pids]
+    dynamic_pid_files = (
+        (runtime_config.external_pid_file,)
+        if runtime_config.external_pid_file
+        else ()
+    )
+    sampler = _RssSampler(
+        root_pids=root_pids,
+        dynamic_pid_files=dynamic_pid_files,
+        dynamic_listener_ports=runtime_config.external_listener_ports,
+        output_path=rss_path,
+    )
     sampler.start()
 
     detector = _FirstTokenDetector(runtime_config.first_token_strategy)
@@ -830,6 +954,7 @@ def write_run_artifacts(
                 "timeout_s": cfg.timeout_s,
                 "external_pids": list(cfg.external_pids),
                 "external_pid_file": cfg.external_pid_file,
+                "external_listener_ports": list(cfg.external_listener_ports),
             }
             for cfg in runtime_configs
         ],
@@ -944,6 +1069,13 @@ def _runner_from_payload(
         raise ValueError(
             f"runner config entry for {runtime_id!r} 'external_pid_file' must be a string"
         )
+    external_listener_ports_raw = payload.get("external_listener_ports") or ()
+    if not isinstance(external_listener_ports_raw, (list, tuple)) or not all(
+        isinstance(port, int) for port in external_listener_ports_raw
+    ):
+        raise ValueError(
+            f"runner config entry for {runtime_id!r} 'external_listener_ports' must be a list of ints"
+        )
     return RuntimeRunnerConfig(
         runtime_id=runtime_id,
         runtime_version=runtime_version,
@@ -955,6 +1087,7 @@ def _runner_from_payload(
         tokens_method=tokens_method,
         external_pids=tuple(int(pid) for pid in external_pids_raw),
         external_pid_file=external_pid_file,
+        external_listener_ports=tuple(int(port) for port in external_listener_ports_raw),
     )
 
 
