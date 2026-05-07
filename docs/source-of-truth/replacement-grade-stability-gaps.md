@@ -88,7 +88,10 @@ Current boundary:
 - cache currently points at `owlmlx.cache_request_aggregation_active_seam`
 - `closure_level = aggregation_active_seam_exact`
 - exact blocker:
-  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection`
+  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection`
+- subprocess-transport sentinel narrowing is closed in the current paradigm;
+  further cache-scheduler progress redirects to native MLX backend feasibility
+  rather than another sentinel rung
 
 ### 3.3 `multi_model_lifecycle_governance`
 
@@ -264,10 +267,23 @@ That means the current loop posture is now:
   detection on that same internal record
 - the literal prefix before `runtime_owned_terminal_b` is not yet an honest
   runtime-owned transport boundary on this path
-- the remaining exact blocker is now
-  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection`
 - earlier-runtime-owned boundary stem detection is now frozen as the first
   honest unique boundary on that newer runtime-owned boundary record
+- one distinct earlier runtime-owned terminal record now exists ahead of that
+  current stem seam
+- a second backend stream request can now also enter the live backend exchange
+  after child stdout reaches `runtime_owned_terminal_earlier_boundary` and
+  before child stdout reaches `runtime_owned_terminal_b`
+- earlier-runtime-owned-boundary earlier-boundary detection is also frozen as
+  the first honest unique boundary on the newer earlier-boundary record
+- one distinct earlier-earlier runtime-owned terminal record now exists ahead
+  of that existing earlier-boundary record:
+  `runtime_owned_terminal_earlier_earlier_boundary`
+- a second backend stream request can now also enter the live backend exchange
+  after child stdout reaches `runtime_owned_terminal_earlier_earlier_boundary`
+  and before child stdout reaches `runtime_owned_terminal_earlier_boundary`
+- the remaining exact blocker is now
+  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection`
 - the newer earlier-runtime-owned discriminator discriminant remains frozen as
   the first honest unique boundary on the newer earlier-runtime-owned
   discriminator record
@@ -284,11 +300,12 @@ That means the current loop posture is now:
   terminal-notice record
 - cache is now the next dominant locally reducible gap
 - governance micro-rounds must not reopen
-- the next coordinator choice is no longer whether the current earlier-runtime-
-  owned boundary stem seam is honest
-- the next coordinator choice is whether to authorize one new earlier runtime-
-  owned boundary ahead of
-  `backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_dependency`
-  while preserving post-claim serial invariants and non-stream handoff truth,
-  rather than widening this runtime-owned boundary-stem first-unique-boundary
-  freeze into a broader batching story
+- the next coordinator choice is no longer whether to authorize one new
+  earlier runtime-owned boundary ahead of the current stem seam
+- the next coordinator choice is no longer whether to narrow inside
+  `backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_dependency`
+- the subprocess-transport sentinel chain is now a baseline contract that a
+  native backend must preserve or replace explicitly
+- the next executable mainline is native MLX backend feasibility while
+  preserving post-claim serial invariants and non-stream handoff truth; this
+  still does not claim batching, prefix-cache reuse, parity, or interleaving

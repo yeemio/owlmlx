@@ -493,6 +493,28 @@ def main() -> int:
                 _emit(
                     {
                         "ok": True,
+                        "runtime_owned_terminal_earlier_earlier_boundary": True,
+                        "action": "stream_runtime_owned_terminal_earlier_earlier_boundary",
+                        "terminal_action": "stream_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
+                        "runtime_owned_terminal_earlier_boundary": True,
+                        "action": "stream_runtime_owned_terminal_earlier_boundary",
+                        "terminal_action": "stream_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
                         "runtime_owned_terminal_boundary": True,
                         "action": "stream_runtime_owned_terminal_boundary",
                         "terminal_action": "stream_done",
@@ -686,6 +708,30 @@ def main() -> int:
                     "first_visible_token_ms": first_visible_token_ms,
                     "stream_wall_ms": _elapsed_ms(request_start),
                 }
+                _emit(
+                    {
+                        "ok": True,
+                        "runtime_owned_terminal_earlier_earlier_boundary": True,
+                        "action": "stream_runtime_owned_terminal_earlier_earlier_boundary",
+                        "terminal_action": "stream_message_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                        "message_count": len(messages),
+                    }
+                )
+                _emit(
+                    {
+                        "ok": True,
+                        "runtime_owned_terminal_earlier_boundary": True,
+                        "action": "stream_runtime_owned_terminal_earlier_boundary",
+                        "terminal_action": "stream_message_done",
+                        "model_id": current_model_id,
+                        "pid": os.getpid(),
+                        "sequence": sequence,
+                        "message_count": len(messages),
+                    }
+                )
                 _emit(
                     {
                         "ok": True,

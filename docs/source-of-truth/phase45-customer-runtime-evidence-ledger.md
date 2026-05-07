@@ -135,13 +135,36 @@ because `owlmlx` still has:
   new runtime-owned boundary stem and before child stdout reaches fuller
   earlier-runtime-owned-boundary prefix detection on that same internal
   record, where the literal prefix before `runtime_owned_terminal_b` is not
-  yet an honest runtime-owned transport boundary, so the remaining exact
-  blocker now stays at the earlier-runtime-owned-boundary-stem boundary as the
-  first honest unique boundary on that newer runtime-owned boundary record
-  while the fuller boundary-prefix detection plus fuller boundary detection
-  stay preserved as secondary truth and the newer leading-discriminator
-  discriminant stays frozen as the first honest unique boundary on that newer
-  runtime-owned record
+  yet an honest runtime-owned transport boundary, so the earlier-runtime-
+  owned-boundary stem was frozen as the first honest unique boundary on that
+  newer runtime-owned boundary record, and now onto one distinct earlier
+  runtime-owned terminal record `runtime_owned_terminal_earlier_boundary`
+  ahead of that stem, where a second backend stream request can be written
+  before child stdout reaches `runtime_owned_terminal_b`; the current exact
+  blocker is now earlier-runtime-owned-boundary earlier-boundary detection,
+  while the fuller stem/prefix/detection truth stays preserved as secondary
+  truth and the newer leading-discriminator discriminant stays frozen as the
+  first honest unique boundary on that newer runtime-owned record; and the
+  earlier-runtime-owned-boundary earlier-boundary detection is now also frozen
+  as the first honest unique boundary on the newer earlier-boundary record
+  itself, because the literal prefix before `runtime_owned_terminal_earlier_b`
+  is the same shared prefix `{"ok": true, "runtime_owned_terminal_` that also
+  fronts the older runtime-owned boundary record on this path, so it is not
+  yet an honest runtime-owned transport boundary — this is a metadata-only
+  freeze that does not move the active seam, does not introduce a new
+  runtime-owned record, and does not relax post-claim serial invariants;
+  and now onto one distinct earlier-earlier runtime-owned terminal record
+  `runtime_owned_terminal_earlier_earlier_boundary` ahead of the existing
+  earlier-boundary record, where the existing earlier-boundary trigger has
+  been tightened from the shared `_e` prefix to `_earlier_b` (the honest
+  unique stem identified by the prior freeze) and the new earlier-earlier
+  trigger is `_earlier_e`, so a second backend stream request can be written
+  once child stdout reaches `runtime_owned_terminal_earlier_earlier_boundary`
+  and before child stdout reaches `runtime_owned_terminal_earlier_boundary`;
+  the current exact blocker is now earlier-runtime-owned-boundary
+  earlier-earlier-boundary detection, while the prior earlier-boundary first-
+  unique-boundary truth stays preserved as secondary truth and post-claim
+  `max_concurrent = 1`, ticketed FIFO, and serial safety remain preserved
 
 ## 6. What This Changes
 

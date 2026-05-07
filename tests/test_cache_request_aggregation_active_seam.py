@@ -125,6 +125,15 @@ from owlmlx.cache_stream_backend_terminal_notice_leading_discriminator_marker_ea
 from owlmlx.cache_stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_exactness import (
     CacheStreamBackendTerminalNoticeLeadingDiscriminatorMarkerEarlierRuntimeOwnedBoundaryStemExactness,
 )
+from owlmlx.cache_stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness import (
+    CacheStreamBackendTerminalNoticeLeadingDiscriminatorMarkerEarlierRuntimeOwnedBoundaryFirstUniqueBoundaryExactness,
+)
+from owlmlx.cache_stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_exactness import (
+    CacheStreamBackendTerminalNoticeLeadingDiscriminatorMarkerEarlierRuntimeOwnedBoundaryEarlierBoundaryExactness,
+)
+from owlmlx.cache_stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_exactness import (
+    CacheStreamBackendTerminalNoticeLeadingDiscriminatorMarkerEarlierRuntimeOwnedBoundaryEarlierEarlierBoundaryExactness,
+)
 from owlmlx.cache_stream_backend_terminal_notice_leading_discriminator_marker_stem_exactness import (
     CacheStreamBackendTerminalNoticeLeadingDiscriminatorMarkerStemExactness,
 )
@@ -2253,6 +2262,40 @@ def test_cache_request_aggregation_active_seam_advances_after_backend_terminal_n
             recommended_next_step="treat backend terminal notice leading discriminator marker earlier runtime-owned boundary stem detection as the current exact stream dependency",
         )
     )
+    backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness = (
+        CacheStreamBackendTerminalNoticeLeadingDiscriminatorMarkerEarlierRuntimeOwnedBoundaryFirstUniqueBoundaryExactness(
+            backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_exactness=(
+                backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_exactness
+            ),
+            status="partial",
+            exactness_rung="stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exact",
+            verdict="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_dependency_still_blocked",
+            earlier_runtime_owned_boundary_first_unique_boundary_status="backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection_visible",
+            exchange_boundary="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_is_first_honest_unique_boundary_visible",
+            next_active_dependency="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_dependency",
+            next_active_dependency_status="backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection",
+            preserved_non_stream_handoff_status="cohort_handed_off_to_aggregated_child_exchange_visible",
+            residual_blocker="the remaining exact stream seam stays at earlier-runtime-owned-boundary stem detection on this path: the literal prefix before runtime_owned_terminal_b is not yet an honest runtime-owned transport boundary, so earlier-runtime-owned-boundary stem detection is already the first honest unique boundary on the newer runtime-owned boundary record and no earlier live seam is yet available",
+            recommended_next_step="either keep backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary stem detection frozen as the current exact seam or introduce one new earlier runtime-owned boundary ahead of this first honest unique boundary without widening the claim into stream interleaving, continuous batching, or cache parity",
+        )
+    )
+    backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_exactness = (
+        CacheStreamBackendTerminalNoticeLeadingDiscriminatorMarkerEarlierRuntimeOwnedBoundaryEarlierBoundaryExactness(
+            backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness=(
+                backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness
+            ),
+            status="partial",
+            exactness_rung="stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_exact",
+            verdict="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_introduced",
+            earlier_runtime_owned_boundary_earlier_boundary_status="backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection_visible",
+            exchange_boundary="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detected_before_boundary_stem_detection",
+            next_active_dependency="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_dependency",
+            next_active_dependency_status="backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection",
+            preserved_non_stream_handoff_status="cohort_handed_off_to_aggregated_child_exchange_visible",
+            residual_blocker="owlmlx now owns one distinct earlier runtime-owned boundary record ahead of the current earlier-runtime-owned-boundary stem seam: a second backend stream request can be written once child stdout reaches runtime_owned_terminal_earlier_boundary and before child stdout reaches runtime_owned_terminal_b, so the remaining exact stream seam now sits at earlier-runtime-owned-boundary earlier-boundary detection",
+            recommended_next_step="treat backend terminal notice leading discriminator marker earlier runtime-owned boundary earlier-boundary detection as the current exact stream dependency",
+        )
+    )
 
     payload = cache_request_aggregation_active_seam_to_dict(
         build_cache_request_aggregation_active_seam(
@@ -2367,6 +2410,12 @@ def test_cache_request_aggregation_active_seam_advances_after_backend_terminal_n
             stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_exactness=(
                 backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_exactness
             ),
+            stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness=(
+                backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness
+            ),
+            stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_exactness=(
+                backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_exactness
+            ),
             stream_backend_terminal_notice_leading_discriminator_marker_stem_exactness=(
                 backend_terminal_notice_leading_discriminator_marker_stem_exactness
             ),
@@ -2376,14 +2425,121 @@ def test_cache_request_aggregation_active_seam_advances_after_backend_terminal_n
     assert payload["summary"]["seam_rung"] == "aggregation_active_seam_exact"
     assert (
         payload["selected_seam"]["seam"]
-        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_dependency"
+        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_dependency"
     )
     assert (
         payload["selected_seam"]["status"]
-        == "backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection"
+        == "backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection"
     )
-    assert "earlier-runtime-owned-boundary prefix detection" in payload["summary"]["residual_blocker"]
+    assert "distinct earlier runtime-owned boundary" in payload["summary"]["residual_blocker"]
+    assert "runtime_owned_terminal_earlier_boundary" in payload["summary"]["residual_blocker"]
+    assert "runtime_owned_terminal_b" in payload["summary"]["residual_blocker"]
     assert payload["preserved_secondary_dependencies"] == []
+
+
+def test_cache_request_aggregation_active_seam_advances_after_earlier_earlier_boundary_introduction() -> None:
+    reentry = CacheRequestAggregationWindowReentry(
+        continuous_batching_branch_reduction=object(),
+        request_aggregation_window_exactness=object(),
+        status="partial",
+        reentry_rung="aggregation_reentry_exact",
+        selected_reentry_target="request_aggregation_window",
+        selected_reentry_target_status="reentered_as_active_cache_subchain",
+        preserved_secondary_scheduler_reduction=(
+            "shared_prefill_batch_step",
+            "interleaved_decode_scheduler",
+        ),
+        preserved_secondary_runtime_branch="turboquant_preconditions",
+        preserved_secondary_runtime_branch_status="preconditions_exact",
+        residual_blocker="request aggregation reentered",
+        recommended_next_step="active seam",
+    )
+    exactness = CacheRequestAggregationWindowExactness(
+        mechanism_subgap=object(),
+        status="partial",
+        exactness_rung="aggregation_window_blocker_exact",
+        ingress_window_status="bounded_pre_gate_admission_window_present",
+        admission_boundary_status="cohort_forms_before_generation_gate_claim",
+        child_dependency_status="cohort_handed_off_to_aggregated_child_exchange_visible",
+        stream_dependency_status="stream_session_holds_gate_until_completion",
+        residual_blocker="stream hold still blocks",
+        recommended_next_step="freeze stream hold",
+    )
+    child_exactness = CacheChildExchangeAggregatedDispatchExactness(
+        request_aggregation_window_exactness=exactness,
+        status="partial",
+        exactness_rung="child_exchange_dependency_exact",
+        child_exchange_status="aggregated_non_stream_child_exchange_visible",
+        exchange_shape="single_child_exchange_carries_multiple_non_stream_requests",
+        next_active_dependency="cohort_to_child_exchange_handoff_dependency",
+        next_active_dependency_status="pre_gate_cohort_not_yet_handed_off_to_aggregated_child_exchange",
+        preserved_stream_dependency_status="stream_session_holds_gate_until_completion",
+        residual_blocker="cohort handoff still missing",
+        recommended_next_step="freeze cohort handoff",
+    )
+    handoff_exactness = CacheCohortToChildExchangeHandoffExactness(
+        child_exchange_exactness=child_exactness,
+        status="partial",
+        exactness_rung="cohort_to_child_handoff_exact",
+        handoff_status="cohort_handed_off_to_aggregated_child_exchange_visible",
+        main_path_shape="bounded_pre_gate_cohort_reaches_single_aggregated_non_stream_child_exchange",
+        next_active_dependency="stream_session_holds_gate_until_completion",
+        next_active_dependency_status="stream_session_holds_gate_until_completion",
+        preserved_stream_dependency_status="stream_session_holds_gate_until_completion",
+        residual_blocker="stream hold still blocks",
+        recommended_next_step="freeze stream hold",
+    )
+    stream_hold_exactness = CacheStreamHoldDependencyExactness(
+        cohort_handoff_exactness=handoff_exactness,
+        status="partial",
+        exactness_rung="stream_hold_dependency_exact",
+        verdict="stream_hold_dependency_narrowed",
+        hold_status="stream_gate_release_decoupled_from_consumer_completion_visible",
+        gate_release_boundary="backend_stream_iterator_completion_before_consumer_drain",
+        next_active_dependency="stream_backend_iterator_completion_dependency",
+        next_active_dependency_status="stream_backend_iterator_holds_gate_until_completion",
+        preserved_non_stream_handoff_status="cohort_handed_off_to_aggregated_child_exchange_visible",
+        residual_blocker="stream gate release no longer waits for session completion",
+        recommended_next_step="freeze backend iterator completion",
+    )
+    earlier_earlier_exactness = (
+        CacheStreamBackendTerminalNoticeLeadingDiscriminatorMarkerEarlierRuntimeOwnedBoundaryEarlierEarlierBoundaryExactness(
+            backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_first_unique_boundary_exactness=object(),  # type: ignore[arg-type]
+            status="partial",
+            exactness_rung="stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_exact",
+            verdict="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_introduced",
+            earlier_runtime_owned_boundary_earlier_earlier_boundary_status="backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection_visible",
+            exchange_boundary="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detected_before_earlier_boundary_detection",
+            next_active_dependency="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_dependency",
+            next_active_dependency_status="backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection",
+            preserved_non_stream_handoff_status="cohort_handed_off_to_aggregated_child_exchange_visible",
+            residual_blocker="owlmlx now owns one distinct earlier-earlier runtime-owned boundary record ahead of the current earlier-runtime-owned-boundary earlier-boundary seam",
+            recommended_next_step="treat earlier-earlier boundary detection as the current exact stream dependency",
+        )
+    )
+
+    payload = cache_request_aggregation_active_seam_to_dict(
+        build_cache_request_aggregation_active_seam(
+            request_aggregation_window_reentry=reentry,
+            request_aggregation_window_exactness=exactness,
+            child_exchange_exactness=child_exactness,
+            cohort_handoff_exactness=handoff_exactness,
+            stream_hold_exactness=stream_hold_exactness,
+            stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_exactness=(
+                earlier_earlier_exactness
+            ),
+        )
+    )
+
+    assert (
+        payload["selected_seam"]["seam"]
+        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_dependency"
+    )
+    assert (
+        payload["selected_seam"]["status"]
+        == "backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection"
+    )
+    assert "earlier-earlier runtime-owned boundary" in payload["summary"]["residual_blocker"]
 
 
 def test_cache_request_aggregation_active_seam_module_has_no_platform_dependency() -> None:

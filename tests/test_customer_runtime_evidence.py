@@ -5230,7 +5230,7 @@ def test_customer_runtime_evidence_mentions_earlier_runtime_owned_boundary_prefi
     assert "backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary prefix detection" in payload["summary"]["recommended_next_step"]
 
 
-def test_customer_runtime_evidence_mentions_earlier_runtime_owned_boundary_stem_when_stem_is_active_seam(
+def test_customer_runtime_evidence_mentions_earlier_runtime_owned_boundary_earlier_boundary_when_active_seam_moves_beyond_stem(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -5251,9 +5251,9 @@ def test_customer_runtime_evidence_mentions_earlier_runtime_owned_boundary_stem_
         "owlmlx.customer_runtime_evidence.build_cache_request_aggregation_active_seam",
         lambda **_: _request_aggregation_active_seam(
             seam_rung="aggregation_active_seam_exact",
-            selected_seam="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_dependency",
-            selected_seam_status="backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection",
-            residual_blocker="the remaining exact stream seam is now closer than earlier-runtime-owned-boundary prefix detection on this path",
+            selected_seam="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_dependency",
+            selected_seam_status="backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection",
+            residual_blocker="owlmlx now owns one distinct earlier runtime-owned boundary record ahead of the current earlier-runtime-owned-boundary stem seam: a second backend stream request can be written once child stdout reaches runtime_owned_terminal_earlier_boundary and before child stdout reaches runtime_owned_terminal_b",
         ),
     )
     monkeypatch.setattr(
@@ -5289,7 +5289,37 @@ def test_customer_runtime_evidence_mentions_earlier_runtime_owned_boundary_stem_
         "owlmlx.customer_runtime_evidence.build_multi_model_governance_transition_ledger",
         lambda **_: _governance_transition_ledger(
             ledger_rung="partial_closure",
-            blocked_reason="boundary-stem narrowing remains cache-local",
+            blocked_reason="boundary-earlier-boundary introduction remains cache-local",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_policy_gap",
+        lambda **_: _governance_policy_gap(
+            policy_gap_rung="policy_gap_exact",
+            residual_blocker="remaining governance gap is policy-grade only",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_host_stable_execution_status",
+        lambda **_: _host(
+            ready=True,
+            status="host_ready_for_runtime_validation",
+            blocked_reason=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_heavy_weight_runtime_repeatability_status",
+        lambda **_: _heavy(
+            repeatability_rung="supported_host_repeatability_visible",
+            blocked_reason=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_turboquant_preconditions_gap",
+        lambda **_: SimpleNamespace(
+            status="partial",
+            preconditions_rung="preconditions_exact",
+            residual_blocker="TurboQuant remains exact but secondary",
         ),
     )
 
@@ -5303,9 +5333,229 @@ def test_customer_runtime_evidence_mentions_earlier_runtime_owned_boundary_stem_
         )
     )
 
-    assert "post-runtime-owned earlier terminal-notice boundary stem freeze work" in payload["summary"]["recommended_next_step"]
-    assert "boundary-stem boundary" in payload["summary"]["recommended_next_step"]
-    assert "backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary stem detection" in payload["summary"]["recommended_next_step"]
+    assert "post-runtime-owned earlier terminal-notice boundary earlier-boundary introduction work" in payload["summary"]["recommended_next_step"]
+    assert "runtime_owned_terminal_earlier_boundary" in payload["summary"]["recommended_next_step"]
+    assert "runtime_owned_terminal_b" in payload["summary"]["recommended_next_step"]
+    assert "backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary earlier-boundary detection" in payload["summary"]["recommended_next_step"]
+
+
+def test_customer_runtime_evidence_mentions_earlier_earlier_boundary_when_active_seam_advances_to_earlier_earlier_boundary_dependency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_counter_gap",
+        lambda **_: _cache_counter_gap(
+            counter_gap_rung="counter_gap_exact",
+            residual_blocker="remaining cache gap is now exact",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_counter_feasibility",
+        lambda **_: _cache_counter_feasibility(
+            feasibility_rung="counter_ownership_exact",
+            residual_blocker="cache counter ownership is now exact",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_request_aggregation_active_seam",
+        lambda **_: _request_aggregation_active_seam(
+            seam_rung="aggregation_active_seam_exact",
+            selected_seam="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_dependency",
+            selected_seam_status="backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection",
+            residual_blocker="owlmlx now owns one distinct earlier-earlier runtime-owned boundary record ahead of the previous earlier-runtime-owned-boundary earlier-boundary seam: a second backend stream request can be written once child stdout reaches runtime_owned_terminal_earlier_earlier_boundary and before child stdout reaches runtime_owned_terminal_earlier_boundary",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_pre_gate_admission_window_seam",
+        lambda **_: _pre_gate_window_seam(
+            seam_rung="pre_gate_admission_window_seam_unresolved",
+            selected_seam_status="not_selected",
+            residual_blocker="window already entered",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_structural_ingress_seam",
+        lambda **_: _structural_ingress(
+            seam_rung="structural_ingress_seam_introduced",
+            residual_blocker="structural ingress seam exists",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_status",
+        lambda **_: _governance(
+            governance_rung="partial_closure",
+            blocked_reason="pinning and TTL remain absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_controls",
+        lambda **_: _governance_controls(
+            controls_rung="partial_closure",
+            blocked_reason="pinning and TTL remain absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_transition_ledger",
+        lambda **_: _governance_transition_ledger(
+            ledger_rung="partial_closure",
+            blocked_reason="earlier-earlier-boundary introduction remains cache-local",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_policy_gap",
+        lambda **_: _governance_policy_gap(
+            policy_gap_rung="policy_gap_exact",
+            residual_blocker="remaining governance gap is policy-grade only",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_host_stable_execution_status",
+        lambda **_: _host(
+            ready=True,
+            status="host_ready_for_runtime_validation",
+            blocked_reason=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_heavy_weight_runtime_repeatability_status",
+        lambda **_: _heavy(
+            repeatability_rung="supported_host_repeatability_visible",
+            blocked_reason=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_turboquant_preconditions_gap",
+        lambda **_: SimpleNamespace(
+            status="partial",
+            preconditions_rung="preconditions_exact",
+            residual_blocker="TurboQuant remains exact but secondary",
+        ),
+    )
+
+    payload = customer_runtime_evidence_to_dict(
+        build_customer_runtime_evidence(
+            specimen_path="/tmp/specimen",
+            dominant_gap_reselection=_dominant_gap(
+                selected_gap="cache_scheduler_depth",
+                rationale="cache remains dominant",
+            ),
+        )
+    )
+
+    assert "post-runtime-owned earlier terminal-notice boundary earlier-earlier-boundary introduction work" in payload["summary"]["recommended_next_step"]
+    assert "runtime_owned_terminal_earlier_earlier_boundary" in payload["summary"]["recommended_next_step"]
+    assert "runtime_owned_terminal_earlier_boundary" in payload["summary"]["recommended_next_step"]
+    assert "backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary earlier-earlier-boundary detection" in payload["summary"]["recommended_next_step"]
+
+
+def test_customer_runtime_evidence_mentions_earlier_boundary_first_unique_boundary_when_active_seam_freezes_first_honest_unique_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_counter_gap",
+        lambda **_: _cache_counter_gap(
+            counter_gap_rung="counter_gap_exact",
+            residual_blocker="remaining cache gap is now exact",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_counter_feasibility",
+        lambda **_: _cache_counter_feasibility(
+            feasibility_rung="counter_ownership_exact",
+            residual_blocker="cache counter ownership is now exact",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_request_aggregation_active_seam",
+        lambda **_: _request_aggregation_active_seam(
+            seam_rung="aggregation_active_seam_exact",
+            selected_seam="backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_dependency",
+            selected_seam_status="backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection",
+            residual_blocker="owlmlx already owns one distinct earlier runtime-owned boundary record (runtime_owned_terminal_earlier_boundary) ahead of the previous boundary stem (runtime_owned_terminal_b), and the remaining exact stream seam stays at earlier-runtime-owned-boundary earlier-boundary detection on this path: the literal prefix before runtime_owned_terminal_earlier_b is not yet an honest runtime-owned transport boundary, so earlier-boundary detection is already the first honest unique boundary on the newer earlier-boundary record and no earlier live seam is yet available",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_pre_gate_admission_window_seam",
+        lambda **_: _pre_gate_window_seam(
+            seam_rung="pre_gate_admission_window_seam_unresolved",
+            selected_seam_status="not_selected",
+            residual_blocker="window already entered",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_structural_ingress_seam",
+        lambda **_: _structural_ingress(
+            seam_rung="structural_ingress_seam_introduced",
+            residual_blocker="structural ingress seam exists",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_status",
+        lambda **_: _governance(
+            governance_rung="partial_closure",
+            blocked_reason="pinning and TTL remain absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_controls",
+        lambda **_: _governance_controls(
+            controls_rung="partial_closure",
+            blocked_reason="pinning and TTL remain absent",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_transition_ledger",
+        lambda **_: _governance_transition_ledger(
+            ledger_rung="partial_closure",
+            blocked_reason="boundary-earlier-boundary first-unique-boundary remains cache-local",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_multi_model_governance_policy_gap",
+        lambda **_: _governance_policy_gap(
+            policy_gap_rung="policy_gap_exact",
+            residual_blocker="remaining governance gap is policy-grade only",
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_host_stable_execution_status",
+        lambda **_: _host(
+            ready=True,
+            status="host_ready_for_runtime_validation",
+            blocked_reason=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_heavy_weight_runtime_repeatability_status",
+        lambda **_: _heavy(
+            repeatability_rung="supported_host_repeatability_visible",
+            blocked_reason=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.customer_runtime_evidence.build_cache_turboquant_preconditions_gap",
+        lambda **_: SimpleNamespace(
+            status="partial",
+            preconditions_rung="preconditions_exact",
+            residual_blocker="TurboQuant remains exact but secondary",
+        ),
+    )
+
+    payload = customer_runtime_evidence_to_dict(
+        build_customer_runtime_evidence(
+            specimen_path="/tmp/specimen",
+            dominant_gap_reselection=_dominant_gap(
+                selected_gap="cache_scheduler_depth",
+                rationale="cache remains dominant",
+            ),
+        )
+    )
+
+    assert "post-runtime-owned earlier terminal-notice boundary earlier-boundary first-unique-boundary work" in payload["summary"]["recommended_next_step"]
+    assert "first honest unique boundary on the newer earlier-boundary record" in payload["summary"]["recommended_next_step"]
+    assert "runtime_owned_terminal_earlier_b" in payload["summary"]["recommended_next_step"]
+
+
 def test_customer_runtime_evidence_mentions_earlier_runtime_owned_leading_discriminator_discriminant_when_active_seam_moves_beyond_stem(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

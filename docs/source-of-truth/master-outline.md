@@ -167,22 +167,27 @@ These are runtime-level goals, not temporary integration work.
 122. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-exactness.md`
 123. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-prefix-exactness.md`
 124. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-stem-exactness.md`
-125. `delivery-discipline.md`
-126. `single-host-orchestration-architecture.md`
-127. `release-readiness-backlog.md`
-128. `release-readiness-execution-plan.md`
-129. `comparative-evidence-harness-contract.md`
-130. `comparative-evidence-schema-stub.md`
-131. `release-floor-3-1-cache-scheduler-capability-audit.md`
-132. `reclaim-barrier-event.md`
-133. `termination-recovery-policy.md`
-134. `public-surface.md`
-135. `model-release-candidate-program.md`
-136. `deepseek-v4-flash-adapter-optimization-candidate.md`
-137. `peer-reference-mechanism-audit-for-model-profiles.md`
-138. `peer-reference-vendor-provenance-audit.md`
-139. `mlx-lm-generation-baseline-triage.md`
-140. `model-load-admission.md`
+125. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-first-unique-boundary-exactness.md`
+126. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-earlier-boundary-exactness.md`
+127. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-earlier-boundary-first-unique-boundary-exactness.md`
+128. `phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-earlier-earlier-boundary-exactness.md`
+129. `delivery-discipline.md`
+130. `single-host-orchestration-architecture.md`
+131. `release-readiness-backlog.md`
+132. `release-readiness-execution-plan.md`
+133. `comparative-evidence-harness-contract.md`
+134. `comparative-evidence-schema-stub.md`
+135. `native-mlx-backend-capability-matrix.md`
+136. `release-floor-3-1-cache-scheduler-capability-audit.md`
+137. `reclaim-barrier-event.md`
+138. `termination-recovery-policy.md`
+139. `public-surface.md`
+140. `model-release-candidate-program.md`
+141. `deepseek-v4-flash-adapter-optimization-candidate.md`
+142. `peer-reference-mechanism-audit-for-model-profiles.md`
+143. `peer-reference-vendor-provenance-audit.md`
+144. `mlx-lm-generation-baseline-triage.md`
+145. `model-load-admission.md`
 
 ## 6. Adoption Model
 
@@ -246,17 +251,18 @@ The next executable closure round is:
 - supported-host repeated heavy-weight proof is now visible on the selected
   budget-fit path
 - cache is now the next dominant locally reducible gap
+- within `cache_scheduler_depth`, the subprocess-transport sentinel narrowing
+  chain is closed in the current paradigm; the next executable main line is
+  native MLX backend feasibility, not another sentinel rung
 - governance remains frozen
 - cache has reopened beyond the old structural checkpoint and now waits at the
-  backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-stem seam,
-  while fuller earlier-runtime-owned-boundary prefix detection plus fuller
-  earlier-runtime-owned-boundary detection remain preserved as secondary
-  truth, current marker-discriminant detection remains frozen as the first
-  honest unique boundary on the current runtime-owned marker-first record,
-  the newer earlier-runtime-owned discriminator discriminant and
-  newer earlier-runtime-owned leading-discriminator discriminant remain
-  frozen as the first honest unique boundaries on their newer runtime-owned
-  records, and old marker-key lead stays preserved as secondary truth
+  backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-earlier-earlier-boundary
+  seam, while earlier-boundary detection, earlier-boundary first-unique
+  truth, fuller earlier-runtime-owned-boundary stem/prefix/detection,
+  current marker-discriminant detection, the newer earlier-runtime-owned
+  discriminator discriminant, the newer earlier-runtime-owned
+  leading-discriminator discriminant, and old marker-key lead stay preserved
+  as secondary truth
 
 The current cache checkpoint result is:
 
@@ -268,7 +274,7 @@ The current cache checkpoint result is:
 - the active cache truth now points at
   `owlmlx.cache_request_aggregation_active_seam`
 - the current exact cache blocker is
-  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection`
+  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection`
 - the newer earlier-runtime-owned leading-discriminator discriminant remains
   frozen as the first honest unique boundary on the newer earlier-runtime-
   owned leading-discriminator record
@@ -337,8 +343,22 @@ The current cache checkpoint result is:
   once child stdout reaches that new earlier runtime-owned boundary stem and
   before child stdout reaches fuller earlier-runtime-owned-boundary prefix
   detection on that same internal record
+- owlmlx now also owns one distinct earlier runtime-owned terminal record
+  `runtime_owned_terminal_earlier_boundary` ahead of the current
+  earlier-runtime-owned-boundary stem seam
+- a second backend stream request can already enter the live backend exchange
+  after child stdout reaches that distinct earlier boundary and before child
+  stdout reaches `runtime_owned_terminal_b`
+- earlier-runtime-owned-boundary earlier-boundary detection is also frozen as
+  the first honest unique boundary on the newer earlier-boundary record
+- owlmlx now also owns one distinct earlier-earlier runtime-owned terminal
+  record `runtime_owned_terminal_earlier_earlier_boundary` ahead of the
+  existing earlier-boundary record
+- a second backend stream request can already enter the live backend exchange
+  after child stdout reaches that earlier-earlier boundary and before child
+  stdout reaches `runtime_owned_terminal_earlier_boundary`
 - the current exact cache blocker is
-  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection`
+  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection`
 - marker-key lead remains preserved as the first unique boundary on the old
   terminal-notice record
 - it still does not imply continuous batching, parity, or replacement-ready

@@ -1880,11 +1880,43 @@ def build_customer_runtime_evidence(
                 ):
                     if (
                         cache_request_aggregation_active_seam_status.selected_seam
-                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_dependency"
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_dependency"
                     ):
                         recommended_next_step = (
-                            "treat cache as post-runtime-owned earlier terminal-notice boundary stem freeze work on this path; owlmlx now owns a new runtime-owned boundary-stem boundary ahead of the fuller earlier-runtime-owned-boundary prefix on the current internal record and a second backend stream request can already enter the live backend exchange before child stdout reaches that fuller prefix boundary, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary stem detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                            "treat cache as post-runtime-owned earlier terminal-notice boundary earlier-earlier-boundary introduction work on this path; owlmlx now owns one distinct earlier-earlier runtime-owned boundary record (runtime_owned_terminal_earlier_earlier_boundary) ahead of the previous earlier-runtime-owned-boundary earlier-boundary seam, and a second backend stream request can already enter the live backend exchange after runtime_owned_terminal_earlier_earlier_boundary while still before runtime_owned_terminal_earlier_boundary on child stdout, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary earlier-earlier-boundary detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
                         )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_dependency"
+                    ):
+                        if (
+                            cache_request_aggregation_active_seam_status.residual_blocker
+                            and "first honest unique boundary on the newer earlier-boundary record"
+                            in cache_request_aggregation_active_seam_status.residual_blocker
+                        ):
+                            recommended_next_step = (
+                                "treat cache as post-runtime-owned earlier terminal-notice boundary earlier-boundary first-unique-boundary work on this path; owlmlx now also freezes that earlier-runtime-owned-boundary earlier-boundary detection is the first honest unique boundary on the newer earlier-boundary record because the literal prefix before runtime_owned_terminal_earlier_b is not yet an honest runtime-owned transport boundary, but the remaining exact blocker still sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary earlier-boundary detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                            )
+                        else:
+                            recommended_next_step = (
+                                "treat cache as post-runtime-owned earlier terminal-notice boundary earlier-boundary introduction work on this path; owlmlx now owns one distinct earlier runtime-owned boundary record ahead of the current earlier-runtime-owned-boundary stem seam and a second backend stream request can already enter the live backend exchange after runtime_owned_terminal_earlier_boundary while still before runtime_owned_terminal_b on child stdout, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary earlier-boundary detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                            )
+                    elif (
+                        cache_request_aggregation_active_seam_status.selected_seam
+                        == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_dependency"
+                    ):
+                        if (
+                            cache_request_aggregation_active_seam_status.residual_blocker
+                            and "first honest unique boundary"
+                            in cache_request_aggregation_active_seam_status.residual_blocker
+                        ):
+                            recommended_next_step = (
+                                "treat cache as post-runtime-owned earlier terminal-notice boundary first-unique-boundary work on this path; owlmlx now owns a newer runtime-owned boundary record ahead of the newer runtime-owned leading-discriminator record and a second backend stream request can already enter the live backend exchange before child stdout reaches the fuller earlier-runtime-owned-boundary prefix on that newer record, but the literal prefix before runtime_owned_terminal_b is not yet an honest runtime-owned transport boundary, so the remaining exact blocker still sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary stem detection because that boundary is already the first honest unique boundary on the newer runtime-owned boundary record, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                            )
+                        else:
+                            recommended_next_step = (
+                                "treat cache as post-runtime-owned earlier terminal-notice boundary stem freeze work on this path; owlmlx now owns a new runtime-owned boundary-stem boundary ahead of the fuller earlier-runtime-owned-boundary prefix on the current internal record and a second backend stream request can already enter the live backend exchange before child stdout reaches that fuller prefix boundary, but the remaining exact blocker now sits at backend-terminal notice leading-discriminator marker earlier-runtime-owned-boundary stem detection inside the live backend exchange, while TurboQuant remains exact-but-secondary and the governance policy gap and supported-host checkpoint remain exact"
+                            )
                     elif (
                         cache_request_aggregation_active_seam_status.selected_seam
                         == "backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_dependency"

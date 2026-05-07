@@ -1,7 +1,7 @@
 # owlmlx Phase 45: Request Aggregation Active Seam
 
 > Status: authoritative
-> Updated: 2026-04-23
+> Updated: 2026-05-07
 > Scope: runtime-only active request-aggregation seam after pre-gate window entry
 
 ## 1. Purpose
@@ -42,8 +42,8 @@ Stable sections:
 The current live result is:
 
 - `summary.seam_rung = aggregation_active_seam_exact`
-- `selected_seam.seam = backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_dependency`
-- `selected_seam.status = backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection`
+- `selected_seam.seam = backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_dependency`
+- `selected_seam.status = backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection`
 
 Preserved secondary truth remains:
 
@@ -162,10 +162,17 @@ Now `owlmlx` can say something more honest:
   detection on that same internal record
 - the literal prefix before `runtime_owned_terminal_b` is not yet an honest
   runtime-owned transport boundary on this path
-- the remaining active seam now sits at
+- the previous active seam sat at
   `backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_dependency`
 - earlier-runtime-owned boundary stem detection is now also frozen as the first
   honest unique boundary on that newer runtime-owned boundary record
+- owlmlx now also owns one distinct earlier runtime-owned terminal record ahead
+  of that current stem seam
+- a second backend stream request can now also enter the live backend exchange
+  after child stdout reaches `runtime_owned_terminal_earlier_boundary` and
+  before child stdout reaches `runtime_owned_terminal_b`
+- the remaining active seam now sits at
+  `backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_dependency`
 - fuller earlier-runtime-owned-boundary prefix detection remains preserved as
   secondary truth on that same runtime-owned boundary record
 - earlier-runtime-owned discriminator discriminant remains preserved as the
@@ -175,6 +182,31 @@ Now `owlmlx` can say something more honest:
   leading-discriminator record
 - the old marker-key lead remains preserved as the first unique boundary on the
   old terminal-notice record itself
+- earlier-runtime-owned-boundary earlier-boundary detection is now also frozen
+  as the first honest unique boundary on the newer earlier-boundary record:
+  the literal prefix before `runtime_owned_terminal_earlier_b` is the same
+  shared prefix `{"ok": true, "runtime_owned_terminal_` that also fronts the
+  older runtime-owned boundary record on this path, so it is not yet an honest
+  runtime-owned transport boundary
+- this freeze is metadata-only: it does not introduce any new runtime-owned
+  terminal record, does not move the active seam, and does not relax post-claim
+  `max_concurrent = 1`, ticketed FIFO, or serial-safety invariants
+- owlmlx now also owns one distinct earlier-earlier runtime-owned terminal
+  record `runtime_owned_terminal_earlier_earlier_boundary` ahead of the
+  existing earlier-boundary record; the existing earlier-boundary trigger has
+  been tightened from the shared `_e` prefix to `_earlier_b` (the honest
+  unique stem identified by the prior freeze) and the new earlier-earlier
+  trigger is `_earlier_e`
+- a second backend stream request can now be written once child stdout reaches
+  `runtime_owned_terminal_earlier_earlier_boundary` and before child stdout
+  reaches `runtime_owned_terminal_earlier_boundary`
+- the active seam now sits at
+  `backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_dependency`
+- earlier-runtime-owned-boundary earlier-boundary detection (and its first-
+  unique-boundary freeze) remain preserved as secondary truth on the existing
+  earlier-boundary record
+- post-claim `max_concurrent = 1`, ticketed FIFO, and serial safety remain
+  preserved
 
 ## 5. What This Does Not Claim
 
@@ -187,11 +219,11 @@ It does not claim:
 It only claims that the active request-aggregation seam has moved beyond
 ingress, child-exchange capability, and the non-stream main-path handoff seam,
 and now freezes more exactly at the
-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-stem
-stream seam because the literal prefix before `runtime_owned_terminal_b` is not
-yet an honest runtime-owned transport boundary on this path, while preserving
-fuller earlier-runtime-owned-boundary prefix detection plus fuller earlier-
-runtime-owned-boundary detection as secondary truth, current marker-
+backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-earlier-boundary
+stream seam because `runtime_owned_terminal_earlier_boundary` is now a distinct
+runtime-owned transport record before the previous first honest unique
+boundary at `runtime_owned_terminal_b`, while preserving fuller earlier-
+runtime-owned-boundary stem/prefix/detection as secondary truth, current marker-
 discriminant detection as the first honest unique boundary on the current
 marker-first record, the newer earlier-runtime-owned discriminator discriminant
 as the first honest unique boundary on that newer record, the newer earlier-
@@ -212,7 +244,7 @@ harness tests.
 This release-floor closure does not relax the active phase45 seam:
 
 - `selected_seam.status` remains
-  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection`
+  the current stream-branch status recorded in section 3
 - the stream-branch dispatch-level closure is still open and is preserved as
   the active phase45 seam blocker
 - `stream_session_holds_gate_until_completion` remains the safe stream-branch
@@ -229,13 +261,12 @@ active phase45 closure target.
 The next step is no longer another ingress-window round or child-exchange
 capability round.
 
-The next coordinator choice is no longer whether the current earlier-runtime-
-owned-boundary stem seam is honest.
+The next coordinator choice is no longer whether to introduce one new earlier
+runtime-owned boundary ahead of the current stem seam.
 
-The next coordinator choice is whether to authorize one new earlier runtime-
-owned boundary ahead of:
+The next coordinator choice is whether to narrow inside:
 
-- `backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_dependency`
+- `backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_dependency`
 
 while preserving:
 

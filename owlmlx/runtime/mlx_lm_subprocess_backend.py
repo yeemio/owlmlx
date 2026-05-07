@@ -205,6 +205,26 @@ _STREAM_TERMINAL_NOTICE_PREFIXES = (
     '{"ok":true,"terminal_notice":true,"action":"stream_terminal_notice"',
 )
 
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_EARLIER_EARLIER_BOUNDARIES = (
+    '{"ok": true, "runtime_owned_terminal_earlier_earlier_boundary": true, "action": "stream_runtime_owned_terminal_earlier_earlier_boundary"',
+    '{"ok":true,"runtime_owned_terminal_earlier_earlier_boundary":true,"action":"stream_runtime_owned_terminal_earlier_earlier_boundary"',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_EARLIER_EARLIER_BOUNDARY_STEMS = (
+    '{"ok": true, "runtime_owned_terminal_earlier_e',
+    '{"ok":true,"runtime_owned_terminal_earlier_e',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_EARLIER_BOUNDARIES = (
+    '{"ok": true, "runtime_owned_terminal_earlier_boundary": true, "action": "stream_runtime_owned_terminal_earlier_boundary"',
+    '{"ok":true,"runtime_owned_terminal_earlier_boundary":true,"action":"stream_runtime_owned_terminal_earlier_boundary"',
+)
+
+_STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_EARLIER_BOUNDARY_STEMS = (
+    '{"ok": true, "runtime_owned_terminal_earlier_b',
+    '{"ok":true,"runtime_owned_terminal_earlier_b',
+)
+
 _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_BOUNDARIES = (
     '{"ok": true, "runtime_owned_terminal_boundary": true, "action": "stream_runtime_owned_terminal_boundary"',
     '{"ok":true,"runtime_owned_terminal_boundary":true,"action":"stream_runtime_owned_terminal_boundary"',
@@ -391,6 +411,26 @@ def _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discr
     )
 
 
+def _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_earlier_boundary_record(
+    text: str,
+) -> bool:
+    """Return whether a transport record is the earlier runtime-owned earlier-earlier-boundary."""
+
+    return text.startswith(
+        _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_EARLIER_EARLIER_BOUNDARIES
+    )
+
+
+def _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_boundary_record(
+    text: str,
+) -> bool:
+    """Return whether a transport record is the earlier runtime-owned earlier-boundary."""
+
+    return text.startswith(
+        _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_EARLIER_BOUNDARIES
+    )
+
+
 def _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_record(
     text: str,
 ) -> bool:
@@ -425,6 +465,28 @@ def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_lead
     return any(
         buffer.startswith(prefix)
         for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_LEADING_DISCRIMINATORS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_earlier_boundary_stem(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer reaches the earlier runtime-owned earlier-earlier-boundary stem."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_EARLIER_EARLIER_BOUNDARY_STEMS
+    )
+
+
+def _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_boundary_stem(
+    buffer: str,
+) -> bool:
+    """Return whether a partial buffer reaches the earlier runtime-owned earlier-boundary stem."""
+
+    return any(
+        buffer.startswith(prefix)
+        for prefix in _STREAM_TERMINAL_NOTICE_LEADING_DISCRIMINATOR_MARKER_EARLIER_RUNTIME_OWNED_EARLIER_BOUNDARY_STEMS
     )
 
 
@@ -706,6 +768,12 @@ class MlxLmSubprocessBackend:
         self._stream_debug_before_terminal_notice_prefix_detection: (
             Callable[[str], None] | None
         ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection: (
+            Callable[[str], None] | None
+        ) = None
+        self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection: (
+            Callable[[str], None] | None
+        ) = None
         self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection: (
             Callable[[str], None] | None
         ) = None
@@ -866,6 +934,14 @@ class MlxLmSubprocessBackend:
         stdout: Any,
         *,
         release_serial_boundary: Callable[[], None] | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection: Callable[
+            [str], None
+        ]
+        | None = None,
+        before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection: Callable[
+            [str], None
+        ]
+        | None = None,
         before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection: Callable[
             [str], None
         ]
@@ -954,6 +1030,8 @@ class MlxLmSubprocessBackend:
         """Read one stream transport line and optionally release the serial boundary early."""
 
         raw_chars: list[str] = []
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detected = False
+        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detected = False
         terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detected = False
         terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detected = False
         terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detected = False
@@ -993,6 +1071,40 @@ class MlxLmSubprocessBackend:
             if terminal_prefix_detected:
                 continue
             buffer = "".join(raw_chars)
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_earlier_boundary_stem(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection = None
+            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detected and (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_boundary_stem(
+                    buffer
+                )
+            ):
+                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detected = True
+                if release_serial_boundary is not None:
+                    release_serial_boundary()
+                    release_serial_boundary = None
+                if (
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection
+                    is not None
+                ):
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection(
+                        buffer
+                    )
+                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection = None
             if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detected and (
                 _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem(
                     buffer
@@ -1618,6 +1730,12 @@ class MlxLmSubprocessBackend:
                             release_serial_boundary=(
                                 release_gate_lock if gate_lock_held else None
                             ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection
+                            ),
+                            before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection=(
+                                self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection
+                            ),
                             before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection=(
                                 self._stream_debug_before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection
                             ),
@@ -1707,6 +1825,18 @@ class MlxLmSubprocessBackend:
                             ),
                         )
                         if not text:
+                            continue
+                        if _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_earlier_boundary_record(
+                            text
+                        ):
+                            if gate_lock_held:
+                                release_gate_lock()
+                            continue
+                        if _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_boundary_record(
+                            text
+                        ):
+                            if gate_lock_held:
+                                release_gate_lock()
                             continue
                         if _is_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_record(
                             text
