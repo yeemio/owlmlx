@@ -49,7 +49,15 @@ _BACKEND_NAME = "mlx-native"
 
 @dataclass(slots=True)
 class _NativeSession:
-    """In-process state for one loaded model on the native path."""
+    """In-process state for one loaded model on the native path.
+
+    ``last_prompt_cache`` records the **most recent single-request** KV cache
+    handle (the result of ``mlx_lm.models.cache.make_prompt_cache(model)``)
+    so that tests and future rounds can observe the binding. owlmlx makes
+    **no** cross-request prefix-cache reuse claim; this attribute is
+    explicitly per-request and is overwritten on every ``generate`` /
+    ``stream_generate`` call.
+    """
 
     model_id: str
     model: Any
@@ -57,6 +65,9 @@ class _NativeSession:
     info: LoadedModelInfo
     lock: threading.Lock = field(default_factory=threading.Lock)
     last_error: str | None = None
+    last_prompt_cache: Any = None
+    last_prompt_cache_id: int | None = None
+    prompt_cache_call_count: int = 0
 
 
 class _TicketedAdmission:
@@ -139,6 +150,37 @@ def _import_mlx_lm() -> tuple[Any, str | None]:
     return mlx_lm, None
 
 
+def _resolve_make_prompt_cache(mlx_lm_module: Any) -> Any | None:
+    """Return ``make_prompt_cache`` reachable through the given mlx_lm module.
+
+    Resolved by attribute walk on the passed-in module
+    (``mlx_lm_module.models.cache.make_prompt_cache``) rather than via a
+    top-level ``import mlx_lm.models.cache`` so that fake-injected
+    ``mlx_lm`` stubs in tests can honestly report "no cache surface" even
+    when the real ``mlx_lm.models.cache`` is cached in ``sys.modules`` from
+    a prior import.
+
+    Returns ``None`` when the upstream cache surface is missing on this
+    particular module reference, or when the resolved attribute is not
+    callable. Callers must treat ``None`` as "skip cache binding silently"
+    — consistent with the scaffold-grade rating in the capability matrix.
+    """
+
+    try:
+        models_attr = getattr(mlx_lm_module, "models", None)
+        if models_attr is None:
+            return None
+        cache_attr = getattr(models_attr, "cache", None)
+        if cache_attr is None:
+            return None
+        candidate = getattr(cache_attr, "make_prompt_cache", None)
+    except Exception:
+        return None
+    if candidate is None or not callable(candidate):
+        return None
+    return candidate
+
+
 class MlxNativeBackend:
     """Experimental in-process MLX backend.
 
@@ -158,6 +200,44 @@ class MlxNativeBackend:
         self._registry_lock = threading.Lock()
         self._last_error: str | None = None
         self._admission = _TicketedAdmission()
+
+    # ------------------------------------------------------------------ #
+    # KV cache binding (single-request only — no cross-request reuse claim)
+    # ------------------------------------------------------------------ #
+    def _make_fresh_prompt_cache(
+        self,
+        mlx_lm_module: Any,
+        session: _NativeSession,
+    ) -> Any | None:
+        """Create a fresh per-request KV cache handle, if upstream supports it.
+
+        Returns the cache object on success and records it on
+        ``session.last_prompt_cache`` for introspection. Returns ``None``
+        when the upstream cache surface is not reachable (fake-injected
+        ``mlx_lm`` stubs in tests, or older mlx-lm versions); callers must
+        treat ``None`` as "skip cache binding silently".
+
+        Each call produces a fresh cache. owlmlx makes **no** cross-request
+        prefix-cache reuse claim; ``last_prompt_cache`` is observable for
+        tests but is overwritten on every call.
+        """
+
+        make_cache = _resolve_make_prompt_cache(mlx_lm_module)
+        if make_cache is None:
+            session.last_prompt_cache = None
+            session.last_prompt_cache_id = None
+            return None
+        try:
+            cache = make_cache(session.model)
+        except Exception as exc:  # pragma: no cover - defensive
+            session.last_error = f"make_prompt_cache failed: {exc}"
+            session.last_prompt_cache = None
+            session.last_prompt_cache_id = None
+            return None
+        session.last_prompt_cache = cache
+        session.last_prompt_cache_id = id(cache)
+        session.prompt_cache_call_count += 1
+        return cache
 
     # ------------------------------------------------------------------ #
     # Lifecycle
@@ -245,6 +325,8 @@ class MlxNativeBackend:
         freed = float(session.info.memory_gb)
         session.model = None
         session.tokenizer = None
+        session.last_prompt_cache = None
+        session.last_prompt_cache_id = None
         return UnloadResult(
             ok=True,
             message="unloaded",
@@ -285,11 +367,19 @@ class MlxNativeBackend:
         try:
             try:
                 with session.lock:
+                    fresh_cache = self._make_fresh_prompt_cache(
+                        mlx_lm, session
+                    )
+                    call_kwargs: dict[str, Any] = {
+                        "prompt": prompt,
+                        "max_tokens": max_tokens,
+                    }
+                    if fresh_cache is not None:
+                        call_kwargs["prompt_cache"] = fresh_cache
                     text = mlx_lm.generate(
                         session.model,
                         session.tokenizer,
-                        prompt=prompt,
-                        max_tokens=max_tokens,
+                        **call_kwargs,
                     )
             except Exception as exc:  # pragma: no cover - defensive
                 session.last_error = str(exc)
@@ -371,11 +461,19 @@ class MlxNativeBackend:
         try:
             try:
                 with session.lock:
+                    fresh_cache = self._make_fresh_prompt_cache(
+                        mlx_lm, session
+                    )
+                    stream_kwargs: dict[str, Any] = {
+                        "prompt": prompt,
+                        "max_tokens": max_tokens,
+                    }
+                    if fresh_cache is not None:
+                        stream_kwargs["prompt_cache"] = fresh_cache
                     for token_payload in mlx_lm.stream_generate(
                         session.model,
                         session.tokenizer,
-                        prompt=prompt,
-                        max_tokens=max_tokens,
+                        **stream_kwargs,
                     ):
                         sequence += 1
                         completion_tokens += 1
@@ -448,6 +546,12 @@ class MlxNativeBackend:
         if not healthy:
             detail["import_error"] = import_error
         detail["admission"] = self._admission.snapshot()
+        if mlx_lm is not None:
+            detail["upstream_make_prompt_cache_reachable"] = (
+                _resolve_make_prompt_cache(mlx_lm) is not None
+            )
+        else:
+            detail["upstream_make_prompt_cache_reachable"] = False
         return BackendStatus(
             backend_name=_BACKEND_NAME,
             healthy=healthy,
@@ -469,6 +573,11 @@ class MlxNativeBackend:
         session = self._sessions.get(model_id)
         if session is None:
             return {"available": False, "reason": "model_not_loaded"}
+        mlx_lm, _ = _import_mlx_lm()
+        upstream_cache_reachable = (
+            mlx_lm is not None
+            and _resolve_make_prompt_cache(mlx_lm) is not None
+        )
         return {
             "available": True,
             "model_handle_present": session.model is not None,
@@ -479,7 +588,14 @@ class MlxNativeBackend:
             },
             "kv_cache_factory": {
                 "symbol": "mlx_lm.models.cache.make_prompt_cache",
-                "status": "not_verified_this_round",
+                "status": (
+                    "bound_per_request_single_request_only"
+                    if upstream_cache_reachable
+                    else "upstream_not_reachable"
+                ),
+                "last_prompt_cache_id": session.last_prompt_cache_id,
+                "prompt_cache_call_count": session.prompt_cache_call_count,
+                "cross_request_reuse_claimed": False,
             },
             "sampler_factory": {
                 "symbol": "mlx_lm.sample_utils.make_sampler",

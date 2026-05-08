@@ -65,6 +65,10 @@ Current honest state:
 - `docs/source-of-truth/system-architecture.md`
 - `docs/source-of-truth/repository-boundaries.md`
 - `docs/source-of-truth/runtime-capability-matrix.md`
+- `docs/source-of-truth/native-mlx-backend-capability-matrix.md`
+- `docs/source-of-truth/native-mlx-backend-input-contract.md`
+- `docs/source-of-truth/native-mlx-backend-local-candidate-admissibility.md`
+- `docs/source-of-truth/native-mlx-backend-conversion-path-ownership.md`
 - `docs/source-of-truth/runtime-contracts.md`
 - `docs/source-of-truth/runtime-status-schema.md`
 - `docs/source-of-truth/runtime-governance.md`
@@ -80,3 +84,19 @@ Current honest state:
 The current job of this repository is to freeze the runtime boundary and
 architecture truth first. Code extraction and package layout come after the
 source-of-truth layer is stable.
+
+## Development Environment
+
+Project Python is **3.11.15** (pinned via `.python-version`); toolchain is
+**uv**. From a fresh clone:
+
+```bash
+uv sync --extra runtime
+uv run pytest
+```
+
+`pytest` will emit a loud `UserWarning` if invoked outside `.venv/` so the
+default shell `python3` (often a different version) cannot be silently
+used. See `docs/source-of-truth/python-environment.md` for full developer
+workflow and `docs/source-of-truth/python-environment-research.md` for
+the rationale behind the pin.

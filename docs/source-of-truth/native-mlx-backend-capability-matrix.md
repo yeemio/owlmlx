@@ -1,7 +1,7 @@
 # owlmlx Native MLX Backend — Capability Matrix
 
 > Status: authoritative
-> Updated: 2026-05-07
+> Updated: 2026-05-08
 > Scope: capability entry points exposed by the experimental
 > `MlxNativeBackend` adapter at `owlmlx/runtime/mlx_native_backend.py`,
 > compared against the existing `MlxLmSubprocessBackend` baseline.
@@ -35,6 +35,39 @@ native row below is still scaffold-grade. A `supported` label would require
 the follow-up smoke round to prove the entry point under an installed
 `runtime` extra.
 
+## 1a. Promotion Gate (Anti-Pollution Contract)
+
+Native rows are promoted from `partial` to `supported` **only on declared-
+provenance real-candidate evidence**. A promotion is rejected, regardless of
+how many tests are green, when any of the following hold:
+
+- the smoke artifact is a sub-2B-parameter "toy" model selected ad-hoc to
+  produce a green check, with no entry in
+  `native-mlx-backend-local-candidate-admissibility.md`
+- the smoke artifact's provenance form is not on the acceptable list in
+  `native-mlx-backend-local-candidate-admissibility.md` §4.1
+- the promoting round's checkpoint does not record the artifact's provenance
+  (HF revision SHA for HF-sourced artifacts; convert command + mlx_lm
+  version for self-converted artifacts)
+- the promoted row's evidence relies on a quantization-variant distinction
+  that does not exist at runtime — for example, claiming a separate
+  promotion for "4bit-DWQ" vs "4bit affine" when
+  `native-mlx-backend-input-contract.md` §6 records that they are
+  indistinguishable at `mlx_lm.load` time
+
+A promotion that meets the gate must:
+
+1. cite the candidate row in
+   `native-mlx-backend-local-candidate-admissibility.md` whose verdict has
+   been advanced to `admissible`
+2. record provenance in the round's coordinator-checkpoint document
+3. update the relevant row's `Notes` column with the load and lifecycle
+   evidence (test file + revision)
+
+Toy-grade smoke runs may still be performed for quick adapter
+sanity-checks, but their output is **not** valid promotion evidence and
+must not appear in §3a of this matrix.
+
 ## 2. Environment Notes
 
 - `mlx_lm` and `mlx` are listed as the optional `runtime` extra in
@@ -58,8 +91,8 @@ the follow-up smoke round to prove the entry point under an installed
 | In-process tokenizer handle                    | `experimental`     | `not_in_scope`     | Native: `_NativeSession.tokenizer` stores the object returned by `mlx_lm.load`. Subprocess: tokenization happens in child process. Real `mlx_lm` smoke is still pending. |
 | Token-level `decode_step` iterator             | `experimental`     | `not_in_scope`     | Native: adapter is wired to `mlx_lm.stream_generate` and fake tests prove token events are forwarded. Subprocess: per-token events arrive as JSON lines, no in-process Python hook. |
 | Per-step finish-reason inspection              | `experimental`     | `partial`          | Native: adapter reads `finish_reason` from each stream payload when present. Subprocess: only terminal `done` payload is visible to parent. |
-| KV cache handle (`make_prompt_cache`)          | `experimental`     | `not_in_scope`     | Native: upstream path is recorded as an entry-point assumption (`mlx_lm.models.cache.make_prompt_cache`), but the adapter does **not** yet import or thread a cache handle through the public surface. No cache-reuse claim. |
-| KV cache reuse across requests                 | `experimental`     | `not_in_scope`     | The handle exists; the *invariant* (correctness when reused across cohort members) has not yet been verified by a harness. Reopening this lawfully requires a follow-up round; see redirected main line in chain-closed checkpoint. |
+| KV cache handle (`make_prompt_cache`)          | `partial`          | `not_in_scope`     | Native: adapter resolves `mlx_lm.models.cache.make_prompt_cache` through the live module attribute walk (`_resolve_make_prompt_cache`), creates a **fresh per-request** cache via `_make_fresh_prompt_cache`, threads it into `mlx_lm.stream_generate` / `mlx_lm.generate` via `prompt_cache=` kwarg, and records `last_prompt_cache` / `last_prompt_cache_id` / `prompt_cache_call_count` on `_NativeSession` for observability. Verified against real `mlx_lm 0.31.2` by `tests/test_mlx_native_backend_real_upstream_binding.py` — including identity check that consecutive calls produce **distinct** cache objects (single-request only, no cross-request reuse). Real-model lifecycle smoke (env-gated) deferred. |
+| KV cache reuse across requests                 | `not_in_scope`     | `not_in_scope`     | Single-request semantics deliberately enforced by the binding: `_make_fresh_prompt_cache` creates a new cache on every call and overwrites `last_prompt_cache`. No cross-request prefix-cache reuse claim. Opening this lawfully requires a follow-up round whose only job is to prove cohort-member correctness. |
 | Sampler injection (`make_sampler`)             | `experimental`     | `not_in_scope`     | Native: upstream path is recorded as an entry-point assumption (`mlx_lm.sample_utils.make_sampler`) and requires real-smoke verification. Subprocess: only request-level params. |
 | Logits hook (per-step logits inspection)       | `partial`          | `not_in_scope`     | Native: likely reachable via a custom sampler that captures logits before sampling, but no first-class `on_logits` callback is owned by owlmlx yet. |
 | Speculative drafter slot                       | `experimental`     | `not_in_scope`     | Native: `mlx_lm` exposes a speculative-decoding path with a draft model parameter; the API is in flux across `0.22.x`. owlmlx makes no speculative claim yet; the entry point is reachable. |
@@ -81,11 +114,19 @@ upstream model runtime:
 |------------------------------------------------|---------------|----------|
 | Scheduler admission hook                       | `partial`     | `tests/test_mlx_native_backend_post_claim_invariants.py` — six tests: serial safety (`test_native_backend_admission_serializes_concurrent_streams`), ticketed FIFO order (`test_native_backend_admission_preserves_ticketed_fifo_order`), uncontested queue-marker correctness (`test_native_backend_uncontested_requests_are_not_marked_queued`), error-path release (`test_native_backend_admission_releases_on_error_path`), generator-close release (`test_native_backend_admission_releases_on_generator_close`), mixed generate/stream serialization (`test_native_backend_generate_is_also_admission_serialized`). Adapter implements `_TicketedAdmission` with monotonic ticket counter + condition variable; plain `threading.Lock` would not pass these tests. |
 | Cooperative token-level cancellation           | `partial`     | `test_native_backend_admission_releases_on_generator_close` — proves generator `finally` releases the admission ticket on early caller close, so subsequent waiters are not deadlocked. |
+| KV cache handle (`make_prompt_cache`)          | `partial`     | **real-installed-mlx_lm upstream binding** — `tests/test_mlx_native_backend_real_upstream_binding.py` four tests: `_resolve_make_prompt_cache` returns the canonical upstream symbol; `make_prompt_cache` accepts a minimal `mlx.nn.Module` and produces an iterable cache; `MlxNativeBackend._make_fresh_prompt_cache` populates `_NativeSession.last_prompt_cache` and consecutive calls produce **distinct** cache objects (single-request semantics locked); `status().detail.upstream_make_prompt_cache_reachable` is truthful. Verified against `mlx_lm 0.31.2` as installed in `.venv`. |
 
-These rows are not `supported` because they have not been driven against
-real `mlx_lm`; the upstream surface still has not been bound. The
-`partial` status reflects: owlmlx owns the adapter-side concurrency
-contract, but the upstream-binding contract is still scaffold-grade.
+The first two rows (admission, cancellation) are not `supported` because
+they were proved with fake-injected `mlx_lm`; the upstream stream-runtime
+binding has not been smoke-tested. The KV cache handle row crosses an
+evidence-kind threshold: it is the first native row whose binding is
+verified against the **real installed upstream library**, not a fake
+stub. It is still `partial` rather than `supported` because real-model
+lifecycle smoke (`load → stream_generate → unload` on an actual model)
+is deferred to env-gated `tests/test_mlx_native_backend_real_smoke.py`
+which is opt-in and not run by default. Promotion to `supported` for any
+of these rows requires the env-gated real-model smoke to have been run
+on a CI lane.
 
 Other rows remain `experimental` / `partial` / `not_in_scope` per the
 Section 3 matrix.
@@ -102,8 +143,10 @@ evidence for the main-line switch recorded in the chain-closed checkpoint:
    upstream emits it** — needed
    for any future scheduler that reasons about token boundaries within a
    request rather than across requests
-3. **KV cache handle entry-point assumption** — needed for prefix cache reuse
-   and continuous batching, but not yet owned by owlmlx
+3. **KV cache handle partial upstream binding** — the real installed
+   `mlx_lm.models.cache.make_prompt_cache` path is now bound and recorded
+   on `_NativeSession` with fresh single-request semantics; prefix cache
+   reuse across requests remains explicitly not in scope
 4. **Sampler injection entry-point assumption** — needed for any
    structured-output or grammar integration that owlmlx might land
 5. **Speculative drafter slot** — entry point for MTP / draft-model rounds

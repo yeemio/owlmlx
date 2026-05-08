@@ -143,7 +143,10 @@ def test_native_backend_load_succeeds_with_fake_mlx_lm(
         cap = backend.capability_entry_points("fake-model")
         assert cap["available"] is True
         assert cap["model_handle_present"] is True
-        assert cap["kv_cache_factory"]["status"] == "not_verified_this_round"
+        assert cap["kv_cache_factory"]["status"] == "upstream_not_reachable"
+        assert cap["kv_cache_factory"]["cross_request_reuse_claimed"] is False
+        assert cap["kv_cache_factory"]["last_prompt_cache_id"] is None
+        assert cap["kv_cache_factory"]["prompt_cache_call_count"] == 0
         assert cap["sampler_factory"]["status"] == "not_verified_this_round"
         unloaded = backend.unload("fake-model")
         assert unloaded.ok is True
