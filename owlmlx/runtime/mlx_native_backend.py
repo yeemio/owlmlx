@@ -59,6 +59,71 @@ class _NativeSession:
     last_error: str | None = None
 
 
+class _TicketedAdmission:
+    """Adapter-local ticketed FIFO admission.
+
+    Preserves post-claim invariants on the native path:
+    - ``max_concurrent = 1`` after admission: at most one generate / stream
+      critical section is active at any moment
+    - ticketed FIFO: requests are served strictly in arrival order; later
+      arrivals cannot overtake earlier waiters even if scheduling is
+      otherwise fair
+
+    This is **adapter-local** — it preserves the contract owlmlx already
+    proves on the subprocess backend without claiming any new capability
+    (no batching, no parity, no interleaving).
+    """
+
+    __slots__ = (
+        "_cond",
+        "_next_ticket",
+        "_serving",
+        "_in_critical_section",
+        "_max_observed_concurrency",
+    )
+
+    def __init__(self) -> None:
+        self._cond = threading.Condition(threading.Lock())
+        self._next_ticket = 0
+        self._serving = 0
+        self._in_critical_section = 0
+        self._max_observed_concurrency = 0
+
+    def acquire(self) -> tuple[int, bool]:
+        """Block until it is this caller's turn.
+
+        Returns ``(ticket, was_queued)``. ``was_queued`` is true only when
+        this caller had to wait behind an active or earlier-admitted request;
+        monotonic ticket values alone do not imply queueing.
+        """
+
+        with self._cond:
+            ticket = self._next_ticket
+            self._next_ticket += 1
+            was_queued = self._in_critical_section > 0 or self._serving != ticket
+            while self._serving != ticket:
+                self._cond.wait()
+            self._in_critical_section += 1
+            if self._in_critical_section > self._max_observed_concurrency:
+                self._max_observed_concurrency = self._in_critical_section
+            return ticket, was_queued
+
+    def release(self) -> None:
+        with self._cond:
+            self._in_critical_section -= 1
+            self._serving += 1
+            self._cond.notify_all()
+
+    def snapshot(self) -> dict[str, int]:
+        with self._cond:
+            return {
+                "next_ticket": self._next_ticket,
+                "serving": self._serving,
+                "in_critical_section": self._in_critical_section,
+                "max_observed_concurrency": self._max_observed_concurrency,
+            }
+
+
 def _import_mlx_lm() -> tuple[Any, str | None]:
     """Return (mlx_lm_module, error). Defers import so missing extra fails gracefully."""
 
@@ -92,6 +157,7 @@ class MlxNativeBackend:
         self._sessions: dict[str, _NativeSession] = {}
         self._registry_lock = threading.Lock()
         self._last_error: str | None = None
+        self._admission = _TicketedAdmission()
 
     # ------------------------------------------------------------------ #
     # Lifecycle
@@ -213,28 +279,36 @@ class MlxNativeBackend:
             )
         max_tokens = int(kwargs.get("max_tokens") or 64)  # type: ignore[arg-type]
         started = time.time()
+        wait_started = started
+        _ticket, was_queued = self._admission.acquire()
+        wait_time_s = time.time() - wait_started
         try:
-            with session.lock:
-                text = mlx_lm.generate(
-                    session.model,
-                    session.tokenizer,
-                    prompt=prompt,
-                    max_tokens=max_tokens,
+            try:
+                with session.lock:
+                    text = mlx_lm.generate(
+                        session.model,
+                        session.tokenizer,
+                        prompt=prompt,
+                        max_tokens=max_tokens,
+                    )
+            except Exception as exc:  # pragma: no cover - defensive
+                session.last_error = str(exc)
+                return GenerateResult(
+                    ok=False,
+                    message=f"native generate failed: {exc}",
+                    error_code=RuntimeErrorCode.backend_error,
+                    model_id=model_id,
                 )
-        except Exception as exc:  # pragma: no cover - defensive
-            session.last_error = str(exc)
-            return GenerateResult(
-                ok=False,
-                message=f"native generate failed: {exc}",
-                error_code=RuntimeErrorCode.backend_error,
-                model_id=model_id,
-            )
+        finally:
+            self._admission.release()
         return GenerateResult(
             ok=True,
             message="generated",
             model_id=model_id,
             text=str(text),
             execution_time_s=time.time() - started,
+            wait_time_s=wait_time_s,
+            was_queued=was_queued,
         )
 
     def generate_messages(
@@ -291,48 +365,58 @@ class MlxNativeBackend:
         sequence = 0
         completion_tokens = 0
         finish_reason: str | None = None
+        wait_started = time.time()
+        _ticket, was_queued = self._admission.acquire()
+        wait_time_s = time.time() - wait_started
         try:
-            with session.lock:
-                for token_payload in mlx_lm.stream_generate(
-                    session.model,
-                    session.tokenizer,
-                    prompt=prompt,
-                    max_tokens=max_tokens,
-                ):
-                    sequence += 1
-                    completion_tokens += 1
-                    text = (
-                        token_payload.text
-                        if hasattr(token_payload, "text")
-                        else str(token_payload)
-                    )
-                    finish_reason = getattr(token_payload, "finish_reason", None)
-                    yield StreamEvent(
-                        event="token",
-                        model_id=model_id,
-                        text=text,
-                        sequence=sequence,
-                        completion_tokens=completion_tokens,
-                        finish_reason=finish_reason,
-                    )
-                    if finish_reason is not None:
-                        break
-        except Exception as exc:  # pragma: no cover - defensive
-            session.last_error = str(exc)
+            try:
+                with session.lock:
+                    for token_payload in mlx_lm.stream_generate(
+                        session.model,
+                        session.tokenizer,
+                        prompt=prompt,
+                        max_tokens=max_tokens,
+                    ):
+                        sequence += 1
+                        completion_tokens += 1
+                        text = (
+                            token_payload.text
+                            if hasattr(token_payload, "text")
+                            else str(token_payload)
+                        )
+                        finish_reason = getattr(token_payload, "finish_reason", None)
+                        yield StreamEvent(
+                            event="token",
+                            model_id=model_id,
+                            text=text,
+                            sequence=sequence,
+                            completion_tokens=completion_tokens,
+                            finish_reason=finish_reason,
+                            wait_time_s=wait_time_s,
+                            was_queued=was_queued,
+                        )
+                        if finish_reason is not None:
+                            break
+            except Exception as exc:  # pragma: no cover - defensive
+                session.last_error = str(exc)
+                yield StreamEvent(
+                    event="error",
+                    model_id=model_id,
+                    error_code=RuntimeErrorCode.backend_error,
+                    detail={"message": f"native stream_generate failed: {exc}"},
+                )
+                return
             yield StreamEvent(
-                event="error",
+                event="done",
                 model_id=model_id,
-                error_code=RuntimeErrorCode.backend_error,
-                detail={"message": f"native stream_generate failed: {exc}"},
+                sequence=sequence,
+                completion_tokens=completion_tokens,
+                finish_reason=finish_reason or "stop",
+                wait_time_s=wait_time_s,
+                was_queued=was_queued,
             )
-            return
-        yield StreamEvent(
-            event="done",
-            model_id=model_id,
-            sequence=sequence,
-            completion_tokens=completion_tokens,
-            finish_reason=finish_reason or "stop",
-        )
+        finally:
+            self._admission.release()
 
     def stream_generate_messages(
         self,
@@ -363,6 +447,7 @@ class MlxNativeBackend:
         }
         if not healthy:
             detail["import_error"] = import_error
+        detail["admission"] = self._admission.snapshot()
         return BackendStatus(
             backend_name=_BACKEND_NAME,
             healthy=healthy,

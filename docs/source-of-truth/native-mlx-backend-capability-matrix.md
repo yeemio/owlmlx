@@ -63,12 +63,32 @@ the follow-up smoke round to prove the entry point under an installed
 | Sampler injection (`make_sampler`)             | `experimental`     | `not_in_scope`     | Native: upstream path is recorded as an entry-point assumption (`mlx_lm.sample_utils.make_sampler`) and requires real-smoke verification. Subprocess: only request-level params. |
 | Logits hook (per-step logits inspection)       | `partial`          | `not_in_scope`     | Native: likely reachable via a custom sampler that captures logits before sampling, but no first-class `on_logits` callback is owned by owlmlx yet. |
 | Speculative drafter slot                       | `experimental`     | `not_in_scope`     | Native: `mlx_lm` exposes a speculative-decoding path with a draft model parameter; the API is in flux across `0.22.x`. owlmlx makes no speculative claim yet; the entry point is reachable. |
-| Scheduler admission hook                       | `not_in_scope`     | `partial`          | Neither upstream provides a multi-request scheduler. Subprocess backend has owlmlx-side ticketed FIFO + serial gate (the post-claim invariants); native has *no* scheduler yet — a future round must build it on top. The "subprocess `partial`" column reflects the owlmlx-built admission, not anything from upstream. |
+| Scheduler admission hook                       | `partial`          | `partial`          | Neither upstream provides a multi-request scheduler. Both backends now have owlmlx-side ticketed FIFO + serial gate proved against the post-claim invariants. Native: `_TicketedAdmission` on `MlxNativeBackend` proved by `tests/test_mlx_native_backend_post_claim_invariants.py` (max_concurrent=1, FIFO order, queue marker correctness, ticket released on error and on generator close, mixed generate/stream serialized). Subprocess: owlmlx-side admission proved by phase45 sentinel chain. Both columns are `partial` because no upstream multi-request scheduler exists; owlmlx owns admission on both paths. |
 | In-process model residency / pinning           | `experimental`     | `partial`          | Native: model lives in adapter's process once loaded; pinning can be represented by retaining the session entry. Subprocess: model lives in child process; pinning works but residency is one-process-removed. |
-| Cooperative token-level cancellation           | `partial`          | `partial`          | Native: dropping the `stream_generate` iterator should stop at generator close / next yield, but this has not been proved against real `mlx_lm`. Subprocess: cancellation arrives at the next `stream_done` boundary measured by phase45 sentinel chain. |
+| Cooperative token-level cancellation           | `partial`          | `partial`          | Native: dropping the `stream_generate` iterator releases the admission ticket via the generator's `finally` clause, proved by `test_native_backend_admission_releases_on_generator_close`; behavior under real `mlx_lm` token-stream cancellation has not been proved yet. Subprocess: cancellation arrives at the next `stream_done` boundary measured by phase45 sentinel chain. |
 | Structured output / grammar enforcement        | `not_in_scope`     | `not_in_scope`     | Upstream `mlx_lm` does not ship a first-class grammar enforcer in 0.22; integrations with Outlines / lm-format-enforcer are community-side. Reaching this in either backend requires explicit external dependency choice. |
 | Prefill / decode separation                    | `partial`          | `not_in_scope`     | Native: prefill happens implicitly inside `stream_generate`'s first yield; no separate `prefill()` call in the public surface. A future round can split it by walking the model's KV cache manually. Subprocess: not visible. |
 | Multi-stream true interleaving                 | `not_in_scope`     | `not_in_scope`     | Both backends preserve post-claim `max_concurrent = 1` + ticketed FIFO + serial safety. Lawful reopening of this invariant is the explicit subject of the redirected main line, not this matrix. |
+
+## 3a. Verified Rows in This Round
+
+Rows whose **native adapter-side** behavior is now backed by focused test
+evidence inside this scaffold round. These tests use fake `mlx_lm` because
+the behavior under test is owlmlx's admission/cancellation contract, not the
+upstream model runtime:
+
+| Capability entry point                         | Native column | Evidence |
+|------------------------------------------------|---------------|----------|
+| Scheduler admission hook                       | `partial`     | `tests/test_mlx_native_backend_post_claim_invariants.py` — six tests: serial safety (`test_native_backend_admission_serializes_concurrent_streams`), ticketed FIFO order (`test_native_backend_admission_preserves_ticketed_fifo_order`), uncontested queue-marker correctness (`test_native_backend_uncontested_requests_are_not_marked_queued`), error-path release (`test_native_backend_admission_releases_on_error_path`), generator-close release (`test_native_backend_admission_releases_on_generator_close`), mixed generate/stream serialization (`test_native_backend_generate_is_also_admission_serialized`). Adapter implements `_TicketedAdmission` with monotonic ticket counter + condition variable; plain `threading.Lock` would not pass these tests. |
+| Cooperative token-level cancellation           | `partial`     | `test_native_backend_admission_releases_on_generator_close` — proves generator `finally` releases the admission ticket on early caller close, so subsequent waiters are not deadlocked. |
+
+These rows are not `supported` because they have not been driven against
+real `mlx_lm`; the upstream surface still has not been bound. The
+`partial` status reflects: owlmlx owns the adapter-side concurrency
+contract, but the upstream-binding contract is still scaffold-grade.
+
+Other rows remain `experimental` / `partial` / `not_in_scope` per the
+Section 3 matrix.
 
 ## 4. Native-Only Delta (Reasons The Main Line Switched)
 
@@ -98,12 +118,13 @@ evidence for the main-line switch recorded in the chain-closed checkpoint:
   speculative decoding, structured output, or multi-stream interleaving.
 - It does not claim the native adapter is production-ready or wired into
   any serving path.
-- It does not claim parity with the subprocess adapter on the post-claim
-  serial invariants on a live multi-request workload — the native adapter
-  has not been driven through the existing harnesses, and that is
-  deliberately scope for a later round.
-- It does not claim any capability listed above is yet **owned** by owlmlx;
-  it only records the scaffold-grade entry-point shape.
+- It does not claim parity with the subprocess adapter on a live
+  `mlx_lm`-backed multi-request workload — native adapter-side admission is
+  now proved with fake `mlx_lm`, while real upstream binding remains scope
+  for a later round.
+- It does not claim any upstream capability listed above is yet **owned** by
+  owlmlx; only the adapter-side ticketed admission contract is owned, and it
+  remains `partial` until real `mlx_lm` smoke extends the proof.
 
 ## 6. Feasibility Verdict
 
@@ -115,8 +136,8 @@ the optional `runtime` extra is missing.
 
 Lifecycle smoke testing under a real `mlx_lm` install is deferred to a
 follow-up round whose only job is to wire one minimal `mlx_lm`-backed
-session through the adapter and re-run the existing post-claim invariant
-harnesses against the native path.
+session through the adapter and extend the native post-claim invariant proof
+to a real upstream-bound session.
 
 ## 7. Recommended Next Round
 
@@ -127,7 +148,7 @@ harnesses against the native path.
   unload`
 - expose the KV cache handle as a first-class attribute on `_NativeSession`
   without yet claiming reuse
-- re-run the existing post-claim serial-safety invariant harnesses against
-  the native path
+- extend the native post-claim serial-safety invariant tests to a real
+  `mlx_lm`-backed session where practical
 - explicitly forbid claiming continuous batching, prefix cache reuse, or
   speculative decoding in that round
