@@ -31,7 +31,7 @@ No model was loaded; no `mlx_lm.load()` call was executed.
 
 | Path | Format | `model_type` | Arch module present | Quant | safetensors layout | Admissibility |
 |---|---|---|---|---|---|---|
-| `/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B` | HF release (Transformers/vLLM/SGLang/KTransformers compatible) | `qwen3_5_moe` (top) + `qwen3_5_moe_text` / `qwen3_5_moe` nested | `mlx_lm/models/qwen3_5_moe.py` ✓ | none (bf16) | `model-NNNNN-of-00026.safetensors` + `model.safetensors.index.json` ✓ | **likely-admissible-pending-load** |
+| `/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B` | HF release (Transformers/vLLM/SGLang/KTransformers compatible) | `qwen3_5_moe` (top) + `qwen3_5_moe_text` / `qwen3_5_moe` nested | `mlx_lm/models/qwen3_5_moe.py` ✓ | none (bf16) | `model-NNNNN-of-00026.safetensors` + `model.safetensors.index.json` ✓ | **admissible** (B-1, 2026-05-08) |
 | `/Users/yeemio/AI/Agent/models/Qwen3.6-27B` | HF release | `qwen3_5` (top, dense) + `text_config` nested | `mlx_lm/models/qwen3_5.py` ✓ | none (bf16) | sharded safetensors ✓ | **likely-admissible-pending-load** |
 | `/Users/yeemio/AI/Agent/models/gemma-4-31B-it` | HF release | `gemma4` (top) + `gemma4_text` / `gemma4_vision` nested | `mlx_lm/models/gemma4.py` ✓ + `gemma4_text.py` ✓ | none (bf16) | `model-NNNNN-of-00002.safetensors` + index ✓ | **likely-admissible-pending-load** |
 
@@ -54,17 +54,29 @@ No model was loaded; no `mlx_lm.load()` call was executed.
 - maps to `qwen3_5_moe` arch which has the `text_config` tolerance and
   `vision_tower` / `model.visual` sanitization (input contract §5)
 - bf16, no `quantization` block — loads as bf16
-- residual unknown (medium confidence): whether the original HF release's
-  weight tensor naming exactly matches what `Model.sanitize` expects.
-  Specifically `experts.gate_up_proj` repack (`qwen3_5_moe.py:36-50`)
-  was designed against mlx-vlm-converted layouts; the upstream HF release
-  may use a different naming the sanitize step does not normalize.
-  **This is the load-time risk that distinguishes "likely-admissible"
-  from "admissible".**
-- upgrade path if load fails: `mlx-community/Qwen3.6-35B-A3B-bf16` (or
-  any quantized variant) is published and is the preferred fallback
-  candidate because it is already MLX-formatted; actual admission still
-  requires a load attempt (see provenance §4.1)
+- residual unknown (medium confidence) about `Model.sanitize` matching
+  the upstream HF tensor naming was the load-time risk distinguishing
+  `likely-admissible` from `admissible`. **B-1 (2026-05-08) resolved
+  this by executing one `mlx_lm.load()` call against this directory:**
+  - `mlx_lm.load()` returned without exception in **14.05 s**
+  - returned `model_module = mlx_lm.models.qwen3_5_moe.Model`,
+    `tokenizer = mlx_lm.tokenizer_utils.TokenizerWrapper`
+  - one minimal `stream_generate(prompt="hello", max_tokens=8)` returned
+    8 chunks in 7.93 s; first observed token was the comma `,`
+    (token id 11); decode peak memory **69.4 GB**
+  - `experts.gate_up_proj` repack inside `Model.sanitize`
+    (`qwen3_5_moe.py:36-50`) operated cleanly on the upstream HF release's
+    tensor layout — no mismatch surfaced
+- **Provenance (per §4.1, "Local HF mirror" first-class form):**
+  - upstream repo: `Qwen/Qwen3.6-35B-A3B` (HF), license-linked from
+    the local `README.md`
+  - upstream commit SHA: `53c43178507d69762986fbfa314f6e8d4d859409`
+    (cited from `.cache/huggingface/download/*.metadata` first line,
+    consistent across multiple sampled files)
+  - mirror download date: 2026-04-23
+  - mlx_lm version under which admission was verified: 0.31.2
+- upgrade path if a future mlx_lm version regresses sanitize behavior:
+  `mlx-community/Qwen3.6-35B-A3B-bf16` (or quantized variants)
 
 **Qwen3.6-27B** (~52 GB on disk):
 
