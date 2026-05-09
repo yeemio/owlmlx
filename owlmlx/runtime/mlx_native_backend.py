@@ -25,13 +25,19 @@ both backends can be swapped behind the same runtime kernel contract.
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
-from owlmlx.cache_manager import CacheManager
+from owlmlx.cache_manager import CacheManager, CachedRequestHandle
+from owlmlx.memory_actuator import (
+    AllocatorFloorConfig,
+    MemoryActuator,
+    ReclaimReceipt,
+)
 
 from .types import (
     BackendStatus,
@@ -70,6 +76,11 @@ class _NativeSession:
     last_prompt_cache: Any = None
     last_prompt_cache_id: int | None = None
     prompt_cache_call_count: int = 0
+    # C-1.2 release wiring: the active cache_manager handle for the
+    # in-flight request. Set by ``_make_fresh_prompt_cache``, cleared by
+    # ``_release_active_cache`` on generate/stream completion or unload.
+    # ``None`` means no active acquire is pending release.
+    active_cache_handle: CachedRequestHandle | None = None
 
 
 class _TicketedAdmission:
@@ -208,6 +219,23 @@ class MlxNativeBackend:
         # backward-compatible mirror so existing callers that read them
         # continue to work; the manager's counters are the canonical ledger.
         self._cache_manager = CacheManager()
+        # C-3.1 wiring: the memory_actuator is the only sanctioned call site
+        # for ``mlx_module.clear_cache()`` in owlmlx. ``unload`` constructs
+        # a fresh actuator per call (with the lazily-imported mlx.core, or
+        # ``None`` when the optional ``runtime`` extra is missing — in which
+        # case the actuator returns a shaped no-op receipt). The most
+        # recent receipt is observable on ``_last_unload_receipt`` so tests
+        # and future telemetry can verify the actuator was invoked.
+        self._last_unload_receipt: ReclaimReceipt | None = None
+        # C-3.3 wiring: allocator floor configuration is operator-opt-in via
+        # env vars OWLMLX_NATIVE_CACHE_LIMIT_BYTES + OWLMLX_NATIVE_WIRED_LIMIT_BYTES.
+        # Configured exactly once on the first successful load (idempotent
+        # via the flag below). When neither env var is set, configuration
+        # is skipped entirely — preserving the prior unbounded-cache-pool
+        # behavior for operators who have not opted in. The most recent
+        # config (or ``None``) is observable on ``_last_allocator_floor_config``.
+        self._allocator_floor_configured = False
+        self._last_allocator_floor_config: AllocatorFloorConfig | None = None
 
     # ------------------------------------------------------------------ #
     # KV cache binding (single-request only — no cross-request reuse claim)
@@ -253,6 +281,7 @@ class MlxNativeBackend:
             session.last_error = f"make_prompt_cache failed: {exc}"
             session.last_prompt_cache = None
             session.last_prompt_cache_id = None
+            session.active_cache_handle = None
             return None
         session.last_prompt_cache = cache
         session.last_prompt_cache_id = id(cache)
@@ -260,8 +289,29 @@ class MlxNativeBackend:
         # The handle's monotonic ``cache_object_id`` is owned by the manager;
         # the session's ``last_prompt_cache_id`` continues to use ``id(cache)``
         # for backward compat with tests written before the manager existed.
-        del handle
+        # The handle reference is retained on the session so
+        # ``_release_active_cache`` can hand it back to the manager when the
+        # request lifecycle completes (generate return, stream finally,
+        # unload).
+        session.active_cache_handle = handle
         return cache
+
+    def _release_active_cache(self, session: _NativeSession) -> None:
+        """Hand the active cache handle back to the manager. Idempotent.
+
+        Called from generate's outer finally, stream_generate's outer
+        finally (which fires on terminal yield, on exception, AND on
+        early generator close per Python semantics), and from unload
+        before the session is dropped.
+        """
+
+        handle = session.active_cache_handle
+        if handle is None:
+            return
+        try:
+            self._cache_manager.release_for_request(handle)
+        finally:
+            session.active_cache_handle = None
 
     # ------------------------------------------------------------------ #
     # Lifecycle
@@ -333,6 +383,10 @@ class MlxNativeBackend:
                 tokenizer=tokenizer,
                 info=info,
             )
+        # C-3.3: configure the allocator floor on the first successful load
+        # (idempotent — subsequent loads see the flag already set). Reads
+        # operator-supplied env vars; skips silently if neither is set.
+        self._maybe_configure_allocator_floor()
         return LoadResult(ok=True, message="loaded", model=info)
 
     def unload(self, model_id: str) -> UnloadResult:
@@ -346,17 +400,128 @@ class MlxNativeBackend:
                 model_id=model_id,
             )
         # Drop strong references; let MLX/Python free in-process state.
+        # C-1.2: hand any active cache handle back to the manager BEFORE
+        # the session is dropped — otherwise the manager's per-model
+        # registry would carry orphaned handles for an unloaded model.
+        self._release_active_cache(session)
         freed = float(session.info.memory_gb)
         session.model = None
         session.tokenizer = None
         session.last_prompt_cache = None
         session.last_prompt_cache_id = None
+        # C-3.1: invoke the memory_actuator to actually return GPU/unified
+        # memory pages back to the OS. This is the first owlmlx code path
+        # to call ``mx.clear_cache()`` on the production unload path. When
+        # mlx.core is not importable (no optional ``runtime`` extra), the
+        # actuator returns a shaped no-op receipt and the existing
+        # "drop refs and hope" behavior is preserved exactly.
+        mlx_core_module = self._try_import_mlx_core()
+        actuator = MemoryActuator(mlx_module=mlx_core_module)
+        self._last_unload_receipt = actuator.release_single_model(
+            model_id=model_id,
+            declared_freed_gb=freed,
+        )
+        # C-3.2: surface measured allocator deltas onto UnloadResult when
+        # the actuator had a real mlx_module (no-op receipt → both deltas
+        # remain None). The declared ``freed_gb`` is unchanged.
+        active_freed = self._compute_freed_bytes(
+            self._last_unload_receipt.active_memory_before_bytes,
+            self._last_unload_receipt.active_memory_after_bytes,
+        )
+        cache_freed = self._compute_freed_bytes(
+            self._last_unload_receipt.cache_memory_before_bytes,
+            self._last_unload_receipt.cache_memory_after_bytes,
+        )
         return UnloadResult(
             ok=True,
             message="unloaded",
             model_id=model_id,
             freed_gb=freed,
+            active_memory_freed_bytes=active_freed,
+            cache_memory_freed_bytes=cache_freed,
         )
+
+    @staticmethod
+    def _compute_freed_bytes(
+        before: int | None,
+        after: int | None,
+    ) -> int | None:
+        """Compute ``before - after`` byte delta, or ``None`` if either
+        reading is missing (no-mlx no-op receipt). Negative deltas are
+        clamped to ``0`` because allocator growth during the measurement
+        window is not a release; reporting it as negative would mislead
+        callers that sum across unloads.
+        """
+
+        if before is None or after is None:
+            return None
+        return max(0, before - after)
+
+    def _maybe_configure_allocator_floor(self) -> None:
+        """Operator-opt-in allocator floor configuration. Idempotent.
+
+        Reads ``OWLMLX_NATIVE_CACHE_LIMIT_BYTES`` and
+        ``OWLMLX_NATIVE_WIRED_LIMIT_BYTES`` from the environment. When
+        both are unset, returns silently — the prior unbounded-cache-pool
+        behavior is preserved for operators who have not opted in.
+        Otherwise, lazily imports ``mlx.core``, constructs a fresh
+        actuator, and calls ``configure_allocator_floor`` once. The
+        idempotent flag prevents repeat configuration across multiple
+        loads on the same backend instance.
+        """
+
+        if self._allocator_floor_configured:
+            return
+        # Set the flag BEFORE doing work so concurrent loads do not
+        # double-configure (the registry lock serializes load() entry but
+        # this is belt-and-suspenders for any future reentrancy).
+        self._allocator_floor_configured = True
+
+        cache_limit = self._read_env_int("OWLMLX_NATIVE_CACHE_LIMIT_BYTES")
+        wired_limit = self._read_env_int("OWLMLX_NATIVE_WIRED_LIMIT_BYTES")
+        if cache_limit is None and wired_limit is None:
+            return  # operator opted out — no actuator call
+
+        mlx_core_module = self._try_import_mlx_core()
+        actuator = MemoryActuator(mlx_module=mlx_core_module)
+        self._last_allocator_floor_config = actuator.configure_allocator_floor(
+            cache_limit_bytes=cache_limit,
+            wired_limit_bytes=wired_limit,
+        )
+
+    @staticmethod
+    def _read_env_int(env_var: str) -> int | None:
+        """Read an env var as int; return ``None`` for unset or unparseable.
+
+        Silently swallowing parse errors here is intentional — operator
+        misconfiguration of an opt-in tuning knob should not block a
+        model load. The fallthrough to ``None`` skips the configure
+        call entirely if it's the only signal.
+        """
+
+        raw = os.environ.get(env_var)
+        if raw is None or raw == "":
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _try_import_mlx_core() -> object | None:
+        """Lazily import ``mlx.core`` for the memory actuator.
+
+        Returns the module on success, ``None`` when the optional
+        ``runtime`` extra is not installed. The actuator's no-op branch
+        (``mlx_module=None``) preserves the prior unload semantics
+        exactly when mlx is unavailable.
+        """
+
+        try:
+            import mlx.core as mx_core
+        except ImportError:
+            return None
+        return mx_core
 
     # ------------------------------------------------------------------ #
     # Generation
@@ -414,6 +579,10 @@ class MlxNativeBackend:
                     model_id=model_id,
                 )
         finally:
+            # C-1.2: release the active cache handle before releasing the
+            # admission ticket so the manager observes the request as fully
+            # closed before the next acquire fires under the gate.
+            self._release_active_cache(session)
             self._admission.release()
         return GenerateResult(
             ok=True,
@@ -538,6 +707,11 @@ class MlxNativeBackend:
                 was_queued=was_queued,
             )
         finally:
+            # C-1.2: release the active cache handle on terminal yield, on
+            # exception path, AND on early generator close (Python guarantees
+            # the generator's ``finally`` runs in all three cases). Pair
+            # with admission release so the gate remains the outermost lock.
+            self._release_active_cache(session)
             self._admission.release()
 
     def stream_generate_messages(

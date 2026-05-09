@@ -125,6 +125,15 @@ class UnloadResult(RuntimeOperationResult):
 
     model_id: str | None = None
     freed_gb: float = 0.0
+    # C-3.2 measured-release fields populated by the native backend's
+    # ``unload`` when ``mlx.core`` is importable and the memory_actuator
+    # invokes ``mx.clear_cache``. ``freed_gb`` remains the **declared**
+    # footprint (``session.info.memory_gb``); these two fields carry the
+    # **measured** allocator deltas. Both ``None`` means the measurement
+    # was not available (no ``runtime`` extra installed, subprocess
+    # backend, or any backend whose unload does not invoke the actuator).
+    active_memory_freed_bytes: int | None = None
+    cache_memory_freed_bytes: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
