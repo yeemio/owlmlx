@@ -64,6 +64,13 @@ def create_technical_preview_app():
       evidence JSONL ledger for the read-only evidence routes.
     - ``OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH``: optional Model RC JSONL
       ledger for the read-only Model RC routes.
+    - ``OWLMLX_RUNTIME_TEST_RUN_LEDGER_PATH``: optional Runtime Monitor
+      test-run audit JSONL ledger.
+    - ``OWLMLX_RUNTIME_MONITOR_TREND_LEDGER_PATH``: optional Runtime Monitor
+      rolling trend JSONL ledger.
+    - ``OWLMLX_RUNTIME_MONITOR_SAMPLE_INTERVAL_S``: optional background
+      monitor sample interval; set to a positive value with the trend ledger.
+    - ``OWLMLX_RUNTIME_URL``: public URL recorded by background monitor samples.
     - ``OWLMLX_BACKEND_TIMEOUT_S``: child request timeout in seconds.
     - ``OWLMLX_BACKEND_RUNNER_MODULE``: child runner module override.
     - ``OWLMLX_FORCE_CPU``: when ``1``, propagated to child processes.
@@ -99,4 +106,14 @@ def create_technical_preview_app():
         model_release_candidate_ledger_path=os.environ.get(
             "OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH"
         ),
+        runtime_test_run_ledger_path=os.environ.get(
+            "OWLMLX_RUNTIME_TEST_RUN_LEDGER_PATH"
+        ),
+        runtime_monitor_trend_ledger_path=os.environ.get(
+            "OWLMLX_RUNTIME_MONITOR_TREND_LEDGER_PATH"
+        ),
+        runtime_monitor_sample_interval_s=float(
+            os.environ.get("OWLMLX_RUNTIME_MONITOR_SAMPLE_INTERVAL_S", "0") or "0"
+        ),
+        runtime_monitor_url=os.environ.get("OWLMLX_RUNTIME_URL", "http://127.0.0.1:8066"),
     )

@@ -42,6 +42,22 @@ def main() -> int:
         help="Optional JSONL ledger path for Model RC HTTP routes.",
     )
     parser.add_argument(
+        "--runtime-test-run-ledger-path",
+        default=os.environ.get("OWLMLX_RUNTIME_TEST_RUN_LEDGER_PATH", ""),
+        help="Optional JSONL ledger path for Runtime Monitor test-run audit routes.",
+    )
+    parser.add_argument(
+        "--runtime-monitor-trend-ledger-path",
+        default=os.environ.get("OWLMLX_RUNTIME_MONITOR_TREND_LEDGER_PATH", ""),
+        help="Optional rolling JSONL ledger path for Runtime Monitor trend history.",
+    )
+    parser.add_argument(
+        "--runtime-monitor-sample-interval-s",
+        type=float,
+        default=float(os.environ.get("OWLMLX_RUNTIME_MONITOR_SAMPLE_INTERVAL_S", "0")),
+        help="Background Runtime Monitor sampling interval in seconds; 0 disables it.",
+    )
+    parser.add_argument(
         "--backend-timeout-s",
         type=float,
         default=float(os.environ.get("OWLMLX_BACKEND_TIMEOUT_S", "600")),
@@ -66,6 +82,19 @@ def main() -> int:
         os.environ["OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH"] = str(
             Path(args.model_release_candidate_ledger_path).expanduser()
         )
+    if args.runtime_test_run_ledger_path:
+        os.environ["OWLMLX_RUNTIME_TEST_RUN_LEDGER_PATH"] = str(
+            Path(args.runtime_test_run_ledger_path).expanduser()
+        )
+    if args.runtime_monitor_trend_ledger_path:
+        os.environ["OWLMLX_RUNTIME_MONITOR_TREND_LEDGER_PATH"] = str(
+            Path(args.runtime_monitor_trend_ledger_path).expanduser()
+        )
+    if args.runtime_monitor_sample_interval_s > 0:
+        os.environ["OWLMLX_RUNTIME_MONITOR_SAMPLE_INTERVAL_S"] = str(
+            args.runtime_monitor_sample_interval_s
+        )
+    os.environ["OWLMLX_RUNTIME_URL"] = f"http://{args.host}:{args.port}"
     if args.force_cpu:
         os.environ["OWLMLX_FORCE_CPU"] = "1"
 
