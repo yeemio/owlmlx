@@ -144,8 +144,15 @@ class CacheManager:
         model_id: str,
         mlx_lm_module: Any,
         model: Any,
-    ) -> CachedRequestHandle:
+    ) -> tuple[CachedRequestHandle, Any]:
         """Produce a fresh per-request KV cache via upstream ``make_prompt_cache``.
+
+        Returns a ``(handle, cache_object)`` tuple. The caller owns the
+        ``cache_object`` strong reference (single-request semantics: the
+        manager intentionally does NOT retain the cache object beyond this
+        call so that GC reclaims it after the caller releases its ref).
+        ``handle.cache_object_id`` is a per-manager monotonic counter
+        independent of Python's ``id(cache_object)``.
 
         Resolves ``mlx_lm_module.models.cache.make_prompt_cache`` through a
         defensive attribute walk (matching the pattern in
@@ -163,12 +170,6 @@ class CacheManager:
 
         make_cache = self._resolve_make_prompt_cache(mlx_lm_module)
         cache_object = make_cache(model)
-        # Bind the cache object to the handle by reading its identity into a
-        # monotonic counter rather than ``id(cache_object)``. The manager
-        # does not retain ``cache_object`` (single-request semantics), so
-        # ``id()`` would be unstable across acquires once GC reclaims the
-        # underlying memory.
-        del cache_object
 
         with self._lock:
             self._next_cache_object_id += 1
@@ -189,7 +190,7 @@ class CacheManager:
                 hit_count=self._counters.hit_count,
                 eviction_events=self._counters.eviction_events,
             )
-        return handle
+        return handle, cache_object
 
     def release_for_request(self, handle: CachedRequestHandle) -> None:
         """Drop the handle reference for a completed single-request cache.

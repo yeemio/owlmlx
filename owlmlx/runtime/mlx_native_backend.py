@@ -31,6 +31,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
+from owlmlx.cache_manager import CacheManager
+
 from .types import (
     BackendStatus,
     ChatTurn,
@@ -200,6 +202,12 @@ class MlxNativeBackend:
         self._registry_lock = threading.Lock()
         self._last_error: str | None = None
         self._admission = _TicketedAdmission()
+        # C-1.1 wiring: the cache_manager owns the in-process per-request KV
+        # cache lifetime. ``_make_fresh_prompt_cache`` delegates to this
+        # manager. ``_NativeSession`` cache fields remain populated as a
+        # backward-compatible mirror so existing callers that read them
+        # continue to work; the manager's counters are the canonical ledger.
+        self._cache_manager = CacheManager()
 
     # ------------------------------------------------------------------ #
     # KV cache binding (single-request only — no cross-request reuse claim)
@@ -220,15 +228,27 @@ class MlxNativeBackend:
         Each call produces a fresh cache. owlmlx makes **no** cross-request
         prefix-cache reuse claim; ``last_prompt_cache`` is observable for
         tests but is overwritten on every call.
+
+        C-1.1 wiring: when upstream is reachable, delegates to
+        ``self._cache_manager.acquire_for_request(...)``; the manager's
+        counters become the canonical ledger and ``_NativeSession`` cache
+        fields are mirrored for backward compatibility. When upstream is
+        not reachable (fake stubs), the manager is bypassed because
+        ``CacheManager.acquire_for_request`` raises ``RuntimeError`` on
+        missing surface, while this method must silently return ``None``
+        to preserve the adapter's defensive contract.
         """
 
-        make_cache = _resolve_make_prompt_cache(mlx_lm_module)
-        if make_cache is None:
+        if _resolve_make_prompt_cache(mlx_lm_module) is None:
             session.last_prompt_cache = None
             session.last_prompt_cache_id = None
             return None
         try:
-            cache = make_cache(session.model)
+            handle, cache = self._cache_manager.acquire_for_request(
+                model_id=session.info.model_id,
+                mlx_lm_module=mlx_lm_module,
+                model=session.model,
+            )
         except Exception as exc:  # pragma: no cover - defensive
             session.last_error = f"make_prompt_cache failed: {exc}"
             session.last_prompt_cache = None
@@ -237,6 +257,10 @@ class MlxNativeBackend:
         session.last_prompt_cache = cache
         session.last_prompt_cache_id = id(cache)
         session.prompt_cache_call_count += 1
+        # The handle's monotonic ``cache_object_id`` is owned by the manager;
+        # the session's ``last_prompt_cache_id`` continues to use ``id(cache)``
+        # for backward compat with tests written before the manager existed.
+        del handle
         return cache
 
     # ------------------------------------------------------------------ #

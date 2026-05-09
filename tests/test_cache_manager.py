@@ -85,7 +85,7 @@ def test_cache_manager_starts_with_zero_counters() -> None:
 def test_acquire_for_request_returns_handle_with_correct_model_id() -> None:
     manager = CacheManager()
     fake_mlx_lm = _build_fake_mlx_lm_with_cache_surface()
-    handle = manager.acquire_for_request(
+    handle, _cache = manager.acquire_for_request(
         model_id="fake-model-A",
         mlx_lm_module=fake_mlx_lm,
         model=object(),
@@ -95,6 +95,33 @@ def test_acquire_for_request_returns_handle_with_correct_model_id() -> None:
     assert isinstance(handle.cache_object_id, int)
     assert handle.cross_request_reuse_claimed is False
     assert handle.created_at > 0.0
+
+
+def test_acquire_returns_handle_and_cache_object_tuple() -> None:
+    """Wiring contract: ``acquire_for_request`` returns ``(handle, cache_object)``.
+
+    The cache_object is the value returned by upstream ``make_prompt_cache``.
+    The caller owns the strong reference; the manager intentionally does not
+    retain it (single-request semantics).
+    """
+
+    manager = CacheManager()
+    sentinel = object()
+    fake = types.ModuleType("mlx_lm")
+    models = types.ModuleType("mlx_lm.models")
+    cache_mod = types.ModuleType("mlx_lm.models.cache")
+    cache_mod.make_prompt_cache = lambda model: sentinel  # type: ignore[attr-defined]
+    models.cache = cache_mod  # type: ignore[attr-defined]
+    fake.models = models  # type: ignore[attr-defined]
+
+    handle, cache_object = manager.acquire_for_request(
+        model_id="m",
+        mlx_lm_module=fake,
+        model=object(),
+    )
+
+    assert isinstance(handle, CachedRequestHandle)
+    assert cache_object is sentinel
 
 
 def test_acquire_calls_make_prompt_cache_via_attribute_walk() -> None:
@@ -119,7 +146,7 @@ def test_acquire_calls_make_prompt_cache_via_attribute_walk() -> None:
 
     manager = CacheManager()
     model_obj = object()
-    handle = manager.acquire_for_request(
+    handle, cache_object = manager.acquire_for_request(
         model_id="fake-attr-walk",
         mlx_lm_module=fake,
         model=model_obj,
@@ -129,7 +156,8 @@ def test_acquire_calls_make_prompt_cache_via_attribute_walk() -> None:
     # ``id(sentinel_cache)`` — see ``CachedRequestHandle`` docstring.
     # Anchor: first acquire on a fresh manager assigns id 1.
     assert handle.cache_object_id == 1
-    assert sentinel_cache is not None  # silence unused-local warning
+    # Cache object passes through unmodified.
+    assert cache_object is sentinel_cache
 
 
 def test_acquire_increments_entries_counter() -> None:
@@ -163,17 +191,17 @@ def test_consecutive_acquires_produce_distinct_cache_object_ids() -> None:
 
     manager = CacheManager()
     fake_mlx_lm = _build_fake_mlx_lm_with_cache_surface()
-    h1 = manager.acquire_for_request(
+    h1, _c1 = manager.acquire_for_request(
         model_id="m",
         mlx_lm_module=fake_mlx_lm,
         model=object(),
     )
-    h2 = manager.acquire_for_request(
+    h2, _c2 = manager.acquire_for_request(
         model_id="m",
         mlx_lm_module=fake_mlx_lm,
         model=object(),
     )
-    h3 = manager.acquire_for_request(
+    h3, _c3 = manager.acquire_for_request(
         model_id="m",
         mlx_lm_module=fake_mlx_lm,
         model=object(),
@@ -188,7 +216,7 @@ def test_consecutive_acquires_produce_distinct_cache_object_ids() -> None:
 def test_release_drops_handle_reference_without_changing_counters() -> None:
     manager = CacheManager()
     fake_mlx_lm = _build_fake_mlx_lm_with_cache_surface()
-    handle = manager.acquire_for_request(
+    handle, _cache = manager.acquire_for_request(
         model_id="m",
         mlx_lm_module=fake_mlx_lm,
         model=object(),
