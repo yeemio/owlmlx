@@ -99,6 +99,30 @@ The owned reference documents for those surfaces are:
 - `runtime-status-schema.md`
 - `runtime-governance.md`
 - `hazardous-operations.md`
+- `single-host-orchestration-architecture.md`
+
+### 3.4 Single-Host Orchestration Direction
+
+`owlmlx` now also treats single-host orchestration as a core-runtime concern.
+
+This is the layer that should eventually own:
+
+- admission control ahead of execution claim
+- request scheduling policy
+- model residency policy
+- memory-pressure response
+- recovery policy after reclaim or worker failure
+
+It is narrower than cluster scheduling and broader than one execution lock.
+
+The current implementation floor remains conservative:
+
+- serialized `GenerationGate` execution
+- bounded pre-gate admission work on the active path
+- runtime-owned pinning / TTL / eviction-history controls
+
+The architecture for this direction is frozen in
+`single-host-orchestration-architecture.md`.
 
 ## 4. owlmlx Runtime Paths
 

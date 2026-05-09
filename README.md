@@ -63,6 +63,7 @@ Current honest state:
 - `docs/source-of-truth/master-outline.md`
 - `docs/source-of-truth/product-definition.md`
 - `docs/source-of-truth/system-architecture.md`
+- `docs/source-of-truth/single-host-orchestration-architecture.md`
 - `docs/source-of-truth/repository-boundaries.md`
 - `docs/source-of-truth/runtime-capability-matrix.md`
 - `docs/source-of-truth/native-mlx-backend-capability-matrix.md`
