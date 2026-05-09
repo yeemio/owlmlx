@@ -95,6 +95,7 @@ from owlmlx.runtime_monitor_test_console import (
 
 from .backends import FakeBackend, RuntimeBackend
 from .kernel import RuntimeKernel
+from .serving_hardening import RequestIdMiddleware
 from .types import ChatTurn
 
 
@@ -524,6 +525,7 @@ def create_app(
 
     runtime = kernel if kernel is not None else RuntimeKernel(FakeBackend())
     app = FastAPI(title="owlmlx Runtime", version="0.0.0-runtime7")
+    app.add_middleware(RequestIdMiddleware)
     app.state.kernel = runtime
     app.state.loadability_lineage_records = (
         dict(loadability_lineage_records)
