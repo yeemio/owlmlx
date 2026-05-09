@@ -15,6 +15,12 @@ class PreGateAdmissionHookHarnessResult:
     runtime_owned_hook_present: bool
     hook_boundary: str
     hook_mode: str
+    cohort_window_status: str
+    observed_cohort_count: int
+    observed_open_cohort_size: int
+    observed_peak_cohort_size: int
+    observed_total_cohorts_formed: int
+    aggregation_scope: str
     observed_midflight_staged_count: int
     observed_total_staged: int
     observed_total_claimed: int
@@ -46,9 +52,9 @@ def run_pre_gate_admission_hook_harness() -> PreGateAdmissionHookHarnessResult:
 
     async def observe() -> dict[str, object]:
         first = asyncio.create_task(kernel.generate("one"))
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.005)
         second = asyncio.create_task(kernel.generate("two"))
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.005)
         mid = kernel.status_dict()["generation_gate"]["pre_gate_admission"]
         await asyncio.gather(first, second)
         final = kernel.status_dict()["generation_gate"]["pre_gate_admission"]
@@ -61,6 +67,12 @@ def run_pre_gate_admission_hook_harness() -> PreGateAdmissionHookHarnessResult:
         runtime_owned_hook_present=mid["hook_status"] == "present",
         hook_boundary=str(mid["hook_boundary"]),
         hook_mode=str(mid["hook_mode"]),
+        cohort_window_status=str(mid["cohort_window_status"]),
+        observed_cohort_count=int(mid["cohort_count"]),
+        observed_open_cohort_size=int(mid["open_cohort_size"]),
+        observed_peak_cohort_size=int(mid["peak_cohort_size"]),
+        observed_total_cohorts_formed=int(mid["total_cohorts_formed"]),
+        aggregation_scope=str(mid["aggregation_scope"]),
         observed_midflight_staged_count=int(mid["staged_count"]),
         observed_total_staged=int(final["total_staged"]),
         observed_total_claimed=int(final["total_claimed"]),

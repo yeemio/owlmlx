@@ -23,6 +23,9 @@ from owlmlx import (
 from owlmlx.cache_runtime_observation_harness import (
     run_cache_runtime_observation_harness,
 )
+from owlmlx.cache_pre_gate_admission_hook_harness import (
+    run_pre_gate_admission_hook_harness,
+)
 
 
 def main() -> int:
@@ -34,6 +37,7 @@ def main() -> int:
 
     if args.run_harness:
         harness = run_cache_runtime_observation_harness()
+        hook_harness = run_pre_gate_admission_hook_harness()
         counter_gap = build_cache_counter_gap(
             closure=harness.closure,
             backend_observations=harness.backend_observations,
@@ -63,10 +67,20 @@ def main() -> int:
         )
         payload = cache_pre_gate_admission_hook_exactness_to_dict(
             build_cache_pre_gate_admission_hook_exactness(
-                cohort_window_feasibility=cohort_window_feasibility
+                cohort_window_feasibility=cohort_window_feasibility,
+                hook_harness=hook_harness,
             )
         )
         payload["cache_harness"] = harness.backend_observations
+        payload["structural_ingress_harness"] = {
+            "runtime_owned_hook_present": hook_harness.runtime_owned_hook_present,
+            "hook_boundary": hook_harness.hook_boundary,
+            "hook_mode": hook_harness.hook_mode,
+            "observed_midflight_staged_count": hook_harness.observed_midflight_staged_count,
+            "observed_total_staged": hook_harness.observed_total_staged,
+            "observed_total_claimed": hook_harness.observed_total_claimed,
+            "observed_total_discarded": hook_harness.observed_total_discarded,
+        }
     else:
         payload = cache_pre_gate_admission_hook_exactness_to_dict(
             build_cache_pre_gate_admission_hook_exactness()

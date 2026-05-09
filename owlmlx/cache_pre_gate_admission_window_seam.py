@@ -76,12 +76,23 @@ def build_cache_pre_gate_admission_window_seam(
         )
         preserved_secondary_runtime_branch = "turboquant_preconditions"
         preserved_secondary_runtime_branch_status = "preconditions_exact"
-        residual_blocker = (
-            "request aggregation now reduces to the pre-gate admission-window seam on this path: a bounded pre-gate admission hook is still missing before whole-request gate claim, while child exchange, stream hold, and TurboQuant remain secondary"
-        )
-        recommended_next_step = (
-            "continue with bounded pre-gate admission-hook work on this path without reopening request-aggregation active-seam or carrier-local exactness"
-        )
+        if (
+            hook_exactness.admission_hook_status
+            == "bounded_hook_present_but_no_request_aggregation_window"
+        ):
+            residual_blocker = (
+                "request aggregation now reduces to the existing bounded pre-gate admission hook on this path: the hook is runtime-owned and precedes whole-request gate claim, but it remains inert/observational and still does not form a request-aggregation window; child exchange, stream hold, and TurboQuant remain secondary"
+            )
+            recommended_next_step = (
+                "continue with post-structural pre-gate admission-window work on this path; the bounded hook now exists, so the next exact blocker is turning that inert seam into a cohort-forming request-aggregation window without weakening post-claim serial invariants"
+            )
+        else:
+            residual_blocker = (
+                "request aggregation now reduces to the pre-gate admission-window seam on this path: a bounded pre-gate admission hook is still missing before whole-request gate claim, while child exchange, stream hold, and TurboQuant remain secondary"
+            )
+            recommended_next_step = (
+                "continue with bounded pre-gate admission-hook work on this path without reopening request-aggregation active-seam or carrier-local exactness"
+            )
 
     return CachePreGateAdmissionWindowSeam(
         request_aggregation_active_seam=active_seam,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .cache_pre_gate_admission_hook_harness import PreGateAdmissionHookHarnessResult
 from .cache_pre_claim_metadata_ticket_ownership import (
     CachePreClaimMetadataTicketOwnership,
     build_cache_pre_claim_metadata_ticket_ownership,
@@ -34,6 +35,7 @@ def build_cache_pre_claim_inert_state_semantics(
     *,
     metadata_ticket_ownership: CachePreClaimMetadataTicketOwnership | None = None,
     cohort_window_feasibility: CachePreGateCohortWindowFeasibility | None = None,
+    hook_harness: PreGateAdmissionHookHarnessResult | None = None,
 ) -> CachePreClaimInertStateSemantics:
     """Build exact inert-state semantics for the active pre-claim path."""
 
@@ -79,6 +81,29 @@ def build_cache_pre_claim_inert_state_semantics(
         recommended_next_step = (
             "treat batching as pre-claim inert-state boundary work on this path; if a future seam expands, freeze exact ticket drop/cancel lifetime and keep cohort membership and execution priority unavailable until whole-request gate claim"
         )
+        if (
+            hook_harness is not None
+            and hook_harness.hook_mode == "bounded_runtime_owned_cohort_window"
+            and hook_harness.observed_peak_cohort_size >= 2
+            and hook_harness.aggregation_scope == "pre_claim_window_only"
+        ):
+            cohort_candidate_status = (
+                "bounded_runtime_owned_cohort_membership_before_gate_claim_without_execution_rights"
+            )
+            allowed_inert_semantics = (
+                "drop_or_cancel_marker_before_gate_claim",
+                "bounded_pre_claim_cohort_membership_without_execution_rights",
+            )
+            forbidden_inert_semantics = (
+                "no_execution_priority_before_gate_claim",
+                "no_prefill_batch_membership_before_gate_claim",
+            )
+            residual_blocker = (
+                "the inert pre-claim semantics are now re-frozen after the cohort-window widening: owlmlx may carry an inert drop/cancel marker and bounded pre-claim cohort membership before gate claim, but that state still grants no execution priority or prefill-batch membership before the first runtime-owned claim boundary"
+            )
+            recommended_next_step = (
+                "treat request aggregation as downstream dependency work on this path; preserve bounded pre-claim cohort membership without granting pre-claim execution rights or post-claim concurrency"
+            )
 
     return CachePreClaimInertStateSemantics(
         metadata_ticket_ownership=ownership,
