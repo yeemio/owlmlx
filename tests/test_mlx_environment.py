@@ -31,8 +31,9 @@ def test_default_environment_candidates_include_current_python() -> None:
     candidates = default_environment_candidates()
 
     if candidates:
-        assert candidates[0].label in {"verified", "current"}
         assert len(candidates) >= 1
+        if is_known_unsafe_python(sys.executable) is False:
+            assert any(candidate.label == "current" for candidate in candidates)
     else:
         assert is_known_unsafe_python(sys.executable) is True
 
@@ -56,7 +57,7 @@ def test_default_environment_candidates_respect_preferred_execution_mode() -> No
     candidates = default_environment_candidates(preferred_execution_mode="force_cpu")
 
     if candidates:
-        assert candidates[0].execution_mode == "force_cpu"
+        assert all(candidate.execution_mode == "force_cpu" for candidate in candidates)
 
 
 def test_known_environment_candidates_include_runtime1_mlx_when_present() -> None:
@@ -416,9 +417,16 @@ def test_readiness_to_dict_reflects_quarantine_count(tmp_path: Path) -> None:
         path=quarantine,
     )
 
-    readiness = build_mlx_environment_readiness(
-        quarantine_path=quarantine,
-    )
+    original = default_environment_candidates
+    try:
+        from owlmlx.runtime import mlx_environment as mlx_environment_module
+
+        mlx_environment_module.default_environment_candidates = lambda **_: ()
+        readiness = build_mlx_environment_readiness(
+            quarantine_path=quarantine,
+        )
+    finally:
+        mlx_environment_module.default_environment_candidates = original
     payload = readiness_to_dict(readiness)
 
     assert payload["quarantine"]["count"] == 2

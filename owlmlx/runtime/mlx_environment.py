@@ -281,16 +281,23 @@ def default_environment_candidates(
     seen: set[str] = set()
 
     for candidate in load_verified_baselines():
-        identity = candidate_identity(candidate.python_executable, candidate.execution_mode)
+        effective_mode = preferred_execution_mode
+        identity = candidate_identity(candidate.python_executable, effective_mode)
         if identity in seen or not Path(candidate.python_executable).exists():
             continue
         if is_known_unsafe_python_with_path(
             candidate.python_executable,
-            execution_mode=candidate.execution_mode,
+            execution_mode=effective_mode,
         ):
             continue
         seen.add(identity)
-        candidates.append(candidate)
+        candidates.append(
+            MlxEnvironmentCandidate(
+                candidate.python_executable,
+                candidate.label,
+                effective_mode,
+            )
+        )
 
     current = str(Path(sys.executable).expanduser())
     identity = candidate_identity(current, preferred_execution_mode)
@@ -312,7 +319,14 @@ def known_environment_candidates(
 
     baselines = load_verified_baselines()
     values: list[tuple[str, str, str]] = [
-        *((candidate.python_executable, candidate.label, candidate.execution_mode) for candidate in baselines),
+        *(
+            (
+                candidate.python_executable,
+                candidate.label,
+                preferred_execution_mode,
+            )
+            for candidate in baselines
+        ),
         (sys.executable, "current", preferred_execution_mode),
         ("/Users/yeemio/AI/gitrep/owlmlx/.runtime1-mlx/bin/python", "runtime1-mlx", preferred_execution_mode),
         ("/Users/yeemio/AI/gitrep/owlmlx/.runtime2-mlx/bin/python", "runtime2-mlx", preferred_execution_mode),

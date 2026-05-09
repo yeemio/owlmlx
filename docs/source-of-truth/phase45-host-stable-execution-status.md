@@ -1,7 +1,7 @@
 # owlmlx Phase 45: Host-Stable Execution Status
 
 > Status: authoritative
-> Updated: 2026-04-13
+> Updated: 2026-04-16
 > Scope: runtime-only host-level execution readiness for replacement-grade validation
 
 ## 1. Purpose
@@ -70,21 +70,40 @@ Interpretation:
 
 ## 4. Current Verified Result On This Host
 
-Current result is:
+Current live result is:
 
-- `summary.status = "host_blocked_move_validation"`
-- `summary.ready = false`
-- `summary.blocked_reason = "no verified-safe mlx baseline exists on this host"`
-- `summary.recommended_next_step = "move replacement-grade runtime validation to another host or system image"`
+- `summary.status = "host_ready_for_runtime_validation"`
+- `summary.ready = true`
+- `summary.preferred_execution_mode = "default_metal"`
+- `summary.blocked_reason = null`
+- `summary.recommended_next_step = "run repeated runtime validation on this host with default_metal"`
 
 Why:
 
-- `default_metal` readiness remains blocked
-- `force_cpu` readiness also remains blocked
-- host forensics continue to show repeated:
-  - `NSRangeException`
-  - `SIGABRT`
-  - `mlx::core::metal::Device::Device()`
+- isolated validation registry truth
+  - `register_verified_mlx_baseline.py` can register
+    `/Users/yeemio/AI/gitrep/runtime-probes/omlx-probe/.venv/bin/python`
+    as `omlx-probe-venv`
+  - `runtime_mlx_environment_readiness.py` then returns:
+    - `readiness = ready`
+    - `selected_label = omlx-probe-venv`
+- default `~/.owlmlx` registry truth
+  - `~/.owlmlx/mlx-verified-python.json` contains `omlx-probe-venv`
+  - `runtime_mlx_environment_readiness.py` returns:
+    - `readiness = ready`
+    - `selected_label = omlx-probe-venv`
+  - `runtime_host_stable_execution_status.py` returns:
+    - `summary.status = host_ready_for_runtime_validation`
+    - `summary.ready = true`
+- historical quarantine residue
+  - `~/.owlmlx/mlx-unsafe-python.json` still retains 6 unsafe entries
+  - host forensics still show historical:
+    - `NSRangeException`
+    - `SIGABRT`
+    - `mlx::core::metal::Device::Device()`
+  - that residue remains historical context, not the current blocked truth,
+    because one verified-safe baseline now exists and is selected by the
+    default registry
 
 ## 5. What This Changes
 
@@ -100,8 +119,10 @@ surfaces.
 
 Now `owlmlx` owns a direct host-level answer for the replacement-grade gap:
 
-- is this host a candidate for deeper runtime validation
-- or should the validation path move away from this machine
+- this host now has one supported candidate baseline for deeper runtime
+  validation
+- historical crash residue can stay visible without being misreported as the
+  current blocking verdict
 
 ## 6. What This Does Not Claim
 
@@ -109,11 +130,12 @@ It does not claim:
 
 - parity with `oMLX` or `vMLX`
 - full runtime stability
+- heavy-weight repeatability restored
 - customer readiness
 
 It only claims:
 
 - `host_stable_execution` now has a runtime-owned contract
-- the current host is not the right place to continue replacement-grade
-  validation
-
+- the current host is a valid candidate for stronger runtime validation
+- the current verdict must distinguish isolated validation truth, default
+  registry truth, and historical quarantine residue

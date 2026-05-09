@@ -18,6 +18,13 @@
 
 - **当前开发机是否已经够资格从 blocked dev host 升级成 supported-host candidate**
 
+## 一句话版任务定义
+
+先纠正旧的 blocked truth，再做一轮窄口 local baseline reentry
+verification；必须区分 isolated `/tmp` registry 和默认 `~/.owlmlx`
+registry 的结论，最后只允许给出 `reentry_admissible` 或
+`still_blocked`，不准直接恢复整条 supported-host mainline。
+
 ## 第一性原则
 
 - `current re-validation > stale blocker narrative`
@@ -67,21 +74,36 @@
 - 历史上确实崩过
 - 但当前这轮 fresh re-validation 里已经**不再稳定复现**
 - `owlmlx` 当前 blocked truth 更像：
-  - stale quarantine
-  - old verified-baseline registry
+  - stale quarantine residue
   - old host-stable narrative
 
 ### 当前 live re-validation 结果
 
 已实测成立：
 
-- `register_verified_mlx_baseline.py` 可成功把新的 safe candidate 注册成：
-  - `omlx-probe-venv`
-  - `/Users/yeemio/AI/gitrep/runtime-probes/omlx-probe/.venv/bin/python`
-- `runtime_mlx_environment_readiness.py` 现在可返回：
-  - `readiness = ready`
-  - `selected_label = omlx-probe-venv`
-  - `python_executable = /Users/yeemio/AI/gitrep/runtime-probes/omlx-probe/.venv/bin/python`
+- targeted pytest 已通过：
+  - `tests/test_mlx_environment.py`
+  - `tests/test_host_stability.py`
+  - `tests/test_customer_runtime_evidence.py`
+  - `tests/test_dominant_gap_reselection.py`
+- isolated `/tmp` registry / quarantine 实测可成立：
+  - `register_verified_mlx_baseline.py` 可成功把新的 safe candidate 注册成：
+    - `omlx-probe-venv`
+    - `/Users/yeemio/AI/gitrep/runtime-probes/omlx-probe/.venv/bin/python`
+  - `runtime_mlx_environment_readiness.py` 可返回：
+    - `readiness = ready`
+    - `selected_label = omlx-probe-venv`
+    - `python_executable = /Users/yeemio/AI/gitrep/runtime-probes/omlx-probe/.venv/bin/python`
+- 默认 `~/.owlmlx` registry / quarantine 也已实测：
+  - `~/.owlmlx/mlx-verified-python.json` 已包含：
+    - `omlx-probe-venv`
+  - `runtime_mlx_environment_readiness.py` 可返回：
+    - `readiness = ready`
+    - `selected_label = omlx-probe-venv`
+  - `runtime_host_stable_execution_status.py --include-known-venvs` 可返回：
+    - `summary.status = host_ready_for_runtime_validation`
+    - `summary.ready = true`
+  - 但 `~/.owlmlx/mlx-unsafe-python.json` 仍保留旧的 historical unsafe entries
 
 ### 当前不能宣称的
 
@@ -262,7 +284,7 @@
 - 有真实 smoke verdict
 - 能明确说当前开发机是：
   - `reentry_admissible`
-  - 或 `still_blocked`
+  - `still_blocked`
 
 ## Wave 4: Customer Evidence + Dominant-Gap Resync
 
@@ -291,8 +313,8 @@
 
 验收：
 - 统筹者看完能直接做二选一：
-  - `reentry admissible`
-  - `still blocked`
+  - `reentry_admissible`
+  - `still_blocked`
 
 ## 必跑验证
 
