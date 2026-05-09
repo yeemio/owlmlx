@@ -106,6 +106,74 @@ def test_heavy_weight_repeatability_marks_host_ready_not_repeated(monkeypatch) -
     )
 
     assert payload["summary"]["repeatability_rung"] == "host_ready_not_repeated"
+    assert payload["boundary_preconditions"]["required_memory_gb"] is None
+
+
+def test_heavy_weight_repeatability_keeps_boundary_blocker_exact(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "owlmlx.heavy_weight_repeatability_status.build_host_stable_execution_status",
+        lambda **_: _host(
+            ready=True,
+            status="host_ready_for_runtime_validation",
+            blocked_reason=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.heavy_weight_repeatability_status.build_large_weight_first_smoke_decision",
+        lambda **_: _decision(
+            smoke_ready=True,
+            decision="local_smoke_ready",
+            blocked_reason=None,
+        ),
+    )
+
+    payload = heavy_weight_repeatability_status_to_dict(
+        build_heavy_weight_runtime_repeatability_status(
+            specimen_path="/tmp/specimen",
+            boundary_required_memory_gb=122.0,
+        )
+    )
+
+    assert payload["summary"]["repeatability_rung"] == "local_preconditions_incomplete"
+    assert payload["boundary_preconditions"]["required_memory_gb"] == 122.0
+    assert payload["boundary_preconditions"]["satisfied"] is False
+    assert payload["boundary_preconditions"]["verdict"] == "exceeds"
+    assert "116.0G limit" in payload["boundary_preconditions"]["reason"]
+
+
+def test_heavy_weight_repeatability_marks_budget_fit_heavy_boundary_entered(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        "owlmlx.heavy_weight_repeatability_status.build_host_stable_execution_status",
+        lambda **_: _host(
+            ready=True,
+            status="host_ready_for_runtime_validation",
+            blocked_reason=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "owlmlx.heavy_weight_repeatability_status.build_large_weight_first_smoke_decision",
+        lambda **_: _decision(
+            smoke_ready=True,
+            decision="local_smoke_ready",
+            blocked_reason=None,
+        ),
+    )
+
+    payload = heavy_weight_repeatability_status_to_dict(
+        build_heavy_weight_runtime_repeatability_status(
+            specimen_path="/tmp/specimen",
+            boundary_required_memory_gb=62.0,
+            boundary_entry_visible=True,
+            boundary_entry_reason="load/generate/unload succeeded on gemma-4-31B-it",
+        )
+    )
+
+    assert payload["summary"]["repeatability_rung"] == "budget_fit_heavy_boundary_entered"
+    assert payload["boundary_preconditions"]["required_memory_gb"] == 62.0
+    assert payload["boundary_preconditions"]["satisfied"] is True
+    assert payload["boundary_entry"]["visible"] is True
 
 
 def test_heavy_weight_repeatability_marks_supported_host_repeatability_visible(

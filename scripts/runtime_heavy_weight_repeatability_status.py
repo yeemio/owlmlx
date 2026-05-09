@@ -20,6 +20,9 @@ def main() -> int:
     parser.add_argument("--include-known-venvs", action="store_true")
     parser.add_argument("--supported-host-proof-visible", action="store_true")
     parser.add_argument("--supported-host-repeat-runs", type=int, default=0)
+    parser.add_argument("--boundary-memory-gb", type=float)
+    parser.add_argument("--boundary-entered", action="store_true")
+    parser.add_argument("--boundary-entry-reason")
     args = parser.parse_args()
 
     status = build_heavy_weight_runtime_repeatability_status(
@@ -27,6 +30,9 @@ def main() -> int:
         include_known_candidates=args.include_known_venvs,
         supported_host_proof_visible=args.supported_host_proof_visible,
         supported_host_repeat_runs=args.supported_host_repeat_runs,
+        boundary_required_memory_gb=args.boundary_memory_gb,
+        boundary_entry_visible=args.boundary_entered,
+        boundary_entry_reason=args.boundary_entry_reason,
     )
     print(json.dumps(heavy_weight_repeatability_status_to_dict(status), indent=2, sort_keys=True))
     return 0

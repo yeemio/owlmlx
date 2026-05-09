@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .memory_budget import evaluate_model_fit
+
 
 def build_host_stable_execution_status(**kwargs: Any) -> object:
     """Lazy wrapper kept at module scope for testability without import cycles."""
@@ -85,6 +87,12 @@ class HeavyWeightRuntimeRepeatabilityStatus:
     repeatability_rung: str
     blocked_reason: str | None
     recommended_next_step: str
+    boundary_required_memory_gb: float | None = None
+    boundary_preconditions_satisfied: bool | None = None
+    boundary_preconditions_reason: str | None = None
+    boundary_preconditions_verdict: str | None = None
+    boundary_entry_visible: bool = False
+    boundary_entry_reason: str | None = None
 
 
 def build_heavy_weight_runtime_repeatability_status(
@@ -97,6 +105,9 @@ def build_heavy_weight_runtime_repeatability_status(
     crash_limit: int = 5,
     supported_host_proof_visible: bool = False,
     supported_host_repeat_runs: int = 0,
+    boundary_required_memory_gb: float | None = None,
+    boundary_entry_visible: bool = False,
+    boundary_entry_reason: str | None = None,
 ) -> HeavyWeightRuntimeRepeatabilityStatus:
     """Build runtime-owned heavy-weight repeatability status."""
 
@@ -121,20 +132,56 @@ def build_heavy_weight_runtime_repeatability_status(
     recommended_next_step = (
         "establish one supported-host heavy-weight repeatability path before claiming replacement-grade runtime depth"
     )
+    boundary_preconditions_satisfied: bool | None = None
+    boundary_preconditions_reason: str | None = None
+    boundary_preconditions_verdict: str | None = None
 
     if first_smoke_decision.decision == "local_preconditions_incomplete":
         repeatability_rung = "local_preconditions_incomplete"
         recommended_next_step = (
             "complete local specimen prerequisites before attempting heavy-weight repeatability validation"
         )
+        boundary_preconditions_satisfied = False
+        boundary_preconditions_reason = blocked_reason
     elif host_stability.ready and first_smoke_decision.smoke_ready:
-        repeatability_rung = "host_ready_not_repeated"
-        blocked_reason = (
-            "supported heavy-weight runtime path is locally ready, but repeated proof is not yet established"
-        )
-        recommended_next_step = (
-            "run repeated heavy-weight validation on the supported host before claiming stronger runtime repeatability"
-        )
+        if boundary_required_memory_gb is not None:
+            boundary_preflight = evaluate_model_fit(
+                requested_gb=float(boundary_required_memory_gb)
+            )
+            boundary_preconditions_reason = boundary_preflight.message
+            boundary_preconditions_verdict = boundary_preflight.verdict.value
+            boundary_preconditions_satisfied = boundary_preflight.verdict != "exceeds"
+            if boundary_preconditions_satisfied:
+                if boundary_entry_visible:
+                    repeatability_rung = "budget_fit_heavy_boundary_entered"
+                    blocked_reason = (
+                        "one budget-fit heavy boundary has been entered on the current host, but repeated proof is not yet established"
+                    )
+                    recommended_next_step = (
+                        "stop here and require coordinator authorization before repeated heavy-weight validation"
+                    )
+                else:
+                    repeatability_rung = "host_ready_not_repeated"
+                    blocked_reason = (
+                        "supported heavy-weight runtime path is locally ready, but repeated proof is not yet established"
+                    )
+                    recommended_next_step = (
+                        "run repeated heavy-weight validation on the supported host before claiming stronger runtime repeatability"
+                    )
+            else:
+                repeatability_rung = "local_preconditions_incomplete"
+                blocked_reason = boundary_preflight.message
+                recommended_next_step = (
+                    "current host candidate baseline exists, but the selected heavy-weight boundary still exceeds the serving budget; freeze this blocker exact before any repeated validation claim"
+                )
+        else:
+            repeatability_rung = "host_ready_not_repeated"
+            blocked_reason = (
+                "supported heavy-weight runtime path is locally ready, but repeated proof is not yet established"
+            )
+            recommended_next_step = (
+                "run repeated heavy-weight validation on the supported host before claiming stronger runtime repeatability"
+            )
 
     if supported_host_proof_visible and supported_host_repeat_runs >= 2:
         repeatability_rung = "supported_host_repeatability_visible"
@@ -144,6 +191,12 @@ def build_heavy_weight_runtime_repeatability_status(
         recommended_next_step = (
             "promote supported-host repeatability into broader customer runtime evidence instead of re-running first-smoke gating"
         )
+        boundary_preconditions_satisfied = True
+        boundary_preconditions_reason = (
+            boundary_preconditions_reason
+            or "supported-host repeated proof is already visible on the selected path"
+        )
+        boundary_preconditions_verdict = boundary_preconditions_verdict or "fits"
 
     return HeavyWeightRuntimeRepeatabilityStatus(
         host_stability=host_stability,
@@ -154,6 +207,16 @@ def build_heavy_weight_runtime_repeatability_status(
         repeatability_rung=repeatability_rung,
         blocked_reason=blocked_reason,
         recommended_next_step=recommended_next_step,
+        boundary_required_memory_gb=(
+            float(boundary_required_memory_gb)
+            if boundary_required_memory_gb is not None
+            else None
+        ),
+        boundary_preconditions_satisfied=boundary_preconditions_satisfied,
+        boundary_preconditions_reason=boundary_preconditions_reason,
+        boundary_preconditions_verdict=boundary_preconditions_verdict,
+        boundary_entry_visible=boundary_entry_visible,
+        boundary_entry_reason=boundary_entry_reason,
     )
 
 
@@ -171,6 +234,8 @@ def heavy_weight_repeatability_status_to_dict(
                 "host_stability",
                 "first_smoke_decision",
                 "supported_host_proof",
+                "boundary_preconditions",
+                "boundary_entry",
             ],
         },
         "summary": {
@@ -186,5 +251,15 @@ def heavy_weight_repeatability_status_to_dict(
         "supported_host_proof": {
             "visible": status.supported_host_proof_visible,
             "repeat_runs": status.supported_host_repeat_runs,
+        },
+        "boundary_preconditions": {
+            "required_memory_gb": status.boundary_required_memory_gb,
+            "satisfied": status.boundary_preconditions_satisfied,
+            "verdict": status.boundary_preconditions_verdict,
+            "reason": status.boundary_preconditions_reason,
+        },
+        "boundary_entry": {
+            "visible": status.boundary_entry_visible,
+            "reason": status.boundary_entry_reason,
         },
     }

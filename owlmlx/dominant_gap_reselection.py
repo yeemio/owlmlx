@@ -117,9 +117,23 @@ def build_dominant_gap_reselection(
 
     if governance_gap.policy_gap_rung == "policy_gap_closed":
         selected_gap = "host_stable_execution"
-        rationale = (
-            "supported-host baseline establishment re-assumes dominance because the local governance fallback branch is now policy-closed while cache remains intentionally frozen at the structural ingress seam"
-        )
+        if heavy_weight.repeatability_rung == "supported_host_repeatability_visible":
+            selected_gap = "cache_scheduler_depth"
+            rationale = (
+                "supported-host repeated heavy-weight proof is now visible on the current host, so host-stable execution no longer dominates; cache_scheduler_depth reassumes dominance while governance remains locally policy-closed and cache remains the next locally reducible internal branch"
+            )
+        elif heavy_weight.repeatability_rung == "local_blocked":
+            rationale = (
+                "supported-host baseline establishment re-assumes dominance because the local governance fallback branch is now policy-closed while cache is not yet the governing active branch on this host"
+            )
+        elif heavy_weight.repeatability_rung == "budget_fit_heavy_boundary_entered":
+            rationale = (
+                "supported-host baseline establishment remains dominant because one budget-fit heavy boundary has now been entered on the current host while repeated heavy-weight validation is still not authorized and cache is not yet the governing active branch on this host"
+            )
+        else:
+            rationale = (
+                "supported-host baseline establishment remains dominant because the current host now has a supported candidate baseline while stronger baseline validation and heavy-weight boundary checks are still the next honest step, and cache is not yet the governing active branch on this host"
+            )
     elif governance_gap.policy_gap_rung == "policy_gap_reduced":
         selected_gap = "multi_model_lifecycle_governance"
         rationale = (

@@ -77,6 +77,11 @@ def main() -> int:
     )
     parser.add_argument("--specimen-path", required=True)
     parser.add_argument("--include-known-venvs", action="store_true")
+    parser.add_argument("--heavy-boundary-memory-gb", type=float)
+    parser.add_argument("--heavy-boundary-entered", action="store_true")
+    parser.add_argument("--heavy-boundary-entry-reason")
+    parser.add_argument("--supported-host-proof-visible", action="store_true")
+    parser.add_argument("--supported-host-repeat-runs", type=int, default=0)
     args = parser.parse_args()
 
     cache_harness = run_cache_runtime_observation_harness()
@@ -98,6 +103,11 @@ def main() -> int:
     governance_gap = _governance_policy_gap()
     heavy_weight = build_heavy_weight_runtime_repeatability_status(
         specimen_path=args.specimen_path,
+        boundary_required_memory_gb=args.heavy_boundary_memory_gb,
+        boundary_entry_visible=args.heavy_boundary_entered,
+        boundary_entry_reason=args.heavy_boundary_entry_reason,
+        supported_host_proof_visible=args.supported_host_proof_visible,
+        supported_host_repeat_runs=args.supported_host_repeat_runs,
         include_known_candidates=args.include_known_venvs,
     )
 
