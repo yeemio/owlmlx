@@ -1,0 +1,95 @@
+{
+  "schema": "owlmlx.gemma_mtp_draft_probe.v1",
+  "created_at_utc": "2026-05-06T13:26:04Z",
+  "host_context": {
+    "owlmlx_8066_post_run_healthz": {
+      "contract": {
+        "surface": "owlmlx.healthz",
+        "version": "stabilization1"
+      },
+      "runtime": "owlmlx",
+      "ok": true,
+      "readiness": "degraded",
+      "active_model_id": null,
+      "model_count": 0,
+      "backend_name": "mlx-lm-subprocess",
+      "backend_error": null,
+      "persistent_child": true,
+      "child_health": {}
+    }
+  },
+  "target_model": {
+    "path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+    "model_type": "gemma4",
+    "architectures": [
+      "Gemma4ForConditionalGeneration"
+    ],
+    "text_model_type": "gemma4_text",
+    "text_hidden_size": 5376,
+    "text_num_hidden_layers": 60,
+    "vocab_size": 262144,
+    "vision_model_type": "gemma4_vision"
+  },
+  "draft_model": {
+    "path": "/Users/yeemio/AI/Agent/model-candidates/mlx-community/gemma-4-31B-it-assistant-bf16",
+    "model_type": "gemma4_assistant",
+    "architectures": [
+      "Gemma4AssistantForCausalLM"
+    ],
+    "text_model_type": "gemma4_text",
+    "text_hidden_size": 1024,
+    "text_num_hidden_layers": 4,
+    "text_num_kv_shared_layers": 4,
+    "layer_types": [
+      "sliding_attention",
+      "sliding_attention",
+      "sliding_attention",
+      "full_attention"
+    ],
+    "vocab_size": 262144
+  },
+  "toolchain": {
+    "probe_python": "/Users/yeemio/AI/gitrep/runtime-probes/mlx-vlm-mtp-probe/.venv/bin/python",
+    "mlx_vlm_version": "0.5.0",
+    "mlx_lm_version": "0.31.3",
+    "mlx_version": "0.31.2",
+    "mlx_vlm_install_source": "git+https://github.com/Blaizzy/mlx-vlm.git@8c9e560bebbeccbd5fbeb46dcd426bc5d80159b0",
+    "reason": "local mlx-vlm 0.4.4 did not expose --draft-model / --draft-kind / --draft-block-size; the model card requires mlx-vlm>=0.4.5"
+  },
+  "runs": [
+    {
+      "name": "two_token_load_smoke",
+      "log": "smoke.log",
+      "max_tokens": 2,
+      "temperature": 0,
+      "prompt": "Answer in two words: local AI.",
+      "observed_output": "Private intelligence",
+      "speculative_summary": "0.0 accepted tokens over 1 rounds",
+      "max_resident_set_size_bytes": 52917960704,
+      "peak_memory_footprint_bytes": 64463910464,
+      "elapsed_seconds": 20.07,
+      "verdict": "loaded_target_and_drafter"
+    },
+    {
+      "name": "acceptance_smoke",
+      "log": "acceptance-smoke.log",
+      "max_tokens": 48,
+      "temperature": 0,
+      "prompt": "Write one concise sentence explaining local AI.",
+      "observed_output": "Local AI refers to artificial intelligence models that run directly on a user's own hardware rather than on a remote cloud server.",
+      "speculative_summary": "2.86 accepted tokens over 7 rounds",
+      "max_resident_set_size_bytes": 45872496640,
+      "peak_memory_footprint_bytes": 64677705304,
+      "elapsed_seconds": 21.47,
+      "verdict": "mtp_drafter_participated"
+    }
+  ],
+  "overall_verdict": {
+    "target_requires_new_download_or_conversion": false,
+    "target_loadable_by_mlx_vlm_mtp_probe": true,
+    "draft_model_is_standalone_target": false,
+    "draft_model_usable_as_mtp_drafter": true,
+    "owlmlx_serving_capability_label": "experimental",
+    "reason": "The external mlx-vlm MTP path can load the local Gemma4 target and assistant drafter, but owlmlx does not yet own this speculative decoding path as a runtime backend/profile."
+  }
+}

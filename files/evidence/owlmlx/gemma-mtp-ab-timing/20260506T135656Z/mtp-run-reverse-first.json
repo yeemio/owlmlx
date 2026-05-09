@@ -1,0 +1,45 @@
+{
+  "adapter_family": "mlx-vlm",
+  "argv": [
+    "/Users/yeemio/AI/gitrep/runtime-probes/mlx-vlm-mtp-probe/.venv/bin/python",
+    "-m",
+    "mlx_vlm",
+    "generate",
+    "--model",
+    "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+    "--prompt",
+    "Write one concise sentence explaining local AI.",
+    "--max-tokens",
+    "48",
+    "--temperature",
+    "0.0",
+    "--draft-model",
+    "/Users/yeemio/AI/Agent/model-candidates/mlx-community/gemma-4-31B-it-assistant-bf16",
+    "--draft-kind",
+    "mtp",
+    "--draft-block-size",
+    "6",
+    "--verbose"
+  ],
+  "capability_label": "experimental",
+  "child_max_resident_set_size": 43951128576,
+  "drafter_enabled": true,
+  "elapsed_ms": 19940.919,
+  "ok": true,
+  "parsed": {
+    "capability_label": "experimental",
+    "generated_text": "Local AI refers to artificial intelligence models that run directly on a user's own hardware rather than on a remote cloud server.",
+    "loaded_drafter": true,
+    "speculative_summary": {
+      "mean_accepted_tokens": 2.86,
+      "rounds": 7
+    },
+    "surface": "owlmlx.gemma4_mtp_drafter",
+    "version": "v1"
+  },
+  "returncode": 0,
+  "stderr": "/Users/yeemio/AI/gitrep/runtime-probes/mlx-vlm-mtp-probe/.venv/lib/python3.14/site-packages/transformers/audio_utils.py:549: UserWarning: At least one mel filter has all zero values. The value for `num_mel_filters` (128) may be set too high. Or, the value for `num_frequency_bins` (257) may be set too low.\n  warnings.warn(\n",
+  "stdout": "Loading drafter (mtp): /Users/yeemio/AI/Agent/model-candidates/mlx-community/gemma-4-31B-it-assistant-bf16\nLocal AI refers to artificial intelligence models that run directly on a user's own hardware rather than on a remote cloud server.\nSpeculative decoding: 2.86 accepted tokens over 7 rounds\n",
+  "surface": "owlmlx.gemma4_mtp_drafter",
+  "version": "v1"
+}

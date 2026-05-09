@@ -1,0 +1,115 @@
+{
+  "adapter_family": "mlx-vlm",
+  "aggregate": {
+    "all_runs_ok": true,
+    "delta_ms_mtp_minus_non_mtp_mean": -2739.611,
+    "mtp_elapsed_ms_mean": 19949.029,
+    "non_mtp_elapsed_ms_mean": 22688.64,
+    "ratio_mtp_over_non_mtp_mean": 0.8793
+  },
+  "capability_label": "experimental",
+  "created_at_utc": "2026-05-06T13:59:19Z",
+  "post_run": {
+    "after_first_pair_8066_healthz": {
+      "active_model_id": null,
+      "backend_error": null,
+      "backend_name": "mlx-lm-subprocess",
+      "child_health": {},
+      "contract": {
+        "surface": "owlmlx.healthz",
+        "version": "stabilization1"
+      },
+      "model_count": 0,
+      "ok": true,
+      "persistent_child": true,
+      "readiness": "degraded",
+      "runtime": "owlmlx"
+    },
+    "after_reverse_pair_8066_healthz": {
+      "active_model_id": null,
+      "backend_error": null,
+      "backend_name": "mlx-lm-subprocess",
+      "child_health": {},
+      "contract": {
+        "surface": "owlmlx.healthz",
+        "version": "stabilization1"
+      },
+      "model_count": 0,
+      "ok": true,
+      "persistent_child": true,
+      "readiness": "degraded",
+      "runtime": "owlmlx"
+    },
+    "residual_processes_after_reverse_pair": ""
+  },
+  "runs": {
+    "pair_1_non_mtp_first": {
+      "delta_ms_mtp_minus_non_mtp": -2568.109,
+      "mtp": {
+        "child_max_resident_set_size": 45247496192,
+        "elapsed_ms": 19957.138,
+        "generated_text": "Local AI refers to artificial intelligence models that run directly on a user's own hardware rather than on a remote cloud server.",
+        "loaded_drafter": true,
+        "ok": true,
+        "returncode": 0,
+        "speculative_summary": {
+          "mean_accepted_tokens": 2.86,
+          "rounds": 7
+        }
+      },
+      "non_mtp": {
+        "child_max_resident_set_size": 43479711744,
+        "elapsed_ms": 22525.247,
+        "generated_text": "Local AI refers to artificial intelligence models that run directly on a user's own hardware rather than on a remote cloud server.",
+        "loaded_drafter": false,
+        "ok": true,
+        "returncode": 0
+      },
+      "order": [
+        "non_mtp",
+        "mtp"
+      ],
+      "ratio_mtp_over_non_mtp": 0.886
+    },
+    "pair_2_mtp_first": {
+      "delta_ms_mtp_minus_non_mtp": -2911.114,
+      "mtp": {
+        "child_max_resident_set_size": 43951128576,
+        "elapsed_ms": 19940.919,
+        "generated_text": "Local AI refers to artificial intelligence models that run directly on a user's own hardware rather than on a remote cloud server.",
+        "loaded_drafter": true,
+        "ok": true,
+        "returncode": 0,
+        "speculative_summary": {
+          "mean_accepted_tokens": 2.86,
+          "rounds": 7
+        }
+      },
+      "non_mtp": {
+        "child_max_resident_set_size": 45879459840,
+        "elapsed_ms": 22852.033,
+        "generated_text": "Local AI refers to artificial intelligence models that run directly on a user's own hardware rather than on a remote cloud server.",
+        "loaded_drafter": false,
+        "ok": true,
+        "returncode": 0
+      },
+      "order": [
+        "mtp",
+        "non_mtp"
+      ],
+      "ratio_mtp_over_non_mtp": 0.8726
+    }
+  },
+  "schema": "owlmlx.gemma_mtp_ab_timing.v1",
+  "verdict": {
+    "grade": "mtp_measured_faster",
+    "read": "MTP was faster in both fresh-CLI orderings for this narrow prompt, but this measures the current experimental per-request CLI bridge rather than resident decode speedup."
+  },
+  "workload": {
+    "claim_boundary": "not resident decode speedup and not supported serving",
+    "max_tokens": 48,
+    "prompt": "Write one concise sentence explaining local AI.",
+    "temperature": 0,
+    "timing_scope": "fresh mlx-vlm CLI process per request, includes model load and process startup cost"
+  }
+}

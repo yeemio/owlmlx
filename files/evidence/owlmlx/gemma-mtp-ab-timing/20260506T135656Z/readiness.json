@@ -1,0 +1,56 @@
+{
+  "capability_label": "experimental",
+  "ok": true,
+  "pair": {
+    "blockers": [],
+    "capability_label": "experimental",
+    "draft": {
+      "architectures": [
+        "Gemma4AssistantForCausalLM"
+      ],
+      "is_assistant": true,
+      "model_type": "gemma4_assistant",
+      "path": "/Users/yeemio/AI/Agent/model-candidates/mlx-community/gemma-4-31B-it-assistant-bf16",
+      "text_hidden_size": 1024,
+      "text_model_type": "gemma4_text",
+      "text_num_hidden_layers": 4,
+      "vocab_size": 262144
+    },
+    "draft_model_is_standalone_target": false,
+    "ok": true,
+    "status": "ready",
+    "surface": "owlmlx.gemma4_mtp_drafter",
+    "target": {
+      "architectures": [
+        "Gemma4ForConditionalGeneration"
+      ],
+      "model_type": "gemma4",
+      "path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+      "text_hidden_size": 5376,
+      "text_model_type": "gemma4_text",
+      "text_num_hidden_layers": 60,
+      "vision_model_type": "gemma4_vision",
+      "vocab_size": 262144
+    },
+    "version": "v1"
+  },
+  "status": "ready",
+  "surface": "owlmlx.gemma4_mtp_drafter",
+  "toolchain": {
+    "capability_label": "experimental",
+    "flags_missing": [],
+    "flags_present": [
+      "--draft-model",
+      "--draft-kind",
+      "--draft-block-size"
+    ],
+    "ok": true,
+    "python_executable": "/Users/yeemio/AI/gitrep/runtime-probes/mlx-vlm-mtp-probe/.venv/bin/python",
+    "returncode": 0,
+    "status": "ready",
+    "stderr_excerpt": "",
+    "surface": "owlmlx.gemma4_mtp_drafter",
+    "version": "v1"
+  },
+  "version": "v1"
+}

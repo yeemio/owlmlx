@@ -1,0 +1,23 @@
+/Users/yeemio/AI/gitrep/runtime-probes/mlx-vlm-mtp-probe/.venv/lib/python3.14/site-packages/transformers/audio_utils.py:549: UserWarning: At least one mel filter has all zero values. The value for `num_mel_filters` (128) may be set too high. Or, the value for `num_frequency_bins` (257) may be set too low.
+  warnings.warn(
+Loading drafter (mtp): /Users/yeemio/AI/Agent/model-candidates/mlx-community/gemma-4-31B-it-assistant-bf16
+Private intelligence
+Speculative decoding: 0.0 accepted tokens over 1 rounds
+       20.07 real         2.22 user        20.20 sys
+         52917960704  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             3962423  page reclaims
+                 109  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                2301  voluntary context switches
+              174461  involuntary context switches
+        121773368670  instructions retired
+         62738020030  cycles elapsed
+         64463910464  peak memory footprint

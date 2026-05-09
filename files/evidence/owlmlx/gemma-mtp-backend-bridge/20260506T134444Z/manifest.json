@@ -1,0 +1,70 @@
+{
+  "schema": "owlmlx.gemma_mtp_backend_bridge.v1",
+  "created_at_utc": "2026-05-06T13:44:44Z",
+  "capability_label": "experimental",
+  "target_model": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+  "draft_model": "/Users/yeemio/AI/Agent/model-candidates/mlx-community/gemma-4-31B-it-assistant-bf16",
+  "runtime_python": "/Users/yeemio/AI/gitrep/runtime-probes/mlx-vlm-mtp-probe/.venv/bin/python",
+  "runner_module": "owlmlx.runtime.mlx_vlm_mtp_runner",
+  "backend": "MlxLmSubprocessBackend",
+  "bridge_mode": "deferred_cli_per_request",
+  "smoke": {
+    "load": {
+      "ok": true,
+      "message": "loaded /Users/yeemio/AI/Agent/models/gemma-4-31B-it in persistent child pid=39441",
+      "detail": {
+        "pid": 39441,
+        "load_time_s": 1.129,
+        "runner_model_id": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it"
+      }
+    },
+    "generate_messages": {
+      "ok": true,
+      "prompt": "Answer in two words: local AI.",
+      "max_tokens": 2,
+      "temperature": 0,
+      "text": "Private intelligence",
+      "detail": {
+        "returncode": 0,
+        "pid": 39441,
+        "generation_count": 1,
+        "message_count": 1
+      }
+    },
+    "unload": {
+      "ok": true,
+      "message": "unloaded /Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+      "detail": {
+        "pid": 39441
+      }
+    }
+  },
+  "post_run": {
+    "residual_mtp_processes": [],
+    "owlmlx_8066_healthz": {
+      "contract": {
+        "surface": "owlmlx.healthz",
+        "version": "stabilization1"
+      },
+      "runtime": "owlmlx",
+      "ok": true,
+      "readiness": "degraded",
+      "active_model_id": null,
+      "model_count": 0,
+      "backend_name": "mlx-lm-subprocess",
+      "backend_error": null,
+      "persistent_child": true,
+      "child_health": {}
+    }
+  },
+  "verdict": {
+    "backend_bridge_selectable": true,
+    "http_8066_default_path_changed": false,
+    "supported_serving_claim": false,
+    "notes": [
+      "The experimental runner is selectable through MlxLmSubprocessBackend runner_module.",
+      "Generation currently shells out to python -m mlx_vlm generate per request, so it is not a resident mlx-vlm backend.",
+      "The bridge remains experimental until same-prompt MTP/non-MTP timing, streaming semantics, and lifecycle evidence are stronger."
+    ]
+  }
+}

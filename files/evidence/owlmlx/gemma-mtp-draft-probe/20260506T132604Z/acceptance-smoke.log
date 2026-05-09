@@ -1,0 +1,23 @@
+/Users/yeemio/AI/gitrep/runtime-probes/mlx-vlm-mtp-probe/.venv/lib/python3.14/site-packages/transformers/audio_utils.py:549: UserWarning: At least one mel filter has all zero values. The value for `num_mel_filters` (128) may be set too high. Or, the value for `num_frequency_bins` (257) may be set too low.
+  warnings.warn(
+Loading drafter (mtp): /Users/yeemio/AI/Agent/model-candidates/mlx-community/gemma-4-31B-it-assistant-bf16
+Local AI refers to artificial intelligence models that run directly on a user's own hardware rather than on a remote cloud server.
+Speculative decoding: 2.86 accepted tokens over 7 rounds
+       21.47 real         2.46 user        22.11 sys
+         45872496640  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             3962445  page reclaims
+                 119  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                5151  voluntary context switches
+              187154  involuntary context switches
+        125370817930  instructions retired
+         68384450057  cycles elapsed
+         64677705304  peak memory footprint
