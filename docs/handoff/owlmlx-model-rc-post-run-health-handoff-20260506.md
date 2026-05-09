@@ -213,13 +213,17 @@ Suggested 8066 start command:
 ```bash
 cd /Users/yeemio/AI/gitrep/owlmlx
 mkdir -p /Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/runtime-test-runs
+mkdir -p /Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/runtime-monitor-trends
 ./.venv/bin/python scripts/runtime_technical_preview_server.py \
   --host 127.0.0.1 \
   --port 8066 \
   --models-root /Users/yeemio/AI/Agent/models \
   --backend-timeout-s 900 \
+  --comparative-evidence-ledger-path /Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/comparative-evidence/cumulative-ledger.jsonl \
   --model-release-candidate-ledger-path /Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/model-release-candidates/cumulative-ledger.jsonl \
   --runtime-test-run-ledger-path /Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/runtime-test-runs/audit-ledger.jsonl \
+  --runtime-monitor-trend-ledger-path /Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/runtime-monitor-trends/trend-ledger.jsonl \
+  --runtime-monitor-sample-interval-s 15 \
   --log-level warning
 ```
 
