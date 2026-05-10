@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 from owlmlx import build_cache_pre_gate_admission_window_seam
@@ -7,7 +8,13 @@ from owlmlx.cache_pre_gate_admission_hook_exactness import CachePreGateAdmission
 from owlmlx.cache_pre_gate_admission_window_seam import (
     cache_pre_gate_admission_window_seam_to_dict,
 )
-from owlmlx.cache_request_aggregation_active_seam import CacheRequestAggregationActiveSeam
+from owlmlx.cache_request_aggregation_active_seam import (
+    build_cache_request_aggregation_active_seam,
+)
+
+
+def _active_seam(**overrides: object) -> object:
+    return replace(build_cache_request_aggregation_active_seam(), **overrides)
 
 
 def test_cache_pre_gate_admission_window_seam_defaults_unresolved() -> None:
@@ -18,50 +25,7 @@ def test_cache_pre_gate_admission_window_seam_defaults_unresolved() -> None:
 
 
 def test_cache_pre_gate_admission_window_seam_freezes_exact() -> None:
-    active_seam = CacheRequestAggregationActiveSeam(
-        request_aggregation_window_reentry=object(),
-        request_aggregation_window_exactness=object(),
-        child_exchange_exactness=object(),
-        cohort_handoff_exactness=object(),
-        stream_hold_exactness=object(),
-        stream_backend_terminal_event_exactness=object(),
-        stream_backend_terminal_payload_commit_exactness=object(),
-        stream_backend_terminal_payload_capture_exactness=object(),
-        stream_backend_terminal_record_capture_exactness=object(),
-        stream_backend_terminal_record_prefix_exactness=object(),
-        stream_backend_terminal_action_discriminant_exactness=object(),
-        stream_backend_terminal_notice_capture_exactness=object(),
-        stream_backend_terminal_notice_prefix_exactness=object(),
-        stream_backend_terminal_notice_action_discriminant_exactness=object(),
-        stream_backend_terminal_notice_action_stem_exactness=object(),
-        stream_backend_terminal_notice_marker_exactness=object(),
-        stream_backend_terminal_notice_marker_prefix_exactness=object(),
-        stream_backend_terminal_notice_marker_stem_exactness=object(),
-        stream_backend_terminal_notice_marker_discriminant_exactness=object(),
-        stream_backend_terminal_notice_marker_key_lead_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_stem_exactness=object(),
+    active_seam = _active_seam(
         status="partial",
         seam_rung="aggregation_active_seam_exact",
         selected_seam="pre_gate_admission_window",
@@ -100,50 +64,7 @@ def test_cache_pre_gate_admission_window_seam_freezes_exact() -> None:
 
 
 def test_cache_pre_gate_admission_window_seam_revalidates_after_structural_ingress() -> None:
-    active_seam = CacheRequestAggregationActiveSeam(
-        request_aggregation_window_reentry=object(),
-        request_aggregation_window_exactness=object(),
-        child_exchange_exactness=object(),
-        cohort_handoff_exactness=object(),
-        stream_hold_exactness=object(),
-        stream_backend_terminal_event_exactness=object(),
-        stream_backend_terminal_payload_commit_exactness=object(),
-        stream_backend_terminal_payload_capture_exactness=object(),
-        stream_backend_terminal_record_capture_exactness=object(),
-        stream_backend_terminal_record_prefix_exactness=object(),
-        stream_backend_terminal_action_discriminant_exactness=object(),
-        stream_backend_terminal_notice_capture_exactness=object(),
-        stream_backend_terminal_notice_prefix_exactness=object(),
-        stream_backend_terminal_notice_action_discriminant_exactness=object(),
-        stream_backend_terminal_notice_action_stem_exactness=object(),
-        stream_backend_terminal_notice_marker_exactness=object(),
-        stream_backend_terminal_notice_marker_prefix_exactness=object(),
-        stream_backend_terminal_notice_marker_stem_exactness=object(),
-        stream_backend_terminal_notice_marker_discriminant_exactness=object(),
-        stream_backend_terminal_notice_marker_key_lead_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_stem_exactness=object(),
+    active_seam = _active_seam(
         status="partial",
         seam_rung="aggregation_active_seam_exact",
         selected_seam="pre_gate_admission_window",
@@ -186,50 +107,7 @@ def test_cache_pre_gate_admission_window_seam_revalidates_after_structural_ingre
 
 
 def test_cache_pre_gate_admission_window_seam_stops_being_active_after_window_entry() -> None:
-    active_seam = CacheRequestAggregationActiveSeam(
-        request_aggregation_window_reentry=object(),
-        request_aggregation_window_exactness=object(),
-        child_exchange_exactness=object(),
-        cohort_handoff_exactness=object(),
-        stream_hold_exactness=object(),
-        stream_backend_terminal_event_exactness=object(),
-        stream_backend_terminal_payload_commit_exactness=object(),
-        stream_backend_terminal_payload_capture_exactness=object(),
-        stream_backend_terminal_record_capture_exactness=object(),
-        stream_backend_terminal_record_prefix_exactness=object(),
-        stream_backend_terminal_action_discriminant_exactness=object(),
-        stream_backend_terminal_notice_capture_exactness=object(),
-        stream_backend_terminal_notice_prefix_exactness=object(),
-        stream_backend_terminal_notice_action_discriminant_exactness=object(),
-        stream_backend_terminal_notice_action_stem_exactness=object(),
-        stream_backend_terminal_notice_marker_exactness=object(),
-        stream_backend_terminal_notice_marker_prefix_exactness=object(),
-        stream_backend_terminal_notice_marker_stem_exactness=object(),
-        stream_backend_terminal_notice_marker_discriminant_exactness=object(),
-        stream_backend_terminal_notice_marker_key_lead_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_first_unique_boundary_exactness=object(),
-        stream_backend_terminal_notice_leading_discriminator_marker_stem_exactness=object(),
+    active_seam = _active_seam(
         status="partial",
         seam_rung="aggregation_active_seam_exact",
         selected_seam="child_exchange_aggregated_dispatch_dependency",
