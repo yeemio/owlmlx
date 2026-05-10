@@ -141,6 +141,72 @@ def test_parse_stream_events_error_detected():
     assert result["error"] == "backend_error"
 
 
+def test_parse_stream_events_prefers_server_side_timing():
+    """Server-side timing from done.detail.timing overrides client-side elapsed."""
+    events = [
+        {
+            "event": "token",
+            "text": "Hello",
+            "completion_tokens": 1,
+            "_client_elapsed_ms": 5000.0,  # batched; all arrive at ~same time
+        },
+        {
+            "event": "token",
+            "text": " world",
+            "completion_tokens": 2,
+            "_client_elapsed_ms": 5001.0,
+        },
+        {
+            "event": "done",
+            "completion_tokens": 2,
+            "finish_reason": "stop",
+            "_client_elapsed_ms": 5002.0,  # practically same → decode_wall≈0 client-side
+            "detail": {
+                "pid": 999,
+                "timing": {
+                    "surface": "owlmlx.child_stream_timing",
+                    "stream_call_start_ms": 10.0,
+                    "first_response_ms": 1200.0,
+                    "first_visible_token_ms": 1200.0,
+                    "stream_wall_ms": 3600.0,
+                },
+            },
+        },
+    ]
+    result = _parse_stream_events(events)
+    # Server-side values should win
+    assert result["first_token_ms"] == pytest.approx(1200.0)
+    assert result["wall_ms"] == pytest.approx(3600.0)
+    # decode_wall = 3600 - 1200 = 2400ms; 1 decode token → 0.417 tps (rounded 3dp)
+    assert result["decode_tps"] == pytest.approx(0.417, abs=1e-3)
+    # prefill derived from server timing: 1200 - 10 = 1190ms
+    assert result["prefill_ms"] == pytest.approx(1190.0)
+    assert result["server_timing"] is not None
+    assert result["server_timing"]["stream_wall_ms"] == pytest.approx(3600.0)
+
+
+def test_parse_stream_events_falls_back_to_client_timing_without_server():
+    """When server_timing is absent the client-side elapsed values are used."""
+    events = [
+        {
+            "event": "token",
+            "text": "Hi",
+            "completion_tokens": 1,
+            "_client_elapsed_ms": 100.0,
+        },
+        {
+            "event": "done",
+            "completion_tokens": 1,
+            "finish_reason": "stop",
+            "_client_elapsed_ms": 200.0,
+        },
+    ]
+    result = _parse_stream_events(events)
+    assert result["first_token_ms"] == pytest.approx(100.0)
+    assert result["wall_ms"] == pytest.approx(200.0)
+    assert result["server_timing"] is None
+
+
 # ---------------------------------------------------------------------------
 # Integration tests (real server)
 # ---------------------------------------------------------------------------
@@ -269,6 +335,7 @@ def test_run_campaign_passes_generation_params_under_params(monkeypatch, tmp_pat
         max_tokens=3,
         temperature=0.25,
         http_timeout_s=30.0,
+        warmup_repeats=0,  # disable warmup so payload count is deterministic
     )
 
     assert result["error"] is None
@@ -295,3 +362,88 @@ def test_parse_stream_events_keeps_partial_text_and_error():
 
     assert result["text"] == "partial"
     assert result["error"] == "backend_error"
+
+
+def test_run_campaign_warmup_repeats_excluded_from_stats(monkeypatch, tmp_path):
+    """warmup_repeats generates are not counted in per_repeat_results or samples."""
+    call_log: list[str] = []
+
+    def fake_http_json(method, url, payload=None, timeout_s=120.0):
+        if url.endswith("/healthz"):
+            return 200, {"ok": True, "active_model_id": None}
+        if url.endswith("/v1/load"):
+            return 200, {"detail": "loaded"}
+        if url.endswith("/v1/unload"):
+            return 200, {"detail": "unloaded"}
+        raise AssertionError(f"unexpected: {method} {url}")
+
+    def fake_stream(url, payload, timeout_s=180.0):
+        call_log.append("stream")
+        return [
+            {"event": "token", "text": "x", "completion_tokens": 1, "_client_elapsed_ms": 10.0},
+            {"event": "done", "finish_reason": "stop", "_client_elapsed_ms": 20.0},
+        ]
+
+    monkeypatch.setattr(campaign, "_http_json", fake_http_json)
+    monkeypatch.setattr(campaign, "_http_ndjson_stream", fake_stream)
+
+    result = run_campaign(
+        server_url="http://127.0.0.1:9999",
+        model_id="m",
+        artifact_path=str(tmp_path),
+        repeat_count=3,
+        prompt="p",
+        max_tokens=2,
+        http_timeout_s=10.0,
+        warmup_repeats=2,
+    )
+
+    assert result["error"] is None
+    # 2 warmup + 3 measured = 5 total stream calls
+    assert len(call_log) == 5
+    # per_repeat_results only covers the 3 measured repeats
+    assert len(result["per_repeat_results"]) == 3
+    stats = result["repeatability_stats_dict"]
+    assert stats["n"] == 3
+
+
+def test_write_per_repeat_evidence_creates_jsonl(tmp_path):
+    """write_per_repeat_evidence creates a JSONL with one row per repeat."""
+    from scripts.runtime_repeatability_campaign import write_per_repeat_evidence
+
+    per_repeat = [
+        {
+            "repeat_index": 1,
+            "first_token_ms": 1200.0,
+            "prefill_ms": 50.0,
+            "wall_ms": 3500.0,
+            "decode_tps": 4.2,
+            "completion_tokens": 10,
+            "finish_reason": "stop",
+            "error": None,
+            "server_timing": {"stream_wall_ms": 3500.0, "first_visible_token_ms": 1200.0, "stream_call_start_ms": 5.0},
+        },
+        {
+            "repeat_index": 2,
+            "first_token_ms": 1100.0,
+            "prefill_ms": 45.0,
+            "wall_ms": 3400.0,
+            "decode_tps": 4.4,
+            "completion_tokens": 10,
+            "finish_reason": "stop",
+            "error": None,
+            "server_timing": None,
+        },
+    ]
+    record_kwargs = {"created_at": "2026-05-11T00:00:00Z", "model_id": "TestModel"}
+
+    path = write_per_repeat_evidence(per_repeat, record_kwargs, str(tmp_path / "ev"))
+
+    lines = (tmp_path / "ev" / path.split("/")[-1]).read_text().splitlines()
+    assert len(lines) == 2
+    row0 = json.loads(lines[0])
+    assert row0["repeat_index"] == 1
+    assert row0["timing_source"] == "server"
+    assert row0["server_stream_wall_ms"] == 3500.0
+    row1 = json.loads(lines[1])
+    assert row1["timing_source"] == "client"

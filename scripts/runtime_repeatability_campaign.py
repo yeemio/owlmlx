@@ -113,22 +113,32 @@ def _rounded_ms(v: float | None) -> float | None:
 def _parse_stream_events(
     events: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Extract timing and content from a /v1/generate/stream NDJSON event list."""
+    """Extract timing and content from a /v1/generate/stream NDJSON event list.
+
+    Timing preference order:
+    1. Server-side: ``detail.timing.{first_visible_token_ms,stream_wall_ms}`` from
+       the ``done`` event.  These are measured inside the subprocess runner and are
+       immune to OS TCP-buffer batching that causes all ``_client_elapsed_ms`` values
+       to land at the same timestamp.
+    2. Client-side fallback: ``_client_elapsed_ms`` at first token and done event.
+       Used when server-side timing is absent (e.g. FakeBackend in tests).
+    """
     text_parts: list[str] = []
-    first_token_ms: float | None = None
+    first_token_client_ms: float | None = None
     prefill_ms: float | None = None
     completion_tokens = 0
     finish_reason: str | None = None
     queue_wait_ms: float | None = None
-    stream_end_elapsed_ms: float | None = None
+    stream_end_client_ms: float | None = None
+    server_timing: dict[str, Any] | None = None
     error_detail: str | None = None
 
     for event in events:
         evt = event.get("event", "")
         if evt == "token":
-            if first_token_ms is None:
+            if first_token_client_ms is None:
                 elapsed = event.get("_client_elapsed_ms")
-                first_token_ms = float(elapsed) if elapsed is not None else None
+                first_token_client_ms = float(elapsed) if elapsed is not None else None
             if event.get("prefill_ms") is not None and prefill_ms is None:
                 prefill_ms = float(event["prefill_ms"])
             if event.get("wait_time_s") is not None and queue_wait_ms is None:
@@ -139,14 +149,31 @@ def _parse_stream_events(
             text_parts.append(event.get("text", ""))
         elif evt == "done":
             elapsed = event.get("_client_elapsed_ms")
-            stream_end_elapsed_ms = float(elapsed) if elapsed is not None else None
+            stream_end_client_ms = float(elapsed) if elapsed is not None else None
             finish_reason = event.get("finish_reason")
-
+            detail = event.get("detail")
+            if isinstance(detail, dict):
+                t = detail.get("timing")
+                if isinstance(t, dict):
+                    server_timing = t
         elif evt == "error":
             detail = event.get("detail", {})
             error_detail = detail.get("message", "unknown error") if isinstance(detail, dict) else str(detail)
 
-    wall_ms = stream_end_elapsed_ms
+    # Prefer server-side timing; fall back to client-side when unavailable.
+    if server_timing is not None:
+        sv_first = server_timing.get("first_visible_token_ms")
+        sv_wall = server_timing.get("stream_wall_ms")
+        first_token_ms = float(sv_first) if sv_first is not None else first_token_client_ms
+        wall_ms = float(sv_wall) if sv_wall is not None else stream_end_client_ms
+        if prefill_ms is None:
+            sc = server_timing.get("stream_call_start_ms")
+            if sv_first is not None and sc is not None:
+                prefill_ms = float(sv_first) - float(sc)
+    else:
+        first_token_ms = first_token_client_ms
+        wall_ms = stream_end_client_ms
+
     decode_tokens = max(completion_tokens - 1, 0)
     decode_wall_ms = (
         max(wall_ms - (first_token_ms or 0.0), 0.0)
@@ -169,6 +196,7 @@ def _parse_stream_events(
         "completion_tokens": completion_tokens,
         "finish_reason": finish_reason,
         "error": error_detail,
+        "server_timing": server_timing,
     }
 
 
@@ -219,14 +247,20 @@ def run_campaign(
     memory_gb: float | None = None,
     host_class: str = "Mac17,6-arm64-macOS-26.4.1-128GB",
     http_timeout_s: float = 180.0,
+    warmup_repeats: int = 1,
 ) -> dict[str, Any]:
     """Run N generations and return a result dict ready for ledger writing.
+
+    ``warmup_repeats`` un-measured generates run before the measured campaign
+    to allow Metal JIT shader compilation so it does not contaminate the first
+    measured repeat.
 
     Returns a dict with:
       - ``record_kwargs``: kwargs for ``build_model_release_candidate_record``
       - ``repeatability_stats_dict``: serialized RepeatabilityStatistics
       - ``campaign_label``: smoke / repeatability_candidate / repeatability_evidence
       - ``error``: str | None
+      - ``per_repeat_results``: list of per-repeat timing dicts
     """
     campaign_label = _campaign_label(repeat_count)
     samples: list[RepeatRunSample] = []
@@ -266,17 +300,33 @@ def run_campaign(
             "error": f"load failed: {load_status} {load_resp}",
         }
 
-    # N generations
+    gen_payload: dict[str, Any] = {
+        "model_id": model_id,
+        "prompt": prompt,
+        "params": {
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        },
+    }
+
+    # Warmup: fire-and-forget generates to prime Metal JIT shader compilation.
+    # These are not counted in repeatability statistics.
+    if warmup_repeats > 0:
+        print(
+            f"[repeatability-campaign] warmup: {warmup_repeats} un-measured "
+            "generate(s) to prime Metal JIT ...",
+            file=sys.stderr,
+        )
+    for _ in range(warmup_repeats):
+        _http_ndjson_stream(
+            f"{server_url}/v1/generate/stream",
+            gen_payload,
+            timeout_s=http_timeout_s,
+        )
+
+    # N measured generations
     repeat_started = _now_iso_utc()
     for index in range(1, repeat_count + 1):
-        gen_payload = {
-            "model_id": model_id,
-            "prompt": prompt,
-            "params": {
-                "max_tokens": max_tokens,
-                "temperature": temperature,
-            },
-        }
         events = _http_ndjson_stream(
             f"{server_url}/v1/generate/stream",
             gen_payload,
@@ -303,6 +353,15 @@ def run_campaign(
                     wall_ms=parsed["wall_ms"],
                     rss_bytes=int(rss_bytes) if rss_bytes is not None else None,
                 )
+            )
+            timing_src = "server" if parsed.get("server_timing") else "client"
+            print(
+                f"[repeatability-campaign] repeat {index}/{repeat_count} OK  "
+                f"ttft={parsed['first_token_ms']}ms  "
+                f"tps={parsed['decode_tps']}  "
+                f"tokens={parsed['completion_tokens']}  "
+                f"timing_src={timing_src}",
+                file=sys.stderr,
             )
 
     # Unload
@@ -421,6 +480,38 @@ def write_to_ledger(record_kwargs: dict[str, Any], ledger_path: str) -> None:
     ModelReleaseCandidateLedger(ledger_path).append(record)
 
 
+def write_per_repeat_evidence(
+    per_repeat_results: list[dict[str, Any]],
+    record_kwargs: dict[str, Any],
+    evidence_dir: str,
+) -> str:
+    """Write per-repeat timing JSONL to evidence_dir. Returns the written path."""
+    Path(evidence_dir).mkdir(parents=True, exist_ok=True)
+    ts = record_kwargs.get("created_at", _now_iso_utc()).replace(":", "-").replace("T", "_")
+    model_slug = str(record_kwargs.get("model_id", "unknown")).replace("/", "_").replace(" ", "_")
+    path = Path(evidence_dir) / f"per-repeat_{model_slug}_{ts}.jsonl"
+    with open(path, "w", encoding="utf-8") as fh:
+        for r in per_repeat_results:
+            row: dict[str, Any] = {
+                "repeat_index": r.get("repeat_index"),
+                "ttft_ms": r.get("first_token_ms"),
+                "prefill_ms": r.get("prefill_ms"),
+                "wall_ms": r.get("wall_ms"),
+                "decode_tps": r.get("decode_tps"),
+                "completion_tokens": r.get("completion_tokens"),
+                "finish_reason": r.get("finish_reason"),
+                "error": r.get("error"),
+                "timing_source": "server" if r.get("server_timing") else "client",
+            }
+            sv = r.get("server_timing") or {}
+            if sv:
+                row["server_stream_wall_ms"] = sv.get("stream_wall_ms")
+                row["server_first_visible_token_ms"] = sv.get("first_visible_token_ms")
+                row["server_stream_call_start_ms"] = sv.get("stream_call_start_ms")
+            fh.write(json.dumps(row) + "\n")
+    return str(path)
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -448,6 +539,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         memory_gb=args.memory_gb,
         host_class=args.host_class,
         http_timeout_s=args.http_timeout_s,
+        warmup_repeats=args.warmup_repeats,
     )
 
     if result["error"]:
@@ -464,6 +556,18 @@ def _cmd_run(args: argparse.Namespace) -> int:
           f"stddev={stats['decode_tps']['stddev']}")
     print(f"  post_health_clean={result['post_health_clean']}")
     print(f"  campaign_label={result['campaign_label']}")
+
+    evidence_dir = (
+        str(Path(args.artifact_path) / "repeatability-evidence")
+        if args.artifact_path
+        else None
+    )
+    if evidence_dir and result.get("per_repeat_results"):
+        rk = result["record_kwargs"]
+        ev_path = write_per_repeat_evidence(
+            result["per_repeat_results"], rk, evidence_dir
+        )
+        print(f"[repeatability-campaign] per-repeat evidence: {ev_path}")
 
     if args.ledger_path:
         rk = result["record_kwargs"]
@@ -508,6 +612,12 @@ def main() -> int:
     )
     run_p.add_argument("--ledger-path", default=None)
     run_p.add_argument("--http-timeout-s", type=float, default=180.0)
+    run_p.add_argument(
+        "--warmup-repeats",
+        type=int,
+        default=1,
+        help="Un-measured generates before campaign to prime Metal JIT (default: 1)",
+    )
     run_p.set_defaults(func=_cmd_run)
 
     args = parser.parse_args()
