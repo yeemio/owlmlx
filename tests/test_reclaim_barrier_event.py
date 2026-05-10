@@ -313,7 +313,11 @@ def test_reclaim_barrier_event_route_after_failed_unload_reports_hard_barrier() 
     client = TestClient(create_app(kernel))
     client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 1.0})
     unload_response = client.post("/v1/unload", json={"model_id": "fake-a"})
-    assert unload_response.json()["ok"] is False
+    assert unload_response.status_code == 500
+    unload_payload = unload_response.json()
+    assert unload_payload["object"] == "error"
+    assert unload_payload["error_code"] == "backend_error"
+    assert unload_payload["http_status"] == 500
 
     response = client.get("/v1/runtime/reclaim-barrier-event")
     assert response.status_code == 200

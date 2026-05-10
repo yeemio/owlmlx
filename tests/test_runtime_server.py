@@ -75,10 +75,11 @@ def test_http_load_respects_memory_budget() -> None:
 
     response = client.post("/v1/load", json={"model_id": "too-large", "memory_gb": 7.0})
 
-    assert response.status_code == 200
+    assert response.status_code == 400
     payload = response.json()
-    assert payload["ok"] is False
+    assert payload["object"] == "error"
     assert payload["error_code"] == "memory_budget_exceeded"
+    assert payload["http_status"] == 400
 
 
 def test_generate_without_loaded_model_returns_runtime_error() -> None:
@@ -86,10 +87,11 @@ def test_generate_without_loaded_model_returns_runtime_error() -> None:
 
     response = client.post("/v1/generate", json={"prompt": "hello"})
 
-    assert response.status_code == 200
+    assert response.status_code == 404
     payload = response.json()
-    assert payload["ok"] is False
+    assert payload["object"] == "error"
     assert payload["error_code"] == "model_not_loaded"
+    assert payload["http_status"] == 404
 
 
 def test_generate_stream_returns_ndjson_events() -> None:
