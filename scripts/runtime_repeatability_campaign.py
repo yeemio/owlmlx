@@ -78,14 +78,19 @@ def _http_ndjson_stream(
     headers = {"Content-Type": "application/json"}
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     events: list[dict[str, Any]] = []
+    started = time.monotonic()
     try:
         with urllib.request.urlopen(req, timeout=timeout_s) as resp:
             for raw_line in resp:
+                elapsed_ms = (time.monotonic() - started) * 1000.0
                 line = raw_line.strip()
                 if not line:
                     continue
                 try:
-                    events.append(json.loads(line))
+                    event = json.loads(line)
+                    if isinstance(event, dict):
+                        event["_client_elapsed_ms"] = elapsed_ms
+                    events.append(event)
                 except json.JSONDecodeError:
                     pass
     except Exception as exc:
@@ -115,16 +120,15 @@ def _parse_stream_events(
     completion_tokens = 0
     finish_reason: str | None = None
     queue_wait_ms: float | None = None
-    stream_start_wall: float | None = None
-    stream_end_wall: float | None = None
+    stream_end_elapsed_ms: float | None = None
     error_detail: str | None = None
 
-    stream_start_wall = time.monotonic()
     for event in events:
         evt = event.get("event", "")
         if evt == "token":
             if first_token_ms is None:
-                first_token_ms = (time.monotonic() - stream_start_wall) * 1000.0
+                elapsed = event.get("_client_elapsed_ms")
+                first_token_ms = float(elapsed) if elapsed is not None else None
             if event.get("prefill_ms") is not None and prefill_ms is None:
                 prefill_ms = float(event["prefill_ms"])
             if event.get("wait_time_s") is not None and queue_wait_ms is None:
@@ -134,18 +138,15 @@ def _parse_stream_events(
                 completion_tokens = int(ct)
             text_parts.append(event.get("text", ""))
         elif evt == "done":
-            stream_end_wall = time.monotonic()
+            elapsed = event.get("_client_elapsed_ms")
+            stream_end_elapsed_ms = float(elapsed) if elapsed is not None else None
             finish_reason = event.get("finish_reason")
 
         elif evt == "error":
             detail = event.get("detail", {})
             error_detail = detail.get("message", "unknown error") if isinstance(detail, dict) else str(detail)
 
-    wall_ms = (
-        (stream_end_wall - stream_start_wall) * 1000.0
-        if stream_end_wall is not None
-        else None
-    )
+    wall_ms = stream_end_elapsed_ms
     decode_tokens = max(completion_tokens - 1, 0)
     decode_wall_ms = (
         max(wall_ms - (first_token_ms or 0.0), 0.0)
@@ -271,8 +272,10 @@ def run_campaign(
         gen_payload = {
             "model_id": model_id,
             "prompt": prompt,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
+            "params": {
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            },
         }
         events = _http_ndjson_stream(
             f"{server_url}/v1/generate/stream",
@@ -370,7 +373,7 @@ def run_campaign(
         visibility_status="visible",
         load_result=load_result,
         generation_result={
-            "status": "pass" if successful else "fail",
+            "status": "pass" if failure_count == 0 and len(successful) == repeat_count else "failed",
             "detail": f"{len(successful)}/{repeat_count} repeats succeeded",
         },
         unload_result=unload_result,

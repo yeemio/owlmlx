@@ -16,6 +16,7 @@ import time
 import pytest
 import uvicorn
 
+import scripts.runtime_repeatability_campaign as campaign
 from owlmlx.runtime import FakeBackend, RuntimeKernel
 from owlmlx.runtime.server import create_app
 from owlmlx.model_release_candidate_ledger import ModelReleaseCandidateLedger
@@ -106,26 +107,32 @@ def test_parse_stream_events_extracts_first_token_and_prefill():
             "completion_tokens": 1,
             "wait_time_s": 0.05,
             "prefill_ms": 120.5,
+            "_client_elapsed_ms": 150.0,
         },
         {
             "event": "token",
             "text": " world",
             "sequence": 2,
             "completion_tokens": 2,
+            "_client_elapsed_ms": 175.0,
         },
         {
             "event": "done",
             "sequence": 2,
             "completion_tokens": 2,
             "finish_reason": "stop",
+            "_client_elapsed_ms": 250.0,
         },
     ]
     result = _parse_stream_events(events)
+    assert result["first_token_ms"] == pytest.approx(150.0)
     assert result["prefill_ms"] == pytest.approx(120.5)
+    assert result["wall_ms"] == pytest.approx(250.0)
     assert result["completion_tokens"] == 2
     assert result["finish_reason"] == "stop"
     assert result["error"] is None
     assert result["queue_wait_ms"] == pytest.approx(50.0)
+    assert result["decode_tps"] == pytest.approx(10.0)
 
 
 def test_parse_stream_events_error_detected():
@@ -220,3 +227,71 @@ def test_run_campaign_returns_per_repeat_results(fake_server, tmp_path):
     for r in result["per_repeat_results"]:
         assert "repeat_index" in r
         assert "completion_tokens" in r
+
+
+def test_run_campaign_passes_generation_params_under_params(monkeypatch, tmp_path):
+    seen_payloads: list[dict] = []
+
+    def fake_http_json(method, url, payload=None, timeout_s=120.0):
+        if url.endswith("/healthz"):
+            return 200, {"ok": True, "active_model_id": None}
+        if url.endswith("/v1/load"):
+            return 200, {"detail": "loaded"}
+        if url.endswith("/v1/unload"):
+            return 200, {"detail": "unloaded"}
+        raise AssertionError(f"unexpected json call: {method} {url}")
+
+    def fake_stream(url, payload, timeout_s=180.0):
+        seen_payloads.append(payload)
+        return [
+            {
+                "event": "token",
+                "text": "a",
+                "completion_tokens": 1,
+                "_client_elapsed_ms": 10.0,
+            },
+            {
+                "event": "done",
+                "finish_reason": "length",
+                "_client_elapsed_ms": 20.0,
+            },
+        ]
+
+    monkeypatch.setattr(campaign, "_http_json", fake_http_json)
+    monkeypatch.setattr(campaign, "_http_ndjson_stream", fake_stream)
+
+    result = run_campaign(
+        server_url="http://127.0.0.1:9999",
+        model_id="test-model",
+        artifact_path=str(tmp_path),
+        repeat_count=2,
+        prompt="Hello",
+        max_tokens=3,
+        temperature=0.25,
+        http_timeout_s=30.0,
+    )
+
+    assert result["error"] is None
+    assert len(result["per_repeat_results"]) == 2
+    assert len(seen_payloads) == 2
+    for payload in seen_payloads:
+        assert payload["model_id"] == "test-model"
+        assert payload["prompt"] == "Hello"
+        assert payload["params"] == {"max_tokens": 3, "temperature": 0.25}
+
+
+def test_parse_stream_events_keeps_partial_text_and_error():
+    events = [
+        {
+            "event": "token",
+            "text": "partial",
+            "completion_tokens": 1,
+            "_client_elapsed_ms": 1.0,
+        },
+        {"event": "error", "detail": {"message": "backend_error"}},
+    ]
+
+    result = _parse_stream_events(events)
+
+    assert result["text"] == "partial"
+    assert result["error"] == "backend_error"
