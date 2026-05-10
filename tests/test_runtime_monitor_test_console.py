@@ -283,14 +283,6 @@ def test_test_run_launch_requires_audit_ledger_and_abort_is_audited() -> None:
     assert abort.json()["policy_boundaries"]["does_not_abort_process"] is True
 
 
-@pytest.mark.skip(
-    reason=(
-        "worker thread does not progress past 'running' under TestClient on "
-        "contended hosts; root cause is in the live-mode launch path, not the "
-        "Monitor contract. Tracked as P0d-mon follow-up; other 6 Monitor tests "
-        "and snapshot/sampler/preflight contracts remain green."
-    )
-)
 def test_runtime_test_run_registry_launches_worker_and_replays_events(tmp_path) -> None:
     ledger_path = tmp_path / "runtime-test-runs.jsonl"
     model_rc_ledger = tmp_path / "model-rc-ledger.jsonl"
@@ -358,11 +350,11 @@ def test_runtime_test_run_registry_launches_worker_and_replays_events(tmp_path) 
         assert snapshot.json()["test_runs"]["audit_ledger_status"] == "available"
         assert snapshot.json()["test_runs"]["known_run_count"] == 1
 
-        for _ in range(40):
+        for _ in range(80):
             status = client.get(f"/v1/runtime/test-runs/{run_id}")
             if status.json()["run"]["status"] == "succeeded":
                 break
-            time.sleep(0.025)
+            time.sleep(0.05)
         final = client.get(f"/v1/runtime/test-runs/{run_id}").json()["run"]
         assert final["status"] == "succeeded"
         assert final["metrics"]["output_tokens"] > 0

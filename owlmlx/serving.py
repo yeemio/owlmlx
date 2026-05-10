@@ -20,10 +20,10 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any, AsyncIterator, Callable, TypeVar
+from typing import Any, AsyncIterator, Callable, Iterator, TypeVar
 
 T = TypeVar("T")
 
@@ -796,6 +796,50 @@ class GenerationGate:
                 await loop.run_in_executor(
                     None, self.discard_admission, reservation.reservation_ticket
                 )
+            if began_turn and exec_start is not None:
+                self._finish_turn(exec_start=exec_start, wait_time=wait_time, served=True)
+
+    @contextmanager
+    def stream_session_with_admission_sync(
+        self,
+        metadata: PreGateAdmissionMetadata,
+    ) -> Iterator[GenerationResult]:
+        """Hold GenerationGate after bounded pre-gate admission staging (sync).
+
+        Synchronous companion to stream_session_with_admission, designed to be
+        called from a thread via loop.run_in_executor(). All gate methods it
+        calls are synchronous; blocking is intentional and expected in the
+        executor context.
+        """
+        reservation = self.stage_admission(metadata)
+        claimed = False
+        began_turn = False
+        was_queued = False
+        wait_time = 0.0
+        exec_start: float | None = None
+        try:
+            claim_ticket = self._ticket_for_reservation(reservation.reservation_ticket)
+            if claim_ticket is None:
+                raise RuntimeError("pre-gate reservation disappeared before claim")
+            joined_open_cohort = self._reservation_joined_open_cohort(
+                reservation.reservation_ticket
+            )
+            cohort_wait = self._await_cohort_window(reservation.reservation_ticket)
+            was_queued, gate_wait, exec_start = self._begin_turn_for_ticket(claim_ticket)
+            was_queued = was_queued or joined_open_cohort
+            wait_time = cohort_wait + gate_wait
+            began_turn = True
+            self._claim_admission(reservation.reservation_ticket)
+            claimed = True
+            yield GenerationResult(
+                value=None,
+                wait_time_s=round(wait_time, 4),
+                execution_time_s=0.0,
+                was_queued=was_queued,
+            )
+        finally:
+            if not claimed:
+                self.discard_admission(reservation.reservation_ticket)
             if began_turn and exec_start is not None:
                 self._finish_turn(exec_start=exec_start, wait_time=wait_time, served=True)
 
