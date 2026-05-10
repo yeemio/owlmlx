@@ -108,6 +108,7 @@ class StreamEvent:
     wait_time_s: float | None = None
     execution_time_s: float | None = None
     was_queued: bool = False
+    prefill_ms: float | None = None
     detail: dict[str, Any] = field(default_factory=dict)
 
 

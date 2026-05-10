@@ -1,5 +1,11 @@
 """owlmlx runtime helpers."""
 
+from .repeatability_statistics import (
+    RepeatRunSample,
+    RepeatabilityStatistics,
+    compute_repeatability_statistics,
+    repeatability_statistics_to_dict,
+)
 from .abort_recovery import (
     MAX_ABORT_HISTORY,
     SNAPSHOT_RECENT_ABORTS,
@@ -1238,4 +1244,8 @@ __all__ = [
     "validate_model_lineage",
     "validate_runtime_status",
     "write_artifact_metadata",
+    "RepeatRunSample",
+    "RepeatabilityStatistics",
+    "compute_repeatability_statistics",
+    "repeatability_statistics_to_dict",
 ]

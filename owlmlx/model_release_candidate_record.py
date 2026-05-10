@@ -111,6 +111,12 @@ class ModelReleaseCandidateRecord:
     reference_comparison_runtime_ids: tuple[str, ...] | None = None
     owlops_observation_status: str | None = None
     owlops_observation_evidence_pointer: str | None = None
+    repeatability_n: int | None = None
+    repeatability_ttft_ms_stddev: float | None = None
+    repeatability_decode_tps_stddev: float | None = None
+    repeatability_rss_bytes_max: int | None = None
+    repeatability_stability_label: str | None = None
+    runtime_prefill_phase_ms: float | None = None
 
 
 def _now_iso_utc() -> str:
@@ -213,6 +219,12 @@ def model_release_candidate_record_to_dict(
         "owlops_observation_evidence_pointer": (
             record.owlops_observation_evidence_pointer
         ),
+        "repeatability_n": record.repeatability_n,
+        "repeatability_ttft_ms_stddev": record.repeatability_ttft_ms_stddev,
+        "repeatability_decode_tps_stddev": record.repeatability_decode_tps_stddev,
+        "repeatability_rss_bytes_max": record.repeatability_rss_bytes_max,
+        "repeatability_stability_label": record.repeatability_stability_label,
+        "runtime_prefill_phase_ms": record.runtime_prefill_phase_ms,
     }
     validate_model_release_candidate_record(payload)
     return payload
@@ -268,6 +280,12 @@ def build_model_release_candidate_record(
     reference_comparison_runtime_ids: tuple[str, ...] | list[str] | None = None,
     owlops_observation_status: str | None = None,
     owlops_observation_evidence_pointer: str | None = None,
+    repeatability_n: int | None = None,
+    repeatability_ttft_ms_stddev: float | None = None,
+    repeatability_decode_tps_stddev: float | None = None,
+    repeatability_rss_bytes_max: int | None = None,
+    repeatability_stability_label: str | None = None,
+    runtime_prefill_phase_ms: float | None = None,
 ) -> ModelReleaseCandidateRecord:
     """Build and validate one model RC v1 record with optional observability v2 fields."""
 
@@ -328,6 +346,12 @@ def build_model_release_candidate_record(
         ),
         owlops_observation_status=owlops_observation_status,
         owlops_observation_evidence_pointer=owlops_observation_evidence_pointer,
+        repeatability_n=repeatability_n,
+        repeatability_ttft_ms_stddev=repeatability_ttft_ms_stddev,
+        repeatability_decode_tps_stddev=repeatability_decode_tps_stddev,
+        repeatability_rss_bytes_max=repeatability_rss_bytes_max,
+        repeatability_stability_label=repeatability_stability_label,
+        runtime_prefill_phase_ms=runtime_prefill_phase_ms,
     )
     model_release_candidate_record_to_dict(record)
     return record

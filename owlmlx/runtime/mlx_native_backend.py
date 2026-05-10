@@ -663,6 +663,8 @@ class MlxNativeBackend:
                     }
                     if fresh_cache is not None:
                         stream_kwargs["prompt_cache"] = fresh_cache
+                    generate_start = time.time()
+                    first_token_prefill_ms: float | None = None
                     for token_payload in mlx_lm.stream_generate(
                         session.model,
                         session.tokenizer,
@@ -670,6 +672,10 @@ class MlxNativeBackend:
                     ):
                         sequence += 1
                         completion_tokens += 1
+                        if sequence == 1:
+                            first_token_prefill_ms = (
+                                time.time() - generate_start
+                            ) * 1000.0
                         text = (
                             token_payload.text
                             if hasattr(token_payload, "text")
@@ -685,6 +691,7 @@ class MlxNativeBackend:
                             finish_reason=finish_reason,
                             wait_time_s=wait_time_s,
                             was_queued=was_queued,
+                            prefill_ms=first_token_prefill_ms if sequence == 1 else None,
                         )
                         if finish_reason is not None:
                             break

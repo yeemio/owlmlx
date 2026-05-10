@@ -30,6 +30,10 @@ from owlmlx.nonresident_loadability_lineage import (
     build_nonresident_loadability_lineage,
     nonresident_loadability_lineage_to_dict,
 )
+from owlmlx.cache_scheduler_status import (
+    build_cache_scheduler_status,
+    cache_scheduler_status_to_dict,
+)
 from owlmlx.orchestration_status import (
     build_orchestration_status,
     orchestration_status_to_dict,
@@ -2301,6 +2305,12 @@ def create_app(
         return JSONResponse(
             status_code=404 if payload.get("status") == "not_found" else 200,
             content=payload,
+        )
+
+    @app.get("/v1/runtime/cache-scheduler-status")
+    def runtime_cache_scheduler_status() -> dict[str, Any]:
+        return cache_scheduler_status_to_dict(
+            build_cache_scheduler_status(gate=runtime.generation_gate)
         )
 
     @app.get("/v1/runtime/orchestration-status")
