@@ -121,10 +121,10 @@ This matrix is based on four inputs:
    - `product-definition.md`
    - `master-outline.md`
 3. local probe verification:
-   - `/Users/yeemio/AI/gitrep/runtime-probes/2026-04-16-mlx-omlx-vmlx-baseline-investigation.md`
+   - `<runtime-probes repo>/2026-04-16-mlx-omlx-vmlx-baseline-investigation.md`
 4. current `oMLX` / `vMLX` public repo surfaces:
-   - `/Users/yeemio/AI/gitrep/runtime-probes/omlx-probe/README.md`
-   - `/Users/yeemio/AI/gitrep/runtime-probes/vmlx-probe/README.md`
+   - `<runtime-probes repo>/omlx-probe/README.md`
+   - `<runtime-probes repo>/vmlx-probe/README.md`
 
 ## 3. Current Honest Top-Level Verdict
 

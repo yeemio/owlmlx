@@ -1,5 +1,11 @@
 # owlmlx
 
+**Developer preview** — self-owned Apple Silicon MLX runtime with measured
+Qwen evidence and runtime-owned observability. Not yet a production replacement
+for `oMLX` or `vMLX`. See `docs/source-of-truth/public-developer-preview-readiness.md`.
+
+---
+
 `owlmlx` is our own runtime.
 
 It exists to become the runtime source of truth we actually need on Apple
@@ -35,20 +41,44 @@ source of truth:
 Those goals are larger than a few upstream patches. They define a runtime
 program.
 
+## Developer Preview Status
+
+`owlmlx` is in **developer preview** as of 2026-05-10. All seven
+`release-readiness-backlog.md` floors are closed. The public surface is frozen
+and documented in `public-surface.md`.
+
+Measured short-prompt performance on `Mac17,6-arm64-macOS-26.4.1-128GB`
+(`max_tokens=64`, `temperature=0`):
+
+| Model | owlmlx TPS | Reference TPS | Runtime |
+|---|---|---|---|
+| Qwen3.6-27B | 5.45 | 2.81 | oMLX |
+| Qwen3.6-35B-A3B | 3.53 | 2.44 | oMLX |
+| Gemma 4 | 3.75 | 3.83 | vMLX |
+
+These are short-prompt results. They do not imply broader parity or
+replacement. See `docs/source-of-truth/public-developer-preview-readiness.md`
+for the full claim matrix and honest open gaps.
+
+Runtime-owned observability ships as first-class HTTP surfaces:
+
+- `GET /v1/runtime/monitor/snapshot` — structured health snapshot
+- `GET /v1/runtime/monitor/history` — persistent trend ledger
+- `GET /metrics` — Prometheus exposition (`owlmlx_native_*` namespace)
+- `GET /v1/runtime/model-release-candidates/history` — per-model RC evidence
+
 ## Current State
 
-Current honest state:
-
-- `owlmlx` is a runtime source-of-truth repository, not yet a code-heavy
-  runtime implementation repository
-- The first mature runtime path is the `large-weight runtime path`
-- `Kimi` is the first validated specimen on that path
-- the current desktop product shell repository remains the operator surface and
-  product integration layer above this runtime
-- `owlmlx` reuses open-source runtime mechanisms freely; it does not require a
-  full rewrite of every execution layer beneath it
-- what `owlmlx` owns is identity, principles, governance, truth contracts, and
-  path semantics — not necessarily every line of execution code
+- Real runtime kernel: OpenAI-compatible, Anthropic-compatible, and
+  native generation endpoints; FIFO admission gate; restart-safe lifecycle
+- Runtime-owned memory governance: pressure classification, eviction policy,
+  non-resident admission, recovery policy
+- Technical-preview serving path: `scripts/runtime_technical_preview_server.py`
+  launches a real `mlx_lm` subprocess backend without stopping legacy services
+- Evidence program: Model RC ledger and comparative-evidence harness with
+  measured same-host records
+- Not owned: desktop shell, packaging, app distribution, operator UI —
+  those belong to `owlops` and product layers above this runtime
 
 ## What `owlmlx` Is Not
 
@@ -60,6 +90,15 @@ Current honest state:
 
 ## Document Map
 
+**Developer preview entry points:**
+- `docs/source-of-truth/public-developer-preview-readiness.md` — readiness
+  position, claim matrix, performance evidence, open gaps
+- `docs/source-of-truth/public-surface.md` — frozen public surface boundary:
+  supported HTTP routes, Python modules, operator scripts
+- `docs/source-of-truth/release-readiness-backlog.md` — 7/7 floors closed;
+  closure ledger with evidence references
+
+**Runtime architecture:**
 - `docs/source-of-truth/master-outline.md`
 - `docs/source-of-truth/product-definition.md`
 - `docs/source-of-truth/system-architecture.md`
@@ -67,24 +106,36 @@ Current honest state:
 - `docs/source-of-truth/repository-boundaries.md`
 - `docs/source-of-truth/runtime-capability-matrix.md`
 - `docs/source-of-truth/native-mlx-backend-capability-matrix.md`
-- `docs/source-of-truth/native-mlx-backend-input-contract.md`
-- `docs/source-of-truth/native-mlx-backend-local-candidate-admissibility.md`
-- `docs/source-of-truth/native-mlx-backend-conversion-path-ownership.md`
 - `docs/source-of-truth/runtime-contracts.md`
 - `docs/source-of-truth/runtime-status-schema.md`
 - `docs/source-of-truth/runtime-governance.md`
 - `docs/source-of-truth/hazardous-operations.md`
-- `docs/source-of-truth/rename-strategy.md`
-- `docs/source-of-truth/contract-mapping.md`
-- `docs/source-of-truth/extraction-inventory.md`
+
+**Evidence program:**
+- `docs/source-of-truth/comparative-evidence-harness-contract.md`
+- `docs/source-of-truth/model-release-candidate-program.md`
+- `docs/source-of-truth/reference-runtime-comparison-matrix.md`
+
+**Governance truth:**
+- `docs/source-of-truth/model-residency-policy.md`
+- `docs/source-of-truth/memory-pressure-contract.md`
+- `docs/source-of-truth/memory-pressure-eviction-policy.md`
+- `docs/source-of-truth/nonresident-model-admission-policy.md`
+- `docs/source-of-truth/termination-recovery-policy.md`
+- `docs/source-of-truth/reclaim-barrier-event.md`
+
+**Developer workflow:**
+- `docs/source-of-truth/python-environment.md`
+- `docs/source-of-truth/python-environment-research.md`
 - `docs/source-of-truth/autonomous-loop-discipline.md`
 - `docs/source-of-truth/roadmap.md`
 
 ## Immediate Priority
 
-The current job of this repository is to freeze the runtime boundary and
-architecture truth first. Code extraction and package layout come after the
-source-of-truth layer is stable.
+The runtime source-of-truth layer is stable. The current job is advancing
+measured evidence coverage (heavier workloads, multi-turn, additional model
+families) and closing the open gaps listed in
+`docs/source-of-truth/public-developer-preview-readiness.md` §7.
 
 ## Development Environment
 
