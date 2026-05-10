@@ -4605,3 +4605,104 @@ def test_subprocess_backend_releases_stream_lock_before_terminal_notice_leading_
     assert first_events == ["token", "done"]
     assert second_events == ["token", "done"]
     backend.unload("model-a")
+
+
+# ---------------------------------------------------------------------------
+# Non-JSON line resilience (stream transport blocker regression)
+# ---------------------------------------------------------------------------
+
+def _write_non_json_stream_runner(tmp_path: Path, *, inject_on_count: int = 1) -> str:
+    """Runner that injects a non-JSON line mid-stream on the N-th stream_generate call."""
+    module = tmp_path / "non_json_stream_runner.py"
+    module.write_text(
+        "\n".join(
+            [
+                "import json, os, sys",
+                "loaded = None",
+                "count = 0",
+                f"inject_on = {inject_on_count}",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        loaded = req['model_id']",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        timing = {'surface': 'owlmlx.child_stream_timing', 'version': 'v1', 'first_response_ms': 5.0, 'first_visible_token_ms': 6.0, 'stream_wall_ms': 7.0}",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming', 'timing': timing}), flush=True)",
+                "        if count == inject_on:",
+                "            print('100%|########| 27/27 [00:02<00:00, 9.1it/s]', flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop', 'timing': timing}), flush=True)",
+                "    elif action == 'ping':",
+                "        print(json.dumps({'ok': True, 'action': 'ping', 'model_id': loaded, 'pid': os.getpid(), 'generation_count': count}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return module.stem
+
+
+def test_subprocess_backend_skips_non_json_line_mid_stream(tmp_path: Path) -> None:
+    """A non-JSON line between token and done is skipped; stream completes cleanly."""
+    runner = _write_non_json_stream_runner(tmp_path, inject_on_count=1)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    events = list(backend.stream_generate("model-a", "hello", max_tokens=4))
+
+    assert [e.event for e in events] == ["token", "done"], events
+    assert events[0].text == "hello"
+    assert events[0].error_code is None
+    assert len(backend._stream_transport_non_json_lines) == 1
+    assert "100%" in backend._stream_transport_non_json_lines[0]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_repeated_stream_non_json_second_run_succeeds(
+    tmp_path: Path,
+) -> None:
+    """Two consecutive stream_generate calls succeed when the second emits a non-JSON line."""
+    runner = _write_non_json_stream_runner(tmp_path, inject_on_count=2)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    first_events = list(backend.stream_generate("model-a", "run1", max_tokens=4))
+    second_events = list(backend.stream_generate("model-a", "run2", max_tokens=4))
+
+    assert [e.event for e in first_events] == ["token", "done"]
+    assert first_events[0].error_code is None
+    assert [e.event for e in second_events] == ["token", "done"], second_events
+    assert second_events[0].error_code is None
+    assert len(backend._stream_transport_non_json_lines) == 1
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_non_json_lines_captured_in_attribute(
+    tmp_path: Path,
+) -> None:
+    """_stream_transport_non_json_lines accumulates all non-JSON lines across calls."""
+    runner = _write_non_json_stream_runner(tmp_path, inject_on_count=1)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    list(backend.stream_generate("model-a", "a", max_tokens=2))
+    list(backend.stream_generate("model-a", "b", max_tokens=2))
+
+    assert len(backend._stream_transport_non_json_lines) == 1
+    backend.unload("model-a")

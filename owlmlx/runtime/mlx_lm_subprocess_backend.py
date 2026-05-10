@@ -759,6 +759,7 @@ class MlxLmSubprocessBackend:
         self._last_error: str | None = None
         self._last_result: MlxLmSubprocessResult | None = None
         self._io_lock = threading.Lock()
+        self._stream_transport_non_json_lines: list[str] = []
         self._stream_debug_after_request_write: (
             Callable[[dict[str, Any]], None] | None
         ) = None
@@ -1882,7 +1883,16 @@ class MlxLmSubprocessBackend:
                         if _is_terminal_stream_record(text):
                             terminal_record = text
                             break
-                        payload = json.loads(text)
+                        try:
+                            payload = json.loads(text)
+                        except json.JSONDecodeError:
+                            print(
+                                f"[owlmlx/stream-transport] non-JSON line from child runner "
+                                f"(skipping): {text!r}",
+                                file=sys.stderr,
+                            )
+                            self._stream_transport_non_json_lines.append(text)
+                            continue
                         if not isinstance(payload, dict):
                             raise ValueError("stream transport record did not decode to an object")
                         if payload.get("event") == "done" or not payload.get("ok"):

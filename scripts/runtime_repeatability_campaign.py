@@ -289,6 +289,10 @@ def run_campaign(
         if parsed["error"]:
             failure_count += 1
             blockers.append("generation_error")
+            print(
+                f"[repeatability-campaign] repeat {index}/{repeat_count} FAILED: {parsed['error']}",
+                file=sys.stderr,
+            )
         else:
             rss_health = _check_health(server_url, timeout_s=30.0)
             rss_bytes = rss_health["payload"].get("rss_bytes") if rss_health["status_code"] == 200 else None
