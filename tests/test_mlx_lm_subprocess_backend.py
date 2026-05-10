@@ -4693,7 +4693,7 @@ def test_subprocess_backend_repeated_stream_non_json_second_run_succeeds(
 def test_subprocess_backend_non_json_lines_captured_in_attribute(
     tmp_path: Path,
 ) -> None:
-    """_stream_transport_non_json_lines accumulates all non-JSON lines across calls."""
+    """_stream_transport_non_json_lines captures benign non-JSON stdout diagnostics."""
     runner = _write_non_json_stream_runner(tmp_path, inject_on_count=1)
     backend = MlxLmSubprocessBackend(
         runner_module=runner,
@@ -4705,4 +4705,208 @@ def test_subprocess_backend_non_json_lines_captured_in_attribute(
     list(backend.stream_generate("model-a", "b", max_tokens=2))
 
     assert len(backend._stream_transport_non_json_lines) == 1
+    assert len(backend._stream_transport_non_json_diagnostics) == 1
+    assert (
+        backend._stream_transport_non_json_diagnostics[0]["classification"]
+        == "benign_child_stdout_noise"
+    )
     backend.unload("model-a")
+
+
+def _write_corrupt_terminal_stream_runner(
+    tmp_path: Path,
+    *,
+    recoverable_embedded_done: bool,
+) -> str:
+    """Runner that emits a malformed terminal transport line after a token."""
+    module = tmp_path / "corrupt_terminal_stream_runner.py"
+    terminal_line = (
+        "'{\"ok\": true, ' + json.dumps(done)"
+        if recoverable_embedded_done
+        else "'{\"ok\": true, \"action\": \"stream_done\",'"
+    )
+    module.write_text(
+        "\n".join(
+            [
+                "import json, os, sys",
+                "loaded = None",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        loaded = req['model_id']",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        timing = {'surface': 'owlmlx.child_stream_timing', 'version': 'v1', 'first_response_ms': 5.0, 'first_visible_token_ms': 6.0, 'stream_wall_ms': 7.0}",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming', 'timing': timing}), flush=True)",
+                "        done = {'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop', 'timing': timing}",
+                f"        print({terminal_line}, flush=True)",
+                "    elif action == 'ping':",
+                "        print(json.dumps({'ok': True, 'action': 'ping', 'model_id': loaded, 'pid': os.getpid(), 'generation_count': count}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return module.stem
+
+
+def test_subprocess_backend_recovers_embedded_terminal_payload(
+    tmp_path: Path,
+) -> None:
+    """A malformed prefix plus embedded done record is recovered with diagnostics."""
+    runner = _write_corrupt_terminal_stream_runner(
+        tmp_path,
+        recoverable_embedded_done=True,
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    events = list(backend.stream_generate("model-a", "hello", max_tokens=4))
+
+    assert [event.event for event in events] == ["token", "done"]
+    assert events[-1].completion_tokens == 1
+    assert len(backend._stream_transport_non_json_diagnostics) == 1
+    diagnostic = backend._stream_transport_non_json_diagnostics[0]
+    assert diagnostic["classification"] == (
+        "partial_json_framing_recovered_terminal_payload"
+    )
+    assert diagnostic["recovered_terminal_payload"] is True
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_corrupt_json_transport_is_not_marked_success(
+    tmp_path: Path,
+) -> None:
+    """Unrecoverable JSON-looking transport corruption yields an error event."""
+    runner = _write_corrupt_terminal_stream_runner(
+        tmp_path,
+        recoverable_embedded_done=False,
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    events = list(backend.stream_generate("model-a", "hello", max_tokens=4))
+
+    assert [event.event for event in events] == ["token", "error"]
+    assert "stream transport corrupted JSON terminal record" in str(events[-1].detail)
+    assert len(backend._stream_transport_non_json_diagnostics) == 1
+    assert (
+        backend._stream_transport_non_json_diagnostics[0]["classification"]
+        == "corrupt_json_transport_record"
+    )
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_status_probe_waits_for_stream_stdout_lock(
+    tmp_path: Path,
+) -> None:
+    """Health probes must not read shared stdout while a stream drains terminal records."""
+    runner = tmp_path / "status_probe_during_stream_runner.py"
+    runner.write_text(
+        "\n".join(
+            [
+                "import json, os, sys",
+                "loaded = None",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        loaded = req['model_id']",
+                "        count = 0",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        print(json.dumps({'ok': True, 'terminal_notice': True, 'action': 'stream_terminal_notice', 'terminal_action': 'stream_done', 'pid': os.getpid(), 'sequence': 1}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 1, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action == 'ping':",
+                "        print(json.dumps({'ok': True, 'action': 'ping', 'model_id': loaded, 'pid': os.getpid(), 'generation_count': count}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner.stem,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    first_token_seen = threading.Event()
+    terminal_notice_capture_entered = threading.Event()
+    allow_terminal_notice = threading.Event()
+    status_finished = threading.Event()
+    stream_events: list[str] = []
+    status_holder: list[object] = []
+
+    def before_terminal_notice_capture(_: dict[str, object]) -> None:
+        terminal_notice_capture_entered.set()
+        if not allow_terminal_notice.wait(timeout=2.0):
+            raise RuntimeError("timed out waiting to release terminal notice")
+
+    backend._stream_debug_before_terminal_notice_capture = before_terminal_notice_capture
+
+    def run_stream() -> None:
+        for event in backend.stream_generate("model-a", "hello", max_tokens=4):
+            stream_events.append(event.event)
+            if event.event == "token":
+                first_token_seen.set()
+
+    def run_status() -> None:
+        status_holder.append(backend.status())
+        status_finished.set()
+
+    stream_thread = threading.Thread(target=run_stream)
+    status_thread = threading.Thread(target=run_status)
+    stream_thread.start()
+    assert first_token_seen.wait(timeout=2.0) is True
+    assert terminal_notice_capture_entered.wait(timeout=2.0) is True
+
+    status_thread.start()
+    assert status_finished.wait(timeout=0.1) is False
+    allow_terminal_notice.set()
+
+    stream_thread.join(timeout=2.0)
+    status_thread.join(timeout=2.0)
+
+    assert stream_events == ["token", "done"]
+    assert status_finished.is_set() is True
+    assert status_holder
+    assert status_holder[0].healthy is True
+    assert len(backend._stream_transport_non_json_diagnostics) == 0
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_non_json_diagnostics_are_capped() -> None:
+    """Malformed stdout diagnostics are bounded by a fixed ring buffer."""
+    backend = MlxLmSubprocessBackend()
+
+    for index in range(40):
+        backend._record_stream_transport_non_json_line(
+            f"noise-{index}",
+            classification="benign_child_stdout_noise",
+        )
+
+    assert len(backend._stream_transport_non_json_lines) == 32
+    assert len(backend._stream_transport_non_json_diagnostics) == 32
+    assert backend._stream_transport_non_json_lines[0] == "noise-8"
+    assert backend._stream_transport_non_json_diagnostics[-1]["preview"] == "noise-39"

@@ -189,6 +189,56 @@ _STREAM_TERMINAL_RECORD_PREFIXES = (
     '{"ok":false',
 )
 
+_STREAM_TRANSPORT_DIAGNOSTIC_LIMIT = 32
+_STREAM_TRANSPORT_DIAGNOSTIC_PREVIEW_CHARS = 1000
+
+
+def _stream_transport_preview(text: str) -> str:
+    """Return a bounded diagnostic preview for malformed child stdout."""
+
+    if len(text) <= _STREAM_TRANSPORT_DIAGNOSTIC_PREVIEW_CHARS:
+        return text
+    return text[:_STREAM_TRANSPORT_DIAGNOSTIC_PREVIEW_CHARS] + "...<truncated>"
+
+
+def _recover_embedded_terminal_stream_payload(text: str) -> dict[str, Any] | None:
+    """Recover a complete terminal payload after a malformed JSON prefix."""
+
+    decoder = json.JSONDecoder()
+    for prefix in _STREAM_TERMINAL_RECORD_PREFIXES:
+        start = text.find(prefix, 1)
+        if start < 0:
+            continue
+        try:
+            payload, end = decoder.raw_decode(text[start:])
+        except json.JSONDecodeError:
+            continue
+        if text[start + end :].strip():
+            continue
+        if isinstance(payload, dict) and (
+            payload.get("event") == "done" or not payload.get("ok")
+        ):
+            return payload
+    return None
+
+
+def _classify_non_json_stream_transport_line(text: str) -> str:
+    """Classify malformed child stdout without silently masking transport corruption."""
+
+    stripped = text.lstrip()
+    if (
+        stripped.startswith("{")
+        or stripped.startswith("[")
+        or '"action":' in stripped
+        or "stream_done" in stripped
+        or "stream_message_done" in stripped
+        or "runtime_owned_terminal" in stripped
+        or "terminal_notice" in stripped
+    ):
+        return "corrupt_json_transport_record"
+    return "benign_child_stdout_noise"
+
+
 _STREAM_TERMINAL_RECORD_ACTION_DISCRIMINANTS = (
     '{"ok": true, "action": "stream_d',
     '{"ok":true,"action":"stream_d',
@@ -759,7 +809,12 @@ class MlxLmSubprocessBackend:
         self._last_error: str | None = None
         self._last_result: MlxLmSubprocessResult | None = None
         self._io_lock = threading.Lock()
-        self._stream_transport_non_json_lines: list[str] = []
+        self._stream_transport_non_json_lines: deque[str] = deque(
+            maxlen=_STREAM_TRANSPORT_DIAGNOSTIC_LIMIT
+        )
+        self._stream_transport_non_json_diagnostics: deque[dict[str, Any]] = deque(
+            maxlen=_STREAM_TRANSPORT_DIAGNOSTIC_LIMIT
+        )
         self._stream_debug_after_request_write: (
             Callable[[dict[str, Any]], None] | None
         ) = None
@@ -1647,6 +1702,24 @@ class MlxLmSubprocessBackend:
             except Exception:
                 discarded.append(text)
 
+    def _record_stream_transport_non_json_line(
+        self,
+        text: str,
+        *,
+        classification: str,
+        recovered_terminal_payload: bool = False,
+    ) -> None:
+        preview = _stream_transport_preview(text)
+        self._stream_transport_non_json_lines.append(preview)
+        self._stream_transport_non_json_diagnostics.append(
+            {
+                "classification": classification,
+                "preview": preview,
+                "raw_length": len(text),
+                "recovered_terminal_payload": recovered_terminal_payload,
+            }
+        )
+
     def _exchange(
         self,
         session: _ChildSession,
@@ -1664,13 +1737,22 @@ class MlxLmSubprocessBackend:
                 payload={"ok": False, "error": "child process is not running"},
             )
         try:
+            stdout_lock_held = False
             with self._io_lock:
                 if proc.stdin is None:
                     raise ValueError("child stdin pipe is unavailable")
+                if proc.stdout is None:
+                    raise ValueError("child stdout pipe is unavailable")
+                session.stream_stdout_lock.acquire()
+                stdout_lock_held = True
                 proc.stdin.write(json.dumps(request) + "\n")
                 proc.stdin.flush()
                 payload, discarded = self._read_payload_line(session, timeout_s=timeout_s)
+                session.stream_stdout_lock.release()
+                stdout_lock_held = False
         except Exception as exc:
+            if stdout_lock_held:
+                session.stream_stdout_lock.release()
             return MlxLmSubprocessResult(
                 ok=False,
                 returncode=int(proc.returncode or -1),
@@ -1886,12 +1968,32 @@ class MlxLmSubprocessBackend:
                         try:
                             payload = json.loads(text)
                         except json.JSONDecodeError:
+                            recovered_payload = _recover_embedded_terminal_stream_payload(text)
+                            if recovered_payload is not None:
+                                self._record_stream_transport_non_json_line(
+                                    text,
+                                    classification=(
+                                        "partial_json_framing_recovered_terminal_payload"
+                                    ),
+                                    recovered_terminal_payload=True,
+                                )
+                                terminal_payload = recovered_payload
+                                break
+                            classification = _classify_non_json_stream_transport_line(text)
+                            self._record_stream_transport_non_json_line(
+                                text,
+                                classification=classification,
+                            )
+                            if classification != "benign_child_stdout_noise":
+                                raise ValueError(
+                                    "stream transport corrupted JSON record: "
+                                    f"{_stream_transport_preview(text)!r}"
+                                )
                             print(
-                                f"[owlmlx/stream-transport] non-JSON line from child runner "
+                                f"[owlmlx/stream-transport] non-JSON child stdout noise "
                                 f"(skipping): {text!r}",
                                 file=sys.stderr,
                             )
-                            self._stream_transport_non_json_lines.append(text)
                             continue
                         if not isinstance(payload, dict):
                             raise ValueError("stream transport record did not decode to an object")
@@ -1910,7 +2012,17 @@ class MlxLmSubprocessBackend:
                     capture_hook = self._stream_debug_before_terminal_payload_capture
                     if capture_hook is not None:
                         capture_hook(terminal_record)
-                    decoded_payload = json.loads(terminal_record)
+                    try:
+                        decoded_payload = json.loads(terminal_record)
+                    except json.JSONDecodeError as exc:
+                        self._record_stream_transport_non_json_line(
+                            terminal_record,
+                            classification="corrupt_json_transport_record",
+                        )
+                        raise ValueError(
+                            "stream transport corrupted JSON terminal record: "
+                            f"{_stream_transport_preview(terminal_record)!r}"
+                        ) from exc
                     if not isinstance(decoded_payload, dict):
                         raise ValueError("terminal stream record did not decode to an object")
                     terminal_payload = decoded_payload
@@ -2747,6 +2859,10 @@ class MlxLmSubprocessBackend:
                 "recoverability": {
                     "restartable_models": restartable_models,
                     "restart_exhausted_models": restart_exhausted_models,
+                },
+                "stream_transport_diagnostics": {
+                    "non_json_line_count": len(self._stream_transport_non_json_lines),
+                    "diagnostics": list(self._stream_transport_non_json_diagnostics),
                 },
                 "last_subprocess": (
                     {
