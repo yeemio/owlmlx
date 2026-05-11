@@ -82,3 +82,51 @@ The immediate question is:
 
 - which replacement-grade stability gap most limits `owlmlx` next, and what is
   the next executable runtime-owned closure round
+
+## Anti-regression rule (Stage 1, 2026-05-11)
+
+After Stage 1 archived 151 spec-as-code modules (cache_stream_*,
+cache_pre_claim_*, multi_model_governance_*, etc.) the following module
+patterns are **prohibited**:
+
+**Do not create new modules matching these naming patterns:**
+
+- `*_exactness.py`
+- `*_carrier.py`
+- `*_marker.py`
+- `*_harness.py`
+- `*_feasibility.py`
+- `*_rung.py`
+- `*_seam.py`
+- `*_charter.py`
+- `*_manifest.py` (when serving as in-tree spec, not as runtime artifact metadata)
+- `*_evidence.py` (when not consumed by a real runtime decision)
+- `*_ledger.py` (when not consumed by a real runtime decision)
+
+**Module-as-spec is forbidden.** A module's reason for existence must be
+that some other module in `owlmlx/runtime/` *reads its dataclass fields
+or calls its functions*. Files whose entire body is a frozen dataclass
+plus a builder that returns hardcoded status strings are documentation,
+not code. Put documentation in `docs/`.
+
+**PR-level check before merging any new `.py` in `owlmlx/`:**
+
+```bash
+# 1. Does at least one file in owlmlx/runtime/ import this module?
+grep -rE "from \.+(\.\.)?<module> import" owlmlx/runtime/
+
+# 2. Does it have any module-level function or method body, not just
+#    builder() returning frozen dataclass with literal strings?
+
+# 3. Are its dataclass fields read by name (`.field_name`) anywhere
+#    outside the module itself, customer_runtime_evidence, and tests?
+```
+
+If 1+3 are NO, the module belongs in `docs/source-of-truth/` as a markdown
+contract, not in the package as Python code.
+
+This rule exists because Stage 1 archived 151 modules / 31K LOC that
+followed the dataclass+builder+hardcoded-strings pattern with no
+runtime consumer reading the fields, AND because LLM-assisted PRs make
+the marginal cost of adding such modules approximately zero. Without
+this explicit ban, the pattern regrows.
