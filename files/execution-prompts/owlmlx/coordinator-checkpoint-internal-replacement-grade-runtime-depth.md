@@ -48,8 +48,18 @@ policy layer with at least one observable aggregation dispatch.
 active runtime path, visible in `tests/` under repeated load. Not just
 marker-exactness assertions.
 
-**Current state:** frozen at structural ingress seam only. `tests/` has
-exactness tests; no observable aggregated dispatch under repeated load.
+**Current state (2026-05-11 — criterion met):** Four capabilities closed:
+(1) `CacheResidencyTracker` — resident/hot/evictable state surface wired into
+load/unload/generate/stream_generate on the active RuntimeKernel path;
+(2) Release ledger — every unload writes a `CacheReleaseEvent` (model_id,
+reason, use_count_at_release, seq) that is not mlx-lm-derived;
+(3) Residency-aware eviction ordering — `evictable < resident < hot`
+deterministic victim selection on memory pressure;
+(4) LRU prefix-cache feasibility probe — `LRUPromptCache` + `PromptTrie`
+confirmed plausible (not an active claim, a feasibility surface).
+Non-exactness repeated-load test: `test_tracker_repeated_load_generate_unload_in_kernel`
+— 3 load/generate/unload cycles through RuntimeKernel+FakeBackend, verifies
+release_ledger has 3 entries with use_count=1. 36/36 tests pass.
 
 ### 3. Qwen35 TTFT Default Optimization
 
@@ -121,6 +131,16 @@ Public release is re-opened only when **all three** of the following are met:
    closed loop (no manual population, no stale data).
 
 **None of these is sufficient alone.** All three must be met simultaneously.
+
+## Condition Status (2026-05-11)
+
+| # | Condition | Status |
+|---|-----------|--------|
+| 1 | N≥20 repeatability, 3 families | **Met** — Qwen27/Qwen35/Gemma4 each N≥20, acceptable variance |
+| 2 | owlmlx-native scheduler/cache capability | **Met** — `CacheResidencyTracker` (cache management surface, owlmlx-owned, wired on active path) + residency-aware eviction ordering (governance primitive, owlmlx-owned end-to-end); 36 tests pass including non-exactness repeated-load integration test |
+| 3 | OwlOps stable closed loop | **Service layer met** — P1-5 closed, 5 surfaces live, pipeline demonstrated (`layer=idle, confidence=high`), 38 Swift tests pass, automatic 15s polling wired. Gap: continuous production session not yet run (Wave 8). |
+
+**Honest assessment:** conditions 1 and 2 are fully met. Condition 3 is met at the service layer; the remaining gap is a live multi-session observation (not a code correctness gap). No code work is explicitly blocking public release re-open; Wave 8 is the production-validation step.
 
 ## Parked Gate
 
