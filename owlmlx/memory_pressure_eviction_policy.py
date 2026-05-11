@@ -89,11 +89,24 @@ def _decision_support() -> dict[str, dict[str, Any]]:
     }
 
 
+# Residency-aware eviction ordering: prefer to evict models that are already
+# idle / evictable before evicting recently-used (hot) models.
+_RESIDENCY_EVICTION_PRIORITY: dict[str, int] = {
+    "evictable": 0,   # idle too long — evict first
+    "resident": 1,    # loaded but cooling (default)
+    "hot": 2,         # recently used — evict last
+}
+
+
 def _candidate_sort_key(candidate: Mapping[str, Any]) -> tuple[Any, ...]:
+    residency_priority = _RESIDENCY_EVICTION_PRIORITY.get(
+        candidate.get("residency_state"), 1
+    )
     return (
         1 if candidate["pinned"] else 0,
         0 if candidate["ttl_expired_unpinned"] else 1,
         1 if candidate["active_protected"] else 0,
+        residency_priority,
         -float(candidate["memory_gb"] or 0.0),
         str(candidate["model_id"]),
     )
@@ -118,6 +131,17 @@ def _build_candidates(
     ttl_expired_pinned_ids = set(
         _list_of_strings(governance_policy.get("ttl_expired_pinned_model_ids"))
     )
+
+    # Residency state from CacheResidencyTracker (present when RuntimeKernel
+    # includes "cache_residency" in status_dict; absent in legacy payloads).
+    _cache_residency_raw = raw_status.get("cache_residency")
+    _cache_residency_entries: Mapping[str, Any] = (
+        _mapping(_cache_residency_raw).get("entries", {})
+        if isinstance(_cache_residency_raw, Mapping)
+        else {}
+    )
+    if not isinstance(_cache_residency_entries, Mapping):
+        _cache_residency_entries = {}
 
     loaded_raw = backend.get("loaded_models")
     loaded = loaded_raw if isinstance(loaded_raw, list) else []
@@ -149,6 +173,12 @@ def _build_candidates(
             ordering_reason = "active_model_protected"
         else:
             ordering_reason = "manual_unload_eligible"
+        _residency_entry = _cache_residency_entries.get(model_id)
+        residency_state: str | None = None
+        if isinstance(_residency_entry, Mapping):
+            _state_val = _residency_entry.get("state")
+            if isinstance(_state_val, str):
+                residency_state = _state_val
         candidates.append(
             {
                 "model_id": model_id,
@@ -159,6 +189,7 @@ def _build_candidates(
                 "ttl_expired_unpinned": is_ttl_expired_unpinned,
                 "eligible": eligible,
                 "ordering_reason": ordering_reason,
+                "residency_state": residency_state,
             }
         )
 
