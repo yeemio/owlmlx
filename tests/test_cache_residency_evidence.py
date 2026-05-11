@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from owlmlx import (
-    CacheFlags,
+from owlmlx import CacheFlags
+from owlmlx.cache_residency_evidence import (
     build_cache_residency_evidence,
     cache_residency_evidence_to_dict,
 )
