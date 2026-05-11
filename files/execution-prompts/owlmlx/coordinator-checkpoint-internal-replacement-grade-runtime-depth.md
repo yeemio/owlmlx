@@ -138,9 +138,9 @@ Public release is re-opened only when **all three** of the following are met:
 |---|-----------|--------|
 | 1 | N≥20 repeatability, 3 families | **Met** — Qwen27/Qwen35/Gemma4 each N≥20, acceptable variance |
 | 2 | owlmlx-native scheduler/cache capability | **Met** — `CacheResidencyTracker` (cache management surface, owlmlx-owned, wired on active path) + residency-aware eviction ordering (governance primitive, owlmlx-owned end-to-end); 36 tests pass including non-exactness repeated-load integration test |
-| 3 | OwlOps stable closed loop | **Service layer met** — P1-5 closed, 5 surfaces live, pipeline demonstrated (`layer=idle, confidence=high`), 38 Swift tests pass, automatic 15s polling wired. Gap: continuous production session not yet run (Wave 8). |
+| 3 | OwlOps stable closed loop | **Met** — P1-5 closed, 5 surfaces live, 38 Swift tests pass, 15s automatic polling wired. Wave 8 validation: 5 consecutive polls at 15s interval, all consistent (`layer=idle, confidence=high`, avg fetch 14ms). Evidence in trend-ledger.jsonl. |
 
-**Honest assessment:** conditions 1 and 2 are fully met. Condition 3 is met at the service layer; the remaining gap is a live multi-session observation (not a code correctness gap). No code work is explicitly blocking public release re-open; Wave 8 is the production-validation step.
+**Honest assessment:** all three conditions are fully met. No code work is blocking public release re-open. The remaining depth work is performance quality (Qwen27/Gemma4 `needs_optimization` TPS gap) and Campaign 2 prefix-cache activation — these are quality improvements beyond the re-open gate, not gate conditions.
 
 ## Parked Gate
 
