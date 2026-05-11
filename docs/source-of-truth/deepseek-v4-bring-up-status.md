@@ -7,15 +7,28 @@
 
 ## 1. Current Status
 
-`owlmlx` returns a clean pre-load `unsupported_model_family` rejection for
-DeepSeek-V4-Flash-2bit-DQ. This is correct defensive behavior: the runtime
-probes for `mlx_lm.models.{model_type}` before attempting load, and the
-stock `mlx-lm >= 0.22.0` (current pyproject.toml constraint) does not include
-`mlx_lm.models.deepseek_v4`. The rejection does not dirty runtime health or
-add load-failure recovery noise.
+**2026-05-11: Lifecycle complete via intermediate path.**
 
-The bring-up target is: **load → generate → unload → clean health**, with a
-measured `model_release_candidate_record` row.
+`DeepSeek-V4-Flash-2bit-DQ` completed load → generate → unload → clean health
+on port 8067 using `.runtime-deepseek-v4-mlx` (Blaizzy fork `pc/add-deepseekv4flash-model`,
+editable at `/tmp/mlx-lm-dsv4`). A `model_release_candidate_record` row has
+been appended to `files/evidence/owlmlx/model-release-candidates/cumulative-ledger.jsonl`.
+
+Measured:
+- load_time_s: 14.125
+- TTFT (cold start): 24821 ms (expected — 96 GB weights cold)
+- TPS: 32.0 tokens/sec
+- Unload: ok, freed_gb=100.0
+- Backend health after unload: ok, model_count=0
+
+Residual issues (not blockers):
+- `transformers 5.7.0` does not register `deepseek_v4` in CONFIG_MAPPING → tokenizer
+  loads via `PreTrainedTokenizerFast` fallback (patched in fork's `tokenizer_utils.py`)
+- The upstream `machiabeli/mlx-lm-1` fork is empty/inaccessible; bring-up used
+  `Blaizzy/mlx-lm@pc/add-deepseekv4flash-model` (same deepseek_v4 implementation)
+- Memory estimate in 3.3 was wrong: actual peak ≈ 96 GB, not 14–16 GB
+
+The bring-up target was: **load → generate → unload → clean health**. ✓ Done.
 
 ## 2. Upstream Dependency
 
@@ -62,9 +75,12 @@ This path is optional. The main bring-up gate is upstream merge.
 
 ### 3.3 Memory Budget Constraint
 
-The 2-bit-DQ variant requires approximately 14–16 GB peak RSS on a 128 GB host.
-The 4-bit variant required >40 GB and caused OOM on the test host. Bring-up
-should target only the 2-bit-DQ variant initially.
+Corrected (2026-05-11): The 2-bit-DQ variant requires approximately 96–100 GB
+peak unified memory (not 14–16 GB as originally estimated). The model has ~284 B
+total parameters; at 2 bits/param ≈ 71 GB weights + KV cache + activations ≈ 96 GB.
+The 4-bit variant (≈ 142 GB) exceeds this host's 128 GB capacity.
+
+Bring-up uses the 2-bit-DQ variant exclusively with `memory_gb=100`.
 
 ## 4. Blocked Scope
 
