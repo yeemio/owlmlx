@@ -9,6 +9,7 @@ from time import monotonic
 from typing import Any, Mapping
 
 from owlmlx.abort_recovery import AbortRecoveryTracker
+from owlmlx.cache_residency_tracker import CacheResidencyTracker
 from owlmlx.memory_budget import (
     BudgetVerdict,
     MachineMemoryProfile,
@@ -106,6 +107,7 @@ class RuntimeKernel:
         self._memory_pressure_cooldown_reason_code: str | None = None
         self._memory_pressure_cooldown_reason_message: str | None = None
         self._memory_pressure_cooldown_failure_fingerprint: tuple[object, ...] | None = None
+        self._cache_residency_tracker = CacheResidencyTracker()
 
     @property
     def active_model_id(self) -> str | None:
@@ -282,6 +284,7 @@ class RuntimeKernel:
             previous_active = self._active_model_id
             self._active_model_id = model_id
             self._touch_model_activity(model_id)
+            self._cache_residency_tracker.record_load(model_id)
             self._record_governance_transition(
                 previous_active=previous_active,
                 new_active=self._active_model_id,
@@ -607,6 +610,7 @@ class RuntimeKernel:
         if result.ok:
             self._record_governance_explicit_targeting(model_id)
             self._touch_model_activity(target_model)
+            self._cache_residency_tracker.record_use(target_model)
         return GenerateResult(
             ok=result.ok,
             message=result.message,
@@ -661,6 +665,7 @@ class RuntimeKernel:
         if result.ok:
             self._record_governance_explicit_targeting(model_id)
             self._touch_model_activity(target_model)
+            self._cache_residency_tracker.record_use(target_model)
         return GenerateResult(
             ok=result.ok,
             message=result.message,
@@ -784,6 +789,7 @@ class RuntimeKernel:
         def mark_success() -> None:
             self._record_governance_explicit_targeting(model_id)
             self._touch_model_activity(target_model)
+            self._cache_residency_tracker.record_use(target_model)
 
         async for event in self._stream_with_background_producer(
             metadata=metadata,
@@ -828,6 +834,7 @@ class RuntimeKernel:
         def mark_success() -> None:
             self._record_governance_explicit_targeting(model_id)
             self._touch_model_activity(target_model)
+            self._cache_residency_tracker.record_use(target_model)
 
         async for event in self._stream_with_background_producer(
             metadata=metadata,
@@ -888,6 +895,13 @@ class RuntimeKernel:
             self._pinned_model_ids.discard(model_id)
             self._ttl_seconds_by_model_id.pop(model_id, None)
             self._ttl_last_touch_s.pop(model_id, None)
+            _reason_map = {
+                "ttl_sweep_reclaim": "ttl_expiry",
+                "pressure_eviction": "pressure_eviction",
+            }
+            self._cache_residency_tracker.record_unload(
+                model_id, reason=_reason_map.get(_operation, "manual_unload")
+            )
         if result.ok:
             self._record_governance_transition(
                 previous_active=previous_active,
@@ -954,7 +968,7 @@ class RuntimeKernel:
         assert policy.selected_victim is not None
         victim = dict(policy.selected_victim)
         victim_id = str(victim["model_id"])
-        unload_result = self.unload_model(victim_id)
+        unload_result = self.unload_model(victim_id, _operation="pressure_eviction")
         unload_payload: dict[str, Any] = {
             "ok": unload_result.ok,
             "message": unload_result.message,
@@ -1424,4 +1438,5 @@ class RuntimeKernel:
             "memory_pressure_cooldown": memory_pressure_cooldown,
             "host_pressure": dict(self._last_host_pressure_snapshot),
             "active_model_id": status.active_model_id,
+            "cache_residency": self._cache_residency_tracker.status_dict(),
         }
