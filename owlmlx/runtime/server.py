@@ -121,6 +121,7 @@ class LoadRequest(BaseModel):
 
     model_id: str = Field(min_length=1)
     memory_gb: float | None = Field(default=None, ge=0)
+    warmup: bool = Field(default=True)
 
 
 class GenerateRequest(BaseModel):
@@ -1505,6 +1506,7 @@ def create_app(
         result = runtime.load_model(
             payload.model_id,
             memory_gb=payload.memory_gb,
+            post_load_warmup=payload.warmup,
         )
         # Idempotent: model_already_loaded is success-with-detail (HTTP 200).
         return _native_runtime_response(

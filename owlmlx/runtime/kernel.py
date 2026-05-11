@@ -108,6 +108,7 @@ class RuntimeKernel:
         self._memory_pressure_cooldown_reason_message: str | None = None
         self._memory_pressure_cooldown_failure_fingerprint: tuple[object, ...] | None = None
         self._cache_residency_tracker = CacheResidencyTracker()
+        self._post_load_warmup_log: list[dict[str, Any]] = []
 
     @property
     def active_model_id(self) -> str | None:
@@ -199,7 +200,13 @@ class RuntimeKernel:
         )
         return ModelInventorySnapshot(entries=entries)
 
-    def load_model(self, model_id: str, *, memory_gb: float | None = None) -> LoadResult:
+    def load_model(
+        self,
+        model_id: str,
+        *,
+        memory_gb: float | None = None,
+        post_load_warmup: bool = False,
+    ) -> LoadResult:
         """Load a model after owlmlx memory-budget preflight."""
 
         backend_status = self.backend.status()
@@ -285,6 +292,8 @@ class RuntimeKernel:
             self._active_model_id = model_id
             self._touch_model_activity(model_id)
             self._cache_residency_tracker.record_load(model_id)
+            if post_load_warmup:
+                self._run_post_load_warmup(model_id)
             self._record_governance_transition(
                 previous_active=previous_active,
                 new_active=self._active_model_id,
@@ -312,6 +321,35 @@ class RuntimeKernel:
                 message=result.message,
             )
         return result
+
+    def _run_post_load_warmup(self, model_id: str) -> None:
+        """Fire one minimal generate to compile Metal JIT shaders after load.
+
+        Runs synchronously inside load_model (which is already off the event
+        loop in the FastAPI thread-pool). Bypasses GenerationGate because
+        nothing else is running at load time. Failure is logged but never
+        propagates — warmup must not undo a successful load.
+        """
+        t0 = self._clock()
+        ok = True
+        error_msg: str | None = None
+        try:
+            for _ in self.backend.stream_generate(model_id, "", max_tokens=1):
+                pass
+        except Exception as exc:
+            ok = False
+            error_msg = str(exc)
+        elapsed_ms = round((self._clock() - t0) * 1000, 1)
+        if ok:
+            self._cache_residency_tracker.record_use(model_id)
+        entry: dict[str, Any] = {
+            "model_id": model_id,
+            "warmup_ms": elapsed_ms,
+            "ok": ok,
+        }
+        if error_msg is not None:
+            entry["error"] = error_msg
+        self._post_load_warmup_log.append(entry)
 
     def _resolve_target_model(self, model_id: str | None) -> str | None:
         return model_id or self._active_model_id
@@ -1439,4 +1477,8 @@ class RuntimeKernel:
             "host_pressure": dict(self._last_host_pressure_snapshot),
             "active_model_id": status.active_model_id,
             "cache_residency": self._cache_residency_tracker.status_dict(),
+            "post_load_warmup": {
+                "total_warmup_count": len(self._post_load_warmup_log),
+                "log": list(self._post_load_warmup_log[-8:]),
+            },
         }
