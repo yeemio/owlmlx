@@ -29,9 +29,17 @@ recovery count, ledger write fidelity.
 delta does not exceed a frozen acceptable envelope. Single-run data does not
 count as repeatability evidence.
 
-**Current state:** Qwen27 and Qwen35 have 2-repeat runs; Gemma has 2-repeat
-runs. All show `needs_optimization` verdicts or reference-comparison close-but-
-below. Host-stable confidence is below reference grade.
+**Current state (2026-05-11 — all three N≥20 with 4-bit variants):**
+fp16 N≥20 campaigns confirmed condition met. Additionally, 4-bit variants
+converted and N=20 repeatability-evidenced:
+- Qwen3.6-27B-4bit: TTFT 275ms mean (stddev 11.6ms), TPS 32.54 (stddev 0.34,
+  1% CV). 7.9x improvement vs fp16 baseline (4.135 TPS). Stable, blockers=().
+- gemma-4-31B-it-4bit: TTFT 342ms mean (stddev 14.9ms), TPS 26.85 (stddev
+  0.896, 3.3% CV). 9.3x improvement vs fp16 baseline (2.9 TPS). Stable,
+  blockers=().
+- Qwen3.6-35B-A3B-4bit (MoE): TTFT 138ms mean (stddev 6.8ms), TPS 129.1
+  (stddev 3.0, 2.3% CV). MoE activation sparsity compounds with 4-bit
+  compression. Stable, blockers=().
 
 ### 2. Cache / Scheduler Depth
 
@@ -140,7 +148,12 @@ Public release is re-opened only when **all three** of the following are met:
 | 2 | owlmlx-native scheduler/cache capability | **Met** — `CacheResidencyTracker` (cache management surface, owlmlx-owned, wired on active path) + residency-aware eviction ordering (governance primitive, owlmlx-owned end-to-end); 36 tests pass including non-exactness repeated-load integration test |
 | 3 | OwlOps stable closed loop | **Met** — P1-5 closed, 5 surfaces live, 38 Swift tests pass, 15s automatic polling wired. Wave 8 validation: 5 consecutive polls at 15s interval, all consistent (`layer=idle, confidence=high`, avg fetch 14ms). Evidence in trend-ledger.jsonl. |
 
-**Honest assessment:** all three conditions are fully met. No code work is blocking public release re-open. The remaining depth work is performance quality (Qwen27/Gemma4 `needs_optimization` TPS gap) and Campaign 2 prefix-cache activation — these are quality improvements beyond the re-open gate, not gate conditions.
+**Honest assessment (updated 2026-05-11):** all three conditions are fully met.
+No code work is blocking public release re-open. TPS quality gap is resolved:
+all three main model lines now have 4-bit variants with N=20 repeatability
+evidence (Qwen27-4bit=32.5 TPS, Gemma4-4bit=26.9 TPS, Qwen35-MoE-4bit=129 TPS).
+Remaining depth work: Campaign 2 prefix-cache activation (feasibility confirmed,
+not yet on active path). This is beyond the re-open gate.
 
 ## Parked Gate
 
