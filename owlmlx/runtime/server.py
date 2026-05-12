@@ -673,6 +673,13 @@ def create_app(
     def _request_runtime_url(request: Request) -> str:
         return str(request.base_url).rstrip("/")
 
+    def _session_id_from_request(request: Request) -> str | None:
+        value = request.headers.get("x-owlmlx-session-id")
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
     def _runtime_model_visibility_contract() -> dict[str, Any]:
         return derive_runtime_model_visibility_contract(
             runtime.inventory_snapshot(),
@@ -1529,20 +1536,29 @@ def create_app(
 
     @app.post("/v1/generate")
     async def generate(payload: GenerateRequest, request: Request) -> JSONResponse:
+        params = dict(payload.params)
+        session_id = _session_id_from_request(request)
+        if session_id is not None:
+            params["session_id"] = session_id
         result = await runtime.generate(
             payload.prompt,
             model_id=payload.model_id,
-            **payload.params,
+            **params,
         )
         return _native_runtime_response(result, request=request)
 
     @app.post("/v1/generate/stream")
-    async def generate_stream(payload: GenerateRequest) -> StreamingResponse:
+    async def generate_stream(payload: GenerateRequest, request: Request) -> StreamingResponse:
+        params = dict(payload.params)
+        session_id = _session_id_from_request(request)
+        if session_id is not None:
+            params["session_id"] = session_id
+
         async def event_source():
             async for event in runtime.generate_stream(
                 payload.prompt,
                 model_id=payload.model_id,
-                **payload.params,
+                **params,
             ):
                 data = asdict(event)
                 error = data.get("error_code")
@@ -1580,6 +1596,9 @@ def create_app(
         if chat_template_kwargs:
             params["chat_template_kwargs"] = chat_template_kwargs
         reasoning_policy = _openai_reasoning_trace_policy(payload, profile=profile)
+        session_id = _session_id_from_request(request)
+        if session_id is not None:
+            params["session_id"] = session_id
 
         if not payload.stream:
             result = await runtime.generate_messages(messages, model_id=target_model, **params)
@@ -1762,6 +1781,9 @@ def create_app(
         if payload.tool_choice is not None:
             params["tool_choice"] = payload.tool_choice
         input_tokens = _estimate_input_tokens_from_turns(turns)
+        session_id = _session_id_from_request(request)
+        if session_id is not None:
+            params["session_id"] = session_id
 
         if not payload.stream:
             result = await runtime.generate_messages(turns, model_id=target_model, **params)
@@ -1901,6 +1923,9 @@ def create_app(
             params["temperature"] = payload.temperature
         if payload.stop is not None:
             params["stop"] = payload.stop
+        session_id = _session_id_from_request(request)
+        if session_id is not None:
+            params["session_id"] = session_id
 
         if not payload.stream:
             result = await runtime.generate(payload.prompt, model_id=target_model, **params)
@@ -2049,6 +2074,20 @@ def create_app(
     @app.get("/v1/runtime/status")
     def runtime_status() -> dict[str, Any]:
         return runtime.status_dict()
+
+    @app.get("/v1/runtime/session-kv-cache")
+    def runtime_session_kv_cache() -> dict[str, Any]:
+        backend_detail = runtime.status_dict().get("backend", {}).get("detail", {})
+        session_cache = backend_detail.get("session_kv_cache")
+        if isinstance(session_cache, dict):
+            return session_cache
+        return {
+            "surface": "owlmlx.session_kv_cache",
+            "capability_label": "experimental",
+            "enabled": False,
+            "scope": "native_backend_explicit_session_id_only",
+            "reason_code": "backend_does_not_expose_session_kv_cache",
+        }
 
     @app.get("/v1/runtime/monitor/snapshot")
     def runtime_monitor_snapshot(request: Request) -> dict[str, Any]:

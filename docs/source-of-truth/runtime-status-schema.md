@@ -105,6 +105,7 @@ From Stabilization-1 onward, `/v1/runtime/status` is split into:
   - `load_failure`
   - `memory_pressure_cooldown`
   - `host_pressure`
+  - `session_kv_cache`
 
 The stable sections are intended for long-lived `owlcoda` / `owlops` consumption.
 The diagnostic sections remain useful, but upper layers must treat them as best-effort detail rather than field-stable compatibility promises.
@@ -125,6 +126,11 @@ load attempts from host-visible macOS memory-pressure output and cached into
 status. It may block a new load when free host memory crosses the runtime-owned
 threshold, but it is not private Metal allocator or command-queue pressure
 truth.
+
+`backend.detail.session_kv_cache` is a diagnostic native-backend cache payload.
+It is experimental, default-off, and scoped to explicit `X-Owlmlx-Session-Id`
+callers. Product layers must not treat its presence as support for paged KV,
+continuous batching, implicit prefix matching, or subprocess cache reuse.
 
 `GET /healthz` is also frozen as a smaller liveness contract in Stabilization-1:
 

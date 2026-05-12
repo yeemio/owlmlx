@@ -242,7 +242,7 @@ class CacheManager:
             "manager_kind": "owlmlx_kv_cache_manager_scaffold",
             "single_request_semantics_enforced": True,
             "cross_request_reuse_claimed": False,
-            "wired_into_native_backend": False,
+            "wired_into_native_backend": True,
             "counters": counters_snapshot.to_dict(),
             "handles_count_by_model": handles_count_by_model,
         }

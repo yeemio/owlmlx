@@ -67,8 +67,9 @@ won't.
 | Abort recovery (substrate state verified before resuming) | supported |
 | Runtime-owned observability (`/v1/runtime/monitor/snapshot`, `/history`, `/metrics`) | supported |
 | Native MLX backend (in-process, bypassing `mlx_lm`) | experimental |
+| Native session KV cache (`X-Owlmlx-Session-Id`, default off) | experimental |
 | Subprocess backend (`mlx_lm` in a separate process) | supported |
-| Continuous batching / paged KV cache / multimodal / speculative | **not in scope** |
+| Continuous batching / paged KV cache / implicit prefix matching / multimodal / speculative | **not in scope** |
 
 Short-prompt TPS on `Mac17,6` (`max_tokens=64`, `temperature=0`):
 

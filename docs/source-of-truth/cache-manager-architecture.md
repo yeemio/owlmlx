@@ -1,8 +1,8 @@
 # owlmlx KV Cache Manager — Architecture (Scaffold)
 
 > Status: authoritative
-> Updated: 2026-05-08
-> Round: C-1 (cache manager scaffold landing)
+> Updated: 2026-05-12
+> Round: C-1 plus native wiring and default-off session-cache extension
 > Implementation: `owlmlx/cache_manager.py`
 
 ## 1. Why this module exists
@@ -18,12 +18,13 @@ The seven-line architectural assessment in
 This document freezes what that scaffold owns, what it deliberately does
 not own, and which upstream and owlmlx-internal modules surround it.
 
-The scaffold does **not** close Line 5 by itself. It lands the ownership
-domain so that a follow-up round (eviction policy, prefix reuse,
-cross-request keying) has a frozen contract to extend. The current
-binding enforces single-request semantics; the broader cache / scheduler
-depth gap remains open until those extension points are implemented and
-walked through the §1a Promotion Gate.
+The original scaffold did **not** close Line 5 by itself. It landed the
+ownership domain so that follow-up rounds could extend it. As of 2026-05-12,
+`MlxNativeBackend` consumes `CacheManager` for single-request prompt-cache
+lifetime, and `owlmlx/session_kv_cache.py` adds a separate default-off,
+explicit-session experimental reuse store. The broader cache / scheduler depth
+gap remains open until these extension points are exercised through the
+promotion gate with real soak and TTFT evidence.
 
 ## 2. Distinct from `cache_truth.py`
 
@@ -49,7 +50,8 @@ not collapsed in this round.
 |---|---|---|
 | In-process KV cache lifetime (per request) | **`owlmlx/cache_manager.py` (this scaffold)** | acquire / release a fresh upstream cache object per request; expose a 5-counter zero-baseline ledger |
 | Upstream KV cache primitives | `mlx_lm.models.cache` | `make_prompt_cache`, `KVCache`, `RotatingKVCache`, `QuantizedKVCache`, `ConcatenateKVCache`, `ChunkedKVCache`, `ArraysCache`, `BatchKVCache`, `BatchRotatingKVCache`, `CacheList`, `TokenBuffer`, `PromptTrie`, `LRUPromptCache` |
-| Adapter-side single-request binding | `owlmlx/runtime/mlx_native_backend.py` (`_make_fresh_prompt_cache`) | drives `make_prompt_cache(model)` per `generate` / `stream_generate` and threads it via `prompt_cache=` kwarg. **NOT modified in this scaffold round** |
+| Adapter-side single-request binding | `owlmlx/runtime/mlx_native_backend.py` (`_make_fresh_prompt_cache`) | drives `make_prompt_cache(model)` per `generate` / `stream_generate` and threads it via `prompt_cache=` kwarg |
+| Explicit session KV reuse | `owlmlx/session_kv_cache.py` | default-off experimental store for explicit `(session_id, model_id)` cache reuse on the native backend only |
 | Legacy SSD / hot-cache schema | `owlmlx/cache_truth.py` | platform-shell-oriented cache profile + TurboQuant safety; not KV-cache-related |
 | Cache manager counters | `owlmlx/cache_manager.py` | declares the 5 live counter names; the older `cache_residency_evidence.py` scaffold is archived |
 | Pre-claim metadata / ticket staging | `owlmlx/cache_pre_claim_*.py` family (e.g. `cache_pre_claim_admission_contract.py:53-58`) | bounded metadata staging seam **before** gate claim; explicitly forbidden actions include `no_gate_claim_from_pre_claim_seam`, `no_child_exchange_from_pre_claim_seam`, `no_stream_start_from_pre_claim_seam`, `no_model_execution_from_pre_claim_seam` |

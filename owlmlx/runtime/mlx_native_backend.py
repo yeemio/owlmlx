@@ -11,7 +11,7 @@ Hard scope (per owlmlx-native-mlx-backend-feasibility-scaffold round):
 
 - does not replace `MlxLmSubprocessBackend`
 - does not change phase45 active seam
-- does not claim continuous batching, cache parity, prefix cache reuse,
+- does not claim continuous batching, cache parity, implicit prefix matching,
   speculative decoding, or stream interleaving — even where the underlying
   mlx_lm API would support them
 - does not relax post-claim ``max_concurrent = 1``, ticketed FIFO, or
@@ -38,6 +38,7 @@ from owlmlx.memory_actuator import (
     MemoryActuator,
     ReclaimReceipt,
 )
+from owlmlx.session_kv_cache import SessionKVCacheStore
 
 from .types import (
     BackendStatus,
@@ -194,6 +195,13 @@ def _resolve_make_prompt_cache(mlx_lm_module: Any) -> Any | None:
     return candidate
 
 
+def _non_empty_string(value: object) -> str | None:
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
+
+
 class MlxNativeBackend:
     """Experimental in-process MLX backend.
 
@@ -219,6 +227,11 @@ class MlxNativeBackend:
         # backward-compatible mirror so existing callers that read them
         # continue to work; the manager's counters are the canonical ledger.
         self._cache_manager = CacheManager()
+        # Experimental, default-off session-scoped KV reuse. This is kept
+        # separate from CacheManager because it deliberately holds a strong
+        # cache-object reference across requests for the same explicit
+        # session_id/model_id pair.
+        self._session_kv_cache = SessionKVCacheStore.from_env()
         # C-3.1 wiring: the memory_actuator is the only sanctioned call site
         # for ``mlx_module.clear_cache()`` in owlmlx. ``unload`` constructs
         # a fresh actuator per call (with the lazily-imported mlx.core, or
@@ -294,6 +307,57 @@ class MlxNativeBackend:
         # request lifecycle completes (generate return, stream finally,
         # unload).
         session.active_cache_handle = handle
+        return cache
+
+    def _make_prompt_cache_for_request(
+        self,
+        mlx_lm_module: Any,
+        session: _NativeSession,
+        *,
+        session_id: str | None,
+        memory_watermark: str | None,
+    ) -> Any | None:
+        """Create or reuse a prompt cache for one request.
+
+        Default-off behavior delegates to ``_make_fresh_prompt_cache`` exactly
+        as before. When session cache is enabled and a session_id is present,
+        the experimental store owns the strong cache reference across requests.
+        Pressure watermark refusal falls back to the single-request path, which
+        avoids persistent cache growth while preserving current generation
+        behavior.
+        """
+
+        if not self._session_kv_cache.enabled or not _non_empty_string(session_id):
+            return self._make_fresh_prompt_cache(mlx_lm_module, session)
+
+        make_cache = _resolve_make_prompt_cache(mlx_lm_module)
+        if make_cache is None:
+            session.last_prompt_cache = None
+            session.last_prompt_cache_id = None
+            return None
+
+        try:
+            decision = self._session_kv_cache.acquire_for_request(
+                session_id=session_id,
+                model_id=session.info.model_id,
+                make_cache=lambda: make_cache(session.model),
+                watermark=memory_watermark,
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            session.last_error = f"session KV cache failed: {exc}"
+            session.last_prompt_cache = None
+            session.last_prompt_cache_id = None
+            return self._make_fresh_prompt_cache(mlx_lm_module, session)
+
+        if decision.cache_object is None:
+            return self._make_fresh_prompt_cache(mlx_lm_module, session)
+
+        cache = decision.cache_object
+        session.last_prompt_cache = cache
+        session.last_prompt_cache_id = id(cache)
+        if decision.created:
+            session.prompt_cache_call_count += 1
+        session.active_cache_handle = None
         return cache
 
     def _release_active_cache(self, session: _NativeSession) -> None:
@@ -404,6 +468,7 @@ class MlxNativeBackend:
         # the session is dropped — otherwise the manager's per-model
         # registry would carry orphaned handles for an unloaded model.
         self._release_active_cache(session)
+        self._session_kv_cache.drop_for_model(model_id)
         freed = float(session.info.memory_gb)
         session.model = None
         session.tokenizer = None
@@ -549,6 +614,10 @@ class MlxNativeBackend:
                 model_id=model_id,
             )
         max_tokens = int(kwargs.get("max_tokens") or 64)  # type: ignore[arg-type]
+        session_id = _non_empty_string(kwargs.pop("session_id", None))
+        memory_watermark = _non_empty_string(
+            kwargs.pop("session_kv_cache_watermark", None)
+        ) or _non_empty_string(kwargs.pop("memory_watermark", None))
         started = time.time()
         wait_started = started
         _ticket, was_queued = self._admission.acquire()
@@ -556,15 +625,18 @@ class MlxNativeBackend:
         try:
             try:
                 with session.lock:
-                    fresh_cache = self._make_fresh_prompt_cache(
-                        mlx_lm, session
+                    prompt_cache = self._make_prompt_cache_for_request(
+                        mlx_lm,
+                        session,
+                        session_id=session_id,
+                        memory_watermark=memory_watermark,
                     )
                     call_kwargs: dict[str, Any] = {
                         "prompt": prompt,
                         "max_tokens": max_tokens,
                     }
-                    if fresh_cache is not None:
-                        call_kwargs["prompt_cache"] = fresh_cache
+                    if prompt_cache is not None:
+                        call_kwargs["prompt_cache"] = prompt_cache
                     text = mlx_lm.generate(
                         session.model,
                         session.tokenizer,
@@ -645,6 +717,10 @@ class MlxNativeBackend:
             )
             return
         max_tokens = int(kwargs.get("max_tokens") or 64)  # type: ignore[arg-type]
+        session_id = _non_empty_string(kwargs.pop("session_id", None))
+        memory_watermark = _non_empty_string(
+            kwargs.pop("session_kv_cache_watermark", None)
+        ) or _non_empty_string(kwargs.pop("memory_watermark", None))
         sequence = 0
         completion_tokens = 0
         finish_reason: str | None = None
@@ -654,15 +730,18 @@ class MlxNativeBackend:
         try:
             try:
                 with session.lock:
-                    fresh_cache = self._make_fresh_prompt_cache(
-                        mlx_lm, session
+                    prompt_cache = self._make_prompt_cache_for_request(
+                        mlx_lm,
+                        session,
+                        session_id=session_id,
+                        memory_watermark=memory_watermark,
                     )
                     stream_kwargs: dict[str, Any] = {
                         "prompt": prompt,
                         "max_tokens": max_tokens,
                     }
-                    if fresh_cache is not None:
-                        stream_kwargs["prompt_cache"] = fresh_cache
+                    if prompt_cache is not None:
+                        stream_kwargs["prompt_cache"] = prompt_cache
                     generate_start = time.time()
                     first_token_prefill_ms: float | None = None
                     for token_payload in mlx_lm.stream_generate(
@@ -751,6 +830,7 @@ class MlxNativeBackend:
         if not healthy:
             detail["import_error"] = import_error
         detail["admission"] = self._admission.snapshot()
+        detail["session_kv_cache"] = self._session_kv_cache.status_dict()
         if mlx_lm is not None:
             detail["upstream_make_prompt_cache_reachable"] = (
                 _resolve_make_prompt_cache(mlx_lm) is not None
@@ -794,13 +874,16 @@ class MlxNativeBackend:
             "kv_cache_factory": {
                 "symbol": "mlx_lm.models.cache.make_prompt_cache",
                 "status": (
-                    "bound_per_request_single_request_only"
-                    if upstream_cache_reachable
-                    else "upstream_not_reachable"
+                    "upstream_not_reachable"
+                    if not upstream_cache_reachable
+                    else "bound_session_scoped_experimental"
+                    if self._session_kv_cache.enabled
+                    else "bound_per_request_single_request_only"
                 ),
                 "last_prompt_cache_id": session.last_prompt_cache_id,
                 "prompt_cache_call_count": session.prompt_cache_call_count,
-                "cross_request_reuse_claimed": False,
+                "cross_request_reuse_claimed": self._session_kv_cache.enabled,
+                "session_kv_cache": self._session_kv_cache.status_dict(),
             },
             "sampler_factory": {
                 "symbol": "mlx_lm.sample_utils.make_sampler",

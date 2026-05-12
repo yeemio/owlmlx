@@ -53,6 +53,9 @@ Current coordination note for that gate:
 Learning artifact v0 decision for the future downstream consumer-readiness gate:
 `learning-artifact-v0-decision.md`.
 
+Session-scoped native KV cache experiment:
+`session-kv-cache-experimental.md`.
+
 1. `master-outline.md`
 2. `ARCHITECTURE-TRUTH.md`
 3. `product-definition.md`

@@ -251,7 +251,7 @@ def test_status_dict_shape_exposes_live_counter_vocabulary() -> None:
     assert snapshot["manager_kind"] == "owlmlx_kv_cache_manager_scaffold"
     assert snapshot["single_request_semantics_enforced"] is True
     assert snapshot["cross_request_reuse_claimed"] is False
-    assert snapshot["wired_into_native_backend"] is False
+    assert snapshot["wired_into_native_backend"] is True
     assert snapshot["handles_count_by_model"] == {"m": 1}
 
     # Counter shape — five expected keys, all integers.
