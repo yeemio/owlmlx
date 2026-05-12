@@ -183,13 +183,13 @@ inside a supported module.
   `build_memory_pressure_eviction_policy(...)`
 - `owlmlx.nonresident_model_admission_policy` — `supported`
 - `owlmlx.nonresident_loadability_lineage` — `supported`
-- `owlmlx.recovery_supervisor_contract` — `supported`
+- `owlmlx.recovery_supervisor` — `supported`
 - `owlmlx.termination_recovery_policy` — `supported`
 - `owlmlx.reclaim_barrier_event` — `supported`
-- `owlmlx.scheduler_admission_contract` — `supported`
+- `owlmlx.scheduler_admission` — `supported`
 - `owlmlx.orchestration_status` — `supported`
 - `owlmlx.model_residency_policy` — `supported`
-- `owlmlx.memory_pressure_contract` — `supported`
+- `owlmlx.memory_pressure_classifier` — `supported`
 - `owlmlx.runtime_status` — `supported`
 
 The full list of every `owlmlx.*` symbol is **not** part of this surface.

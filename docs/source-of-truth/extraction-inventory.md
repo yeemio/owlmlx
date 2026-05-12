@@ -146,9 +146,9 @@ Wave A is considered complete when:
 Current status: **complete** (2026-05-12, Stage 3.1 c3) —
 - `serving.py`, `cache_truth.py`, `model_inventory.py`, `model_lineage.py`,
   `memory_budget.py`, `context_concurrency.py`, `abort_recovery.py`,
-  `runtime_health.py`, `memory_pressure_contract.py`,
+  `runtime_health.py`, `memory_pressure_classifier.py`,
   `memory_pressure_eviction_policy.py`, `settle_barrier_event.py`,
-  `recovery_supervisor_contract.py`, `request_context_length_truth.py`,
+  `recovery_supervisor.py`, `request_context_length_truth.py`,
   `model_residency_policy.py`, `nonresident_loadability_lineage.py`,
   `nonresident_model_admission_policy.py`, and `memory_watermark.py`
   exist and validate against runtime decision paths.
@@ -224,7 +224,7 @@ Current status: **partially internalized** (updated 2026-05-12) —
 - Active-request protection lives in `owlmlx/serving.py` (`GenerationGate`)
   and is enforced by tests.
 - Memory governance decisions (watermark + admission + eviction) are
-  made by owlmlx-owned code in `memory_pressure_contract.py`,
+  made by owlmlx-owned code in `memory_pressure_classifier.py`,
   `memory_pressure_eviction_policy.py`, `memory_watermark.py`, and
   `nonresident_model_admission_policy.py`.
 - Settle-barrier semantics are owlmlx-owned via `settle_barrier_event.py`.

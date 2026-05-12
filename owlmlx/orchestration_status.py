@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from owlmlx.memory_pressure_contract import (
+from owlmlx.memory_pressure_classifier import (
     build_memory_pressure_contract,
     memory_pressure_contract_to_dict,
 )
@@ -13,11 +13,11 @@ from owlmlx.model_residency_policy import (
     build_model_residency_policy,
     model_residency_policy_to_dict,
 )
-from owlmlx.scheduler_admission_contract import (
+from owlmlx.scheduler_admission import (
     build_scheduler_admission_contract,
     scheduler_admission_contract_to_dict,
 )
-from owlmlx.recovery_supervisor_contract import (
+from owlmlx.recovery_supervisor import (
     build_recovery_supervisor_contract,
     recovery_supervisor_contract_to_dict,
 )

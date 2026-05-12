@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from owlmlx.abort_recovery import AbortRecoveryTracker
-from owlmlx.recovery_supervisor_contract import (
+from owlmlx.recovery_supervisor import (
     build_recovery_supervisor_contract,
     recovery_supervisor_contract_to_dict,
 )
@@ -118,7 +118,7 @@ def test_recovery_supervisor_module_has_no_platform_dependency() -> None:
     source = (
         Path(__file__)
         .parents[1]
-        .joinpath("owlmlx", "recovery_supervisor_contract.py")
+        .joinpath("owlmlx", "recovery_supervisor.py")
         .read_text()
     )
     forbidden = [

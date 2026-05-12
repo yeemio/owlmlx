@@ -9,7 +9,7 @@ from owlmlx.request_context_length_truth import (
     build_request_context_length_truth,
     request_context_length_truth_to_dict,
 )
-from owlmlx.recovery_supervisor_contract import (
+from owlmlx.recovery_supervisor import (
     build_recovery_supervisor_contract,
     recovery_supervisor_contract_to_dict,
 )

@@ -19,7 +19,7 @@ It is the narrow admission layer that sits in front of the already-validated
 
 ## 2. Owned Contract
 
-`owlmlx/scheduler_admission_contract.py` now owns:
+`owlmlx/scheduler_admission.py` now owns:
 
 - `build_scheduler_admission_contract(...)`
 - `scheduler_admission_contract_to_dict(...)`

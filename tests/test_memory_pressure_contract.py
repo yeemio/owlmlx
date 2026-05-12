@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from owlmlx.memory_budget import MachineMemoryProfile
-from owlmlx.memory_pressure_contract import (
+from owlmlx.memory_pressure_classifier import (
     build_memory_pressure_contract,
     memory_pressure_contract_to_dict,
 )
@@ -244,7 +244,7 @@ def test_memory_pressure_contract_module_has_no_platform_dependency() -> None:
     source = (
         Path(__file__)
         .parents[1]
-        .joinpath("owlmlx", "memory_pressure_contract.py")
+        .joinpath("owlmlx", "memory_pressure_classifier.py")
         .read_text()
     )
     forbidden = [

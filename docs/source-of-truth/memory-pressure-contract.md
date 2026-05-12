@@ -20,7 +20,7 @@ pressure victim selection or private Metal allocator visibility.
 
 ## 2. Owned Contract
 
-`owlmlx/memory_pressure_contract.py` now owns:
+`owlmlx/memory_pressure_classifier.py` now owns:
 
 - `build_memory_pressure_contract(...)`
 - `memory_pressure_contract_to_dict(...)`

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from .memory_pressure_contract import (
+from .memory_pressure_classifier import (
     MemoryPressureContract,
     build_memory_pressure_contract,
 )
@@ -13,7 +13,7 @@ from .model_residency_policy import (
     ModelResidencyPolicy,
     build_model_residency_policy,
 )
-from .recovery_supervisor_contract import (
+from .recovery_supervisor import (
     RecoverySupervisorContract,
     build_recovery_supervisor_contract,
 )

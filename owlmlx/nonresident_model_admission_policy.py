@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
-from .memory_pressure_contract import (
+from .memory_pressure_classifier import (
     MemoryPressureContract,
     build_memory_pressure_contract,
     memory_pressure_contract_to_dict,
@@ -18,7 +18,7 @@ from .model_residency_policy import (
 from .nonresident_loadability_lineage import (
     NonResidentLoadabilityLineage,
 )
-from .recovery_supervisor_contract import (
+from .recovery_supervisor import (
     RecoverySupervisorContract,
     build_recovery_supervisor_contract,
     recovery_supervisor_contract_to_dict,

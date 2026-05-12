@@ -20,7 +20,7 @@ as full recovery closure.
 
 ## 2. Owned Contract
 
-`owlmlx/recovery_supervisor_contract.py` owns:
+`owlmlx/recovery_supervisor.py` owns:
 
 - `build_recovery_supervisor_contract(...)`
 - `recovery_supervisor_contract_to_dict(...)`

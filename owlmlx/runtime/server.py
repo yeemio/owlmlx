@@ -43,7 +43,7 @@ from owlmlx.orchestration_status import (
     build_orchestration_status,
     orchestration_status_to_dict,
 )
-from owlmlx.scheduler_admission_contract import (
+from owlmlx.scheduler_admission import (
     build_scheduler_admission_contract,
     scheduler_admission_contract_to_dict,
 )
@@ -58,11 +58,11 @@ from owlmlx.memory_watermark import (
     WatermarkAction,
     YELLOW_CEILING,
 )
-from owlmlx.memory_pressure_contract import (
+from owlmlx.memory_pressure_classifier import (
     build_memory_pressure_contract,
     memory_pressure_contract_to_dict,
 )
-from owlmlx.recovery_supervisor_contract import (
+from owlmlx.recovery_supervisor import (
     build_recovery_supervisor_contract,
     recovery_supervisor_contract_to_dict,
 )

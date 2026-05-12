@@ -1,0 +1,36 @@
+name: self-banned module names
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject self-banned owlmlx module names
+        shell: bash
+        run: |
+          banned="$(
+            find owlmlx -maxdepth 1 -type f \
+              \( -name '*_contract.py' \
+              -o -name '*_ledger.py' \
+              -o -name '*_evidence.py' \
+              -o -name '*_harness.py' \
+              -o -name '*_exactness.py' \
+              -o -name '*_carrier.py' \
+              -o -name '*_marker.py' \
+              -o -name '*_feasibility.py' \
+              -o -name '*_rung.py' \
+              -o -name '*_seam.py' \
+              -o -name '*_charter.py' \) \
+              -print
+          )"
+          if [ -n "$banned" ]; then
+            echo "self-banned modules present:"
+            echo "$banned"
+            exit 1
+          fi

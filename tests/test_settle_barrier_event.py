@@ -13,7 +13,7 @@ from owlmlx.settle_barrier_event import (
     build_settle_barrier_event,
     settle_barrier_event_to_dict,
 )
-from owlmlx.recovery_supervisor_contract import (
+from owlmlx.recovery_supervisor import (
     build_recovery_supervisor_contract,
     recovery_supervisor_contract_to_dict,
 )
@@ -230,7 +230,7 @@ def test_recovery_supervisor_reports_hard_barrier_when_event_unresolved() -> Non
 
 
 def test_scheduler_admission_rejects_when_reclaim_barrier_active() -> None:
-    from owlmlx.scheduler_admission_contract import (
+    from owlmlx.scheduler_admission import (
         build_scheduler_admission_contract,
         scheduler_admission_contract_to_dict,
     )
@@ -276,7 +276,7 @@ def test_orchestration_status_reports_recovery_bottleneck_when_event_unresolved(
 
 
 def test_memory_pressure_contract_does_not_claim_reclaim_engine_or_pressure_eviction() -> None:
-    from owlmlx.memory_pressure_contract import (
+    from owlmlx.memory_pressure_classifier import (
         build_memory_pressure_contract,
         memory_pressure_contract_to_dict,
     )

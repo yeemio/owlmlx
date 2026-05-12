@@ -388,7 +388,7 @@ def test_termination_recovery_policy_route_returns_payload() -> None:
 
 
 def test_recovery_supervisor_still_reports_hard_barrier_when_event_unresolved() -> None:
-    from owlmlx.recovery_supervisor_contract import (
+    from owlmlx.recovery_supervisor import (
         build_recovery_supervisor_contract,
         recovery_supervisor_contract_to_dict,
     )
@@ -410,7 +410,7 @@ def test_recovery_supervisor_still_reports_hard_barrier_when_event_unresolved() 
 
 
 def test_admission_still_rejects_via_recovery_hard_barrier() -> None:
-    from owlmlx.scheduler_admission_contract import (
+    from owlmlx.scheduler_admission import (
         build_scheduler_admission_contract,
         scheduler_admission_contract_to_dict,
     )

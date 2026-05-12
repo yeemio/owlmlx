@@ -114,14 +114,12 @@ not code. Put documentation in `docs/`.
 
 | Module | Status | Reason |
 | --- | --- | --- |
-| `memory_pressure_contract.py` | rename pending before `0.3.0` | Runtime/server policy paths read the classifier verdict and fields. |
-| `recovery_supervisor_contract.py` | rename pending before `0.3.0` | Runtime/server recovery policy paths read the supervisor verdict and fields. |
-| `scheduler_admission_contract.py` | rename pending before `0.3.0` | Runtime/server admission policy paths read the scheduler verdict and fields. |
 | `comparative_evidence_history.py` | approved live history | Runtime routes and scripts append/read comparative evidence history. |
 | `model_release_candidate_history.py` | approved live history | Runtime routes and scripts append/read model release-candidate history. |
 
-Do not add new `*_contract.py` modules. Existing contract-named modules are
-temporary compatibility debt, not a pattern to copy.
+Do not add new `*_contract.py` modules. Runtime contract payloads and HTTP
+paths may keep `*-contract` vocabulary where that is the stable wire-format
+name, but Python module filenames must not.
 
 **PR-level check before merging any new `.py` in `owlmlx/`:**
 
