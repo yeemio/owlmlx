@@ -1,6 +1,6 @@
 # owlmlx Public Developer Preview Readiness
 
-> Status: superseded parked release gate
+> Status: historical developer-preview evidence
 > Created: 2026-05-10
 > Parked: 2026-05-10
 > Scope: honest readiness position for public developer preview; anchored to
@@ -8,17 +8,17 @@
 > `release-readiness-backlog.md`, `public-surface.md`, or
 > `reference-runtime-comparison-matrix.md`
 >
-> This document records the earlier developer-preview threshold. It is
-> superseded for public release decisions by
-> `public-release-standard.md`: public release now reopens only when the
-> OwlCoda npm package can use a local model through `owlmlx` to complete the
-> self-training data accumulation and learning loop.
+> This document records the earlier developer-preview threshold. The current
+> release-channel split is defined by `public-release-standard.md`: `owlmlx`
+> owns runtime engineering releases, while OwlCoda owns the downstream
+> npm-package local-learning consumer-readiness proof.
 
 ## 1. One-Line Position
 
 `owlmlx` has the runtime evidence that previously supported a developer-preview
-label, but public release remains parked under the newer OwlCoda learning-loop
-gate in `public-release-standard.md`.
+label. Under the current release-channel split, that evidence can support a
+scoped runtime engineering release; it still does not prove OwlCoda product
+readiness.
 
 ## 2. Release-Floor Status
 

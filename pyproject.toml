@@ -24,5 +24,9 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["owlmlx"]
 
+[tool.owlmlx]
+release_channel = "engineering"
+consumer_readiness_gate = "owlcoda_npm_local_model_learning_loop"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

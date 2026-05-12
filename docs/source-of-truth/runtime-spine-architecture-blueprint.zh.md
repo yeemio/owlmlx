@@ -67,7 +67,7 @@ flowchart TB
 | Backend execution | `owlmlx/runtime/mlx_lm_subprocess_backend.py`, `owlmlx/runtime/mlx_native_backend.py`, `owlmlx/runtime/mlx_lm_runner.py`, `owlmlx/runtime/mlx_vlm_mtp_runner.py`, `owlmlx/gemma4_mtp_drafter.py` | 调用 MLX 生态执行模型；当前有 subprocess 主路径、native scaffold/路径、mlx-vlm MTP runner |
 | Memory governance | `owlmlx/memory_watermark.py`, `owlmlx/memory_pressure_contract.py`, `owlmlx/memory_actuator.py`, `owlmlx/host_pressure.py`, `owlmlx/settle_barrier_event.py`, `owlmlx/model_load_admission.py`, `owlmlx/nonresident_model_admission_policy.py` | 内存水位、加载前检查、释放验证、host pressure、可加载性判断 |
 | Cache / residency / scheduler | `owlmlx/cache_manager.py`, `owlmlx/cache_residency_tracker.py`, `owlmlx/cache_scheduler_status.py`, `owlmlx/memory_pressure_eviction_policy.py`, `owlmlx/model_residency_policy.py`, `owlmlx/cache_truth.py` | 单请求 cache 生命周期、模型 residency 观测、scheduler/cache 诚实状态、后续 eviction 激活入口 |
-| Evidence / truth / comparison | `owlmlx/model_release_candidate_*`, `owlmlx/comparative_evidence_*`, `owlmlx/repeatability_statistics.py`, `owlmlx/repeatability_harness.py`, `owlmlx/runtime_monitor_test_console.py`, `owlmlx/quantization_metadata.py`, `owlmlx/model_lineage.py`, `owlmlx/model_profile.py` | RC ledger、repeatability、reference comparison、runtime monitor、量化 metadata、模型来源和 profile 真值 |
+| Evidence / truth / comparison | `owlmlx/model_release_candidate_*`, `owlmlx/comparative_evidence_*`, `owlmlx/repeatability_statistics.py`, `owlmlx/runtime_monitor_test_console.py`, `owlmlx/quantization_metadata.py`, `owlmlx/model_lineage.py`, `owlmlx/model_profile.py` | RC ledger、repeatability、reference comparison、runtime monitor、量化 metadata、模型来源和 profile 真值；旧 `repeatability_harness.py` scaffold 已归档到 `archive/spec-layer-v0/` |
 
 ## 3. 逻辑架构
 
@@ -469,11 +469,18 @@ Stage 4 不应该继续堆 surface，而应该转向真正改变 runtime 能力�
 1. Track A 先合，保证架构地图正确。
 2. Track B 后合，把能力推进落在正确地图上。
 
-## 11. 当前公开发布标准
+## 11. 当前发布通道拆分
 
-公开发布不再由“developer preview surface 已冻结”单独触发。
+`owlmlx` runtime engineering release 不再交给 OwlCoda 产品闭环单方面决定。
 
-当前标准冻结在 `public-release-standard.md`：
+当前通道拆分冻结在 `public-release-standard.md`：
+
+- `owlmlx` 自己拥有 runtime engineering release 权限；
+- OwlCoda npm local-model learning loop 是下游 consumer readiness / product
+  acceptance gate；
+- public marketing release 仍等待产品层证明。
+
+下游 consumer readiness 证明仍是：
 
 ```text
 OwlCoda npm package
@@ -484,7 +491,7 @@ OwlCoda npm package
   -> OwlCoda consumes the updated local-model path again
 ```
 
-这条线是下游公开发布验收门，不是当前 `owlmlx` 的实现主线。当前主线仍是
+这条线是下游 consumer readiness 验收门，不是当前 `owlmlx` 的实现主线。当前主线仍是
 `owlmlx` 自身 runtime 能力，尤其是 cache / residency / eviction、模型 lineage、
 artifact registration、repeatability 这些未来被 OwlCoda 消费所依赖的基础。
 

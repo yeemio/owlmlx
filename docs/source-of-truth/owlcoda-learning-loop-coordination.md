@@ -16,12 +16,13 @@ Corrected decision:
 ```text
 owlmlx mainline remains owlmlx runtime capability.
 OwlCoda is a downstream consumer of owlmlx.
-The OwlCoda learning loop is the future public-release acceptance gate,
-not the immediate owlmlx implementation mainline.
+The OwlCoda learning loop is the future downstream consumer-readiness gate,
+not the immediate owlmlx implementation mainline and not the sole authority for
+owlmlx runtime engineering releases.
 ```
 
-The public release standard in `public-release-standard.md` remains valid, but
-it does not mean `owlmlx` should immediately switch to OwlCoda integration work.
+The release-channel split in `public-release-standard.md` remains valid, but it
+does not mean `owlmlx` should immediately switch to OwlCoda integration work.
 `owlmlx` first has to reach the runtime capability floor that makes that
 downstream loop meaningful.
 
@@ -31,7 +32,7 @@ Current disposition:
 |---|---|---|
 | Stage 3.2 Track A — independence cleanup | complete | Closed. It corrected the architecture map and should not reopen unless a doc regression reintroduces migration framing. |
 | Stage 3.3 Track B — cache / residency / eviction activation | resume as current owlmlx mainline | This is an owlmlx-owned runtime capability lane and should proceed before OwlCoda integration work. |
-| OwlCoda npm local-model learning loop | future downstream acceptance gate | Park until owlmlx runtime prerequisites are strong enough to be consumed. Do not dispatch OwlCoda work as the current owlmlx mainline. |
+| OwlCoda npm local-model learning loop | future downstream consumer-readiness gate | Park until owlmlx runtime prerequisites are strong enough to be consumed. Do not dispatch OwlCoda work as the current owlmlx mainline. |
 
 ## 2. Why B Leads The Current owlmlx Mainline
 
@@ -53,8 +54,8 @@ OwlCoda npm package -> owlmlx local model -> self-training data accumulation
 Therefore:
 
 - Track B should resume as the current owlmlx runtime lane.
-- Track B must not claim public-release progress except as a supporting
-  reliability prerequisite.
+- Track B may support a runtime engineering release, but must not claim
+  OwlCoda product-readiness progress except as a reliability prerequisite.
 - OwlCoda discovery should wait until the `owlmlx` side has the runtime floor
   required for consumption.
 
@@ -69,7 +70,8 @@ is the `owlmlx` runtime floor that makes future OwlCoda consumption safe:
 2. honest memory-pressure and release evidence;
 3. stable model lineage / artifact registration semantics;
 4. repeatable local-model serving under the intended long-running workflow;
-5. no hidden public-release claim from intermediate runtime evidence.
+5. no hidden OwlCoda product-readiness claim from intermediate runtime
+   evidence.
 
 ## 4. Immediate Work Split
 
@@ -118,23 +120,25 @@ Recommended order:
 3. Close B or identify its blockers.
 4. Only then reopen OwlCoda-facing discovery.
 
-## 6. Current Public Release Gate
+## 6. Current Release-Channel Split
 
-Public release remains parked until `public-release-standard.md` §3-§4 passes.
+Runtime engineering release authority lives in `owlmlx` and is defined by
+`public-release-standard.md` §3.
 
-This gate is downstream. It does not change the current `owlmlx` mainline.
+The OwlCoda learning-loop proof remains downstream consumer readiness. It does
+not change the current `owlmlx` mainline.
 
 Allowed current public-facing status:
 
 ```text
-internal runtime milestone; public release parked behind OwlCoda npm
+runtime engineering milestone; OwlCoda product readiness parked behind npm
 local-model learning-loop proof
 ```
 
 Forbidden:
 
 ```text
-public release ready
+OwlCoda product release ready
 developer preview release
 OwlCoda learning loop complete
 cache eviction closure equals public release closure

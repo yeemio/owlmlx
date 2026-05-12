@@ -1,7 +1,7 @@
 # owlmlx Master Outline
 
 > Status: authoritative outline
-> Updated: 2026-05-05
+> Updated: 2026-05-12
 
 ## 1. What `owlmlx` Is
 
@@ -45,10 +45,13 @@ These are runtime-level goals, not temporary integration work.
 
 Chinese runtime-spine blueprint: `runtime-spine-architecture-blueprint.zh.md`.
 
-Current public release gate: `public-release-standard.md`.
+Current release-channel split: `public-release-standard.md`.
 
 Current coordination note for that gate:
 `owlcoda-learning-loop-coordination.md`.
+
+Learning artifact v0 decision for the future downstream consumer-readiness gate:
+`learning-artifact-v0-decision.md`.
 
 1. `master-outline.md`
 2. `ARCHITECTURE-TRUTH.md`
@@ -233,13 +236,12 @@ The current host-level answer is now frozen:
 
 The current gating program priority is:
 
-- freeze the current post-structural cache blocker exact and hand any further
-  runtime-owned leading-discriminator-marker choice back to coordinator
-  without inflating readiness claims
+- establish memory-discipline baseline evidence before expanding Track B
+  cache/residency/eviction architecture
 
 The current dominant gap is:
 
-- `cache_scheduler_depth`
+- `memory_discipline_baseline_missing`
 
 The current heavy-weight answer is now frozen:
 
@@ -254,146 +256,13 @@ The current heavy-weight answer is now frozen:
 
 The next executable closure round is:
 
-- current-host supported candidate baseline is now established
-- supported-host repeated heavy-weight proof is now visible on the selected
-  budget-fit path
-- cache is now the next dominant locally reducible gap
-- within `cache_scheduler_depth`, the subprocess-transport sentinel narrowing
-  chain is closed in the current paradigm; the next executable main line is
-  native MLX backend feasibility, not another sentinel rung
-- governance remains frozen
-- cache has reopened beyond the old structural checkpoint and now waits at the
-  backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-earlier-earlier-boundary
-  seam, while earlier-boundary detection, earlier-boundary first-unique
-  truth, fuller earlier-runtime-owned-boundary stem/prefix/detection,
-  current marker-discriminant detection, the newer earlier-runtime-owned
-  discriminator discriminant, the newer earlier-runtime-owned
-  leading-discriminator discriminant, and old marker-key lead stay preserved
-  as secondary truth
+- v0 learning artifact shape is frozen in
+  `learning-artifact-v0-decision.md`
+- `scripts/bench/eviction_soak.py` replaces the placeholder with an
+  owlmlx-first soak runner
+- fake backend smoke may prove ledger shape only; native MLX allocator evidence
+  is still required before any memory-stability claim
 
-The current cache checkpoint result is:
-
-- one real pre-gate request-aggregation / cohort window is now visible before
-  whole-request gate claim
-- the old structural and pre-gate window checkpoints remain preserved exact
-- one non-stream child exchange now already carries multiple requests in one
-  exchange
-- the active cache truth now points at
-  `owlmlx.cache_request_aggregation_active_seam`
-- the current exact cache blocker is
-  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection`
-- the newer earlier-runtime-owned leading-discriminator discriminant remains
-  frozen as the first honest unique boundary on the newer earlier-runtime-
-  owned leading-discriminator record
-- a second backend stream can already start before the first iterator consumer
-  receives the first stream's terminal event
-- a second backend stream can already start before the first terminal payload
-  is committed to the first stream queue
-- a second backend stream can already start before the first terminal payload
-  is decoded and captured
-- a second backend stream request can already enter the live backend exchange
-  before the first terminal record is fully captured
-- a second backend stream request can already enter the live backend exchange
-  before the first stream fully matches its terminal-record prefix on child
-  stdout
-- a second backend stream request can already enter the live backend exchange
-  before the first terminal done payload reaches its action discriminant on
-  child stdout
-- a second backend stream request can already enter the live backend exchange
-  before the first terminal-notice record is fully captured
-- a second backend stream request can already enter the live backend exchange
-  before child stdout fully matches the first terminal-notice prefix
-- a second backend stream request can already enter the live backend exchange
-  before the first terminal-notice action stem is reached
-- a second backend stream request can already enter the live backend exchange
-  before child stdout reaches the fuller earlier runtime-owned discriminator
-  prefix on the newer discriminator record
-- a second backend stream request can already enter the live backend exchange
-  before the first explicit terminal-notice marker field is reached
-- a second backend stream request can already enter the live backend exchange
-  before the first terminal-notice marker key is fully matched
-- a second backend stream request can already enter the live backend exchange
-  before the first terminal-notice marker stem is reached
-- a second backend stream request can already enter the live backend exchange
-  before the first terminal-notice marker discriminant is reached
-- owlmlx now also owns one runtime-owned terminal-notice leading-discriminator
-  record ahead of the old marker-key-lead seam
-- a second backend stream request can already enter the live backend exchange
-  before the first terminal-notice marker-key lead on the old notice record is
-  reached
-- a second backend stream request can already enter the live backend exchange
-  before child stdout fully matches that runtime-owned leading-discriminator
-  action
-- a second backend stream request can already enter the live backend exchange
-  before child stdout reaches that runtime-owned leading-discriminator prefix
-- a second backend stream request can already enter the live backend exchange
-  before child stdout reaches that runtime-owned leading-discriminator stem
-- a second backend stream request can already enter the live backend exchange
-  before child stdout reaches that runtime-owned leading-discriminator
-  discriminant
-- a second backend stream request can already enter the live backend exchange
-  before child stdout reaches the earlier runtime-owned leading-discriminator
-  stem on that newer leading-discriminator record
-- a second backend stream request can already enter the live backend exchange
-  before child stdout reaches the earlier runtime-owned leading-discriminator
-  discriminant on that newer leading-discriminator record
-- owlmlx now also owns one earlier runtime-owned `terminal_notice_lead` marker
-  on that same leading-discriminator record
-- the current runtime-owned leading-discriminator marker-discriminant boundary
-  remains frozen as the first honest unique boundary on the current
-  marker-first record
-- owlmlx now also owns one new earlier runtime-owned terminal-notice
-  discriminator record ahead of that current marker-discriminant seam
-- owlmlx now also owns one new earlier runtime-owned boundary record ahead of
-  that newer runtime-owned leading-discriminator record
-- a second backend stream request can already enter the live backend exchange
-  once child stdout reaches that new earlier runtime-owned boundary stem and
-  before child stdout reaches fuller earlier-runtime-owned-boundary prefix
-  detection on that same internal record
-- owlmlx now also owns one distinct earlier runtime-owned terminal record
-  `runtime_owned_terminal_earlier_boundary` ahead of the current
-  earlier-runtime-owned-boundary stem seam
-- a second backend stream request can already enter the live backend exchange
-  after child stdout reaches that distinct earlier boundary and before child
-  stdout reaches `runtime_owned_terminal_b`
-- earlier-runtime-owned-boundary earlier-boundary detection is also frozen as
-  the first honest unique boundary on the newer earlier-boundary record
-- owlmlx now also owns one distinct earlier-earlier runtime-owned terminal
-  record `runtime_owned_terminal_earlier_earlier_boundary` ahead of the
-  existing earlier-boundary record
-- a second backend stream request can already enter the live backend exchange
-  after child stdout reaches that earlier-earlier boundary and before child
-  stdout reaches `runtime_owned_terminal_earlier_boundary`
-- the current exact cache blocker is
-  `backend_stream_exchange_holds_serial_boundary_until_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection`
-- marker-key lead remains preserved as the first unique boundary on the old
-  terminal-notice record
-- it still does not imply continuous batching, parity, or replacement-ready
-
-The current governance fallback result is:
-
-- one real runtime-owned policy control now exists:
-  - `owlmlx.multi_model_pinning_control`
-- a second real runtime-owned policy control now exists:
-  - `owlmlx.multi_model_ttl_policy_control`
-- a third real runtime-owned policy control now exists:
-  - `owlmlx.multi_model_eviction_history_governance`
-- pinning blocks unload on the runtime-owned path
-- pin retention across restart is visible
-- TTL expiry sweep is visible on the runtime-owned path
-- eviction-history governance is visible on the runtime-owned path
-- the local governance fallback branch is now policy-closed
-
-The current next governance policy question is:
-
-- no longer another local policy-control round on this host
-- governance now waits behind stronger baseline validation on the current host
-
-The current restart condition is:
-
-- freeze the repeated-proof result in a fresh coordinator checkpoint
-- do not reopen cache/governance without a fresh coordinator choice
-- do not substitute isolated `/tmp` registry truth for the default
-  `~/.owlmlx` registry verdict
-- Phase 45 no longer stops at `budget_fit_heavy_boundary_entered`; it now holds
-  `supported_host_repeatability_visible` on the selected budget-fit path
+Historical Phase45 cache/governance seam details remain in their individual
+`phase45-*` source-of-truth files. They are not the current selector for the
+next runtime round.

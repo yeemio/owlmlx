@@ -4,7 +4,7 @@
 > Created: 2026-05-10
 > Scope: machine-readable table of allowed and prohibited claims for any
 > external communication about owlmlx; anchored to evidence, closed floors, and
-> the current public release gate in `public-release-standard.md`
+> the current release-channel split in `public-release-standard.md`
 
 ## 1. Purpose
 
@@ -26,7 +26,7 @@ becomes prohibited if the qualification is omitted.
 | Claim | Ruling | Evidence / source |
 |---|---|---|
 | "owlmlx is a self-owned Apple Silicon MLX runtime" | allowed | `product-definition.md`, `repository-boundaries.md` |
-| "owlmlx is in developer preview" | prohibited for current public release copy | Superseded by `public-release-standard.md`; the old developer-preview threshold is parked until the OwlCoda npm local-learning loop is proven |
+| "owlmlx is in developer preview" | allowed (scoped) | Allowed only for the runtime engineering channel when paired with current runtime evidence and limitations |
 | "owlmlx is a technical preview runtime" | allowed (scoped) | Allowed only in engineering docs as "technical-preview surface"; not a public release label |
 | "owlmlx is an early formal runtime" | allowed | `release-readiness-backlog.md` §2 |
 | "owlmlx is production-ready" | prohibited | `public-surface.md` §10 |
@@ -84,8 +84,8 @@ becomes prohibited if the qualification is omitted.
 | Claim | Ruling | Evidence / source |
 |---|---|---|
 | "owlmlx can be installed via uv from a fresh clone" | allowed (scoped) | scope: developer workflow on Python 3.11.15 with the `runtime` extra |
-| "owlmlx public release is gated by the OwlCoda npm package local-model learning loop" | allowed | `public-release-standard.md` |
-| "OwlCoda's npm package has completed the owlmlx-backed self-training data and learning loop" | prohibited until proven | Requires the end-to-end proof in `public-release-standard.md` §3-§4 |
+| "owlmlx has a runtime engineering release channel independent of OwlCoda" | allowed | `public-release-standard.md` |
+| "OwlCoda's npm package has completed the owlmlx-backed self-training data and learning loop" | prohibited until proven | Requires the downstream proof in `public-release-standard.md` §4 |
 | "owlmlx is available as a Homebrew tap" | prohibited | not owned by this repo |
 | "owlmlx ships as a macOS app" | prohibited | desktop shell not owned by runtime repo |
 | "owlmlx has an end-user installer" | prohibited | packaging intentionally not owned |

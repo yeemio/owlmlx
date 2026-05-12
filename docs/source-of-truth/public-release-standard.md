@@ -1,138 +1,102 @@
-# owlmlx Public Release Standard
+# owlmlx Release Standard
 
-> Status: authoritative release gate
+> Status: authoritative release-channel split
 > Created: 2026-05-12
-> Scope: public release reopen standard for `owlmlx` after the runtime-spine
-> refactor and OwlCoda packaging boundary change
+> Updated: 2026-05-12
+> Scope: release authority for `owlmlx` after the runtime-spine refactor and
+> OwlCoda packaging boundary correction
 
 ## 1. One-Line Standard
 
-`owlmlx` public release is reopened only when the OwlCoda npm package can use a
-local model through `owlmlx` to complete the self-training data accumulation and
-learning loop.
+`owlmlx` owns a runtime engineering release channel. OwlCoda owns the
+downstream product acceptance gate that proves an npm package can consume
+`owlmlx` for a local-model learning loop.
 
-This is the public release standard. Earlier developer-preview floor closure,
-HTTP surface freeze, and benchmark evidence remain useful engineering evidence,
-but they are no longer sufficient to justify public release by themselves.
+The OwlCoda loop is required before claiming OwlCoda-backed public product
+readiness. It is not a blocker for an `owlmlx` runtime engineering release.
 
-## 2. Product Boundary Change
+## 2. Release Channels
 
-Current public distribution boundary:
+| Channel | Owner | Release authority | Current status |
+|---|---|---|---|
+| Runtime engineering release | `owlmlx` | runtime-owned tests, benchmarks, HTTP contracts, memory discipline, stability evidence | active channel |
+| Consumer readiness / OwlCoda integration | coordinated `owlmlx` + OwlCoda | OwlCoda npm end-to-end local-model learning loop | downstream gate |
+| Public marketing release | product / brand layer | product-ready narrative plus consumer proof | parked |
 
-- `OwlCoda` is released as an npm package only.
-- `owlmlx` is the local runtime behind the model path.
-- OwlCoda consumes `owlmlx`; OwlCoda does not define `owlmlx` runtime truth.
-- `owlmlx` public release is judged by an end-to-end OwlCoda workflow, not by
-  standalone runtime endpoints alone.
+## 3. Runtime Engineering Release Criteria
 
-## 3. Required End-To-End Loop
+An `owlmlx` runtime engineering release may proceed when runtime-owned evidence
+supports the claimed version scope:
 
-The required public-release proof is:
+- supported HTTP routes remain contract-stable
+- supported backend paths pass focused and release-relevant tests
+- memory pressure, load admission, unload/reclaim, and status truth remain
+  honest
+- benchmark claims are scoped to measured workloads and raw evidence
+- unsupported capabilities stay labelled `not in scope`, `experimental`, or
+  `partial`
+- no runtime claim depends on OwlCoda UI, package behavior, or marketing copy
+
+This channel may publish scoped runtime versions such as `0.x` without waiting
+for OwlCoda.
+
+## 4. OwlCoda Consumer Readiness Gate
+
+The downstream consumer proof remains:
 
 ```text
 OwlCoda npm package
   -> local model served through owlmlx
   -> user/task interaction produces training data
   -> training-data accumulation is persisted with provenance
-  -> learning / fine-tuning / adaptation step consumes that data
-  -> resulting artifact or learning state is registered back into the runtime truth path
-  -> OwlCoda can use the updated local-model path again
+  -> LoRA adapter or explicit no-op learning verdict consumes that data
+  -> resulting artifact or verdict is registered into owlmlx truth surfaces
+  -> OwlCoda consumes the updated local-model path again
 ```
 
-The loop must be real. It cannot be replaced by:
+This loop must be real. It cannot be replaced by:
 
 - a static demo transcript
-- an offline-only script with no OwlCoda path
+- an offline-only script with no OwlCoda package path
 - a runtime-only benchmark
-- a standalone training run that is not connected back to OwlCoda consumption
+- a standalone training run that is not registered back into `owlmlx`
 - an OwlOps dashboard display without the learning loop
-
-## 4. Acceptance Criteria
-
-All of the following must be true before public release can be reopened:
-
-| Gate | Required proof |
-|---|---|
-| OwlCoda package boundary | OwlCoda runs as an npm package and invokes the local runtime path without requiring a separate app shell release |
-| Local-model serving | OwlCoda requests go through `owlmlx` local model serving, not a mocked or remote-only path |
-| Data accumulation | Interaction data is stored with provenance, model id, timestamp or run id, and enough context to train or adapt safely |
-| Learning consumption | A learning/fine-tuning/adaptation step consumes the accumulated data |
-| Runtime registration | The resulting artifact, adapter, learned state, or explicit no-op learning verdict is registered into `owlmlx` truth surfaces |
-| Re-consumption | OwlCoda can consume the updated path again through `owlmlx` |
-| Evidence | The run produces source-of-truth evidence: commands, versions, model id, paths, health, and failure modes |
-| No manual gap hiding | Any manual step must be documented; a hidden manual copy/paste bridge fails the gate |
 
 ## 5. Relationship To Existing Public Docs
 
-This standard supersedes the earlier "public developer preview" decision
-threshold.
+The older "public developer preview" threshold remains historical evidence,
+not the only release authority.
 
-The following remain valid but insufficient:
+The following are valid runtime engineering evidence:
 
-- all seven historical release floors being closed
-- `public-surface.md` freezing supported HTTP routes
-- `public-claim-matrix.md` allowed claims
-- short-prompt reference-runtime performance evidence
-- OwlOps consuming live runtime truth
+- closed historical release floors
+- `public-surface.md` supported HTTP routes
+- `public-claim-matrix.md` scoped allowed claims
+- measured benchmark and model-release-candidate evidence
+- live runtime monitor/status contracts
 
-Those prove that `owlmlx` has a serious runtime surface. They do not prove the
-new public product story.
+They do not prove OwlCoda product readiness. They can support an `owlmlx`
+runtime engineering release when the version scope is explicit.
 
-The new public product story is:
+## 6. Allowed Claims Before OwlCoda Proof
 
-```text
-Local model runtime + OwlCoda npm package + self-training data loop.
-```
+Allowed with scope:
 
-## 6. Protection Rationale
-
-This gate protects both projects:
-
-- It protects `owlmlx` from being released as a raw runtime before it has a
-  concrete user-facing learning workflow.
-- It protects OwlCoda from being judged as a shell over a runtime that has not
-  proven the learning path that makes local models compound in value.
-- It prevents the public narrative from drifting back to "benchmarks and API
-  routes" when the actual product differentiation is local learning feedback.
-
-## 7. Allowed Claims Before The Gate
-
-Before this gate is met, external copy may describe `owlmlx` only with scoped
-engineering language:
-
+- "runtime engineering release"
+- "technical-preview runtime surface"
 - "internal runtime milestone"
-- "runtime-spine refactor"
 - "local MLX runtime surface"
 - "OwlCoda integration target"
-- "not yet publicly released"
 
-Do not use:
+Forbidden without the downstream proof:
 
-- "public release"
-- "developer preview release"
+- "OwlCoda learning loop complete"
+- "OwlCoda-backed public product release ready"
 - "production-ready"
 - "replacement-grade public runtime"
-- "OwlCoda learning loop complete"
+- "cache eviction closure equals product release closure"
 
-## 8. Public Release Direction
+## 7. Final Ruling
 
-The public release direction is not generic public packaging. It is:
-
-```text
-OwlCoda npm package integration with owlmlx local-model learning loop.
-```
-
-This is a downstream acceptance gate, not the current `owlmlx` implementation
-mainline. The current coordinator note is
-`owlcoda-learning-loop-coordination.md`.
-
-When the `owlmlx` runtime prerequisite floor is ready, work should split into
-coordinated lanes:
-
-1. `owlmlx` lane: expose/verify the runtime truth needed for local-model
-   learning artifacts, model lineage, training data provenance, and post-learning
-   registration.
-2. `OwlCoda` lane: prove the npm package can drive the interaction, data
-   capture, learning handoff, and re-consumption path.
-
-The release decision is made only after both lanes meet the end-to-end proof.
+`owlmlx` release authority is no longer delegated to OwlCoda. OwlCoda remains a
+downstream consumer and product acceptance gate.
