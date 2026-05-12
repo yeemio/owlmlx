@@ -1085,467 +1085,129 @@ class MlxLmSubprocessBackend:
     ) -> tuple[str, bool]:
         """Read one stream transport line and optionally release the serial boundary early."""
 
-        raw_chars: list[str] = []
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detected = False
-        terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detected = False
-        terminal_notice_leading_discriminator_marker_discriminant_detected = False
-        terminal_notice_leading_discriminator_marker_stem_detected = False
-        terminal_notice_leading_discriminator_marker_prefix_detected = False
-        terminal_notice_leading_discriminator_marker_detected = False
-        terminal_notice_leading_discriminator_discriminant_detected = False
-        terminal_notice_leading_discriminator_stem_detected = False
-        terminal_notice_leading_discriminator_prefix_detected = False
-        terminal_notice_leading_discriminator_detected = False
-        terminal_notice_marker_key_lead_detected = False
-        terminal_action_discriminant_detected = False
-        terminal_notice_marker_discriminant_detected = False
-        terminal_notice_marker_stem_detected = False
-        terminal_notice_marker_prefix_detected = False
-        terminal_notice_marker_detected = False
-        terminal_notice_action_stem_detected = False
-        terminal_notice_action_discriminant_detected = False
-        terminal_notice_prefix_detected = False
-        terminal_prefix_detected = False
-        while True:
-            ch = stdout.read(1)
-            if not ch:
-                raise ValueError("child process produced no output")
-            if ch == "\n":
-                return "".join(raw_chars).strip(), terminal_prefix_detected
-            raw_chars.append(ch)
-            if terminal_prefix_detected:
-                continue
-            buffer = "".join(raw_chars)
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_earlier_boundary_stem(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_boundary_stem(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection = None
-            if not terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detected and (
-                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator(
-                    buffer
-                )
-            ):
-                terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection = None
-            if not terminal_notice_leading_discriminator_marker_discriminant_detected and (
-                _has_terminal_notice_leading_discriminator_marker_discriminant(buffer)
-            ):
-                terminal_notice_leading_discriminator_marker_discriminant_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_discriminant_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_discriminant_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_discriminant_detection = None
-            if not terminal_notice_leading_discriminator_marker_stem_detected and (
-                _has_terminal_notice_leading_discriminator_marker_stem(buffer)
-            ):
-                terminal_notice_leading_discriminator_marker_stem_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_stem_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_stem_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_stem_detection = None
-            if not terminal_notice_leading_discriminator_marker_prefix_detected and (
-                _has_terminal_notice_leading_discriminator_marker_prefix(buffer)
-            ):
-                terminal_notice_leading_discriminator_marker_prefix_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_marker_prefix_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_marker_prefix_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_prefix_detection = None
-            if not terminal_notice_leading_discriminator_marker_detected and (
-                _has_terminal_notice_leading_discriminator_marker(buffer)
-            ):
-                terminal_notice_leading_discriminator_marker_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_notice_leading_discriminator_marker_detection is not None:
-                    before_terminal_notice_leading_discriminator_marker_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_marker_detection = None
-            if not terminal_notice_leading_discriminator_discriminant_detected and (
-                _has_terminal_notice_leading_discriminator_discriminant(buffer)
-            ):
-                terminal_notice_leading_discriminator_discriminant_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_discriminant_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_discriminant_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_discriminant_detection = None
-            if not terminal_notice_leading_discriminator_stem_detected and (
-                _has_terminal_notice_leading_discriminator_stem(buffer)
-            ):
-                terminal_notice_leading_discriminator_stem_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_notice_leading_discriminator_stem_detection is not None:
-                    before_terminal_notice_leading_discriminator_stem_detection(buffer)
-                    before_terminal_notice_leading_discriminator_stem_detection = None
-            if not terminal_notice_leading_discriminator_prefix_detected and (
-                _has_terminal_notice_leading_discriminator_prefix(buffer)
-            ):
-                terminal_notice_leading_discriminator_prefix_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if (
-                    before_terminal_notice_leading_discriminator_prefix_detection
-                    is not None
-                ):
-                    before_terminal_notice_leading_discriminator_prefix_detection(
-                        buffer
-                    )
-                    before_terminal_notice_leading_discriminator_prefix_detection = None
-            if not terminal_notice_leading_discriminator_detected and (
-                _has_terminal_notice_leading_discriminator(buffer)
-            ):
-                terminal_notice_leading_discriminator_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_notice_leading_discriminator_detection is not None:
-                    before_terminal_notice_leading_discriminator_detection(buffer)
-                    before_terminal_notice_leading_discriminator_detection = None
-            if not terminal_notice_marker_key_lead_detected and (
-                _has_terminal_notice_marker_key_lead(buffer)
-            ):
-                terminal_notice_marker_key_lead_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_notice_marker_key_lead_detection is not None:
-                    before_terminal_notice_marker_key_lead_detection(buffer)
-                    before_terminal_notice_marker_key_lead_detection = None
-            if not terminal_notice_marker_discriminant_detected and (
-                _has_terminal_notice_marker_discriminant(buffer)
-            ):
-                terminal_notice_marker_discriminant_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_notice_marker_discriminant_detection is not None:
-                    before_terminal_notice_marker_discriminant_detection(buffer)
-                    before_terminal_notice_marker_discriminant_detection = None
-            if not terminal_notice_marker_stem_detected and _has_terminal_notice_marker_stem(
-                buffer
-            ):
-                terminal_notice_marker_stem_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_notice_marker_stem_detection is not None:
-                    before_terminal_notice_marker_stem_detection(buffer)
-                    before_terminal_notice_marker_stem_detection = None
-            if not terminal_notice_marker_prefix_detected and _has_terminal_notice_marker_prefix(
-                buffer
-            ):
-                terminal_notice_marker_prefix_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_notice_marker_prefix_detection is not None:
-                    before_terminal_notice_marker_prefix_detection(buffer)
-                    before_terminal_notice_marker_prefix_detection = None
-            if not terminal_notice_marker_detected and _has_terminal_notice_marker(buffer):
-                terminal_notice_marker_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_notice_marker_detection is not None:
-                    before_terminal_notice_marker_detection(buffer)
-                    before_terminal_notice_marker_detection = None
-            if not terminal_notice_action_stem_detected and _has_terminal_notice_action_stem(
-                buffer
-            ):
-                terminal_notice_action_stem_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_notice_action_stem is not None:
-                    before_terminal_notice_action_stem(buffer)
-                    before_terminal_notice_action_stem = None
-            if not terminal_notice_action_discriminant_detected and (
-                _has_terminal_notice_action_discriminant(buffer)
-            ):
-                terminal_notice_action_discriminant_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_notice_action_discriminant is not None:
-                    before_terminal_notice_action_discriminant(buffer)
-                    before_terminal_notice_action_discriminant = None
-            if not terminal_notice_prefix_detected and _has_terminal_notice_prefix(buffer):
-                terminal_notice_prefix_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_notice_prefix_detection is not None:
-                    before_terminal_notice_prefix_detection(buffer)
-                    before_terminal_notice_prefix_detection = None
-            if not terminal_action_discriminant_detected and (
-                _has_terminal_stream_record_action_discriminant(buffer)
-            ):
-                terminal_action_discriminant_detected = True
-                if release_serial_boundary is not None:
-                    release_serial_boundary()
-                    release_serial_boundary = None
-                if before_terminal_record_prefix_detection is not None:
-                    before_terminal_record_prefix_detection(buffer)
-                    before_terminal_record_prefix_detection = None
-            if _has_terminal_stream_record_prefix(buffer):
-                terminal_prefix_detected = True
-                if before_terminal_record_capture is not None:
-                    before_terminal_record_capture(buffer)
-                    before_terminal_record_capture = None
+        line = stdout.readline()
+        if not line:
+            raise ValueError("child process produced no output")
+        buffer = str(line).strip()
+
+        def emit_detection(callback: Callable[[str], None] | None) -> None:
+            nonlocal release_serial_boundary
+            if release_serial_boundary is not None:
+                release_serial_boundary()
+                release_serial_boundary = None
+            if callback is not None:
+                callback(buffer)
+
+        terminal_notice_detectors: tuple[
+            tuple[Callable[[str], bool], Callable[[str], None] | None],
+            ...,
+        ] = (
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_earlier_boundary_stem,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_earlier_boundary_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_earlier_boundary_stem,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_earlier_boundary_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_stem_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_prefix_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_boundary_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_discriminant_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_stem_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_prefix_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_leading_discriminator_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_discriminant_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_stem_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_prefix_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator,
+                before_terminal_notice_leading_discriminator_marker_earlier_runtime_owned_discriminator_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_discriminant,
+                before_terminal_notice_leading_discriminator_marker_discriminant_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_stem,
+                before_terminal_notice_leading_discriminator_marker_stem_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker_prefix,
+                before_terminal_notice_leading_discriminator_marker_prefix_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_marker,
+                before_terminal_notice_leading_discriminator_marker_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_discriminant,
+                before_terminal_notice_leading_discriminator_discriminant_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_stem,
+                before_terminal_notice_leading_discriminator_stem_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator_prefix,
+                before_terminal_notice_leading_discriminator_prefix_detection,
+            ),
+            (
+                _has_terminal_notice_leading_discriminator,
+                before_terminal_notice_leading_discriminator_detection,
+            ),
+            (_has_terminal_notice_marker_key_lead, before_terminal_notice_marker_key_lead_detection),
+            (_has_terminal_notice_marker_discriminant, before_terminal_notice_marker_discriminant_detection),
+            (_has_terminal_notice_marker_stem, before_terminal_notice_marker_stem_detection),
+            (_has_terminal_notice_marker_prefix, before_terminal_notice_marker_prefix_detection),
+            (_has_terminal_notice_marker, before_terminal_notice_marker_detection),
+            (_has_terminal_notice_action_stem, before_terminal_notice_action_stem),
+            (_has_terminal_notice_action_discriminant, before_terminal_notice_action_discriminant),
+            (_has_terminal_notice_prefix, before_terminal_notice_prefix_detection),
+            (
+                _has_terminal_stream_record_action_discriminant,
+                before_terminal_record_prefix_detection,
+            ),
+        )
+
+        for detector, callback in terminal_notice_detectors:
+            if detector(buffer):
+                emit_detection(callback)
+
+        terminal_prefix_detected = _has_terminal_stream_record_prefix(buffer)
+        if terminal_prefix_detected and before_terminal_record_capture is not None:
+            before_terminal_record_capture(buffer)
+        return buffer, terminal_prefix_detected
 
     def load(self, model_id: str, *, memory_gb: float | None = None) -> LoadResult:
         if model_id in self._registrations:

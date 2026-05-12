@@ -78,7 +78,9 @@ What exists today:
 
 - a real serialized post-claim execution boundary via `GenerationGate`
 - explicit `ticketed_fifo` queue policy and `max_concurrent = 1`
-- one bounded pre-gate admission / cohort window on the active cache path
+- one bounded pre-gate admission hook on the active cache path; its cohort
+  window defaults to `0 ms` and only forms multi-request cohorts when explicitly
+  configured for a controlled probe
 - runtime-owned model inventory, active/default selection, and restartability
 - runtime-owned pinning, TTL policy, and eviction-history governance
 - runtime-owned visibility and status surfaces for upper-layer consumers

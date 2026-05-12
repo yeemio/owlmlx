@@ -78,9 +78,11 @@ came from the large-weight path:
 - serialized serving remains the runtime truth
 
 The `was_queued` field is not the authoritative signal for this proof. Under
-pre-gate admission it can reflect either joining an already-open cohort window
-or post-claim gate contention, and short requests can still record `0.0` wait
-time at this scale. The authoritative signals are:
+pre-gate admission it can reflect post-claim gate contention, and controlled
+cohort probes may also make it reflect joining an explicitly enabled
+pre-claim window. The default runtime window is `0 ms`, so ordinary
+single-worker requests do not pay a dead cohort wait. Short requests can still
+record `0.0` wait time at this scale. The authoritative signals are:
 
 - `max_concurrent == 1`
 - `queue_discipline == serial`

@@ -4,6 +4,7 @@ import asyncio
 
 from owlmlx.memory_budget import MachineMemoryProfile
 from owlmlx.runtime import FakeBackend, RuntimeErrorCode, RuntimeKernel
+from owlmlx.serving import GenerationGate
 
 
 def _small_profile() -> MachineMemoryProfile:
@@ -453,6 +454,7 @@ def test_concurrent_generations_handoff_cohort_into_aggregated_child_exchange() 
     kernel = RuntimeKernel(
         FakeBackend(default_memory_gb=1.0, generate_delay_s=0.05),
         profile=_small_profile(),
+        generation_gate=GenerationGate(pre_gate_window_s=0.02),
     )
     kernel.load_model("fake-a")
 
@@ -476,6 +478,35 @@ def test_concurrent_generations_handoff_cohort_into_aggregated_child_exchange() 
     assert status["generation_gate"]["max_concurrent"] == 1
     assert status["generation_gate"]["queue_discipline"] == "serial"
     assert status["generation_gate"]["total_served"] == 2
+
+
+def test_default_runtime_generation_keeps_single_worker_cohort_window_disabled() -> None:
+    kernel = RuntimeKernel(
+        FakeBackend(default_memory_gb=1.0, generate_delay_s=0.05),
+        profile=_small_profile(),
+    )
+    kernel.load_model("fake-a")
+
+    async def run_pair():
+        return await asyncio.gather(
+            kernel.generate("one"),
+            kernel.generate("two"),
+        )
+
+    first, second = asyncio.run(run_pair())
+
+    assert first.ok is True
+    assert second.ok is True
+    status = kernel.status_dict()
+    observations = status["backend"]["detail"]["cache_runtime_observations"]
+    assert observations["aggregated_child_exchange_batch_count"] == 0
+    assert observations["aggregated_child_exchange_request_count"] == 0
+    hook = status["generation_gate"]["pre_gate_admission"]
+    assert hook["window_ms"] == 0
+    assert hook["cohort_window_enabled"] is False
+    assert hook["peak_cohort_size"] == 1
+    assert hook["total_handoffs"] == 0
+    assert hook["total_window_wait_s"] == 0.0
 
 
 def test_status_dict_exposes_governance_observations() -> None:
@@ -521,6 +552,7 @@ def test_status_dict_exposes_runtime_owned_pre_gate_admission_hook() -> None:
     kernel = RuntimeKernel(
         FakeBackend(default_memory_gb=1.0, generate_delay_s=0.05),
         profile=_small_profile(),
+        generation_gate=GenerationGate(pre_gate_window_s=0.02),
     )
     kernel.load_model("model-a")
 
@@ -563,6 +595,7 @@ def test_repeated_concurrent_generations_show_aggregated_dispatch_under_repeated
     kernel = RuntimeKernel(
         FakeBackend(default_memory_gb=1.0, generate_delay_s=0.05),
         profile=_small_profile(),
+        generation_gate=GenerationGate(pre_gate_window_s=0.02),
     )
     kernel.load_model("fake-a")
 

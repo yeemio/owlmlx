@@ -254,6 +254,34 @@ def test_subprocess_backend_stream_generate_reuses_same_child(tmp_path: Path) ->
     backend.unload("model-a")
 
 
+def test_stream_transport_line_uses_readline_not_byte_reads() -> None:
+    class ReadlineOnlyStdout:
+        def readline(self) -> str:
+            return (
+                '{"ok":true,"action":"stream_done","event":"done",'
+                '"finish_reason":"stop"}\n'
+            )
+
+        def read(self, _: int) -> str:
+            raise AssertionError("stream transport must not use byte-at-a-time reads")
+
+    backend = MlxLmSubprocessBackend()
+    released = False
+
+    def release_serial_boundary() -> None:
+        nonlocal released
+        released = True
+
+    text, terminal_prefix_detected = backend._read_stream_transport_line(
+        ReadlineOnlyStdout(),
+        release_serial_boundary=release_serial_boundary,
+    )
+
+    assert text.startswith('{"ok":true,"action":"stream_done"')
+    assert terminal_prefix_detected is True
+    assert released is True
+
+
 def test_subprocess_backend_releases_stream_lock_before_terminal_payload_capture(
     tmp_path: Path,
 ) -> None:

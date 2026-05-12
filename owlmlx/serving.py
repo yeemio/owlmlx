@@ -18,6 +18,7 @@ host the HTTP transport layer, but the generation discipline belongs here.
 from __future__ import annotations
 
 import asyncio
+import os
 import threading
 import time
 from contextlib import asynccontextmanager, contextmanager
@@ -29,6 +30,17 @@ T = TypeVar("T")
 
 # The only validated safe value. K-Q4c proved concurrency >= 2 crashes.
 MAX_GENERATION_CONCURRENCY = 1
+_COHORT_WINDOW_MS_ENV = "OWLMLX_COHORT_WINDOW_MS"
+
+
+def _default_pre_gate_window_s() -> float:
+    raw_window_ms = os.environ.get(_COHORT_WINDOW_MS_ENV)
+    if raw_window_ms is None or raw_window_ms.strip() == "":
+        return 0.0
+    try:
+        return max(float(raw_window_ms), 0.0) / 1000.0
+    except ValueError:
+        return 0.0
 
 
 @dataclass(slots=True)
@@ -121,7 +133,7 @@ class GenerationGate:
     This is path-level truth, not specimen-specific.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, pre_gate_window_s: float | None = None) -> None:
         self._condition = threading.Condition()
         self._active = False
         self._next_ticket = 0
@@ -137,7 +149,12 @@ class GenerationGate:
         self._longest_wait_s = 0.0
         self._longest_exec_s = 0.0
         self._pre_gate_capacity = 32
-        self._pre_gate_window_s = 0.02
+        configured_window_s = (
+            _default_pre_gate_window_s()
+            if pre_gate_window_s is None
+            else pre_gate_window_s
+        )
+        self._pre_gate_window_s = max(configured_window_s, 0.0)
         self._pre_gate_staged: dict[int, _PreGateAdmissionState] = {}
         self._pre_gate_cohorts: dict[int, _PreGateCohortState] = {}
         self._cohort_dispatches: dict[int, _CohortDispatchState] = {}
@@ -154,6 +171,9 @@ class GenerationGate:
         self._pre_gate_total_handoffs = 0
         self._pre_gate_active_handoff_request_count = 0
         self._pre_gate_last_handoff_request_count = 0
+
+    def _pre_gate_window_enabled(self) -> bool:
+        return self._pre_gate_window_s > 0.0
 
     def stage_admission(
         self,
@@ -213,6 +233,22 @@ class GenerationGate:
         return reservation
 
     def _cohort_for_new_reservation_locked(self, now: float) -> _PreGateCohortState:
+        if not self._pre_gate_window_enabled():
+            cohort = _PreGateCohortState(
+                cohort_id=self._next_pre_gate_cohort_id,
+                opened_at_s=round(now, 4),
+                closes_at_s=now,
+                open_for_join=False,
+            )
+            self._next_pre_gate_cohort_id += 1
+            self._pre_gate_cohorts[cohort.cohort_id] = cohort
+            self._cohort_dispatches[cohort.cohort_id] = _CohortDispatchState(
+                cohort_id=cohort.cohort_id
+            )
+            self._open_pre_gate_cohort_id = None
+            self._pre_gate_total_cohorts += 1
+            return cohort
+
         self._seal_expired_open_cohort_locked(now)
         cohort: _PreGateCohortState | None = None
         if self._open_pre_gate_cohort_id is not None:
@@ -245,6 +281,9 @@ class GenerationGate:
             self._open_pre_gate_cohort_id = None
 
     def _await_cohort_window(self, reservation_ticket: int) -> float:
+        if not self._pre_gate_window_enabled():
+            return 0.0
+
         wait_started = time.monotonic()
         with self._condition:
             while True:
@@ -886,6 +925,7 @@ class GenerationGate:
                     "hook_mode": "bounded_runtime_owned_cohort_window",
                     "capacity": self._pre_gate_capacity,
                     "window_ms": int(self._pre_gate_window_s * 1000),
+                    "cohort_window_enabled": self._pre_gate_window_enabled(),
                     "cohort_window_status": (
                         "open_for_join"
                         if open_cohort is not None and open_cohort.reservation_tickets

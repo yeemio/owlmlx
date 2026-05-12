@@ -26,6 +26,8 @@ def test_generation_gate_status_exposes_bounded_pre_gate_hook() -> None:
     assert status["queue_policy"] == "ticketed_fifo"
     assert status["pre_gate_admission"]["hook_status"] == "present"
     assert status["pre_gate_admission"]["hook_boundary"] == "before_whole_request_gate_claim"
+    assert status["pre_gate_admission"]["window_ms"] == 0
+    assert status["pre_gate_admission"]["cohort_window_enabled"] is False
     assert (
         status["pre_gate_admission"]["hook_mode"]
         == "bounded_runtime_owned_cohort_window"
@@ -39,8 +41,37 @@ def test_generation_gate_status_exposes_bounded_pre_gate_hook() -> None:
     ]
 
 
-def test_pre_gate_hook_exists_before_claim_without_reopening_post_claim_invariants() -> None:
+def test_default_single_worker_pre_gate_admission_does_not_wait_for_cohort_window() -> None:
     gate = GenerationGate()
+
+    result = gate.execute_with_admission(
+        _meta(request_kind="generate", model_id="model-a"),
+        lambda: "ok",
+    )
+    status = gate.status["pre_gate_admission"]
+
+    assert result.value == "ok"
+    assert result.wait_time_s == 0.0
+    assert result.was_queued is False
+    assert status["window_ms"] == 0
+    assert status["cohort_window_enabled"] is False
+    assert status["total_window_wait_s"] == 0.0
+    assert status["longest_window_wait_s"] == 0.0
+    assert status["peak_cohort_size"] == 1
+
+
+def test_cohort_window_can_be_enabled_by_environment(monkeypatch) -> None:
+    monkeypatch.setenv("OWLMLX_COHORT_WINDOW_MS", "20")
+
+    gate = GenerationGate()
+    status = gate.status["pre_gate_admission"]
+
+    assert status["window_ms"] == 20
+    assert status["cohort_window_enabled"] is True
+
+
+def test_pre_gate_hook_exists_before_claim_without_reopening_post_claim_invariants() -> None:
+    gate = GenerationGate(pre_gate_window_s=0.02)
     entered = threading.Event()
     release = threading.Event()
     results: dict[str, object] = {}

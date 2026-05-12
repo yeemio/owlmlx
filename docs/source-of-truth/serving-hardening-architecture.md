@@ -76,8 +76,8 @@ The serving-hardening scaffold is bounded. It does NOT:
   other capability that would change the post-claim ticketed-FIFO
   contract on `GenerationGate`
 - change `GenerationGate` concurrency. `MAX_GENERATION_CONCURRENCY`
-  remains 1; the gate's `Condition.wait()` site is observed by the
-  graceful-shutdown drain but not modified
+  remains 1; pre-gate cohort waiting defaults to `0 ms` and does not
+  reopen post-claim parallel generation
 - add a request scheduler, queue priority system, or fair-share
   arbiter. Admission remains ticketed FIFO
 - alter `docs/source-of-truth/single-host-orchestration-architecture.md`
