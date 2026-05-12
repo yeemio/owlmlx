@@ -1,7 +1,7 @@
 # owlmlx Extraction Inventory
 
 > Status: working inventory
-> Updated: 2026-04-10
+> Updated: 2026-05-12 (Stage 3.1 c3 — post Stage 1/2 cleanup)
 
 ## 1. Purpose
 
@@ -74,10 +74,16 @@ checks:
 | `/Users/yeemio/AI/Agent/files/verification-assets/phase-42/kimi-nextgen-next-round-entry-safe-resume.md` | `borrow and internalize` | Resume-entry semantics should be normalized into runtime governance and hazard classification |
 | `/Users/yeemio/AI/gitrep/owlmlx/files/verification-assets/phase-42-imported/kimi-crash-safe-resume-gate.md` | `owlmlx-owned judgment` | Imported first-instance safe-resume artifact preserved inside owlmlx |
 | `/Users/yeemio/AI/gitrep/owlmlx/files/verification-assets/phase-42-imported/kimi-nextgen-next-round-entry-safe-resume.md` | `owlmlx-owned judgment` | Imported first-instance hazardous-operation reclassification artifact preserved inside owlmlx |
-| `/Users/yeemio/AI/gitrep/owlmlx/owlmlx/runtime_status.py` | `owlmlx-owned judgment` | First extracted executable runtime-truth module |
+| `/Users/yeemio/AI/gitrep/owlmlx/owlmlx/runtime_status.py` | `owlmlx-owned judgment` | _Archived in Stage 1 (2026-05-11)_ — spec-shaped module with no runtime consumer; replaced by `RuntimeKernel.status_dict()` truth path. Lives at `archive/spec-layer-v0/owlmlx/runtime_status.py`. |
 | `/Users/yeemio/AI/gitrep/owlmlx/owlmlx/serving.py` | `owlmlx-owned judgment` | Queue-based generation gate — first owlmlx-owned serving discipline module |
-| `/Users/yeemio/AI/gitrep/owlmlx/tests/test_runtime_status.py` | `owlmlx-owned judgment` | First test protection for extracted runtime-truth code |
+| `/Users/yeemio/AI/gitrep/owlmlx/owlmlx/settle_barrier_event.py` | `owlmlx-owned judgment` | Stage 2 (2026-05-12) renamed `reclaim_barrier_event` → `settle_barrier_event` to align with PR #649 vocabulary. Contract surface `owlmlx.settle_barrier_event`. |
+| `/Users/yeemio/AI/gitrep/owlmlx/owlmlx/memory_watermark.py` | `owlmlx-owned judgment` | Stage 2 PR #649 four-level pressure summary (`MemoryWatermark` / `WatermarkAction` + thresholds 65/80/90 %). Consumed by `memory_pressure_contract_to_dict` and `GET /v1/runtime/memory-watermark`. |
+| `/Users/yeemio/AI/gitrep/owlmlx/owlmlx/nonresident_model_admission_policy.py` | `owlmlx-owned judgment` | Hosts `pre_load_check()` — Stage 2 PR #649-shaped admission entrypoint. |
+| `/Users/yeemio/AI/gitrep/owlmlx/tests/test_runtime_status.py` | `owlmlx-owned judgment` | _Archived in Stage 1 alongside `runtime_status.py`._ |
 | `/Users/yeemio/AI/gitrep/owlmlx/tests/test_serving.py` | `owlmlx-owned judgment` | Tests for generation gate serialization, exception safety, async execution |
+| `/Users/yeemio/AI/gitrep/owlmlx/tests/test_memory_watermark.py` | `owlmlx-owned judgment` | Stage 2 — 32 cases covering threshold mapping, classification bridge, four-outcome action policy. |
+| `/Users/yeemio/AI/gitrep/owlmlx/tests/test_pre_load_check.py` | `owlmlx-owned judgment` | Stage 2 — 6 cases verifying alias contract + four-outcome verdict invariant. |
+| `/Users/yeemio/AI/gitrep/owlmlx/tests/test_settle_barrier_event.py` | `owlmlx-owned judgment` | Stage 2 — 17 cases (renamed from `test_reclaim_barrier_event.py`). |
 
 ## 5. Platform-Shell Retained Areas
 
@@ -129,12 +135,29 @@ Wave A is considered complete when:
 4. Contract-test expectations from the platform shell repository point at
    owlmlx truth, not at local copies
 
-Current status: **substantially complete** — `runtime_status.py`, `serving.py`,
-and `serving_status.py` exist and validate; shell-side bridge test imports
-owlmlx; `kimi-sharded-engine.py` imports `GenerationGate` and
-`build_large_weight_serving_status` from owlmlx when available;
-contract-mapping exists. Gap: wider contract-test alignment beyond
-runtime-status and serving paths.
+Current status: **complete** (2026-05-12, Stage 3.1 c3) —
+- `serving.py`, `cache_truth.py`, `model_inventory.py`, `model_lineage.py`,
+  `memory_budget.py`, `context_concurrency.py`, `abort_recovery.py`,
+  `runtime_health.py`, `memory_pressure_contract.py`,
+  `memory_pressure_eviction_policy.py`, `settle_barrier_event.py`,
+  `recovery_supervisor_contract.py`, `request_context_length_truth.py`,
+  `model_residency_policy.py`, `nonresident_loadability_lineage.py`,
+  `nonresident_model_admission_policy.py`, and `memory_watermark.py`
+  exist and validate against runtime decision paths.
+- Shell-side `metrics.py`, `control_service.py`,
+  `distilled_cache_substrate.py`, `primary_line_status.py`,
+  `context_concurrency_policy.py`, and `abort_recovery.py` consume owlmlx
+  contracts (see runtime-capability-matrix.md section 1 — `**platform
+  consumes**` annotations).
+- `kimi-sharded-engine.py` imports `GenerationGate` and large-weight
+  serving status from owlmlx.
+- Stage 1 (2026-05-11) archived 151 spec-as-code modules whose
+  dataclasses had no runtime consumer; Stage 2 (2026-05-12) added
+  `MemoryWatermark`, `SettleBarrierEvent`, and `pre_load_check` as
+  PR #649-aligned public landmark types and wired them into the runtime
+  consumer chain.
+
+Wave A is closed. Open work belongs to Wave B and Wave C below.
 
 ### Wave B: Runtime Entrypoints
 
@@ -157,8 +180,14 @@ Wave B is considered complete when:
 4. The startup path has been validated against the heavy execution protocol
    (dry-run, single-unit, serial, thresholded)
 
-Current status: **not started** — all entrypoints remain in platform shell or
-kimi-sharded-engine.py.
+Current status: **started, partial** (updated 2026-05-12) — owlmlx now
+serves its own HTTP surface via `owlmlx.runtime.server.create_app` with
+frozen `/healthz` and `/v1/runtime/status` contracts (Stabilization-1),
+streaming `/v1/messages` (Anthropic shape), `/v1/chat/completions`,
+`/v1/completions`, and Stage 2's `/v1/runtime/memory-watermark`. Real
+local smokes verified on `gpt-oss-20b-MXFP4-Q4`, `Qwen3.5-27B`, and
+`Qwen3.5-35B-A3B-4bit`. Large-weight startup path (Wave B item 2) and
+heavy execution protocol dry-run validation (Wave B item 4) remain open.
 
 ### Wave C: Memory Governance Internals
 
@@ -183,8 +212,22 @@ Wave C is considered complete when:
 4. Runtime governance (hazardous operations, safe-resume) is enforced by owlmlx
    code, not just documented
 
-Current status: **not started** — governance principles are documented but
-implementation remains in patch form.
+Current status: **partially internalized** (updated 2026-05-12) —
+- Active-request protection lives in `owlmlx/serving.py` (`GenerationGate`)
+  and is enforced by tests.
+- Memory governance decisions (watermark + admission + eviction) are
+  made by owlmlx-owned code in `memory_pressure_contract.py`,
+  `memory_pressure_eviction_policy.py`, `memory_watermark.py`, and
+  `nonresident_model_admission_policy.py`.
+- Settle-barrier semantics are owlmlx-owned via `settle_barrier_event.py`.
+- Runtime governance (hazardous operations / safe-resume) is documented
+  but not yet enforced in code beyond the abort recovery state machine.
+- **Patch-form dependency**: operational scripts in
+  `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/` still apply
+  patches on top of an upstream oMLX install. These are Stage 3+
+  migration candidates (see contract-mapping.md §3, §8). The runtime
+  principles they enforce are owlmlx-owned; only the operational
+  tooling needs to move.
 
 ## 8. Capability Label Promotion Criteria
 
