@@ -446,7 +446,7 @@ Stage 4 不应该继续堆 surface，而应该转向真正改变 runtime 能力�
 
 ## 10. 决策摘要
 
-当前 `owlmlx` 的主线不是“公开发布”，也不是“追外部 runtime 的全部功能”。当前主线是：
+当前 `owlmlx` 的主线不是泛化公开发布，也不是“追外部 runtime 的全部功能”。当前主线是：
 
 ```text
 把 Apple Silicon 上的本地模型执行能力，
@@ -468,3 +468,21 @@ Stage 4 不应该继续堆 surface，而应该转向真正改变 runtime 能力�
 
 1. Track A 先合，保证架构地图正确。
 2. Track B 后合，把能力推进落在正确地图上。
+
+## 11. 当前公开发布标准
+
+公开发布不再由“developer preview surface 已冻结”单独触发。
+
+当前标准冻结在 `public-release-standard.md`：
+
+```text
+OwlCoda npm package
+  -> owlmlx local model
+  -> self-training data accumulation
+  -> learning / adaptation step
+  -> learned artifact or state registered back into runtime truth
+  -> OwlCoda consumes the updated local-model path again
+```
+
+这条线跑通之前，`owlmlx` 可以继续推进内部 runtime milestone、PR review、
+OwlOps 消费和局部 capability promotion，但不能重开 public release 叙事。

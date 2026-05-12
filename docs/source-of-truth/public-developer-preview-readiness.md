@@ -1,6 +1,6 @@
 # owlmlx Public Developer Preview Readiness
 
-> Status: parked release gate
+> Status: superseded parked release gate
 > Created: 2026-05-10
 > Parked: 2026-05-10
 > Scope: honest readiness position for public developer preview; anchored to
@@ -8,16 +8,17 @@
 > `release-readiness-backlog.md`, `public-surface.md`, or
 > `reference-runtime-comparison-matrix.md`
 >
-> This document is accurate but its goal is deferred. The active goal is
-> "Internal Replacement-Grade Runtime Depth." Public release is a parked gate
-> with three re-open conditions; see
-> `files/execution-prompts/owlmlx/coordinator-checkpoint-internal-replacement-grade-runtime-depth.md`.
+> This document records the earlier developer-preview threshold. It is
+> superseded for public release decisions by
+> `public-release-standard.md`: public release now reopens only when the
+> OwlCoda npm package can use a local model through `owlmlx` to complete the
+> self-training data accumulation and learning loop.
 
 ## 1. One-Line Position
 
-`owlmlx` is a self-owned Apple Silicon MLX runtime in **developer preview**:
-measured Qwen evidence, runtime-owned observability, all seven release floors
-closed — not yet a production replacement for `oMLX` or `vMLX`.
+`owlmlx` has the runtime evidence that previously supported a developer-preview
+label, but public release remains parked under the newer OwlCoda learning-loop
+gate in `public-release-standard.md`.
 
 ## 2. Release-Floor Status
 

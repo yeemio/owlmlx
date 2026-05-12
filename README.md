@@ -72,8 +72,10 @@ Short-prompt TPS on `Mac17,6` (`max_tokens=64`, `temperature=0`):
 | Qwen3.6-35B-A3B | 3.53 | 2.44 | oMLX |
 | Gemma 4 | 3.75 | 3.83 | vMLX |
 
-Short-prompt only. See `docs/source-of-truth/public-developer-preview-readiness.md`
-for the full claim matrix and open gaps.
+Short-prompt only. These measurements are engineering evidence, not the public
+release gate. Public release now requires the OwlCoda npm package to run the
+local-model self-training data and learning loop through `owlmlx`; see
+`docs/source-of-truth/public-release-standard.md`.
 
 ## Quick start
 
@@ -89,8 +91,10 @@ emits a loud warning if run outside `.venv/`.
 
 ## Where to look next
 
-- `docs/source-of-truth/public-developer-preview-readiness.md` — full claim
-  matrix, performance evidence, open gaps
+- `docs/source-of-truth/public-release-standard.md` — current public release
+  gate: OwlCoda npm package + owlmlx local-model learning loop
+- `docs/source-of-truth/public-developer-preview-readiness.md` — historical
+  developer-preview evidence, now superseded for release decisions
 - `docs/source-of-truth/public-surface.md` — frozen public boundary
 - `docs/source-of-truth/system-architecture.md` — runtime kernel design
 - `docs/source-of-truth/memory-pressure-contract.md` — watermark contract
@@ -102,8 +106,9 @@ emits a loud warning if run outside `.venv/`.
 
 ## Development status
 
-Developer preview as of 2026-05-10. Public Python surface and HTTP routes
-are stable; internal kernel still under active refinement. Stage 1
+Internal runtime milestone as of 2026-05-12. Public Python surface and HTTP routes
+are stable, but public release is parked behind the OwlCoda npm local-model
+learning-loop gate. Internal kernel still under active refinement. Stage 1
 refactor (2026-05-11) archived 151 spec-as-code modules; Stage 2 (in
 progress) aligns landmark vocabulary with [PR #649][pr649]. See
 `CHANGELOG.md` (when present) or recent `release(...)` / `refactor(...)`
