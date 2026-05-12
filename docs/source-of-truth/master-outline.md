@@ -47,6 +47,9 @@ Chinese runtime-spine blueprint: `runtime-spine-architecture-blueprint.zh.md`.
 
 Current public release gate: `public-release-standard.md`.
 
+Current coordination note for that gate:
+`owlcoda-learning-loop-coordination.md`.
+
 1. `master-outline.md`
 2. `ARCHITECTURE-TRUTH.md`
 3. `product-definition.md`

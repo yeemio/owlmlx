@@ -122,7 +122,10 @@ The next execution direction is not generic public packaging. It is:
 OwlCoda npm package integration with owlmlx local-model learning loop.
 ```
 
-Work should split into two coordinated lanes:
+Work should split into coordinated lanes. The current coordinator note is
+`owlcoda-learning-loop-coordination.md`.
+
+Initial lanes:
 
 1. `owlmlx` lane: expose/verify the runtime truth needed for local-model
    learning artifacts, model lineage, training data provenance, and post-learning
