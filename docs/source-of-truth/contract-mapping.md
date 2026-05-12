@@ -1,7 +1,7 @@
 # owlmlx Contract Mapping
 
 > Status: working mapping
-> Updated: 2026-05-12 (Stage 3.1 c2 — post Stage 1/2 cleanup)
+> Updated: 2026-05-12 (Stage 3.2 Track A — independence cleanup)
 
 ## 1. Purpose
 
@@ -40,7 +40,7 @@ candidates.
 | Cache tier truth | `core runtime status` | `owned, shell-proxied` | `owlmlx/cache_truth.py` owns this. Shell `distilled_cache_substrate.py` and `primary_line_status.py` consume it. |
 | Quantization metadata truth | `core runtime status` | `owned now` | Migrated 2026-05-12 (Stage 3.1 c4). `owlmlx/quantization_metadata.py` consolidates the previously scattered coverage: `ModelLineage` artifact-string fields, `cache_truth.turboquant_cache_safety`, and a new bits/is_static/runtime_supported derivation. Exposed at `GET /v1/runtime/quantization-metadata?model_id=X`. 29 tests cover bit parsing, runtime-support classification, cache-safety integration, route resolution, and AGENTS anti-regression rule compliance. |
 | Snapshot composition | none | `shell-only` | Snapshot embedding is a shell integration concern. |
-| oMLX `swap-safe` patch scripts | `memory governance + settle barrier` | `owned but still shell-hosted` | Capability is owlmlx-owned via `memory_pressure_contract` / `memory_pressure_eviction_policy` / `settle_barrier_event` / `abort_recovery`. Operational tooling (`apply-swap-safe-patch-v034.py`, `apply-full-patch.py`, `validate-swap-safe-patch.py`) still lives in `/Users/yeemio/AI/Agent/runtime_patches/omlx/`. **Stage 3+ migration candidate.** |
+| Agent-side oMLX `swap-safe` patch scripts | n/a (already owlmlx-owned via independent contracts) | `external legacy reference` | The runtime ideas these scripts encode (memory governance, settle barrier, abort recovery) are already independently owlmlx-owned via `memory_pressure_contract` / `memory_pressure_eviction_policy` / `settle_barrier_event` / `abort_recovery`. The Agent-side scripts at `/Users/yeemio/AI/Agent/runtime_patches/omlx/` patch a different runtime (oMLX) and are **not an owlmlx extraction target**. They may remain useful as historical comparison material only. owlmlx does not retire them; oMLX does. |
 
 ## 4. Large-Weight Runtime Path Mapping
 
@@ -64,21 +64,25 @@ candidates.
 
 Updated 2026-05-12 (Stage 3.1 c2).
 
-The remaining real drifts after Stage 1/2/3.1 cleanup:
+The remaining real drifts after Stage 1/2/3.1/3.2-Track-A cleanup:
 
-- **`swap-safe` patch tooling** lives in `/Users/yeemio/AI/Agent/runtime_patches/omlx/`
-  even though the runtime principles those patches encode (memory governance,
-  settle barrier, abort recovery) are now owlmlx-owned. Operational migration
-  pending — Stage 3.2 candidate.
 - **Shell prompts and risky-execution playbooks** still reference oMLX patch
   paths rather than `runtime-governance.md` / `hazardous-operations.md` /
-  `settle_barrier_event` directly.
+  `settle_barrier_event` directly. This is shell-side drift; owlmlx already
+  owns the principle.
 
 Resolved drift (Stage 3.1 c4, 2026-05-12):
 
 - ~~Quantization metadata lacks a dedicated owlmlx contract~~ — owlmlx now
   owns `owlmlx/quantization_metadata.py` exposed at
   `GET /v1/runtime/quantization-metadata`.
+
+Resolved drift (Stage 3.2 Track A, 2026-05-12):
+
+- ~~`swap-safe` patch tooling drift~~ — recategorized as `external legacy
+  reference`. The Agent-side scripts patch a different runtime (oMLX) and
+  are **not an owlmlx extraction target**. owlmlx is an independent runtime;
+  it neither retires those patches nor depends on them being retired.
 
 Resolved drifts from earlier list:
 
@@ -130,11 +134,13 @@ Refreshed 2026-05-12 (Stage 3.1 c2):
 1. ~~Quantization metadata contract~~ — **done** in Stage 3.1 c4
    (`owlmlx/quantization_metadata.py` + `GET /v1/runtime/quantization-metadata`).
    Shell consumers can now switch off private quant_method parsing.
-2. **`swap-safe` patch tooling migration** — bring the operational
-   scripts (`apply-swap-safe-patch-v034.py` / `apply-full-patch.py` /
-   `validate-swap-safe-patch.py`) into owlmlx as owned tooling, since
-   the runtime principles they enforce are already owlmlx-owned. Stage
-   3+ candidate.
+2. ~~`swap-safe` patch tooling migration~~ — **withdrawn** in Stage 3.2
+   Track A (2026-05-12). The Agent-side scripts patch a different
+   runtime (oMLX) and are recategorized as `external legacy reference`,
+   not an owlmlx extraction target. owlmlx owns the same runtime
+   principles independently via `memory_pressure_contract` /
+   `settle_barrier_event` / `abort_recovery`; the Agent scripts'
+   retirement is oMLX's concern, not owlmlx's.
 3. **Risky-execution prompt rewrites** — shell prompts and playbooks
    still cite oMLX patch paths; rewrite to reference
    `runtime-governance.md` / `hazardous-operations.md` /
@@ -143,4 +149,10 @@ Refreshed 2026-05-12 (Stage 3.1 c2):
 4. **Stage 4 prep** — the bench at `scripts/bench/eviction_soak.py` is
    scaffolded but unimplemented. When implemented, it will provide the
    first apples-to-apples evidence ledger entry between owlmlx, oMLX,
-   and vMLX on the memory-discipline axis.
+   and vMLX on the memory-discipline axis. oMLX and vMLX appear here as
+   comparison reference runtimes, not as code-migration sources.
+5. **Stage 3.2 next** — independence cleanup and owned capability target
+   selection. Once Track A documentation lands, the next executor
+   chooses the next *owlmlx-owned* capability to deepen (e.g., the
+   Cache/Residency/Eviction loop addressed by Stage 3.3 Track B). No
+   Agent-side migration item belongs on this list.
