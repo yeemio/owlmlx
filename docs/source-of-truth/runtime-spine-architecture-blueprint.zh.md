@@ -484,5 +484,8 @@ OwlCoda npm package
   -> OwlCoda consumes the updated local-model path again
 ```
 
-这条线跑通之前，`owlmlx` 可以继续推进内部 runtime milestone、PR review、
-OwlOps 消费和局部 capability promotion，但不能重开 public release 叙事。
+这条线是下游公开发布验收门，不是当前 `owlmlx` 的实现主线。当前主线仍是
+`owlmlx` 自身 runtime 能力，尤其是 cache / residency / eviction、模型 lineage、
+artifact registration、repeatability 这些未来被 OwlCoda 消费所依赖的基础。
+
+在这些 runtime 前置能力打稳之前，不应该启动 OwlCoda 侧的集成实现线。

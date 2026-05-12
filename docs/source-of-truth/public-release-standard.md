@@ -114,18 +114,20 @@ Do not use:
 - "replacement-grade public runtime"
 - "OwlCoda learning loop complete"
 
-## 8. Next Execution Direction
+## 8. Public Release Direction
 
-The next execution direction is not generic public packaging. It is:
+The public release direction is not generic public packaging. It is:
 
 ```text
 OwlCoda npm package integration with owlmlx local-model learning loop.
 ```
 
-Work should split into coordinated lanes. The current coordinator note is
+This is a downstream acceptance gate, not the current `owlmlx` implementation
+mainline. The current coordinator note is
 `owlcoda-learning-loop-coordination.md`.
 
-Initial lanes:
+When the `owlmlx` runtime prerequisite floor is ready, work should split into
+coordinated lanes:
 
 1. `owlmlx` lane: expose/verify the runtime truth needed for local-model
    learning artifacts, model lineage, training data provenance, and post-learning
