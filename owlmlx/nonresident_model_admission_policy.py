@@ -664,6 +664,39 @@ def nonresident_model_admission_policy_to_dict(
     }
 
 
+def pre_load_check(
+    model_id: str,
+    *,
+    runtime_status: Mapping[str, Any] | None = None,
+    known_loadable_model_ids: Sequence[str] | None = None,
+    request_context_class: str | None = None,
+    abort_recovery_snapshot: Mapping[str, Any] | None = None,
+    loadability_lineage: NonResidentLoadabilityLineage | None = None,
+) -> NonResidentModelAdmissionPolicy:
+    """PR #649-shaped admission check before loading a non-resident model.
+
+    Thin alias over :func:`build_nonresident_model_admission_policy` that
+    matches the public vocabulary in PR #649
+    (https://github.com/jundot/omlx/pull/649). The PR's `pre_load_check()`
+    inspects projected memory utilization + active-request safety + budget
+    and returns a four-outcome verdict (admit / defer / reject / unknown).
+    owlmlx already implements that decision via the full admission policy
+    builder; this entrypoint exposes the well-known name.
+
+    `model_id` is required positionally — admission is always about a
+    specific target. All other inputs default to "snapshot from
+    runtime_status" semantics, matching :func:`build_nonresident_model_admission_policy`.
+    """
+    return build_nonresident_model_admission_policy(
+        runtime_status=runtime_status,
+        model_id=model_id,
+        known_loadable_model_ids=known_loadable_model_ids,
+        request_context_class=request_context_class,
+        abort_recovery_snapshot=abort_recovery_snapshot,
+        loadability_lineage=loadability_lineage,
+    )
+
+
 __all__ = [
     "NONRESIDENT_ADMISSION_DECISIONS",
     "NONRESIDENT_MODEL_ADMISSION_POLICY_SURFACE",
@@ -672,4 +705,5 @@ __all__ = [
     "NonResidentModelAdmissionPolicy",
     "build_nonresident_model_admission_policy",
     "nonresident_model_admission_policy_to_dict",
+    "pre_load_check",
 ]
