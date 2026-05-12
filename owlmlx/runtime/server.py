@@ -30,6 +30,11 @@ from owlmlx.nonresident_loadability_lineage import (
     build_nonresident_loadability_lineage,
     nonresident_loadability_lineage_to_dict,
 )
+from owlmlx.model_lineage import normalize_model_lineage
+from owlmlx.quantization_metadata import (
+    build_quantization_metadata,
+    quantization_metadata_to_dict,
+)
 from owlmlx.cache_scheduler_status import (
     build_cache_scheduler_status,
     cache_scheduler_status_to_dict,
@@ -2377,6 +2382,29 @@ def create_app(
         return memory_pressure_contract_to_dict(
             build_memory_pressure_contract(runtime_status=runtime.status_dict())
         )
+
+    @app.get("/v1/runtime/quantization-metadata")
+    def runtime_quantization_metadata(
+        model_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Stage 3.1 c4: runtime-owned quantization metadata contract.
+
+        Resolves an artifact's quantization metadata into a structured
+        view (bits, is_static, runtime_supported, cache safety). Sources
+        the lineage from ``app.state.loadability_lineage_records`` when
+        the caller specifies ``model_id``; without a model_id the
+        endpoint returns the ``lineage_missing`` empty signal which is
+        still a valid contract response (callers must treat ``None``
+        bits as "unknown", not "no quant").
+        """
+        lineage = None
+        if model_id is not None:
+            records = app.state.loadability_lineage_records or {}
+            raw = records.get(model_id)
+            if raw is not None:
+                lineage = normalize_model_lineage(raw)
+        meta = build_quantization_metadata(lineage=lineage)
+        return quantization_metadata_to_dict(meta)
 
     @app.get("/v1/runtime/memory-watermark")
     def runtime_memory_watermark() -> dict[str, Any]:

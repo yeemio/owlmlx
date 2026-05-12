@@ -11,6 +11,14 @@ from .context_concurrency import CONCURRENCY_GATE, HIGH_CONTEXT_THRESHOLD_TOKENS
 from .memory_budget import BudgetEvaluation, BudgetVerdict, MachineMemoryProfile, budget_snapshot, default_machine_profile, evaluate_model_fit
 from .memory_watermark import GREEN_CEILING, MemoryWatermark, RED_CEILING, WATERMARK_THRESHOLDS, WatermarkAction, YELLOW_CEILING
 from .nonresident_model_admission_policy import pre_load_check
+from .quantization_metadata import (
+    QUANTIZATION_METADATA_SURFACE,
+    QUANTIZATION_METADATA_VERSION,
+    QuantizationMetadata,
+    SUPPORTED_QUANT_METHODS,
+    build_quantization_metadata,
+    quantization_metadata_to_dict,
+)
 from .model_inventory import LoadedModelEntry, ModelInventorySnapshot, inventory_budget_check, inventory_currently_loaded_gb, inventory_entry_for_model, inventory_health_snapshot, inventory_load_state_for_model, inventory_model_ids, inventory_to_dict, inventory_truth_level_for_model, normalize_inventory_entry, normalize_inventory_snapshot
 from .model_lineage import LINEAGE_REQUIRED_FIELDS, RELAXED_LINEAGE_FIELDS, STRICT_LINEAGE_STATES, LineageChangeType, LineageValidationResult, ModelLineage, TruthInheritance, TruthInheritanceLevel, derive_lineage_change_type, derive_truth_inheritance, lineage_from_artifact_metadata, model_lineage_to_dict, normalize_model_lineage, truth_inheritance_for_change, validate_model_lineage
 from .runtime import BackendStatus, FakeBackend, LoadResult, MlxEnvironmentCandidate, MlxEnvironmentProbe, MlxEnvironmentSelection, MlxLmBackend, MlxLmSubprocessBackend, RuntimeBackend, RuntimeErrorCode, RuntimeKernel, UnloadResult, default_environment_candidates, known_environment_candidates, probe_mlx_environments, probe_to_dict, select_mlx_environment, selection_to_dict
@@ -28,6 +36,12 @@ __all__ = [
     "WatermarkAction",
     "YELLOW_CEILING",
     "pre_load_check",
+    "QUANTIZATION_METADATA_SURFACE",
+    "QUANTIZATION_METADATA_VERSION",
+    "QuantizationMetadata",
+    "SUPPORTED_QUANT_METHODS",
+    "build_quantization_metadata",
+    "quantization_metadata_to_dict",
     "CACHE_CLI_FLAGS",
     "CACHE_ENV_KEYS",
     "CONCURRENCY_GATE",
