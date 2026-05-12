@@ -43,6 +43,8 @@ These are runtime-level goals, not temporary integration work.
 
 ## 5. Core Documents
 
+Chinese runtime-spine blueprint: `runtime-spine-architecture-blueprint.zh.md`.
+
 1. `master-outline.md`
 2. `ARCHITECTURE-TRUTH.md`
 3. `product-definition.md`

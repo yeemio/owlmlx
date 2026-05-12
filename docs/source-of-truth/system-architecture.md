@@ -3,6 +3,8 @@
 > Status: authoritative
 > Updated: 2026-05-12 (Stage 3.2 Track A — independence cleanup)
 
+Chinese full blueprint: `runtime-spine-architecture-blueprint.zh.md`.
+
 ## 0. Independence Boundary
 
 `owlmlx` is an independent runtime, not a fork or patch layer:
