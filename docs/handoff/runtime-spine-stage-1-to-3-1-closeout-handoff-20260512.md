@@ -29,7 +29,16 @@ cross-repository Stage 3.2 work begins.
   `Quantization metadata truth` moved from `owned but still shell-hosted` to
   `owned now` through `owlmlx/quantization_metadata.py` and
   `GET /v1/runtime/quantization-metadata`.
-- Latest full regression on this branch: `991 passed, 3 skipped, 4 warnings`.
+- Latest full regression on the runtime-enabled local checkout:
+  `991 passed, 3 skipped, 4 warnings`.
+- Clean-worktree default validation initially caught an optional-runtime-extra
+  leak in `tests/test_mlx_lm_runner_params.py`; the milestone includes the fix
+  so default tests do not require `mlx_lm` just to validate sampler parameter
+  conversion.
+- Clean-worktree default validation after the fix:
+  `988 passed, 6 skipped, 1 warning`.
+- Clean-worktree server smoke requires the `runtime` optional dependency set;
+  verified with `uv run --extra runtime ...` against temporary port `8078`.
 - Latest whitespace check: `git diff --check` clean.
 - Root archived-script residual check:
   `git ls-files 'scripts/runtime_cache_pre_claim_*.py' 'scripts/runtime_cache_stream_*.py' 'scripts/runtime_*exactness*.py'`
@@ -122,7 +131,7 @@ Optional server smoke:
 
 ```bash
 mkdir -p /tmp/owlmlx-stage31-smoke
-uv run python scripts/runtime_technical_preview_server.py \
+uv run --extra runtime python scripts/runtime_technical_preview_server.py \
   --host 127.0.0.1 \
   --port 8077 \
   --models-root /Users/yeemio/AI/Agent/models \

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import sys
+import types
+
 from owlmlx.runtime.mlx_lm_runner import (
     _StopStringStreamFilter,
     _chat_template_kwargs_from_params,
@@ -10,22 +13,44 @@ from owlmlx.runtime.mlx_lm_runner import (
 )
 
 
+def _install_fake_sampler(monkeypatch):  # type: ignore[no-untyped-def]
+    mlx_lm_module = types.ModuleType("mlx_lm")
+    sample_utils_module = types.ModuleType("mlx_lm.sample_utils")
+
+    def make_sampler(**kwargs):  # type: ignore[no-untyped-def]
+        def sampler(*args, **inner_kwargs):  # type: ignore[no-untyped-def]
+            return {"args": args, "kwargs": inner_kwargs}
+
+        sampler.sample_kwargs = kwargs  # type: ignore[attr-defined]
+        return sampler
+
+    sample_utils_module.make_sampler = make_sampler  # type: ignore[attr-defined]
+    mlx_lm_module.sample_utils = sample_utils_module  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "mlx_lm", mlx_lm_module)
+    monkeypatch.setitem(sys.modules, "mlx_lm.sample_utils", sample_utils_module)
+
+
 def test_prepare_generation_params_leaves_non_sampling_params_unchanged() -> None:
     prepared = _prepare_generation_params({"max_tokens": 4})
 
     assert prepared == {"max_tokens": 4}
 
 
-def test_prepare_generation_params_converts_temperature_to_sampler() -> None:
+def test_prepare_generation_params_converts_temperature_to_sampler(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _install_fake_sampler(monkeypatch)
+
     prepared = _prepare_generation_params({"max_tokens": 2, "temperature": 0.0})
 
     assert prepared["max_tokens"] == 2
     assert callable(prepared["sampler"])
+    assert prepared["sampler"].sample_kwargs == {"temp": 0.0}
     assert "temperature" not in prepared
     assert "temp" not in prepared
 
 
-def test_prepare_generation_params_converts_sampler_family_params() -> None:
+def test_prepare_generation_params_converts_sampler_family_params(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    _install_fake_sampler(monkeypatch)
+
     prepared = _prepare_generation_params(
         {
             "max_tokens": 2,
@@ -38,6 +63,11 @@ def test_prepare_generation_params_converts_sampler_family_params() -> None:
 
     assert prepared["max_tokens"] == 2
     assert callable(prepared["sampler"])
+    assert prepared["sampler"].sample_kwargs == {
+        "temp": 0.2,
+        "top_k": 20,
+        "top_p": 0.9,
+    }
     assert "temperature" not in prepared
     assert "temp" not in prepared
     assert "top_p" not in prepared
