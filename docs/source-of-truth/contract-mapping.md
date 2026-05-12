@@ -1,7 +1,7 @@
 # owlmlx Contract Mapping
 
 > Status: working mapping
-> Updated: 2026-04-10
+> Updated: 2026-05-12 (Stage 3.1 c2 — post Stage 1/2 cleanup)
 
 ## 1. Purpose
 
@@ -26,13 +26,21 @@ It distinguishes:
 
 ## 3. Core Runtime Contract Mapping
 
+Status reflects post-Stage 1/2 reality (2026-05-12). Items where owlmlx
+now owns a stable module AND the shell already references it via a
+documented bridge are `owned, shell-proxied`. Items where the owlmlx
+contract is stable but the shell still carries its own private copy
+remain `owned but still shell-hosted` and are the Stage 3+ migration
+candidates.
+
 | Current shell truth | owlmlx contract target | Category | Notes |
 |---|---|---|---|
-| oMLX runtime status route | `core runtime status` | `owned but still shell-hosted` | Semantics belong to runtime truth even if transport remains in shell |
-| Per-model memory & load state | `core runtime status` | `owned but still shell-hosted` | Runtime fact, not merely dashboard state |
-| Cache tier truth | `core runtime status` | `owned but still shell-hosted` | Cache truth belongs to runtime semantics |
-| Quantization metadata truth | `core runtime status` | `owned but still shell-hosted` | Runtime identity and memory-fit semantics |
-| Snapshot composition | none | `shell-only` | Snapshot embedding is a shell integration concern |
+| oMLX-shape runtime status route | `core runtime status` | `owned now` | owlmlx serves its own `/v1/runtime/status` (frozen contract per Stabilization-1). Legacy oMLX-shape status route on the shell side is now redundant; the shell may proxy or retire it. |
+| Per-model memory & load state | `core runtime status` | `owned, shell-proxied` | `owlmlx/model_inventory.py` owns this. Shell `metrics.py` and `control_service.py` build inventory snapshots through owlmlx. |
+| Cache tier truth | `core runtime status` | `owned, shell-proxied` | `owlmlx/cache_truth.py` owns this. Shell `distilled_cache_substrate.py` and `primary_line_status.py` consume it. |
+| Quantization metadata truth | `core runtime status` | `owned but still shell-hosted` | owlmlx covers part of this via `owlmlx/model_lineage.py` (TurboQuant cache-safety hooks) and `owlmlx/cache_truth.py` (`turboquant_cache_safety`), but a dedicated quant-metadata contract is not yet split out. **Stage 3+ migration candidate.** |
+| Snapshot composition | none | `shell-only` | Snapshot embedding is a shell integration concern. |
+| oMLX `swap-safe` patch scripts | `memory governance + settle barrier` | `owned but still shell-hosted` | Capability is owlmlx-owned via `memory_pressure_contract` / `memory_pressure_eviction_policy` / `settle_barrier_event` / `abort_recovery`. Operational tooling (`apply-swap-safe-patch-v034.py`, `apply-full-patch.py`, `validate-swap-safe-patch.py`) still lives in `/Users/yeemio/AI/Agent/runtime_patches/omlx/`. **Stage 3+ migration candidate.** |
 
 ## 4. Large-Weight Runtime Path Mapping
 
@@ -54,13 +62,31 @@ It distinguishes:
 
 ## 6. Current Dominant Drifts
 
-The biggest current drifts are:
+Updated 2026-05-12 (Stage 3.1 c2).
 
-- runtime contracts still transported mainly through shell protocol docs
-- cache and quant truth still described primarily from shell-facing routes
-- large-weight path schema still anchored to specimen-specific shell docs
-- governance truth now exists in `owlmlx`, but shell prompts have not yet been
-  fully rewritten to reference it first
+The remaining real drifts after Stage 1/2 cleanup:
+
+- **Quantization metadata** still lacks a dedicated owlmlx contract module
+  (the concept is partially served by `model_lineage` + `cache_truth.turboquant_cache_safety`
+  but no single source-of-truth surface).
+- **`swap-safe` patch tooling** lives in `/Users/yeemio/AI/Agent/runtime_patches/omlx/`
+  even though the runtime principles those patches encode (memory governance,
+  settle barrier, abort recovery) are now owlmlx-owned. Operational migration
+  pending.
+- **Shell prompts and risky-execution playbooks** still reference oMLX patch
+  paths rather than `runtime-governance.md` / `hazardous-operations.md` /
+  `settle_barrier_event` directly.
+
+Resolved drifts from earlier list:
+
+- ~~runtime contracts still transported mainly through shell protocol docs~~ —
+  owlmlx now serves its own HTTP surface (Stabilization-1, frozen
+  `/v1/runtime/status`).
+- ~~cache and quant truth still described primarily from shell-facing routes~~ —
+  cache truth contract is owlmlx-owned and shell-proxied. Quant remains the
+  open thread (see above).
+- ~~large-weight path schema still anchored to specimen-specific shell docs~~ —
+  resolved via `large-weight-runtime-path.md` consolidation.
 
 ## 7. Migration Criteria For Shell-Hosted Items
 
@@ -96,7 +122,23 @@ conditions are now met.
 
 ## 8. Next Mapping Actions
 
-1. move shell-facing runtime protocol sections to reference `owlmlx`
-2. align runtime contract tests with `owlmlx` schema language
-3. separate path-level runtime truth from specimen-only shell narratives
-4. update risky execution prompts to cite `runtime-governance.md`
+Refreshed 2026-05-12 (Stage 3.1 c2):
+
+1. **Quantization metadata contract** — design a dedicated owlmlx
+   module or extend `model_lineage` to surface quant metadata as a
+   first-class field set, then move shell consumers off their private
+   copies. Stage 3+ candidate.
+2. **`swap-safe` patch tooling migration** — bring the operational
+   scripts (`apply-swap-safe-patch-v034.py` / `apply-full-patch.py` /
+   `validate-swap-safe-patch.py`) into owlmlx as owned tooling, since
+   the runtime principles they enforce are already owlmlx-owned. Stage
+   3+ candidate.
+3. **Risky-execution prompt rewrites** — shell prompts and playbooks
+   still cite oMLX patch paths; rewrite to reference
+   `runtime-governance.md` / `hazardous-operations.md` /
+   `settle_barrier_event` directly. Shell-side work, tracked here for
+   completeness.
+4. **Stage 4 prep** — the bench at `scripts/bench/eviction_soak.py` is
+   scaffolded but unimplemented. When implemented, it will provide the
+   first apples-to-apples evidence ledger entry between owlmlx, oMLX,
+   and vMLX on the memory-discipline axis.
