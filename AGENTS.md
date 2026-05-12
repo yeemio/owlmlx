@@ -121,6 +121,10 @@ Do not add new `*_contract.py` modules. Runtime contract payloads and HTTP
 paths may keep `*-contract` vocabulary where that is the stable wire-format
 name, but Python module filenames must not.
 
+CI enforces the root-module suffix ban in
+`.github/workflows/self-banned-modules.yml`; treat the naming list above as a
+merge gate, not a style preference.
+
 **PR-level check before merging any new `.py` in `owlmlx/`:**
 
 ```bash
