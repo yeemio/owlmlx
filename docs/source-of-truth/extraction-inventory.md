@@ -1,7 +1,7 @@
 # owlmlx Extraction Inventory
 
 > Status: working inventory
-> Updated: 2026-05-12 (Stage 3.1 c3 — post Stage 1/2 cleanup)
+> Updated: 2026-05-12 (Stage 3.2 Track A — independence cleanup)
 
 ## 1. Purpose
 
@@ -56,12 +56,20 @@ checks:
 
 ### 4.2 Runtime Memory Governance And Switch Safety
 
+Stage 3.2 Track A (2026-05-12) reclassified every row in this section.
+The Agent-side scripts at `/Users/yeemio/AI/Agent/runtime_patches/omlx/`
+patch a different runtime (oMLX) and are **not an owlmlx extraction target**.
+owlmlx already owns the same runtime principles independently via
+`memory_pressure_contract` / `memory_pressure_eviction_policy` /
+`settle_barrier_event` / `abort_recovery`. The Agent-side files remain
+as historical comparison material only.
+
 | Current location | Classification | Why |
 |---|---|---|
-| `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/apply-swap-safe-patch-v034.py` | `borrow and internalize` | Encodes runtime memory-governance and restart-safety ideas that should stop living as upstream patch machinery |
-| `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/apply-full-patch.py` | `borrow and internalize` | Same reason; transitional patch productization, not final home |
-| `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/validate-swap-safe-patch.py` | `borrow and internalize` | Validation logic reflects runtime invariants we will want in owned form |
-| `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/patch-guard.sh` | `external reference only` | Upgrade guard for patched oMLX remains transitional until `owlmlx` no longer depends on patched upstream files |
+| `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/apply-swap-safe-patch-v034.py` | `external legacy reference` | Patches oMLX, not owlmlx. **Not an owlmlx extraction target.** The runtime ideas it encodes (memory governance, settle barrier semantics) are already independently owned by owlmlx modules. |
+| `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/apply-full-patch.py` | `external legacy reference` | Same as above. **Not an owlmlx extraction target.** |
+| `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/validate-swap-safe-patch.py` | `external legacy reference` | Validates an oMLX patch; not part of owlmlx's invariant surface. **Not an owlmlx extraction target.** owlmlx's equivalent invariants are exercised by the owlmlx test suite directly. |
+| `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/patch-guard.sh` | `external legacy reference` | Upgrade guard for patched oMLX. **Not an owlmlx extraction target.** owlmlx does not depend on patched oMLX; its retirement is oMLX's concern. |
 
 ### 4.3 Runtime Truth Contracts
 
@@ -222,12 +230,13 @@ Current status: **partially internalized** (updated 2026-05-12) —
 - Settle-barrier semantics are owlmlx-owned via `settle_barrier_event.py`.
 - Runtime governance (hazardous operations / safe-resume) is documented
   but not yet enforced in code beyond the abort recovery state machine.
-- **Patch-form dependency**: operational scripts in
-  `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/` still apply
-  patches on top of an upstream oMLX install. These are Stage 3+
-  migration candidates (see contract-mapping.md §3, §8). The runtime
-  principles they enforce are owlmlx-owned; only the operational
-  tooling needs to move.
+- **Independence boundary**: scripts in
+  `/Users/yeemio/AI/Agent/runtime_patches/omlx/swap-safe/` patch a
+  different runtime (oMLX). owlmlx does not depend on them. Stage 3.2
+  Track A reclassified these as `external legacy reference` — not an
+  owlmlx extraction target. Their retirement is oMLX's concern, not
+  owlmlx's. See contract-mapping.md §3 (recategorized row) and §8 (item
+  2 withdrawn).
 
 ## 8. Capability Label Promotion Criteria
 
