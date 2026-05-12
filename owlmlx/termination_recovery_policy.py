@@ -1,7 +1,7 @@
 """Runtime-owned termination recovery policy contract for owlmlx.
 
 Frozen cause-to-action policy on top of the cleanup-boundary event truth
-introduced by ``owlmlx.reclaim_barrier_event`` plus runtime-owned
+introduced by ``owlmlx.settle_barrier_event`` plus runtime-owned
 load-failure events recorded inside ``RuntimeKernel.load_model``.
 
 This module classifies termination causes and emits a frozen action per
@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from .reclaim_barrier_event import build_reclaim_barrier_event
+from .settle_barrier_event import build_settle_barrier_event
 
 
 TERMINATION_RECOVERY_POLICY_SURFACE = "owlmlx.termination_recovery_policy"
@@ -123,7 +123,7 @@ def _unresolved_load_failure_events(
 def _unresolved_reclaim_barrier_events(
     raw_status: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    contract = build_reclaim_barrier_event(runtime_status=raw_status)
+    contract = build_settle_barrier_event(runtime_status=raw_status)
     unresolved = [
         dict(event)
         for event in contract.events
@@ -146,7 +146,7 @@ def _build_graceful_unload_failure_decision(
             if active
             else "no_unresolved_reclaim_barrier_event"
         ),
-        source_signal="owlmlx.reclaim_barrier_event",
+        source_signal="owlmlx.settle_barrier_event",
         operator_visible_message=(
             "Cleanup-boundary failure (failed unload, failed reclaim, or "
             "restart unload stage failure) is visible. Quarantine the "

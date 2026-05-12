@@ -145,7 +145,7 @@ def test_graceful_unload_failure_consumes_reclaim_barrier_event() -> None:
     graceful = decisions["graceful_unload_failure"]
     assert graceful["active"] is True
     assert graceful["next_action"] == "quarantine"
-    assert graceful["source_signal"] == "owlmlx.reclaim_barrier_event"
+    assert graceful["source_signal"] == "owlmlx.settle_barrier_event"
     assert any(
         sig.get("operation") == "explicit_unload"
         for sig in graceful["detected_signals"]

@@ -479,7 +479,7 @@ class RuntimeKernel:
 
         Events are recorded at the operation boundary; resolution policy is
         deferred to a later release-floor 3.4 round. See
-        ``owlmlx.reclaim_barrier_event`` for the contract that consumes the
+        ``owlmlx.settle_barrier_event`` for the contract that consumes the
         snapshot.
         """
 

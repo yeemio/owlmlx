@@ -255,7 +255,7 @@ def build_memory_pressure_contract(
             "runtime_owned_metal_oom_cooldown": cooldown_active,
             "runtime_owned_host_pressure_sample": host_pressure.get("available") is True,
             "runtime_owned_reclaim_attempt_result_visibility": (
-                "owlmlx.reclaim_barrier_event_records_failed_unload_and_failed_reclaim_at_operation_boundary"
+                "owlmlx.settle_barrier_event_records_failed_unload_and_failed_reclaim_at_operation_boundary"
             ),
             "owned_actions_visible": [
                 "memory_budget_preflight_for_load",
@@ -288,7 +288,7 @@ def build_memory_pressure_contract(
             {
                 "layer": "recovery",
                 "signal": "runtime_owned_restart_or_isolation_barrier_after_failed_reclaim",
-                "reason": "restart visibility exists, but recovery barrier policy is separate; reclaim attempt-result visibility is owned by owlmlx.reclaim_barrier_event",
+                "reason": "restart visibility exists, but recovery barrier policy is separate; reclaim attempt-result visibility is owned by owlmlx.settle_barrier_event",
             },
         ),
     )

@@ -62,9 +62,9 @@ from owlmlx.memory_pressure_eviction_policy import (
     build_memory_pressure_eviction_policy,
     memory_pressure_eviction_policy_to_dict,
 )
-from owlmlx.reclaim_barrier_event import (
-    build_reclaim_barrier_event,
-    reclaim_barrier_event_to_dict,
+from owlmlx.settle_barrier_event import (
+    build_settle_barrier_event,
+    settle_barrier_event_to_dict,
 )
 from owlmlx.termination_recovery_policy import (
     build_termination_recovery_policy,
@@ -2494,8 +2494,8 @@ def create_app(
 
     @app.get("/v1/runtime/reclaim-barrier-event")
     def runtime_reclaim_barrier_event() -> dict[str, Any]:
-        return reclaim_barrier_event_to_dict(
-            build_reclaim_barrier_event(runtime_status=runtime.status_dict())
+        return settle_barrier_event_to_dict(
+            build_settle_barrier_event(runtime_status=runtime.status_dict())
         )
 
     @app.get("/v1/runtime/termination-recovery-policy")

@@ -5,13 +5,13 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from owlmlx.memory_budget import MachineMemoryProfile
-from owlmlx.reclaim_barrier_event import (
+from owlmlx.settle_barrier_event import (
     BARRIER_STATE_VOCABULARY,
     OPERATION_VOCABULARY,
-    RECLAIM_BARRIER_EVENT_SURFACE,
+    SETTLE_BARRIER_EVENT_SURFACE,
     REQUIRED_EVENT_FIELDS,
-    build_reclaim_barrier_event,
-    reclaim_barrier_event_to_dict,
+    build_settle_barrier_event,
+    settle_barrier_event_to_dict,
 )
 from owlmlx.recovery_supervisor_contract import (
     build_recovery_supervisor_contract,
@@ -66,13 +66,13 @@ class _FailingUnloadFakeBackend(FakeBackend):
         return super().unload(model_id)
 
 
-def test_clean_runtime_reports_no_failed_unload_or_reclaim_barrier_event() -> None:
+def test_clean_runtime_reports_no_failed_unload_or_settle_barrier_event() -> None:
     kernel = RuntimeKernel(FakeBackend(), profile=_profile())
-    payload = reclaim_barrier_event_to_dict(
-        build_reclaim_barrier_event(runtime_status=kernel.status_dict())
+    payload = settle_barrier_event_to_dict(
+        build_settle_barrier_event(runtime_status=kernel.status_dict())
     )
 
-    assert payload["contract"]["surface"] == RECLAIM_BARRIER_EVENT_SURFACE
+    assert payload["contract"]["surface"] == SETTLE_BARRIER_EVENT_SURFACE
     assert payload["contract"]["version"] == "v1"
     assert payload["summary"]["barrier_state"] == "clean"
     assert payload["barrier"]["hard_recovery_barrier"] is False
@@ -91,8 +91,8 @@ def test_explicit_unload_failure_records_failed_unload() -> None:
     assert result.ok is False
     assert result.error_code is RuntimeErrorCode.backend_error
 
-    payload = reclaim_barrier_event_to_dict(
-        build_reclaim_barrier_event(runtime_status=kernel.status_dict())
+    payload = settle_barrier_event_to_dict(
+        build_settle_barrier_event(runtime_status=kernel.status_dict())
     )
     assert payload["summary"]["barrier_state"] == "failed_unload"
     assert payload["barrier"]["hard_recovery_barrier"] is True
@@ -116,8 +116,8 @@ def test_pinned_unload_block_does_not_record_failed_unload_event() -> None:
     assert result.ok is False
     assert result.error_code is RuntimeErrorCode.model_pinned
 
-    payload = reclaim_barrier_event_to_dict(
-        build_reclaim_barrier_event(runtime_status=kernel.status_dict())
+    payload = settle_barrier_event_to_dict(
+        build_settle_barrier_event(runtime_status=kernel.status_dict())
     )
     assert payload["summary"]["barrier_state"] == "clean"
     assert payload["events"] == []
@@ -130,8 +130,8 @@ def test_missing_model_unload_does_not_record_failed_unload_event() -> None:
     assert result.ok is False
     assert result.error_code is RuntimeErrorCode.model_not_loaded
 
-    payload = reclaim_barrier_event_to_dict(
-        build_reclaim_barrier_event(runtime_status=kernel.status_dict())
+    payload = settle_barrier_event_to_dict(
+        build_settle_barrier_event(runtime_status=kernel.status_dict())
     )
     assert payload["summary"]["barrier_state"] == "clean"
     assert payload["events"] == []
@@ -156,8 +156,8 @@ def test_ttl_sweep_failure_records_failed_reclaim() -> None:
     assert sweep.expired_model_ids == ("fake-a",)
     assert sweep.unloaded_model_ids == ()  # unload failed
 
-    payload = reclaim_barrier_event_to_dict(
-        build_reclaim_barrier_event(runtime_status=kernel.status_dict())
+    payload = settle_barrier_event_to_dict(
+        build_settle_barrier_event(runtime_status=kernel.status_dict())
     )
     assert payload["summary"]["barrier_state"] == "failed_reclaim"
     assert payload["barrier"]["unresolved_event_count"] == 1
@@ -181,8 +181,8 @@ def test_ttl_pinned_skip_does_not_record_reclaim_failure_barrier() -> None:
     sweep = kernel.sweep_expired_models()
     assert sweep.skipped_pinned_model_ids == ("fake-a",)
 
-    payload = reclaim_barrier_event_to_dict(
-        build_reclaim_barrier_event(runtime_status=kernel.status_dict())
+    payload = settle_barrier_event_to_dict(
+        build_settle_barrier_event(runtime_status=kernel.status_dict())
     )
     assert payload["summary"]["barrier_state"] == "clean"
     assert payload["events"] == []
@@ -199,8 +199,8 @@ def test_restart_unload_stage_failure_records_restart_unload_failed() -> None:
     assert restart.ok is False
     assert restart.stage == "unload"
 
-    payload = reclaim_barrier_event_to_dict(
-        build_reclaim_barrier_event(runtime_status=kernel.status_dict())
+    payload = settle_barrier_event_to_dict(
+        build_settle_barrier_event(runtime_status=kernel.status_dict())
     )
     assert payload["summary"]["barrier_state"] == "restart_unload_failed"
     assert payload["barrier"]["unresolved_event_count"] == 1
@@ -292,20 +292,20 @@ def test_memory_pressure_contract_does_not_claim_reclaim_engine_or_pressure_evic
     assert "reclaim_engine" in boundaries["out_of_scope"]
 
 
-def test_reclaim_barrier_event_route_returns_payload() -> None:
+def test_settle_barrier_event_route_returns_payload() -> None:
     client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
 
     response = client.get("/v1/runtime/reclaim-barrier-event")
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["contract"]["surface"] == RECLAIM_BARRIER_EVENT_SURFACE
+    assert payload["contract"]["surface"] == SETTLE_BARRIER_EVENT_SURFACE
     assert payload["summary"]["barrier_state"] == "clean"
     assert payload["summary"]["supported_barrier_states"] == list(BARRIER_STATE_VOCABULARY)
     assert payload["summary"]["supported_operations"] == list(OPERATION_VOCABULARY)
 
 
-def test_reclaim_barrier_event_route_after_failed_unload_reports_hard_barrier() -> None:
+def test_settle_barrier_event_route_after_failed_unload_reports_hard_barrier() -> None:
     kernel = RuntimeKernel(
         _FailingUnloadFakeBackend(fail_unload_for={"fake-a"}),
         profile=_profile(),
@@ -326,11 +326,11 @@ def test_reclaim_barrier_event_route_after_failed_unload_reports_hard_barrier() 
     assert payload["barrier"]["hard_recovery_barrier"] is True
 
 
-def test_reclaim_barrier_event_module_has_no_platform_dependency() -> None:
+def test_settle_barrier_event_module_has_no_platform_dependency() -> None:
     source = (
         Path(__file__).parents[1]
         / "owlmlx"
-        / "reclaim_barrier_event.py"
+        / "settle_barrier_event.py"
     ).read_text()
     forbidden = ["llm_router", "ops_dashboard", "AI/Agent", "owlops", "owlcoda"]
     for pattern in forbidden:
@@ -354,8 +354,8 @@ def test_decision_vocabulary_is_stable() -> None:
 
 
 def test_unknown_state_when_runtime_status_has_no_section() -> None:
-    payload = reclaim_barrier_event_to_dict(
-        build_reclaim_barrier_event(runtime_status={})
+    payload = settle_barrier_event_to_dict(
+        build_settle_barrier_event(runtime_status={})
     )
     assert payload["summary"]["barrier_state"] == "unknown"
     assert payload["barrier"]["hard_recovery_barrier"] is False
@@ -363,8 +363,8 @@ def test_unknown_state_when_runtime_status_has_no_section() -> None:
 
 
 def test_resolved_event_does_not_create_barrier() -> None:
-    payload = reclaim_barrier_event_to_dict(
-        build_reclaim_barrier_event(
+    payload = settle_barrier_event_to_dict(
+        build_settle_barrier_event(
             runtime_status={
                 "reclaim_barrier": {
                     "events": [

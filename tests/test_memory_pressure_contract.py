@@ -178,11 +178,11 @@ def test_memory_pressure_contract_keeps_reclaim_and_eviction_insufficient_signal
     )
     assert payload["residency_context"]["ttl_sweep_evictable_model_ids"] == ["fake-b"]
     assert "pressure_ranked_eviction" in payload["policy_boundaries"]["out_of_scope"]
-    # reclaim attempt-result visibility now lives in owlmlx.reclaim_barrier_event;
+    # reclaim attempt-result visibility now lives in owlmlx.settle_barrier_event;
     # the pressure contract still does not own a reclaim engine, but it should
     # no longer claim reclaim-attempt visibility is entirely missing.
     assert (
-        "reclaim_barrier_event"
+        "settle_barrier_event"
         in payload["policy_boundaries"]["runtime_owned_reclaim_attempt_result_visibility"]
     )
     assert payload["policy_boundaries"]["runtime_owned_reclaim_barrier"] is False

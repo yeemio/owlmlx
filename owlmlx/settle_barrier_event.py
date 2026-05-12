@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 
-RECLAIM_BARRIER_EVENT_SURFACE = "owlmlx.reclaim_barrier_event"
+SETTLE_BARRIER_EVENT_SURFACE = "owlmlx.settle_barrier_event"
 RECLAIM_BARRIER_EVENT_VERSION = "v1"
 
 OPERATION_VOCABULARY: tuple[str, ...] = (
@@ -52,7 +52,7 @@ REQUIRED_EVENT_FIELDS: tuple[str, ...] = (
 
 
 @dataclass(frozen=True, slots=True)
-class ReclaimBarrierEventContract:
+class SettleBarrierEvent:
     """Stable runtime-owned reclaim-barrier-event assessment."""
 
     barrier_state: str
@@ -168,10 +168,10 @@ def _classify_barrier_state(
     )
 
 
-def build_reclaim_barrier_event(
+def build_settle_barrier_event(
     *,
     runtime_status: Mapping[str, Any] | None = None,
-) -> ReclaimBarrierEventContract:
+) -> SettleBarrierEvent:
     """Build the current runtime-owned reclaim-barrier-event assessment."""
 
     raw_status = _mapping(runtime_status)
@@ -199,7 +199,7 @@ def build_reclaim_barrier_event(
         "restart_unload_failed",
     }
 
-    return ReclaimBarrierEventContract(
+    return SettleBarrierEvent(
         barrier_state=barrier_state,
         confidence=confidence,
         reason_code=reason_code,
@@ -288,14 +288,14 @@ def build_reclaim_barrier_event(
     )
 
 
-def reclaim_barrier_event_to_dict(
-    contract: ReclaimBarrierEventContract,
+def settle_barrier_event_to_dict(
+    contract: SettleBarrierEvent,
 ) -> dict[str, Any]:
     """Serialize the runtime-owned reclaim-barrier-event contract."""
 
     return {
         "contract": {
-            "surface": RECLAIM_BARRIER_EVENT_SURFACE,
+            "surface": SETTLE_BARRIER_EVENT_SURFACE,
             "version": RECLAIM_BARRIER_EVENT_VERSION,
             "stable_sections": [
                 "summary",
@@ -331,10 +331,10 @@ def reclaim_barrier_event_to_dict(
 __all__ = [
     "BARRIER_STATE_VOCABULARY",
     "OPERATION_VOCABULARY",
-    "RECLAIM_BARRIER_EVENT_SURFACE",
+    "SETTLE_BARRIER_EVENT_SURFACE",
     "RECLAIM_BARRIER_EVENT_VERSION",
     "REQUIRED_EVENT_FIELDS",
-    "ReclaimBarrierEventContract",
-    "build_reclaim_barrier_event",
-    "reclaim_barrier_event_to_dict",
+    "SettleBarrierEvent",
+    "build_settle_barrier_event",
+    "settle_barrier_event_to_dict",
 ]

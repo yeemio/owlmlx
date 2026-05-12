@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from .reclaim_barrier_event import build_reclaim_barrier_event
+from .settle_barrier_event import build_settle_barrier_event
 
 
 RECOVERY_SUPERVISOR_CONTRACT_SURFACE = "owlmlx.recovery_supervisor_contract"
@@ -84,7 +84,7 @@ def _classify_recovery(
             "high",
             f"reclaim_barrier_event_unresolved_{reclaim_barrier_state}",
             (
-                f"Runtime-owned reclaim_barrier_event reports {reclaim_barrier_state} "
+                f"Runtime-owned settle_barrier_event reports {reclaim_barrier_state} "
                 f"with {reclaim_barrier_unresolved_count} unresolved event(s); "
                 "recovery barrier required until the four-class recovery policy "
                 "resolves them."
@@ -143,7 +143,7 @@ def build_recovery_supervisor_contract(
     abort_state_value = abort_snapshot.get("state")
     abort_state = str(abort_state_value) if isinstance(abort_state_value, str) else None
     recovery_required = _bool_or_none(abort_snapshot.get("recovery_required"))
-    reclaim_barrier_contract = build_reclaim_barrier_event(runtime_status=raw_status)
+    reclaim_barrier_contract = build_settle_barrier_event(runtime_status=raw_status)
     reclaim_barrier_state = reclaim_barrier_contract.barrier_state
     reclaim_barrier_unresolved_count = int(
         reclaim_barrier_contract.barrier.get("unresolved_event_count", 0)
@@ -267,7 +267,7 @@ def build_recovery_supervisor_contract(
             {
                 "layer": "recovery",
                 "signal": "frozen_four_class_termination_cause_recovery_policy",
-                "reason": "reclaim_barrier_event records cleanup-boundary failures, but the four-class termination-cause recovery policy and event-resolution rules remain future 3.4 work",
+                "reason": "settle_barrier_event records cleanup-boundary failures, but the four-class termination-cause recovery policy and event-resolution rules remain future 3.4 work",
             },
         ),
     )
