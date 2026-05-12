@@ -1,154 +1,110 @@
 # owlmlx
 
-**Developer preview** — self-owned Apple Silicon MLX runtime with measured
-Qwen evidence and runtime-owned observability. Not yet a production replacement
-for `oMLX` or `vMLX`. See `docs/source-of-truth/public-developer-preview-readiness.md`.
+A memory-discipline-first MLX serving runtime for Apple Silicon. Single
+worker by design. Watermark + settle barrier on every load path.
 
----
+```python
+from owlmlx import MemoryWatermark, WatermarkAction, pre_load_check
 
-`owlmlx` is our own runtime.
+verdict = pre_load_check("model-id", runtime_status=current_status)
+# verdict.decision ∈ {admit_and_load, defer, reject, unknown}
+```
 
-It exists to become the runtime source of truth we actually need on Apple
-Silicon, rather than a long-lived patch layer on top of someone else's
-runtime. `oMLX` and `vMLX` matter to this project as reference points and
-sources of proven ideas, not as identity anchors.
+## What this is
 
-## Project Definition
+`owlmlx` is the MLX runtime we wanted when [oMLX#649][pr649] showed that
+Apple Silicon's unified memory needs a different shape of discipline than
+multi-host servers were designed for. Two primitives are central:
 
-`owlmlx` is a self-owned MLX runtime project with four frozen statements:
+- **MemoryWatermark** — four-level projected utilization classification
+  (`GREEN < 65 % < YELLOW < 80 % < RED < 90 % < FATAL`) consulted before
+  every model load. Pressure-aware eviction picks LRU victims when YELLOW
+  or higher; FATAL refuses the load rather than oversubscribing.
+- **Settle barrier** — after every model unload, poll
+  `mx.get_active_memory()` until the observed reclaim equals the expected
+  unload size. The contract is *verified reclaim*, not estimated unload.
+  Without this, repeated model switching accumulates Metal buffer pressure
+  silently until the system swaps.
 
-1. `owlmlx` is our own runtime.
-2. Its direction is to replace `oMLX`, while absorbing useful experience from
-   `oMLX`, `vMLX`, and other MLX runtimes as `owlmlx`'s own architecture.
-3. The `large-weight runtime path` is the first mature path inside `owlmlx`;
-   `Kimi` is the first validated specimen on that path, not the path's name.
-4. The current desktop product shell repository, historically referred to as
-   `local-llm-platform`, sits on top of `owlmlx` and is not a peer runtime
-   source of truth.
+[pr649]: https://github.com/jundot/omlx/pull/649
 
-## Why This Repository Exists
+`owlmlx` runs **one generation at a time** (`MAX_GENERATION_CONCURRENCY = 1`).
+This is not a temporary limitation. MLX's Metal thread model is unsafe under
+concurrent generation on the default stream; a FIFO admission gate trades
+throughput for crash-freeness on a single-host Apple Silicon box. Multi-host
+batching and continuous batching are explicitly out of scope — projects like
+`oMLX` and `vMLX` cover that surface.
 
-We are no longer solving a "patch upstream and hope it sticks" problem.
+## What this is for
 
-Our runtime direction already includes requirements that deserve their own
-source of truth:
+A single Mac Studio / Mac Pro running an inference service for a small team
+or a backing service. The deployment shape is:
 
-- Memory governance during multi-model switching
-- Switch safety and restart-safe runtime behavior
-- Runtime truth exposure to higher layers
-- Background-heavy serving for workloads that do not fit interactive latency
+- One host, unified memory
+- 1–10 simultaneous users behind a request queue
+- Models swapped in/out during the day; the swap path must not leak memory
+- Long uptime expected; restart-safe lifecycle and abort recovery are
+  first-class
 
-Those goals are larger than a few upstream patches. They define a runtime
-program.
+If your shape is a fleet, continuous batching, or multi-tenant cluster,
+look at oMLX or vMLX instead. They have features `owlmlx` doesn't and
+won't.
 
-## Developer Preview Status
+## What ships now
 
-`owlmlx` is in **developer preview** as of 2026-05-10. All seven
-`release-readiness-backlog.md` floors are closed. The public surface is frozen
-and documented in `public-surface.md`.
+| Surface | Status |
+|---|---|
+| OpenAI-compatible HTTP (`/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`) | supported |
+| Anthropic-compatible HTTP (`/v1/messages`) | supported |
+| Memory watermark + settle barrier | supported |
+| Pressure-aware LRU eviction | supported |
+| Abort recovery (substrate state verified before resuming) | supported |
+| Runtime-owned observability (`/v1/runtime/monitor/snapshot`, `/history`, `/metrics`) | supported |
+| Native MLX backend (in-process, bypassing `mlx_lm`) | experimental |
+| Subprocess backend (`mlx_lm` in a separate process) | supported |
+| Continuous batching / paged KV cache / multimodal / speculative | **not in scope** |
 
-Measured short-prompt performance on `Mac17,6-arm64-macOS-26.4.1-128GB`
-(`max_tokens=64`, `temperature=0`):
+Short-prompt TPS on `Mac17,6` (`max_tokens=64`, `temperature=0`):
 
-| Model | owlmlx TPS | Reference TPS | Runtime |
+| Model | owlmlx | Reference | Reference runtime |
 |---|---|---|---|
 | Qwen3.6-27B | 5.45 | 2.81 | oMLX |
 | Qwen3.6-35B-A3B | 3.53 | 2.44 | oMLX |
 | Gemma 4 | 3.75 | 3.83 | vMLX |
 
-These are short-prompt results. They do not imply broader parity or
-replacement. See `docs/source-of-truth/public-developer-preview-readiness.md`
-for the full claim matrix and honest open gaps.
+Short-prompt only. See `docs/source-of-truth/public-developer-preview-readiness.md`
+for the full claim matrix and open gaps.
 
-Runtime-owned observability ships as first-class HTTP surfaces:
-
-- `GET /v1/runtime/monitor/snapshot` — structured health snapshot
-- `GET /v1/runtime/monitor/history` — persistent trend ledger
-- `GET /metrics` — Prometheus exposition (`owlmlx_native_*` namespace)
-- `GET /v1/runtime/model-release-candidates/history` — per-model RC evidence
-
-## Current State
-
-- Real runtime kernel: OpenAI-compatible, Anthropic-compatible, and
-  native generation endpoints; FIFO admission gate; restart-safe lifecycle
-- Runtime-owned memory governance: pressure classification, eviction policy,
-  non-resident admission, recovery policy
-- Technical-preview serving path: `scripts/runtime_technical_preview_server.py`
-  launches a real `mlx_lm` subprocess backend without stopping legacy services
-- Evidence program: Model RC ledger and comparative-evidence harness with
-  measured same-host records
-- Not owned: desktop shell, packaging, app distribution, operator UI —
-  those belong to `owlops` and product layers above this runtime
-
-## What `owlmlx` Is Not
-
-- Not a renamed `oMLX` fork
-- Not a thin wrapper around `vMLX`
-- Not a copy of the current desktop product shell repository
-- Not a GUI or dashboard project
-- Not a claim that generalized foreground runtime is already solved
-
-## Document Map
-
-**Developer preview entry points:**
-- `docs/source-of-truth/public-developer-preview-readiness.md` — readiness
-  position, claim matrix, performance evidence, open gaps
-- `docs/source-of-truth/public-surface.md` — frozen public surface boundary:
-  supported HTTP routes, Python modules, operator scripts
-- `docs/source-of-truth/release-readiness-backlog.md` — 7/7 floors closed;
-  closure ledger with evidence references
-
-**Runtime architecture:**
-- `docs/source-of-truth/master-outline.md`
-- `docs/source-of-truth/product-definition.md`
-- `docs/source-of-truth/system-architecture.md`
-- `docs/source-of-truth/single-host-orchestration-architecture.md`
-- `docs/source-of-truth/repository-boundaries.md`
-- `docs/source-of-truth/runtime-capability-matrix.md`
-- `docs/source-of-truth/native-mlx-backend-capability-matrix.md`
-- `docs/source-of-truth/runtime-contracts.md`
-- `docs/source-of-truth/runtime-status-schema.md`
-- `docs/source-of-truth/runtime-governance.md`
-- `docs/source-of-truth/hazardous-operations.md`
-
-**Evidence program:**
-- `docs/source-of-truth/comparative-evidence-harness-contract.md`
-- `docs/source-of-truth/model-release-candidate-program.md`
-- `docs/source-of-truth/reference-runtime-comparison-matrix.md`
-
-**Governance truth:**
-- `docs/source-of-truth/model-residency-policy.md`
-- `docs/source-of-truth/memory-pressure-contract.md`
-- `docs/source-of-truth/memory-pressure-eviction-policy.md`
-- `docs/source-of-truth/nonresident-model-admission-policy.md`
-- `docs/source-of-truth/termination-recovery-policy.md`
-- `docs/source-of-truth/reclaim-barrier-event.md`
-
-**Developer workflow:**
-- `docs/source-of-truth/python-environment.md`
-- `docs/source-of-truth/python-environment-research.md`
-- `docs/source-of-truth/autonomous-loop-discipline.md`
-- `docs/source-of-truth/roadmap.md`
-
-## Immediate Priority
-
-The runtime source-of-truth layer is stable. The current job is advancing
-measured evidence coverage (heavier workloads, multi-turn, additional model
-families) and closing the open gaps listed in
-`docs/source-of-truth/public-developer-preview-readiness.md` §7.
-
-## Development Environment
-
-Project Python is **3.11.15** (pinned via `.python-version`); toolchain is
-**uv**. From a fresh clone:
+## Quick start
 
 ```bash
 uv sync --extra runtime
-uv run pytest
+uv run pytest             # 960 cases, ~33 s
+uv run python -m uvicorn 'owlmlx.runtime.server:create_app' --factory --port 8082
+curl http://127.0.0.1:8082/v1/runtime/monitor/snapshot
 ```
 
-`pytest` will emit a loud `UserWarning` if invoked outside `.venv/` so the
-default shell `python3` (often a different version) cannot be silently
-used. See `docs/source-of-truth/python-environment.md` for full developer
-workflow and `docs/source-of-truth/python-environment-research.md` for
-the rationale behind the pin.
+Project Python is **3.11.15** (pinned via `.python-version`). `pytest`
+emits a loud warning if run outside `.venv/`.
+
+## Where to look next
+
+- `docs/source-of-truth/public-developer-preview-readiness.md` — full claim
+  matrix, performance evidence, open gaps
+- `docs/source-of-truth/public-surface.md` — frozen public boundary
+- `docs/source-of-truth/system-architecture.md` — runtime kernel design
+- `docs/source-of-truth/memory-pressure-contract.md` — watermark contract
+- `docs/source-of-truth/reclaim-barrier-event.md` — settle barrier contract
+  (file name retained for git history; the contract is `SettleBarrierEvent`)
+- `docs/source-of-truth/nonresident-model-admission-policy.md` — `pre_load_check`
+- `AGENTS.md` — repository navigation + anti-regression rules for
+  LLM-assisted contributors
+
+## Development status
+
+Developer preview as of 2026-05-10. Public Python surface and HTTP routes
+are stable; internal kernel still under active refinement. Stage 1
+refactor (2026-05-11) archived 151 spec-as-code modules; Stage 2 (in
+progress) aligns landmark vocabulary with [PR #649][pr649]. See
+`CHANGELOG.md` (when present) or recent `release(...)` / `refactor(...)`
+commits.
