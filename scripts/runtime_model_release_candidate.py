@@ -17,10 +17,10 @@ import socket
 from pathlib import Path
 from typing import Any
 
-from owlmlx.comparative_evidence_ledger import ComparativeEvidenceLedger
+from owlmlx.comparative_evidence_history import ComparativeEvidenceLedger
 from owlmlx.model_profile import model_profile_to_dict, resolve_model_profile
 from owlmlx.reasoning_trace_policy import apply_reasoning_trace_policy
-from owlmlx.model_release_candidate_ledger import (
+from owlmlx.model_release_candidate_history import (
     ModelReleaseCandidateLedger,
     model_release_candidate_history_envelope,
     model_release_candidate_still_blocked_payload,

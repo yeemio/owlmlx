@@ -101,13 +101,27 @@ patterns are **prohibited**:
 - `*_charter.py`
 - `*_manifest.py` (when serving as in-tree spec, not as runtime artifact metadata)
 - `*_evidence.py` (when not consumed by a real runtime decision)
-- `*_ledger.py` (when not consumed by a real runtime decision)
+- `*_ledger.py` (when serving as in-tree spec, not as live append-and-read
+  history with a runtime consumer)
 
 **Module-as-spec is forbidden.** A module's reason for existence must be
 that some other module in `owlmlx/runtime/` *reads its dataclass fields
 or calls its functions*. Files whose entire body is a frozen dataclass
 plus a builder that returns hardcoded status strings are documentation,
 not code. Put documentation in `docs/`.
+
+**Grandfathered live surfaces after Stage 1:**
+
+| Module | Status | Reason |
+| --- | --- | --- |
+| `memory_pressure_contract.py` | rename pending before `0.3.0` | Runtime/server policy paths read the classifier verdict and fields. |
+| `recovery_supervisor_contract.py` | rename pending before `0.3.0` | Runtime/server recovery policy paths read the supervisor verdict and fields. |
+| `scheduler_admission_contract.py` | rename pending before `0.3.0` | Runtime/server admission policy paths read the scheduler verdict and fields. |
+| `comparative_evidence_history.py` | approved live history | Runtime routes and scripts append/read comparative evidence history. |
+| `model_release_candidate_history.py` | approved live history | Runtime routes and scripts append/read model release-candidate history. |
+
+Do not add new `*_contract.py` modules. Existing contract-named modules are
+temporary compatibility debt, not a pattern to copy.
 
 **PR-level check before merging any new `.py` in `owlmlx/`:**
 

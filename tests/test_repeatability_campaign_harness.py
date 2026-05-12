@@ -19,7 +19,7 @@ import uvicorn
 import scripts.runtime_repeatability_campaign as campaign
 from owlmlx.runtime import FakeBackend, RuntimeKernel
 from owlmlx.runtime.server import create_app
-from owlmlx.model_release_candidate_ledger import ModelReleaseCandidateLedger
+from owlmlx.model_release_candidate_history import ModelReleaseCandidateLedger
 from scripts.runtime_repeatability_campaign import (
     _campaign_label,
     _parse_stream_events,

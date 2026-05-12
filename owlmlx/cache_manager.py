@@ -28,10 +28,11 @@ from typing import Any
 # --------------------------------------------------------------------------- #
 # Counter ledger
 #
-# The five counter names are pinned to ``cache_residency_evidence.py:19-28``
-# so existing residency-evidence / closure-rung consumers can already query
-# the manager without breaking when real implementations land later. In this
-# scaffold round all counters except ``entries`` remain at zero by design.
+# The five counter names are owned directly by CacheManagerCounters. The older
+# cache_residency_evidence scaffold was archived in Stage 1; live native
+# backend code reads this manager instead of a standalone evidence module.
+# In this scaffold round all counters except ``entries`` remain at zero by
+# design.
 # --------------------------------------------------------------------------- #
 
 
@@ -39,10 +40,9 @@ from typing import Any
 class CacheManagerCounters:
     """Zero-baseline counter ledger for the KV cache manager scaffold.
 
-    Field names mirror ``CacheResidencyMetrics`` in
-    ``cache_residency_evidence.py``. The scaffold publishes every field as
-    an integer (never ``None``) so consumers can read a stable shape. Real
-    accounting for ``resident_bytes``, ``reuse_events``, ``hit_count``,
+    The scaffold publishes every field as an integer (never ``None``) so
+    consumers can read a stable shape. Real accounting for
+    ``resident_bytes``, ``reuse_events``, ``hit_count``, and
     ``eviction_events`` is an extension point, not an implementation.
     """
 
@@ -227,10 +227,9 @@ class CacheManager:
     def status_dict(self) -> dict[str, Any]:
         """Return a status payload shape suitable for runtime status endpoints.
 
-        The ``counters`` key matches the field names used by
-        ``cache_residency_evidence.CacheResidencyMetrics`` so existing
-        residency-evidence / closure-rung consumers can read this manager
-        without bespoke adapters.
+        The ``counters`` key exposes the live runtime-owned counter names
+        directly; the archived cache_residency_evidence scaffold is no longer
+        required as a translation layer.
         """
 
         with self._lock:

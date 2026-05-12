@@ -51,7 +51,7 @@ not collapsed in this round.
 | Upstream KV cache primitives | `mlx_lm.models.cache` | `make_prompt_cache`, `KVCache`, `RotatingKVCache`, `QuantizedKVCache`, `ConcatenateKVCache`, `ChunkedKVCache`, `ArraysCache`, `BatchKVCache`, `BatchRotatingKVCache`, `CacheList`, `TokenBuffer`, `PromptTrie`, `LRUPromptCache` |
 | Adapter-side single-request binding | `owlmlx/runtime/mlx_native_backend.py` (`_make_fresh_prompt_cache`) | drives `make_prompt_cache(model)` per `generate` / `stream_generate` and threads it via `prompt_cache=` kwarg. **NOT modified in this scaffold round** |
 | Legacy SSD / hot-cache schema | `owlmlx/cache_truth.py` | platform-shell-oriented cache profile + TurboQuant safety; not KV-cache-related |
-| Cache residency / reuse evidence | `owlmlx/cache_residency_evidence.py` | declares `CacheResidencyMetrics` with the 5 counter names; consumes runtime-visible counters |
+| Cache manager counters | `owlmlx/cache_manager.py` | declares the 5 live counter names; the older `cache_residency_evidence.py` scaffold is archived |
 | Pre-claim metadata / ticket staging | `owlmlx/cache_pre_claim_*.py` family (e.g. `cache_pre_claim_admission_contract.py:53-58`) | bounded metadata staging seam **before** gate claim; explicitly forbidden actions include `no_gate_claim_from_pre_claim_seam`, `no_child_exchange_from_pre_claim_seam`, `no_stream_start_from_pre_claim_seam`, `no_model_execution_from_pre_claim_seam` |
 | Pre-gate admission hook / cohort window | `owlmlx/cache_pre_gate_*.py` family | window feasibility, admission hook exactness; does not own KV cache lifetime |
 | Closure rung / counter feasibility / gap | `owlmlx/cache_closure_rung.py`, `owlmlx/cache_counter_*.py` | accounting truth surfaces; do not own KV cache lifetime |
@@ -102,9 +102,8 @@ Intended invariants in this scaffold round:
   update any counter (release is incidental in single-request mode and
   is not an eviction event)
 - `counters()` returns a frozen `CacheManagerCounters` snapshot
-- `status_dict()` returns a payload whose `counters` key matches the
-  `CacheResidencyMetrics` field names so existing residency-evidence
-  consumers can read this manager without bespoke adapters
+- `status_dict()` returns a payload whose `counters` key exposes the live
+  runtime-owned counter names directly
 - the manager raises a clear `RuntimeError` when the upstream attribute
   path is missing — the manager's contract is to fail loudly because
   callers reach it only when they intend to bind
@@ -141,8 +140,8 @@ reuse on flips this flag explicitly and accepts the §1a obligation.
 
 ## 6. Counter contract
 
-The 5-counter zero-baseline ledger is pinned to
-`cache_residency_evidence.py:19-28`:
+The 5-counter zero-baseline ledger is owned directly by
+`CacheManagerCounters`:
 
 | Counter | Scaffold behavior | Future surface |
 |---|---|---|
@@ -153,11 +152,9 @@ The 5-counter zero-baseline ledger is pinned to
 | `eviction_events` | always zero | future LRU / size-pressure eviction layer |
 
 `CacheManagerCounters.to_dict()` returns plain `int` values for every
-field (never `None`). This is stricter than `CacheResidencyMetrics`,
-which permits `None` per field; the manager publishes a stable shape so
-that residency-evidence consumers see consistent zero-baselines instead
-of "field present / field absent" toggling. Where a residency-evidence
-consumer expects an `Optional[int]`, a zero-int is a valid narrowing.
+field (never `None`). The manager publishes a stable shape so runtime
+status consumers see consistent zero-baselines instead of "field present /
+field absent" toggling.
 
 `status_dict()`'s `counters` key uses the same field names so that the
 adapter wiring round (which is **not** this round) can drop the

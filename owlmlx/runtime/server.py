@@ -82,12 +82,12 @@ from owlmlx.termination_recovery_policy import (
     build_termination_recovery_policy,
     termination_recovery_policy_to_dict,
 )
-from owlmlx.comparative_evidence_ledger import (
+from owlmlx.comparative_evidence_history import (
     ComparativeEvidenceLedger,
     history_envelope as comparative_evidence_history_envelope,
     still_blocked_payload as comparative_evidence_still_blocked_payload,
 )
-from owlmlx.model_release_candidate_ledger import (
+from owlmlx.model_release_candidate_history import (
     ModelReleaseCandidateLedger,
     model_release_candidate_history_envelope,
     model_release_candidate_still_blocked_payload,

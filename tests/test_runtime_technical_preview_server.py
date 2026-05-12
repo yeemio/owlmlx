@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from owlmlx.model_release_candidate_ledger import ModelReleaseCandidateLedger
+from owlmlx.model_release_candidate_history import ModelReleaseCandidateLedger
 from owlmlx.model_release_candidate_record import build_dry_run_model_release_candidate_records
 from owlmlx.runtime.mlx_lm_subprocess_backend import MlxLmSubprocessBackend
 from owlmlx.runtime.technical_preview import (

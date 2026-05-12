@@ -158,7 +158,7 @@ inside a supported module.
   (`COMPARATIVE_EVIDENCE_RECORD_SURFACE`/`VERSION`, `WORKLOAD_CLASSES`,
   `RUNTIME_IDS`, `VERDICT_GRADES`, `BANNED_VERDICT_VOCABULARY`) and
   `validate_comparative_evidence_record(...)`
-- `owlmlx.comparative_evidence_ledger` — `supported` —
+- `owlmlx.comparative_evidence_history` — `supported` —
   `ComparativeEvidenceLedger`, `still_blocked_payload(...)`,
   `history_envelope(...)`
 - `owlmlx.comparative_evidence_runner` — `partial` — measured-runner
@@ -173,7 +173,7 @@ inside a supported module.
   `build_model_release_candidate_record(...)`,
   `build_dry_run_model_release_candidate_records(...)`, and
   `model_release_candidate_record_to_dict(...)`
-- `owlmlx.model_release_candidate_ledger` — `supported` —
+- `owlmlx.model_release_candidate_history` — `supported` —
   `ModelReleaseCandidateLedger`, `model_release_candidate_still_blocked_payload(...)`,
   and `model_release_candidate_history_envelope(...)`
 - `owlmlx.model_load_admission` — `supported` —

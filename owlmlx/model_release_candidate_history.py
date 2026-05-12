@@ -1,4 +1,4 @@
-"""Append-only JSONL ledger for model release-candidate evidence records."""
+"""Append-and-read JSONL history for model release-candidate evidence records."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from .model_release_candidate_schema import (
 
 
 class ModelReleaseCandidateLedger:
-    """Thin append-only wrapper around one JSONL ledger."""
+    """Thin append-only wrapper around one model release-candidate history file."""
 
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path)

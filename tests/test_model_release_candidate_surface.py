@@ -12,13 +12,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from owlmlx.comparative_evidence_ledger import ComparativeEvidenceLedger
+from owlmlx.comparative_evidence_history import ComparativeEvidenceLedger
 from owlmlx.comparative_evidence_record import (
     ComparativeEvidenceMeasurement,
     ComparativeEvidenceRuntime,
     build_comparative_evidence_record,
 )
-from owlmlx.model_release_candidate_ledger import (
+from owlmlx.model_release_candidate_history import (
     ModelReleaseCandidateLedger,
     model_release_candidate_history_envelope,
     model_release_candidate_still_blocked_payload,

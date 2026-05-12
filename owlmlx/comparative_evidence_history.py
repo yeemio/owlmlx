@@ -1,4 +1,4 @@
-"""Append-only JSONL ledger for ``comparative_evidence_record`` v1 records.
+"""Append-and-read JSONL history for ``comparative_evidence_record`` v1 records.
 
 Every emitted record is appended as one JSON object per line. Records may
 be superseded by later records but never silently rewritten — the file is
@@ -23,7 +23,7 @@ from .comparative_evidence_schema import (
 
 
 class ComparativeEvidenceLedger:
-    """Thin wrapper over a JSONL ledger file."""
+    """Thin wrapper over a JSONL comparative-evidence history file."""
 
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path)

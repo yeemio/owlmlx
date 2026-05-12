@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from owlmlx.memory_budget import MachineMemoryProfile
-from owlmlx.model_release_candidate_ledger import ModelReleaseCandidateLedger
+from owlmlx.model_release_candidate_history import ModelReleaseCandidateLedger
 from owlmlx.model_release_candidate_record import build_model_release_candidate_record
 from owlmlx.runtime import FakeBackend, RuntimeKernel
 from owlmlx.runtime.server import create_app

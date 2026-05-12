@@ -1,7 +1,7 @@
 # owlmlx Phase 45: Cache Residency/Reuse Evidence
 
-> Status: authoritative
-> Updated: 2026-04-13
+> Status: archived scaffold
+> Updated: 2026-05-12
 > Scope: runtime-only cache residency/reuse evidence for replacement-grade alignment
 
 ## 1. Purpose
@@ -19,16 +19,25 @@ This is still narrower than cache parity. It exists so the runtime can separate:
 - scheduler depth truth
 - actual runtime-owned evidence of residency or reuse
 
-## 2. Owned Contract
+## 2. Archived Contract
 
-`owlmlx/cache_residency_evidence.py` now owns:
+The former Python scaffold was archived because it was a spec-shaped evidence
+surface without a runtime decision consumer.
+
+Archived files:
+
+- `archive/spec-layer-v0/owlmlx/cache_residency_evidence.py`
+- `archive/spec-layer-v0/scripts/runtime_cache_residency_evidence.py`
+- `archive/spec-layer-v0/tests/test_cache_residency_evidence.py`
+
+The archived module owned:
 
 - `build_cache_residency_evidence(...)`
 - `cache_residency_evidence_to_dict(...)`
 
-Operator entry:
+Archived operator entry:
 
-- `scripts/runtime_cache_residency_evidence.py`
+- `archive/spec-layer-v0/scripts/runtime_cache_residency_evidence.py`
 
 Contract:
 
@@ -97,7 +106,8 @@ But it still lacked a runtime-owned way to say:
 - whether that evidence is only configuration, profile-under-load, residency,
   or reuse
 
-Now `owlmlx` owns that answer directly.
+This answer is now historical scaffold truth. Live runtime cache state is owned
+by `CacheManagerCounters` and `RuntimeKernel.status_dict()`.
 
 ## 6. What This Does Not Claim
 

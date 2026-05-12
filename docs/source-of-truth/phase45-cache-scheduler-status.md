@@ -120,5 +120,5 @@ It only claims:
 - `cache_scheduler_depth` now has a runtime-owned status contract
 - the current closure level is still partial
 - the next honest runtime-owned step after this status surface is stronger
-  repeated-serving reuse/eviction evidence on top of the new
-  `owlmlx.cache_residency_evidence` surface
+  repeated-serving reuse/eviction evidence on top of the live
+  `owlmlx.cache_manager` counter surface

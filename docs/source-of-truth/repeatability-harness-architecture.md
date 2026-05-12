@@ -1,7 +1,7 @@
 # owlmlx Repeatability Harness Architecture
 
-> Status: scaffold
-> Updated: 2026-05-08
+> Status: archived scaffold
+> Updated: 2026-05-12
 > Authorship: runtime-owned (`owlmlx`)
 > Scope: contract types and ownership boundaries for a multi-axis
 >        randomized-load repeatability harness; this round freezes the
@@ -9,20 +9,21 @@
 
 ## 1. Status / Scope / Authorship
 
-This document is the source of truth for the
-``owlmlx.repeatability_harness`` module shape. It is **scaffold-grade**:
-it freezes the public contract types (`RepeatabilityRunRecord`,
-`RepeatabilityRunSpec`, `RepeatabilityVerdict`,
-`LoadShapeGenerator`, `DegradationDiscriminator`,
-`RepeatabilityHarness`) and the placeholder runner, but it does not
-freeze a measurement loop, statistical thresholds, or any binding to
-an actual backend.
+This document preserves the archived scaffold contract for the former
+``owlmlx.repeatability_harness`` module. The Python module was moved out of
+the importable package during the Stage 1 anti-regression cleanup because it
+was contract-shaped scaffold code with no runtime consumer.
 
-The corresponding Python module is:
+The archived contract types remain useful as history
+(`RepeatabilityRunRecord`, `RepeatabilityRunSpec`, `RepeatabilityVerdict`,
+`LoadShapeGenerator`, `DegradationDiscriminator`, `RepeatabilityHarness`), but
+they are not an active owlmlx runtime API.
 
-- `owlmlx/repeatability_harness.py`
+The archived Python module is:
 
-That module is governed by this doc, and by
+- `archive/spec-layer-v0/owlmlx/repeatability_harness.py`
+
+That archived module was governed by this doc, and by
 `docs/source-of-truth/comparative-evidence-harness-contract.md` for the
 six standard measurement field names and the verdict-text vocabulary.
 
@@ -91,7 +92,7 @@ only contract-text rule shared across both harnesses.
 | `owlmlx/cache_repeatability_evidence.py` | per-run `CacheResidencyEvidence` aggregation, cache-only repeatability ladder |
 | `owlmlx/cache_runtime_observation_harness.py` | a fixed two-prompt warm-warm runner against the subprocess backend, used for cache-residency evidence only |
 | `owlmlx/comparative_evidence_*.py` | single-shot cross-runtime comparative records, ledger, HTTP surface, schema validation |
-| `owlmlx/repeatability_harness.py` (this module) | scaffold contract types for a multi-axis randomized-load repeatability harness; no measurement loop yet |
+| `archive/spec-layer-v0/owlmlx/repeatability_harness.py` | archived scaffold contract types for a multi-axis randomized-load repeatability harness; no measurement loop |
 
 Non-duplication: this module is the only place where a `(run_index,
 prompt_class, specimen_path)` triple is the unit of work. None of the

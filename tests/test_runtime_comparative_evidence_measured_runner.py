@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from owlmlx.comparative_evidence_ledger import ComparativeEvidenceLedger
+from owlmlx.comparative_evidence_history import ComparativeEvidenceLedger
 from owlmlx.comparative_evidence_runner import (
     RuntimeRunnerConfig,
     WorkloadInputs,

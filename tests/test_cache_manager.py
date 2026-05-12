@@ -235,11 +235,8 @@ def test_release_drops_handle_reference_without_changing_counters() -> None:
     assert snapshot["handles_count_by_model"] == {}
 
 
-def test_status_dict_shape_matches_residency_evidence_consumer_expectation() -> None:
-    """``status_dict``'s ``counters`` key must use the field names of
-    ``cache_residency_evidence.CacheResidencyMetrics`` so existing
-    consumers can read this manager without a translation layer.
-    """
+def test_status_dict_shape_exposes_live_counter_vocabulary() -> None:
+    """``status_dict`` exposes the live runtime-owned counter names."""
 
     manager = CacheManager()
     fake_mlx_lm = _build_fake_mlx_lm_with_cache_surface()

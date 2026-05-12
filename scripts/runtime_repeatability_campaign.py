@@ -33,7 +33,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from owlmlx.model_release_candidate_ledger import ModelReleaseCandidateLedger
+from owlmlx.model_release_candidate_history import ModelReleaseCandidateLedger
 from owlmlx.model_release_candidate_record import build_model_release_candidate_record
 from owlmlx.repeatability_statistics import (
     RepeatRunSample,

@@ -203,7 +203,7 @@ verified through the OwlOps R156 sub-round
   `comparative_evidence_record_history` v1 envelope, or the same
   `still_blocked` payload when the ledger is empty
 - the runtime-owned ledger backing both endpoints is JSONL, append-only
-  (`owlmlx.comparative_evidence_ledger.ComparativeEvidenceLedger`)
+  (`owlmlx.comparative_evidence_history.ComparativeEvidenceLedger`)
 - `scripts/runtime_comparative_evidence.py` is the operator entry for
   `append-rejected-record` / `latest` / `history`
 

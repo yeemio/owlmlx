@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from owlmlx.comparative_evidence_ledger import (
+from owlmlx.comparative_evidence_history import (
     ComparativeEvidenceLedger,
     history_envelope,
     still_blocked_payload,

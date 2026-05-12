@@ -179,7 +179,8 @@ replacement-grade stability alignment without claiming parity:
     deeper runtime validation
 - `owlmlx.cache_scheduler_status`
   - direct runtime-owned answer for current cache/scheduler closure depth
-- `owlmlx.cache_residency_evidence`
+- archived `owlmlx.cache_residency_evidence` scaffold; live cache counters are
+  exposed by `owlmlx.cache_manager`
   - direct runtime-owned answer for current cache residency/reuse evidence rung
 - `owlmlx.cache_repeatability_evidence`
   - direct runtime-owned answer for repeated-serving cache evidence rung
@@ -554,7 +555,7 @@ and `comparative-evidence-schema-stub.md`. It sits alongside
     connected or empty
 
 The surface is backed by the runtime-owned JSONL ledger
-`owlmlx.comparative_evidence_ledger.ComparativeEvidenceLedger`. The
+`owlmlx.comparative_evidence_history.ComparativeEvidenceLedger`. The
 ledger path is connected at `create_app(...)` construction time
 (`comparative_evidence_ledger_path`); `create_fake_app()` honors the
 `OWLMLX_COMPARATIVE_EVIDENCE_LEDGER_PATH` environment variable so live
@@ -628,7 +629,7 @@ and is not part of the core status payload.
     empty
 
 The surface is backed by
-`owlmlx.model_release_candidate_ledger.ModelReleaseCandidateLedger`. The ledger
+`owlmlx.model_release_candidate_history.ModelReleaseCandidateLedger`. The ledger
 path is connected at `create_app(...)` construction time
 (`model_release_candidate_ledger_path`); `create_fake_app()` honors the
 `OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH` environment variable for live

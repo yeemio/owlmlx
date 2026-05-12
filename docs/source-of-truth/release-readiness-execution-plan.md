@@ -106,7 +106,7 @@ Model RC A0 result (2026-05-05,
 - runtime-owned schema / record / ledger modules added:
   `owlmlx.model_release_candidate_schema`,
   `owlmlx.model_release_candidate_record`, and
-  `owlmlx.model_release_candidate_ledger`
+  `owlmlx.model_release_candidate_history`
 - operator entry added at `scripts/runtime_model_release_candidate.py` with
   `dry-run-matrix`, `append-dry-run-matrix`, `latest`, and `history`
 - read-only HTTP surfaces added:
@@ -1239,7 +1239,7 @@ OwlOps R156 external dependency surface (2026-04-26 closeout):
   - the runtime-owned record contract
     (`owlmlx.comparative_evidence_record` v1), schema authority
     (`owlmlx.comparative_evidence_schema`), JSONL ledger
-    (`owlmlx.comparative_evidence_ledger`), and operator entry
+    (`owlmlx.comparative_evidence_history`), and operator entry
     (`scripts/runtime_comparative_evidence.py`) all exist
   - one real `verdict_grade = "rejected"` record (reason
     `reference_runtime_unavailable`) was emitted and served by both
