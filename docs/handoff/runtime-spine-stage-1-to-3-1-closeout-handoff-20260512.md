@@ -53,8 +53,12 @@ cross-repository Stage 3.2 work begins.
 - Do not batch-rename remaining `reclaim_barrier_event` internal names. Stage 2
   intentionally preserved route URLs, kernel internals, compound payload fields,
   and test-facing method names where compatibility mattered.
-- Do not start Stage 3.2 as a drive-by continuation. It crosses into
-  `/Users/yeemio/AI/Agent/runtime_patches/omlx/` and needs its own audit.
+- Stage 3.2 is **not** a swap-safe patch tooling migration. Track A
+  (2026-05-12, documentation only) recategorized the Agent-side
+  `/Users/yeemio/AI/Agent/runtime_patches/omlx/` scripts as
+  `external legacy reference`. They patch a different runtime (oMLX)
+  and are not an owlmlx extraction target. Do not reopen the migration
+  framing.
 - Do not stage `files/evidence/owlmlx/runtime-monitor-trends/trend-ledger.jsonl`
   as part of this milestone. It is runtime-generated local evidence.
 
@@ -95,7 +99,10 @@ verification.
 - `GET /v1/runtime/quantization-metadata?model_id=Qwen3.6-27B` can return
   `lineage_missing` when lineage is absent. That is an honest contract state,
   not a failure.
-- Stage 3.2 swap-safe patch migration is not started.
+- Stage 3.2 Track A (independence cleanup, documentation) is in
+  progress on `refactor/stage-3.2-independence-cleanup`. It withdrew
+  the swap-safe patch migration framing from Stage 3.1's residual
+  next-action list.
 - Public release remains a separate operator decision; this refactor milestone
   does not imply public release.
 
@@ -108,13 +115,26 @@ Milestone handling gap:
 3. Decide whether remote `main` should fast-forward with full commit history,
    be represented by a curated PR, or remain parked while Stage 3.2 is audited.
 
-Runtime migration gap after this milestone:
+Next gap after this milestone:
 
-`Stage 3.2 — swap-safe patch tooling migration audit`
+`Stage 3.2 — independence cleanup and owned capability target selection`
 
-This must begin with a read-only audit of
-`/Users/yeemio/AI/Agent/runtime_patches/omlx/`, current consumers, and
-retirement criteria for `patch-guard.sh`.
+Track A (documentation, in progress on
+`refactor/stage-3.2-independence-cleanup`) freezes the architecture
+narrative: `owlmlx` is independent; Agent-side oMLX patch tooling is
+external legacy reference, not a migration target. See updated
+`contract-mapping.md` §3 row, `extraction-inventory.md` §4.2, and
+`system-architecture.md` §0 (independence boundary diagram).
+
+Track B (runtime work, separate branch
+`refactor/stage-3.3-cache-eviction-activation`) deepens an owned
+owlmlx capability: the Cache / Residency / Eviction closure on the
+load → residency → pressure → eviction → release-ledger → status path.
+Track B does not touch contract-mapping / extraction-inventory; Track A
+does not touch runtime code. Merge order: Track A first (so Track B's
+capability promotion lands against the corrected map), Track B after.
+
+Neither track touches `/Users/yeemio/AI/Agent/runtime_patches/omlx/`.
 
 ## Suggested First Commands
 

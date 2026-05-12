@@ -1,7 +1,61 @@
 # owlmlx System Architecture
 
 > Status: authoritative
-> Updated: 2026-04-09
+> Updated: 2026-05-12 (Stage 3.2 Track A — independence cleanup)
+
+## 0. Independence Boundary
+
+`owlmlx` is an independent runtime, not a fork or patch layer:
+
+```text
+                    +--------------------------+
+                    |  Product integration     |
+                    |  layer (desktop shell,   |
+                    |  OwlOps, operator UI)    |
+                    +-----------+--------------+
+                                | consumes
+                                | runtime truth
+                                v
+                    +--------------------------+
+                    |        owlmlx            |   <-- this repository
+                    |                          |
+                    |  - runtime truth         |
+                    |  - serving discipline    |
+                    |  - memory governance     |
+                    |  - cache / residency     |
+                    |  - model truth           |
+                    |  - execution backends    |
+                    +-----------+--------------+
+                                | calls
+                                | substrate API
+                                v
+                    +--------------------------+
+                    |  MLX substrate           |
+                    |  (mlx, mlx-lm, mlx-vlm)  |
+                    +--------------------------+
+
+External references (comparison only, not dependencies):
+
+    oMLX  vMLX  vLLM  SGLang        Agent-side oMLX patch tooling
+    -----------------------         -------------------------------
+    benchmark + mechanism            external legacy reference;
+    references for design            patches a different runtime
+    decisions and apples-to-         (oMLX) and is not an owlmlx
+    apples evidence comparison       extraction target. owlmlx owns
+                                     the same runtime principles
+                                     independently.
+```
+
+Three reading rules follow from this diagram:
+
+1. `owlmlx` does not retire Agent-side oMLX patch tooling. That tooling's
+   retirement is oMLX's concern, not owlmlx's. owlmlx's independence
+   does not depend on it.
+2. oMLX, vMLX, vLLM, and SGLang remain valid comparison reference
+   runtimes (benchmarks, mechanism studies, design comparisons). They
+   are not extraction sources or upstream identities.
+3. Product integration layer code (desktop shell, OwlOps, dashboards)
+   consumes owlmlx truth and may proxy it. It must not redefine it.
 
 ## 1. Layer Model
 
