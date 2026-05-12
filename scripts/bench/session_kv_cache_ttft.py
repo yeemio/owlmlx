@@ -41,20 +41,28 @@ DEFAULT_MODEL_ID = "synthetic-small-model"
 @dataclass(frozen=True, slots=True)
 class BenchModeSummary:
     cache_enabled: bool
+    min_first_token_ms: float | None
     p50_first_token_ms: float | None
     p95_first_token_ms: float | None
+    max_first_token_ms: float | None
+    warm_min_first_token_ms: float | None
     warm_p50_first_token_ms: float | None
     warm_p95_first_token_ms: float | None
+    warm_max_first_token_ms: float | None
     operation_count: int
     ok: bool
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "cache_enabled": self.cache_enabled,
+            "min_first_token_ms": self.min_first_token_ms,
             "p50_first_token_ms": self.p50_first_token_ms,
             "p95_first_token_ms": self.p95_first_token_ms,
+            "max_first_token_ms": self.max_first_token_ms,
+            "warm_min_first_token_ms": self.warm_min_first_token_ms,
             "warm_p50_first_token_ms": self.warm_p50_first_token_ms,
             "warm_p95_first_token_ms": self.warm_p95_first_token_ms,
+            "warm_max_first_token_ms": self.warm_max_first_token_ms,
             "operation_count": self.operation_count,
             "ok": self.ok,
         }
@@ -106,6 +114,14 @@ def _percentile(values: list[float], percentile: float) -> float | None:
     return round(value, 3)
 
 
+def _rounded_min(values: list[float]) -> float | None:
+    return round(min(values), 3) if values else None
+
+
+def _rounded_max(values: list[float]) -> float | None:
+    return round(max(values), 3) if values else None
+
+
 def _mode_summary(records: list[dict[str, Any]], *, cache_enabled: bool) -> BenchModeSummary:
     subset = [record for record in records if record["cache_enabled"] is cache_enabled]
     ttft = [
@@ -120,10 +136,14 @@ def _mode_summary(records: list[dict[str, Any]], *, cache_enabled: bool) -> Benc
     ]
     return BenchModeSummary(
         cache_enabled=cache_enabled,
+        min_first_token_ms=_rounded_min(ttft),
         p50_first_token_ms=_percentile(ttft, 0.50),
         p95_first_token_ms=_percentile(ttft, 0.95),
+        max_first_token_ms=_rounded_max(ttft),
+        warm_min_first_token_ms=_rounded_min(warm_ttft),
         warm_p50_first_token_ms=_percentile(warm_ttft, 0.50),
         warm_p95_first_token_ms=_percentile(warm_ttft, 0.95),
+        warm_max_first_token_ms=_rounded_max(warm_ttft),
         operation_count=len(subset),
         ok=all(bool(record.get("ok")) for record in subset),
     )
@@ -451,8 +471,11 @@ def run_session_kv_cache_ttft(
 
     disabled_summary = _mode_summary(records, cache_enabled=False)
     enabled_summary = _mode_summary(records, cache_enabled=True)
+    improvement_formula = (
+        "disabled.warm_p50_first_token_ms / enabled.warm_p50_first_token_ms"
+    )
     improvement_ratio = _ratio(
-        disabled_summary.p50_first_token_ms,
+        disabled_summary.warm_p50_first_token_ms,
         enabled_summary.warm_p50_first_token_ms,
     )
     summary = {
@@ -467,6 +490,7 @@ def run_session_kv_cache_ttft(
         "session_id": session_id,
         "disabled": disabled_summary.to_dict(),
         "enabled": enabled_summary.to_dict(),
+        "warm_cache_p50_improvement_formula": improvement_formula,
         "warm_cache_p50_improvement_ratio": improvement_ratio,
         "meets_5x_ttft_gate": (
             improvement_ratio is not None and improvement_ratio >= 5.0

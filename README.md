@@ -71,6 +71,24 @@ won't.
 | Subprocess backend (`mlx_lm` in a separate process) | supported |
 | Continuous batching / paged KV cache / implicit prefix matching / multimodal / speculative | **not in scope** |
 
+### Session KV cache (experimental) prefill evidence
+
+`OWLMLX_SESSION_CACHE_ENABLED=1` plus `X-Owlmlx-Session-Id` lets the native
+backend reuse an explicit session prefix on stream requests. This is TTFT /
+prefill evidence, not a decode-TPS claim.
+
+| Model | Backend | Prompt shape | Warm TTFT off | Warm TTFT on | Improvement |
+|---|---|---|---:|---:|---:|
+| Qwen3.6-27B-4bit | native | ~4.2k chars, append-only, 4 rounds | 3397.977 / 4026.099 / 4419.626 ms | 536.325 / 543.389 / 652.471 ms | 7.409x |
+
+Warm TTFT columns are `min / p50 / max` across rounds 2-4. Improvement is
+`disabled.warm_p50_first_token_ms / enabled.warm_p50_first_token_ms`. Raw
+evidence:
+`files/evidence/owlmlx/bench/session-kv-cache/20260512T123316Z-owlmlx-native-session-kv-ttft-n4.jsonl`.
+
+This remains `experimental`: native backend only, default off, explicit
+session id, append-only reuse for non-trimmable upstream caches.
+
 Short-prompt TPS on `Mac17,6` (`max_tokens=64`, `temperature=0`):
 
 | Model | owlmlx | Reference | Reference runtime |
@@ -83,17 +101,6 @@ Short-prompt only. These measurements are runtime engineering evidence, not
 OwlCoda product-readiness proof. `owlmlx` owns a runtime engineering release
 channel; the OwlCoda npm local-learning loop remains the downstream consumer
 readiness gate. See `docs/source-of-truth/public-release-standard.md`.
-
-Experimental native session KV cache TTFT evidence (`Qwen3.6-27B-4bit`,
-4k system prompt, append-only multi-turn stream, `max_tokens=2`):
-
-| Mode | Warm p50 TTFT | Evidence |
-|---|---:|---|
-| cache disabled | 4026.099 ms | `files/evidence/owlmlx/bench/session-kv-cache/20260512T123316Z-owlmlx-native-session-kv-ttft-n4.jsonl` |
-| cache enabled | 543.389 ms | same run, 3 warm hits / 0 drops |
-
-This is still `experimental`: native backend only, default off, explicit
-`X-Owlmlx-Session-Id`, append-only reuse for non-trimmable upstream caches.
 
 ## Quick start
 

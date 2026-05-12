@@ -27,8 +27,15 @@ def test_fake_session_kv_cache_ttft_writes_jsonl_and_warm_improves(tmp_path):
     assert summary["ok"] is True
     assert summary["measurement_mode"] == "synthetic_native_prompt_cache_ttft_smoke"
     assert summary["evidence_strength"] == "smoke_only_no_real_model_or_allocator_claim"
+    assert summary["warm_cache_p50_improvement_formula"] == (
+        "disabled.warm_p50_first_token_ms / enabled.warm_p50_first_token_ms"
+    )
     assert summary["warm_cache_p50_improvement_ratio"] >= 5.0
     assert summary["meets_5x_ttft_gate"] is True
+    assert summary["disabled"]["warm_min_first_token_ms"] is not None
+    assert summary["disabled"]["warm_max_first_token_ms"] is not None
+    assert summary["enabled"]["warm_min_first_token_ms"] is not None
+    assert summary["enabled"]["warm_max_first_token_ms"] is not None
 
     output_path = tmp_path / f"{summary['run_id']}.jsonl"
     records = _records(output_path)
