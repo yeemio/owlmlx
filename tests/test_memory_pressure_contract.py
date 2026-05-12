@@ -200,6 +200,44 @@ def test_runtime_memory_pressure_contract_route_returns_surface() -> None:
     assert payload["contract"]["surface"] == "owlmlx.memory_pressure_contract"
     assert payload["summary"]["pressure_classification"] == "within_budget"
     assert payload["budget"]["serving_budget_gb"] == 6.0
+    # 2.1: PR #649 watermark fields land in the contract summary.
+    assert payload["summary"]["watermark"] == "green"
+    assert payload["summary"]["watermark_action"] == "proceed"
+
+
+def test_runtime_memory_watermark_route_returns_headline_payload() -> None:
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 2.0})
+
+    response = client.get("/v1/runtime/memory-watermark")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["contract"]["surface"] == "owlmlx.memory_watermark"
+    assert payload["watermark"] in {"green", "yellow", "red", "fatal", "unknown"}
+    assert payload["action"] in {
+        "proceed", "evict_lru", "aggressive_evict", "refuse_load", "defer"
+    }
+    assert payload["thresholds"]["green_ceiling"] == 0.65
+    assert payload["thresholds"]["yellow_ceiling"] == 0.80
+    assert payload["thresholds"]["red_ceiling"] == 0.90
+    assert payload["pressure_classification"] == "within_budget"
+
+
+def test_runtime_memory_watermark_route_under_pressure() -> None:
+    """When fake backend is loaded beyond the warning threshold, the watermark
+    must reflect the elevated pressure level — verifies that the route is
+    actually reading runtime state, not a static value."""
+    client = TestClient(create_app(RuntimeKernel(FakeBackend(), profile=_profile())))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 5.5})
+
+    response = client.get("/v1/runtime/memory-watermark")
+    payload = response.json()
+
+    # within_budget (warning_threshold_gb=5.0) → near_budget once loaded > 5GB
+    assert payload["pressure_classification"] in {"near_budget", "over_budget"}
+    assert payload["watermark"] in {"yellow", "red"}
+    assert payload["action"] in {"evict_lru", "aggressive_evict"}
 
 
 def test_memory_pressure_contract_module_has_no_platform_dependency() -> None:

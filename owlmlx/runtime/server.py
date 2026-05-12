@@ -46,6 +46,13 @@ from owlmlx.model_residency_policy import (
     build_model_residency_policy,
     model_residency_policy_to_dict,
 )
+from owlmlx.memory_watermark import (
+    GREEN_CEILING,
+    MemoryWatermark,
+    RED_CEILING,
+    WatermarkAction,
+    YELLOW_CEILING,
+)
 from owlmlx.memory_pressure_contract import (
     build_memory_pressure_contract,
     memory_pressure_contract_to_dict,
@@ -2370,6 +2377,38 @@ def create_app(
         return memory_pressure_contract_to_dict(
             build_memory_pressure_contract(runtime_status=runtime.status_dict())
         )
+
+    @app.get("/v1/runtime/memory-watermark")
+    def runtime_memory_watermark() -> dict[str, Any]:
+        """PR #649 watermark + action, derived from current pressure contract.
+
+        Headline single-shot endpoint for the four-level watermark
+        (GREEN/YELLOW/RED/FATAL/UNKNOWN) + recommended action. Surfaces
+        the PR #649 vocabulary at a stable URL distinct from the deeper
+        memory_pressure_contract surface.
+        """
+        contract = build_memory_pressure_contract(runtime_status=runtime.status_dict())
+        watermark = MemoryWatermark.from_classification(contract.pressure_classification)
+        action = WatermarkAction.for_watermark(watermark)
+        return {
+            "contract": {
+                "surface": "owlmlx.memory_watermark",
+                "version": "v1",
+            },
+            "watermark": watermark.value,
+            "action": action.value,
+            "thresholds": {
+                "green_ceiling": GREEN_CEILING,
+                "yellow_ceiling": YELLOW_CEILING,
+                "red_ceiling": RED_CEILING,
+            },
+            "pressure_classification": contract.pressure_classification,
+            "confidence": contract.confidence,
+            "reason": {
+                "code": contract.reason_code,
+                "message": contract.reason_message,
+            },
+        }
 
     @app.get("/v1/runtime/recovery-supervisor-contract")
     def runtime_recovery_supervisor_contract() -> dict[str, Any]:

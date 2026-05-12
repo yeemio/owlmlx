@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from .memory_watermark import MemoryWatermark, WatermarkAction
+
 
 MEMORY_PRESSURE_CONTRACT_SURFACE = "owlmlx.memory_pressure_contract"
 MEMORY_PRESSURE_CONTRACT_VERSION = "v1"
@@ -318,6 +320,15 @@ def memory_pressure_contract_to_dict(contract: MemoryPressureContract) -> dict[s
             "confidence": contract.confidence,
             "supported_classifications": list(PRESSURE_CLASSIFICATIONS),
             "policy_depth": "budget_pressure_classification",
+            # PR #649 watermark + recommended action. Derived from
+            # pressure_classification; serialized as `.value` strings so
+            # HTTP consumers don't have to import the enum.
+            "watermark": MemoryWatermark.from_classification(
+                contract.pressure_classification
+            ).value,
+            "watermark_action": WatermarkAction.for_watermark(
+                MemoryWatermark.from_classification(contract.pressure_classification)
+            ).value,
         },
         "reason": {
             "code": contract.reason_code,
