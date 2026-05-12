@@ -61,6 +61,7 @@ class _SessionKVCacheEntry:
     cache_object_id: int
     created_at_s: float
     last_used_at_s: float
+    prompt_tokens: tuple[int, ...] = ()
     token_count: int = 0
     byte_estimate: int = 0
     hit_count: int = 0
@@ -110,6 +111,9 @@ class SessionKVCacheDecision:
     reason_code: str
     cache_object: Any | None = None
     cache_object_id: int | None = None
+    suffix_tokens: tuple[int, ...] | None = None
+    common_prefix_token_count: int = 0
+    previous_prompt_token_count: int = 0
     created: bool = False
     reused: bool = False
     evicted_count: int = 0
@@ -149,6 +153,7 @@ class SessionKVCacheStore:
         make_cache: Callable[[], Any],
         now_s: float | None = None,
         watermark: str | None = None,
+        prompt_tokens: tuple[int, ...] | None = None,
         token_count: int = 0,
         byte_estimate: int = 0,
     ) -> SessionKVCacheDecision:
@@ -174,6 +179,7 @@ class SessionKVCacheStore:
             raise ValueError("model_id must be non-empty")
 
         now = time.time() if now_s is None else float(now_s)
+        requested_prompt_tokens = prompt_tokens or ()
         pressure = _normalize_watermark(watermark)
         if pressure in _PRESSURE_WATERMARKS:
             evicted = self.evict_lru_until(
@@ -197,6 +203,10 @@ class SessionKVCacheStore:
             expired = self._expire_locked(now)
             entry = self._entries.get(key)
             if entry is not None:
+                common_prefix_count = _common_prefix_len(
+                    entry.prompt_tokens,
+                    requested_prompt_tokens,
+                )
                 entry.last_used_at_s = now
                 entry.hit_count += 1
                 self._counters = _replace_counter(
@@ -209,6 +219,13 @@ class SessionKVCacheStore:
                     reason_code="session_cache_hit",
                     cache_object=entry.cache_object,
                     cache_object_id=entry.cache_object_id,
+                    suffix_tokens=(
+                        requested_prompt_tokens[common_prefix_count:]
+                        if requested_prompt_tokens
+                        else None
+                    ),
+                    common_prefix_token_count=common_prefix_count,
+                    previous_prompt_token_count=len(entry.prompt_tokens),
                     reused=True,
                 )
             counters_after_expiry = _replace_counter(
@@ -243,9 +260,51 @@ class SessionKVCacheStore:
             reason_code="session_cache_miss",
             cache_object=cache_object,
             cache_object_id=cache_object_id,
+            suffix_tokens=requested_prompt_tokens if requested_prompt_tokens else None,
             created=True,
             evicted_count=evicted_for_count,
         )
+
+    def remember_prompt(
+        self,
+        *,
+        session_id: str | None,
+        model_id: str,
+        prompt_tokens: tuple[int, ...],
+        token_count: int | None = None,
+        byte_estimate: int | None = None,
+    ) -> bool:
+        """Persist the prompt-token prefix represented by a session entry."""
+
+        normalized_session_id = (session_id or "").strip()
+        if not normalized_session_id or not model_id:
+            return False
+        with self._lock:
+            entry = self._entries.get((normalized_session_id, model_id))
+            if entry is None:
+                return False
+            entry.prompt_tokens = tuple(prompt_tokens)
+            if token_count is not None:
+                entry.token_count = max(int(token_count), 0)
+            if byte_estimate is not None:
+                entry.byte_estimate = max(int(byte_estimate), 0)
+            return True
+
+    def drop_for_session_model(self, *, session_id: str | None, model_id: str) -> bool:
+        """Drop one session/model cache entry after an aborted or unsafe reuse."""
+
+        normalized_session_id = (session_id or "").strip()
+        if not normalized_session_id or not model_id:
+            return False
+        with self._lock:
+            removed = self._entries.pop((normalized_session_id, model_id), None)
+            if removed is None:
+                return False
+            self._counters = _replace_counter(
+                self._counters,
+                drops=self._counters.drops + 1,
+            )
+            return True
 
     def drop_for_model(self, model_id: str) -> int:
         """Drop all session cache entries for a model before unload."""
@@ -361,6 +420,15 @@ def _normalize_watermark(watermark: str | None) -> str | None:
         return None
     normalized = str(watermark).strip().lower()
     return normalized or None
+
+
+def _common_prefix_len(left: tuple[int, ...], right: tuple[int, ...]) -> int:
+    count = 0
+    for a, b in zip(left, right):
+        if a != b:
+            break
+        count += 1
+    return count
 
 
 def _env_bool(name: str, *, default: bool) -> bool:

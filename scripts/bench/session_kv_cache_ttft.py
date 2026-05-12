@@ -61,21 +61,34 @@ class BenchModeSummary:
 
 
 class _FakeToken:
-    def __init__(self, text: str, finish_reason: str | None = None) -> None:
+    def __init__(
+        self,
+        text: str,
+        finish_reason: str | None = None,
+        token: int = 999,
+    ) -> None:
         self.text = text
         self.finish_reason = finish_reason
+        self.token = token
 
 
 def _now_compact_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
-def _build_prompt(*, prompt_chars: int, round_idx: int) -> str:
+def _build_prompt(
+    *,
+    prompt_chars: int,
+    round_idx: int,
+    transcript: str,
+) -> str:
     system = "owlmlx session kv cache TTFT synthetic system prompt. "
     repeated = (system * ((prompt_chars // len(system)) + 1))[:prompt_chars]
+    prefix = transcript or f"system: {repeated}\n"
     return (
-        f"system: {repeated}\n"
-        f"user: turn {round_idx}; reply with exactly two short words."
+        f"{prefix}"
+        f"user: turn {round_idx}; reply with exactly two short words.\n"
+        f"assistant:"
     )
 
 
@@ -151,14 +164,35 @@ def _fake_mlx_lm(
     seen_prompt_cache_ids: set[int] = set()
     created_cache_count = 0
 
+    class FakeTokenizer:
+        bos_token = None
+
+        def encode(self, prompt: str, add_special_tokens: bool = True) -> list[int]:
+            _ = add_special_tokens
+            return [ord(ch) for ch in prompt]
+
     def make_prompt_cache(model: object) -> list[object]:
         nonlocal created_cache_count
         _ = model
         created_cache_count += 1
-        return [object()]
+        return [{"tokens": []}]
+
+    def trim_prompt_cache(cache: list[object], token_count: int) -> int:
+        if not cache:
+            return 0
+        state = cache[0]
+        if not isinstance(state, dict):
+            return 0
+        tokens = state.get("tokens")
+        if not isinstance(tokens, list):
+            return 0
+        trimmed = min(int(token_count), len(tokens))
+        if trimmed:
+            del tokens[-trimmed:]
+        return trimmed
 
     def fake_load(model_id: str) -> tuple[object, object]:
-        return ({"model_id": model_id}, {"tokenizer": "fake"})
+        return ({"model_id": model_id}, FakeTokenizer())
 
     def fake_stream_generate(
         model,
@@ -177,12 +211,28 @@ def _fake_mlx_lm(
             delay_ms = cold_prefill_ms
             if cache_id is not None:
                 seen_prompt_cache_ids.add(cache_id)
+        generated_count = max(int(max_tokens), 1)
+        if prompt_cache is not None and prompt_cache:
+            state = prompt_cache[0]
+            if isinstance(state, dict):
+                tokens = state.get("tokens")
+                if isinstance(tokens, list):
+                    if isinstance(prompt, list):
+                        tokens.extend(prompt)
+                    else:
+                        tokens.extend(tokenizer.encode(prompt))
+                    tokens.extend(999 + idx for idx in range(generated_count))
         if delay_ms > 0:
             time.sleep(delay_ms / 1000.0)
-        yield _FakeToken("hello")
-        yield _FakeToken(" world", finish_reason="stop")
+        for idx in range(generated_count):
+            yield _FakeToken(
+                "hello" if idx == 0 else " world",
+                finish_reason="stop" if idx == generated_count - 1 else None,
+                token=999 + idx,
+            )
 
     cache_mod.make_prompt_cache = make_prompt_cache  # type: ignore[attr-defined]
+    cache_mod.trim_prompt_cache = trim_prompt_cache  # type: ignore[attr-defined]
     models.cache = cache_mod  # type: ignore[attr-defined]
     fake.models = models  # type: ignore[attr-defined]
     fake.load = fake_load  # type: ignore[attr-defined]
@@ -214,6 +264,7 @@ async def _measure_stream_ttft(
     started = time.monotonic()
     first_token_ms: float | None = None
     completion_tokens = 0
+    generated_text: list[str] = []
     error: dict[str, Any] | None = None
     async for event in kernel.generate_stream(
         prompt,
@@ -223,6 +274,8 @@ async def _measure_stream_ttft(
     ):
         if event.event == "token" and first_token_ms is None:
             first_token_ms = round((time.monotonic() - started) * 1000.0, 3)
+        if event.event == "token":
+            generated_text.append(event.text)
         if event.completion_tokens is not None:
             completion_tokens = int(event.completion_tokens)
         if event.event == "error":
@@ -236,6 +289,7 @@ async def _measure_stream_ttft(
         "first_token_ms": first_token_ms,
         "total_stream_ms": total_ms,
         "completion_tokens": completion_tokens,
+        "generated_text": "".join(generated_text),
         "error": error,
     }
 
@@ -265,9 +319,14 @@ async def _run_mode(
         if not load.ok:
             raise RuntimeError(f"load failed for {model_id}: {load.message}")
         records: list[dict[str, Any]] = []
+        transcript = ""
         try:
             for round_idx in range(1, rounds + 1):
-                prompt = _build_prompt(prompt_chars=prompt_chars, round_idx=round_idx)
+                prompt = _build_prompt(
+                    prompt_chars=prompt_chars,
+                    round_idx=round_idx,
+                    transcript=transcript,
+                )
                 measurement = await _measure_stream_ttft(
                     kernel,
                     model_id=model_id,
@@ -302,6 +361,8 @@ async def _run_mode(
                         },
                     }
                 )
+                if measurement["ok"]:
+                    transcript = f"{prompt}{measurement['generated_text']}\n"
         finally:
             kernel.unload_model(model_id)
         return records

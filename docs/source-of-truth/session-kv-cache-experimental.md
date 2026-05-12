@@ -8,7 +8,7 @@
 ## 1. Scope
 
 Session KV cache is an experimental native-backend capability for explicit
-single-session prompt-cache reuse.
+single-session prompt-prefix reuse.
 
 It is intentionally narrow:
 
@@ -16,6 +16,9 @@ It is intentionally narrow:
 - only when `OWLMLX_SESSION_CACHE_ENABLED=1`
 - only when the caller sends `X-Owlmlx-Session-Id`
 - only within the same `session_id` and `model_id`
+- append-only reuse is supported when the upstream cache cannot be trimmed
+- tail-edit reuse is attempted only when `mlx_lm.models.cache.trim_prompt_cache`
+  can trim the concrete cache object
 - no implicit prefix matching
 - no paged KV
 - no continuous batching
@@ -27,8 +30,23 @@ The supported subprocess backend remains unchanged.
 
 When enabled, the native backend stores the cache object returned by
 `mlx_lm.models.cache.make_prompt_cache(model)` for the explicit
-`(session_id, model_id)` pair. A later request with the same pair reuses that
-object through the existing `prompt_cache=` argument.
+`(session_id, model_id)` pair. A later stream request with the same pair reuses
+that object through the existing `prompt_cache=` argument and sends only the
+token suffix after the remembered prompt prefix.
+
+The concrete reuse mode depends on the upstream cache type:
+
+- if the cache can be trimmed, the backend trims generated tokens after a
+  stream completes and can also trim an old prompt tail before sending the new
+  suffix
+- if the cache cannot be trimmed, the backend remembers the prompt plus
+  generated token ids and only reuses the cache when the next prompt extends
+  that exact prefix; edited or repeated prompts fall back to a fresh
+  single-request cache
+
+Non-stream `generate` remains on the fresh single-request cache path in this
+experimental slice because it does not expose generated token ids needed to
+keep a persistent cache prefix honest.
 
 When disabled or when no session id is present, the native backend keeps its
 prior single-request behavior through `CacheManager.acquire_for_request(...)`.
@@ -91,3 +109,12 @@ The capability remains `experimental` until all of the following are true:
 - abort and unload paths leave no retained session cache entries
 
 Until then, the default remains off.
+
+Current real-model evidence:
+
+- `files/evidence/owlmlx/bench/session-kv-cache/20260512T123316Z-owlmlx-native-session-kv-ttft-n4.jsonl`
+- Backend/model: native `MlxNativeBackend`, `Qwen3.6-27B-4bit`
+- Shape: 4k system prompt, append-only multi-turn stream, `max_tokens=2`
+- Result: disabled warm p50 TTFT `4026.099 ms`; enabled warm p50 TTFT
+  `543.389 ms`; improvement ratio `6.831x`; session cache counters end at
+  `entries_created=1`, `hits=3`, `drops=0`

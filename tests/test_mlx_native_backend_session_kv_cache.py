@@ -9,20 +9,55 @@ import types
 import pytest
 
 
-def _build_fake_mlx_lm_with_observable_cache() -> types.ModuleType:
+def _build_fake_mlx_lm_with_observable_cache(
+    *,
+    trim_supported: bool = True,
+) -> types.ModuleType:
     fake = types.ModuleType("mlx_lm")
     models = types.ModuleType("mlx_lm.models")
     cache_mod = types.ModuleType("mlx_lm.models.cache")
-    created_caches: list[list[object]] = []
+    created_caches: list[dict[str, object]] = []
     seen_prompt_caches: list[object | None] = []
+    seen_stream_prompts: list[object] = []
+    trim_calls: list[int] = []
 
-    def make_prompt_cache(model: object) -> list[object]:
-        cache = [object()]
+    class FakeTokenizer:
+        bos_token = None
+
+        def encode(self, prompt: str, add_special_tokens: bool = True) -> list[int]:
+            _ = add_special_tokens
+            return [ord(ch) for ch in prompt]
+
+    class FakeToken:
+        def __init__(
+            self,
+            text: str,
+            finish_reason: str | None = None,
+            token: int = 999,
+        ) -> None:
+            self.text = text
+            self.finish_reason = finish_reason
+            self.token = token
+
+    def make_prompt_cache(model: object) -> dict[str, object]:
+        cache = {"model": model, "tokens": []}
         created_caches.append(cache)
         return cache
 
+    def trim_prompt_cache(cache: dict[str, object], token_count: int) -> int:
+        if not trim_supported:
+            trim_calls.append(0)
+            return 0
+        tokens = cache["tokens"]
+        assert isinstance(tokens, list)
+        trimmed = min(int(token_count), len(tokens))
+        if trimmed:
+            del tokens[-trimmed:]
+        trim_calls.append(trimmed)
+        return trimmed
+
     def fake_load(model_id: str) -> tuple[object, object]:
-        return (object(), object())
+        return (object(), FakeTokenizer())
 
     def fake_generate(
         model,
@@ -35,20 +70,44 @@ def _build_fake_mlx_lm_with_observable_cache() -> types.ModuleType:
         seen_prompt_caches.append(prompt_cache)
         return f"generated:{prompt}:{max_tokens}"
 
+    def fake_stream_generate(
+        model,
+        tokenizer,
+        *,
+        prompt,
+        max_tokens,
+        prompt_cache=None,
+    ):
+        _ = (model, tokenizer, max_tokens)
+        seen_prompt_caches.append(prompt_cache)
+        seen_stream_prompts.append(prompt)
+        if prompt_cache is not None:
+            tokens = prompt_cache["tokens"]
+            assert isinstance(tokens, list)
+            tokens.extend(prompt if isinstance(prompt, list) else tokenizer.encode(prompt))
+            tokens.append(999)
+        yield FakeToken(chr(999), finish_reason="stop", token=999)
+
     cache_mod.make_prompt_cache = make_prompt_cache  # type: ignore[attr-defined]
+    cache_mod.trim_prompt_cache = trim_prompt_cache  # type: ignore[attr-defined]
     models.cache = cache_mod  # type: ignore[attr-defined]
     fake.models = models  # type: ignore[attr-defined]
     fake.load = fake_load  # type: ignore[attr-defined]
     fake.generate = fake_generate  # type: ignore[attr-defined]
+    fake.stream_generate = fake_stream_generate  # type: ignore[attr-defined]
     fake._created_caches = created_caches  # type: ignore[attr-defined]
     fake._seen_prompt_caches = seen_prompt_caches  # type: ignore[attr-defined]
+    fake._seen_stream_prompts = seen_stream_prompts  # type: ignore[attr-defined]
+    fake._trim_calls = trim_calls  # type: ignore[attr-defined]
     return fake
 
 
 def _reload_native_backend_with_fake_mlx_lm(
     monkeypatch: pytest.MonkeyPatch,
+    *,
+    trim_supported: bool = True,
 ):
-    fake = _build_fake_mlx_lm_with_observable_cache()
+    fake = _build_fake_mlx_lm_with_observable_cache(trim_supported=trim_supported)
     monkeypatch.setitem(sys.modules, "mlx_lm", fake)
     monkeypatch.setitem(sys.modules, "mlx_lm.models", fake.models)
     monkeypatch.setitem(sys.modules, "mlx_lm.models.cache", fake.models.cache)
@@ -57,7 +116,7 @@ def _reload_native_backend_with_fake_mlx_lm(
     return mod, fake
 
 
-def test_native_session_kv_cache_reuses_prompt_cache_for_same_session(
+def test_native_session_kv_cache_stream_reuses_prompt_cache_with_suffix_tokens(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
@@ -66,19 +125,51 @@ def test_native_session_kv_cache_reuses_prompt_cache_for_same_session(
         backend = mod.MlxNativeBackend()
         assert backend.load("fake-model").ok is True
 
-        first = backend.generate("fake-model", "hello", session_id="s1")
-        second = backend.generate("fake-model", "hello again", session_id="s1")
+        first = list(backend.stream_generate("fake-model", "prefix A", session_id="s1"))
+        second = list(backend.stream_generate("fake-model", "prefix B", session_id="s1"))
 
-        assert first.ok is True
-        assert second.ok is True
+        assert first[-1].event == "done"
+        assert second[-1].event == "done"
         assert len(fake._created_caches) == 1
         assert fake._seen_prompt_caches[0] is fake._seen_prompt_caches[1]
+        assert fake._seen_stream_prompts[0] == [ord(ch) for ch in "prefix A"]
+        assert fake._seen_stream_prompts[1] == [ord("B")]
+        assert fake._trim_calls == [1, 1, 1]
         assert backend._cache_manager.counters().entries == 0
         status = backend.status().detail["session_kv_cache"]
         assert status["enabled"] is True
         assert status["active_entries"] == 1
         assert status["counters"]["entries_created"] == 1
         assert status["counters"]["hits"] == 1
+    finally:
+        importlib.reload(mod)
+
+
+def test_native_session_kv_cache_non_trimmable_cache_reuses_append_only_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
+    mod, fake = _reload_native_backend_with_fake_mlx_lm(
+        monkeypatch,
+        trim_supported=False,
+    )
+    try:
+        backend = mod.MlxNativeBackend()
+        assert backend.load("fake-model").ok is True
+
+        first = list(backend.stream_generate("fake-model", "prefix A", session_id="s1"))
+        second_prompt = "prefix A" + chr(999) + " suffix"
+        second = list(backend.stream_generate("fake-model", second_prompt, session_id="s1"))
+
+        assert first[-1].event == "done"
+        assert second[-1].event == "done"
+        assert len(fake._created_caches) == 1
+        assert fake._seen_prompt_caches[0] is fake._seen_prompt_caches[1]
+        assert fake._seen_stream_prompts[1] == [ord(ch) for ch in " suffix"]
+        status = backend.status().detail["session_kv_cache"]
+        assert status["active_entries"] == 1
+        assert status["counters"]["hits"] == 1
+        assert status["counters"]["drops"] == 0
     finally:
         importlib.reload(mod)
 
@@ -91,7 +182,7 @@ def test_native_session_kv_cache_drops_model_entries_before_unload(
     try:
         backend = mod.MlxNativeBackend()
         backend.load("fake-model")
-        backend.generate("fake-model", "hello", session_id="s1")
+        list(backend.stream_generate("fake-model", "hello", session_id="s1"))
         assert backend.status().detail["session_kv_cache"]["active_entries"] == 1
 
         unload = backend.unload("fake-model")
@@ -112,16 +203,18 @@ def test_native_session_kv_cache_pressure_falls_back_to_single_request_cache(
     try:
         backend = mod.MlxNativeBackend()
         backend.load("fake-model")
-        backend.generate("fake-model", "hello", session_id="s1")
+        list(backend.stream_generate("fake-model", "hello", session_id="s1"))
 
-        pressured = backend.generate(
-            "fake-model",
-            "hello under pressure",
-            session_id="s1",
-            session_kv_cache_watermark="yellow",
+        pressured = list(
+            backend.stream_generate(
+                "fake-model",
+                "hello under pressure",
+                session_id="s1",
+                session_kv_cache_watermark="yellow",
+            )
         )
 
-        assert pressured.ok is True
+        assert pressured[-1].event == "done"
         assert len(fake._created_caches) == 2
         assert fake._seen_prompt_caches[0] is not fake._seen_prompt_caches[1]
         assert backend._cache_manager.counters().entries == 1
