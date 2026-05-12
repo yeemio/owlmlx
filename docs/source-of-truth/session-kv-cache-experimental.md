@@ -68,6 +68,11 @@ No body schema changes are required. HTTP compatibility routes use the
 For non-native backends, the route returns an experimental disabled fallback
 instead of fabricating capability support.
 
+Because this surface is still experimental, the `contract.surface` /
+`surface` string is allowed to change before promotion to `supported`.
+Clients that need a stable compatibility contract must wait for the promotion
+gate rather than keying release logic on the experimental string.
+
 The same payload is also visible at:
 
 ```text
@@ -81,7 +86,8 @@ The capability remains `experimental` until all of the following are true:
 - 24h soak with `OWLMLX_SESSION_CACHE_ENABLED=1` and mixed 1-10 sessions
 - settle-barrier failed reclaim count is zero
 - active-memory drift is bounded against the cache-disabled baseline
-- 4k+ multi-turn prompt TTFT p50 improves by at least 5x
+- 4k+ multi-turn prompt TTFT p50 improves by at least 5x, measured by
+  `scripts/bench/session_kv_cache_ttft.py` in native mode
 - abort and unload paths leave no retained session cache entries
 
 Until then, the default remains off.
