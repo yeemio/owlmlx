@@ -66,6 +66,32 @@ class _FailingUnloadFakeBackend(FakeBackend):
         return super().unload(model_id)
 
 
+class _MeasuredUnloadFakeBackend(FakeBackend):
+    def __init__(
+        self,
+        *,
+        active_memory_freed_bytes: int,
+        cache_memory_freed_bytes: int,
+        **kwargs: object,
+    ) -> None:
+        super().__init__(**kwargs)
+        self._active_memory_freed_bytes = active_memory_freed_bytes
+        self._cache_memory_freed_bytes = cache_memory_freed_bytes
+
+    def unload(self, model_id: str) -> UnloadResult:
+        result = super().unload(model_id)
+        if not result.ok:
+            return result
+        return UnloadResult(
+            ok=True,
+            message=result.message,
+            model_id=result.model_id,
+            freed_gb=result.freed_gb,
+            active_memory_freed_bytes=self._active_memory_freed_bytes,
+            cache_memory_freed_bytes=self._cache_memory_freed_bytes,
+        )
+
+
 def test_clean_runtime_reports_no_failed_unload_or_settle_barrier_event() -> None:
     kernel = RuntimeKernel(FakeBackend(), profile=_profile())
     payload = settle_barrier_event_to_dict(
@@ -303,6 +329,59 @@ def test_settle_barrier_event_route_returns_payload() -> None:
     assert payload["summary"]["barrier_state"] == "clean"
     assert payload["summary"]["supported_barrier_states"] == list(BARRIER_STATE_VOCABULARY)
     assert payload["summary"]["supported_operations"] == list(OPERATION_VOCABULARY)
+
+
+def test_reclaim_barrier_event_stats_route_reports_measured_unload_distribution() -> None:
+    kernel = RuntimeKernel(
+        _MeasuredUnloadFakeBackend(
+            active_memory_freed_bytes=900_000_000,
+            cache_memory_freed_bytes=12_000_000,
+        ),
+        profile=_profile(),
+    )
+    client = TestClient(create_app(kernel))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 1.0})
+
+    unload_response = client.post("/v1/unload", json={"model_id": "fake-a"})
+    assert unload_response.status_code == 200
+
+    response = client.get("/v1/runtime/reclaim-barrier-event/stats")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["contract"] == {
+        "surface": "owlmlx.reclaim_barrier_event.stats",
+        "version": "v1",
+    }
+    assert payload["summary"]["measurement_count"] == 1
+    assert payload["summary"]["event_count"] == 0
+    assert payload["operation_counts"] == {"explicit_unload": 1}
+    assert payload["observed_active_memory_freed_bytes"]["p50"] == 900_000_000
+    assert payload["observed_cache_memory_freed_bytes"]["p50"] == 12_000_000
+    assert payload["expected_minus_observed_active_bytes"]["p50"] == 100_000_000
+    assert payload["measurements"][0]["expected_reclaim_bytes"] == 1_000_000_000
+    assert payload["policy_boundaries"]["read_only"] is True
+
+
+def test_reclaim_barrier_event_stats_route_reports_failures_without_resolving() -> None:
+    kernel = RuntimeKernel(
+        _FailingUnloadFakeBackend(fail_unload_for={"fake-a"}),
+        profile=_profile(),
+    )
+    client = TestClient(create_app(kernel))
+    client.post("/v1/load", json={"model_id": "fake-a", "memory_gb": 1.0})
+
+    unload_response = client.post("/v1/unload", json={"model_id": "fake-a"})
+    assert unload_response.status_code == 500
+
+    response = client.get("/v1/runtime/reclaim-barrier-event/stats")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["measurement_count"] == 1
+    assert payload["summary"]["event_count"] == 1
+    assert payload["summary"]["unresolved_event_count"] == 1
+    assert payload["failure_counts"]["by_operation"] == {"explicit_unload": 1}
+    assert payload["failure_counts"]["by_error_code"] == {"backend_error": 1}
+    assert payload["events"][0]["resolved"] is False
 
 
 def test_settle_barrier_event_route_after_failed_unload_reports_hard_barrier() -> None:

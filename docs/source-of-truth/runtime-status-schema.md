@@ -583,6 +583,13 @@ payload.
     serialization
   - the route must not clear events, retry operations, or perform
     recovery
+- `GET /v1/runtime/reclaim-barrier-event/stats`
+  - 200: read-only `owlmlx.reclaim_barrier_event.stats` v1 aggregate
+    measurement surface
+  - the route reports unload-boundary duration and backend-reported
+    reclaim distributions when those signals exist
+  - the route must not resolve events, retry operations, or perform
+    eviction/recovery
 
 `/v1/runtime/status` exposes a diagnostic section `reclaim_barrier`
 with:
@@ -590,6 +597,11 @@ with:
 - `events` — most recent up to 32 events (read-only snapshot)
 - `total_event_count`
 - `unresolved_event_count`
+
+The stats route is intentionally separate from `/v1/runtime/status`.
+It aggregates the kernel's unload/reclaim boundary measurements while
+leaving the failure-event stream reserved for unresolved cleanup
+barriers.
 
 This surface does not advance release floor `3.4` to `closed`. It is the
 cleanup-boundary event-recording sub-round (`3.4A0`) that the future

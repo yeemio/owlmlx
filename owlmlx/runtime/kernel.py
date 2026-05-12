@@ -53,6 +53,51 @@ from .types import (
 
 
 _METAL_OOM_COOLDOWN_S = 120.0
+_BYTES_PER_GB = 1_000_000_000
+
+
+def _percentile(values: list[float], percentile: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return round(ordered[0], 6)
+    rank = (len(ordered) - 1) * percentile
+    lower = int(rank)
+    upper = min(lower + 1, len(ordered) - 1)
+    weight = rank - lower
+    value = ordered[lower] * (1.0 - weight) + ordered[upper] * weight
+    return round(value, 6)
+
+
+def _distribution(values: Iterable[int | float]) -> dict[str, Any]:
+    sample = [float(value) for value in values]
+    return {
+        "count": len(sample),
+        "min": round(min(sample), 6) if sample else None,
+        "p50": _percentile(sample, 0.50),
+        "p95": _percentile(sample, 0.95),
+        "p99": _percentile(sample, 0.99),
+        "max": round(max(sample), 6) if sample else None,
+    }
+
+
+def _count_by(items: Iterable[Mapping[str, Any]], field: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in items:
+        value = item.get(field)
+        key = str(value) if value is not None else "none"
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _declared_gb_to_bytes(value: float | int | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(round(max(float(value), 0.0) * _BYTES_PER_GB))
+    except (TypeError, ValueError):
+        return None
 
 
 class RuntimeKernel:
@@ -101,6 +146,8 @@ class RuntimeKernel:
         self._governance_eviction_history_visible = False
         self._reclaim_barrier_events: list[dict[str, Any]] = []
         self._reclaim_barrier_event_seq: int = 0
+        self._reclaim_measurements: list[dict[str, Any]] = []
+        self._reclaim_measurement_seq: int = 0
         self._load_failure_events: list[dict[str, Any]] = []
         self._load_failure_event_seq: int = 0
         self._memory_pressure_cooldown_until_s: float | None = None
@@ -498,6 +545,149 @@ class RuntimeKernel:
         }
         self._reclaim_barrier_events.append(event)
         return event
+
+    def _record_reclaim_measurement(
+        self,
+        *,
+        model_id: str,
+        operation: str,
+        stage: str,
+        result: UnloadResult,
+        started_at_s: float,
+        finished_at_s: float,
+        source: str = "runtime_kernel",
+    ) -> dict[str, Any] | None:
+        if (
+            not result.ok
+            and result.error_code is RuntimeErrorCode.model_not_loaded
+        ):
+            return None
+        self._reclaim_measurement_seq += 1
+        expected_reclaim_bytes = _declared_gb_to_bytes(result.freed_gb)
+        observed_active = result.active_memory_freed_bytes
+        observed_cache = result.cache_memory_freed_bytes
+        expected_minus_observed_active = (
+            expected_reclaim_bytes - int(observed_active)
+            if expected_reclaim_bytes is not None and observed_active is not None
+            else None
+        )
+        measurement = {
+            "measurement_id": self._reclaim_measurement_seq,
+            "model_id": model_id,
+            "operation": operation,
+            "source": source,
+            "stage": stage,
+            "ok": bool(result.ok),
+            "error_code": (
+                result.error_code.value
+                if result.error_code is not None
+                else None
+            ),
+            "message": result.message,
+            "started_at_s": round(float(started_at_s), 6),
+            "finished_at_s": round(float(finished_at_s), 6),
+            "duration_ms": round(
+                max(float(finished_at_s) - float(started_at_s), 0.0) * 1000.0,
+                6,
+            ),
+            "declared_freed_gb": float(result.freed_gb or 0.0),
+            "expected_reclaim_bytes": expected_reclaim_bytes,
+            "observed_active_memory_freed_bytes": observed_active,
+            "observed_cache_memory_freed_bytes": observed_cache,
+            "expected_minus_observed_active_bytes": expected_minus_observed_active,
+        }
+        self._reclaim_measurements.append(measurement)
+        return measurement
+
+    def reclaim_barrier_stats(self) -> dict[str, Any]:
+        """Aggregate unload/reclaim boundary measurements without mutating state."""
+
+        measurements = [dict(item) for item in self._reclaim_measurements[-128:]]
+        events = [dict(event) for event in self._reclaim_barrier_events[-32:]]
+        unresolved_event_count = sum(
+            1
+            for event in self._reclaim_barrier_events
+            if not event.get("resolved", False)
+        )
+        failed_measurements = [
+            measurement for measurement in measurements if not measurement.get("ok")
+        ]
+        active_observed = [
+            int(value)
+            for measurement in measurements
+            for value in [measurement.get("observed_active_memory_freed_bytes")]
+            if value is not None
+        ]
+        cache_observed = [
+            int(value)
+            for measurement in measurements
+            for value in [measurement.get("observed_cache_memory_freed_bytes")]
+            if value is not None
+        ]
+        reclaim_delta = [
+            int(value)
+            for measurement in measurements
+            for value in [measurement.get("expected_minus_observed_active_bytes")]
+            if value is not None
+        ]
+        missing_signals: list[dict[str, str]] = []
+        if measurements and not active_observed:
+            missing_signals.append(
+                {
+                    "signal": "observed_active_memory_freed_bytes",
+                    "reason_code": "backend_did_not_report_measured_active_reclaim",
+                }
+            )
+        if measurements and not cache_observed:
+            missing_signals.append(
+                {
+                    "signal": "observed_cache_memory_freed_bytes",
+                    "reason_code": "backend_did_not_report_measured_cache_reclaim",
+                }
+            )
+        return {
+            "contract": {
+                "surface": "owlmlx.reclaim_barrier_event.stats",
+                "version": "v1",
+            },
+            "summary": {
+                "classification_status": "supported",
+                "measurement_count": len(self._reclaim_measurements),
+                "event_count": len(self._reclaim_barrier_events),
+                "unresolved_event_count": unresolved_event_count,
+                "failure_measurement_count": len(
+                    [
+                        item
+                        for item in self._reclaim_measurements
+                        if not item.get("ok")
+                    ]
+                ),
+                "retained_measurement_count": len(measurements),
+                "retained_event_count": len(events),
+            },
+            "operation_counts": _count_by(measurements, "operation"),
+            "failure_counts": {
+                "by_operation": _count_by(failed_measurements, "operation"),
+                "by_error_code": _count_by(failed_measurements, "error_code"),
+            },
+            "duration_ms": _distribution(
+                measurement["duration_ms"] for measurement in measurements
+            ),
+            "observed_active_memory_freed_bytes": _distribution(active_observed),
+            "observed_cache_memory_freed_bytes": _distribution(cache_observed),
+            "expected_minus_observed_active_bytes": _distribution(reclaim_delta),
+            "measurements": measurements,
+            "events": events,
+            "missing_signals": missing_signals,
+            "policy_boundaries": {
+                "read_only": True,
+                "does_not_resolve_events": True,
+                "does_not_retry_unload": True,
+                "does_not_run_eviction": True,
+                "duration_scope": "backend_unload_boundary_duration",
+                "observed_reclaim_scope": "backend_reported_unload_result_fields",
+            },
+        }
 
     def _record_eviction_history(
         self,
@@ -910,7 +1100,17 @@ class RuntimeKernel:
             )
 
         previous_active = self._active_model_id
+        unload_started_at_s = self._now_s()
         result = self.backend.unload(model_id)
+        unload_finished_at_s = self._now_s()
+        self._record_reclaim_measurement(
+            model_id=model_id,
+            operation=_operation,
+            stage="backend_unload",
+            result=result,
+            started_at_s=unload_started_at_s,
+            finished_at_s=unload_finished_at_s,
+        )
         if (
             not result.ok
             and result.error_code is not RuntimeErrorCode.model_not_loaded
@@ -1149,7 +1349,17 @@ class RuntimeKernel:
 
         previous_active = self._active_model_id
         was_active = self._active_model_id == model_id
+        unload_started_at_s = self._now_s()
         unloaded = self.backend.unload(model_id)
+        unload_finished_at_s = self._now_s()
+        self._record_reclaim_measurement(
+            model_id=model_id,
+            operation="restart_unload_stage",
+            stage="backend_unload",
+            result=unloaded,
+            started_at_s=unload_started_at_s,
+            finished_at_s=unload_finished_at_s,
+        )
         if not unloaded.ok:
             if unloaded.error_code is not RuntimeErrorCode.model_not_loaded:
                 self._record_reclaim_barrier_event(

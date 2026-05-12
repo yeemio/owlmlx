@@ -1,7 +1,7 @@
 # owlmlx Public Surface
 
 > Status: authoritative
-> Updated: 2026-05-05
+> Updated: 2026-05-12
 > Scope: which modules, contracts, HTTP routes, and operator scripts are part
 > of the supported public technical-preview surface, and which surfaces remain
 > internal
@@ -113,6 +113,9 @@ documented in its source-of-truth file.
   execution path; refuses unless decision is `evict`
 - `GET /v1/runtime/reclaim-barrier-event` — `supported` — see
   `reclaim-barrier-event.md`
+- `GET /v1/runtime/reclaim-barrier-event/stats` — `supported` — read-only
+  aggregate unload/reclaim boundary measurements; see
+  `reclaim-barrier-event.md`
 - `GET /v1/runtime/termination-recovery-policy` — `supported` — see
   `termination-recovery-policy.md`
 - `GET /v1/runtime/comparative-evidence` — `supported` — latest validated
@@ -125,6 +128,12 @@ documented in its source-of-truth file.
   `still_blocked` 503); see `model-release-candidate-program.md`
 - `GET /v1/runtime/model-release-candidates/history` — `supported` — stable
   `model_release_candidate_record_history` v1 envelope
+
+### 3.5 Experimental Runtime Surfaces
+
+- `GET /v1/runtime/session-kv-cache` — `experimental` — native-backend
+  session KV cache status for explicit `X-Owlmlx-Session-Id` reuse; see
+  `session-kv-cache-experimental.md`
 
 ## 4. Supported Runtime Modules / Python APIs
 

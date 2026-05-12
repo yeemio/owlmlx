@@ -1,7 +1,7 @@
 # owlmlx Reclaim Barrier Event Contract
 
 > Status: authoritative
-> Updated: 2026-04-26
+> Updated: 2026-05-12
 > Scope: runtime-only failed-unload / failed-reclaim / restart-unload-stage barrier event surface (release floor 3.4 sub-round 3.4A0)
 
 ## 1. Purpose
@@ -32,6 +32,7 @@ rules remain future 3.4 work.
 Runtime transport surface:
 
 - `GET /v1/runtime/reclaim-barrier-event`
+- `GET /v1/runtime/reclaim-barrier-event/stats`
 
 Contract:
 
@@ -50,6 +51,10 @@ Stable sections:
 
 The HTTP route is read-only. It must not clear events, retry operations, or
 perform recovery.
+
+The `/stats` route is also read-only. It aggregates unload/reclaim boundary
+measurements that `RuntimeKernel` records alongside the barrier-event stream.
+It does not change event resolution state.
 
 ## 3. Operation Vocabulary
 
@@ -145,6 +150,26 @@ under the diagnostic section `reclaim_barrier`:
 - `total_event_count` — total events recorded
 - `unresolved_event_count` — unresolved events
 
+`RuntimeKernel.reclaim_barrier_stats()` exposes a separate aggregate surface
+through `GET /v1/runtime/reclaim-barrier-event/stats`:
+
+- `summary.measurement_count` — unload/reclaim boundary measurements recorded
+  by the kernel
+- `duration_ms` — min / p50 / p95 / p99 / max for backend unload-boundary
+  duration
+- `observed_active_memory_freed_bytes` and
+  `observed_cache_memory_freed_bytes` — distributions when the backend reports
+  measured reclaim fields on `UnloadResult`
+- `expected_minus_observed_active_bytes` — signed distribution for declared
+  reclaim bytes minus observed active-memory freed bytes when both signals are
+  available
+- `operation_counts` and `failure_counts` — aggregate counts by operation and
+  error code
+
+The stats surface intentionally keeps successful unload measurements separate
+from `reclaim_barrier.events`, because the event stream remains reserved for
+cleanup-boundary failures that may require a recovery barrier.
+
 ## 8. Event Resolution Semantics (3.4A)
 
 3.4A0 intentionally left every event `resolved = False`. The follow-on
@@ -172,7 +197,7 @@ It does not claim:
   remediation
 - a background recovery supervisor daemon
 - pressure-ranked victim selection or automatic unload under pressure
-- stream-hold counters, durations, or active stream-session tracking
+- stream-hold counters or active stream-session tracking
 - automatic execution of the four-class termination-cause recovery
   policy (`retry / quarantine / surface_to_coordinator / drop`); the
   policy itself is frozen by `termination-recovery-policy.md`, but

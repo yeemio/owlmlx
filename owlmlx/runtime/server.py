@@ -2604,6 +2604,10 @@ def create_app(
             build_settle_barrier_event(runtime_status=runtime.status_dict())
         )
 
+    @app.get("/v1/runtime/reclaim-barrier-event/stats")
+    def runtime_reclaim_barrier_event_stats() -> dict[str, Any]:
+        return runtime.reclaim_barrier_stats()
+
     @app.get("/v1/runtime/termination-recovery-policy")
     def runtime_termination_recovery_policy() -> dict[str, Any]:
         return termination_recovery_policy_to_dict(
