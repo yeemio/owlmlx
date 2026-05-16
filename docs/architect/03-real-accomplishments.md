@@ -388,7 +388,7 @@
 > ④ 27-row OwlOps ledger live + comparative_evidence_history live。
 >
 > **runtime mainline 实测尚未闭环**（路线图工作面）：
-> ① Session KV cache supported gate **四条** 0/4（B-1a 第二模型 + B-1b cache=on settle 无回归 + B-1c §1 纯 soak + B-1c §2 soak+swap） +
+> ① Session KV cache supported gate **四条** 1/4（B-1a 第二模型已过；待 B-1b cache=on settle 无回归 + B-1c §1 纯 soak + B-1c §2 soak+swap） +
 > ② N≥20 host-stable repeatability + 队列尾延迟（主证据 #4） +
 > ③ Qwen35 TTFT default warmup + DeepSeek V4 lifecycle + speculative path safety 正交矩阵 +
 > ④ native backend 4-gate promote-path + `server.py` 工程化拆分（Wave H）。
