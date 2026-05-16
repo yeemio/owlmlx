@@ -392,8 +392,10 @@ gantt
 ```yaml
 B-1a · second_model_byte_equiv:
   required: true
-  current: failed  # awaiting evidence
-  blocker: "Gemma 4-31B-it 复现 session KV warm TTFT + N≥5 prompt 字节等价"
+  current: passed
+  evidence:
+    part_A: "Gemma 4-31B-it RuntimeKernel session KV warm p50 1542.972ms -> 687.102ms (2.246x)"
+    part_B: "native/subprocess UTF-8 byte equivalence 5/5 prompts"
 
 B-1b · cache_on_no_regress:
   required: true
@@ -414,7 +416,7 @@ B-1c·§2 · soak_plus_swap_stability:
 
 supported_promotion:
   formula: B-1a AND B-1b AND B-1c·§1 AND B-1c·§2
-  current: 0/4
+  current: 1/4
   越级红线:
     - 不允许合并跑 36h 假装 48h
     - 不允许 §1 失败重启接续 §2

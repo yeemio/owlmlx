@@ -188,7 +188,7 @@
 ### Campaign B — Cache / Scheduler Depth
 
 - **目标**：cache_manager 从 single-request gateway → real policy layer；不主张 continuous batching
-- **当前**：`session_kv_cache.py` + `MlxNativeBackend` 实证 Qwen3.6-27B-4bit warm p50 TTFT **7.409×**
+- **当前**：`session_kv_cache.py` + `MlxNativeBackend` 实证 Qwen3.6-27B-4bit warm p50 TTFT **7.409×**；B-1a Gemma 4-31B-it RuntimeKernel 复现 **2.246×**，并通过 native/subprocess N≥5 UTF-8 byte equivalence
 
 **近期闭环（0–3 月）· Session KV cache `supported` gate 四条**（升级语义：experimental → supported，**不是** partial 中转）：
 

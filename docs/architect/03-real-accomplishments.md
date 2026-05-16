@@ -138,22 +138,28 @@
 
 | # | 主证据 | 状态 | 关键数据 / Gap |
 |---|---|---|---|
-| **①** Session KV TTFT 提升 | ✅ 已实证（Qwen3.6-27B-4bit, 7.409×） | 见 §5.1；supported gate 待 B-1a / B-1b / B-1c §1 / B-1c §2 |
+| **①** Session KV TTFT 提升 | ✅ 已实证（Qwen3.6-27B-4bit, 7.409×；Gemma 4-31B-it, 2.246×） | 见 §5.1；supported gate 已过 B-1a，待 B-1b / B-1c §1 / B-1c §2 |
 | **②** 模型切换 reclaim 干净 | 🟡 部分实证（settle barrier + reclaim stats supported；分布数据待加入主叙事） | 见 §5.2 |
 | **③** 长上线稳定（48h+ 两段 soak） | 🔴 **缺** —— eviction_soak.py 已退出 placeholder，但无 24h+ 真实 soak 报告 | 见 §5.3；Campaign B-1c §1 + §2 |
 | **④** 队列尾延迟（p50/p99/p99.9） | 🔴 **缺** —— GenerationGate supported；serial 已证；N 并发下分布未公开 | 见 §5.4 |
 
-### 5.1 ✅ 主证据 ① · Session KV cache TTFT 实测（Qwen3.6-27B-4bit）
+### 5.1 ✅ 主证据 ① · Session KV cache TTFT 实测（Qwen + Gemma）
 
-> 出处：`files/evidence/owlmlx/bench/session-kv-cache/20260512T123316Z-owlmlx-native-session-kv-ttft-n4.jsonl` + README.md:80–87
+> 出处：
+> `files/evidence/owlmlx/bench/session-kv-cache/20260512T123316Z-owlmlx-native-session-kv-ttft-n4.jsonl` +
+> `files/evidence/owlmlx/bench/session-kv-cache/20260516T151100Z-b1a-gemma4-31b-it-session-kv-ttft.jsonl` +
+> README.md Session KV evidence 表
 
-| 配置 | Warm round-2 TTFT | Warm round-3 TTFT | Warm round-4 TTFT |
-|---|---:|---:|---:|
-| Disabled | 3397.977 ms | 4026.099 ms | 4419.626 ms |
-| Enabled | 536.325 ms | **543.389 ms** | 652.471 ms |
+| 模型 / 配置 | Warm round-2 TTFT | Warm round-3 TTFT | Warm round-4 TTFT | p50 提升 |
+|---|---:|---:|---:|---:|
+| Qwen3.6-27B-4bit disabled | 3397.977 ms | 4026.099 ms | 4419.626 ms | — |
+| Qwen3.6-27B-4bit enabled | 536.325 ms | **543.389 ms** | 652.471 ms | **7.409×** |
+| Gemma 4-31B-it disabled | 1542.972 ms | 1558.077 ms | 1537.596 ms | — |
+| Gemma 4-31B-it enabled | 679.811 ms | **687.102 ms** | 695.413 ms | **2.246×** |
 
-- **提升倍率（p50）**：`disabled.warm_p50_first_token_ms / enabled.warm_p50_first_token_ms = 4026.099 / 543.389 = 7.409×**
-- 命中：**3 hit / 0 drop**
+- **提升倍率公式**：`disabled.warm_p50_first_token_ms / enabled.warm_p50_first_token_ms`
+- Qwen 命中：**3 hit / 0 drop**
+- Gemma B-1a 命中：**3 hit / 0 drop**，`RuntimeKernel.restart_model()` 子探针 completed
 - 提示形态：~4.2k chars、append-only、4 rounds
 - 标签维持 `experimental`：native backend only、default off、显式 session id、append-only reuse
 
@@ -240,12 +246,12 @@
 
 | Gate | 状态 | 缺什么 |
 |---|---|---|
-| **B-1a · 第二模型 / 第二形状** | ❌ | Qwen3.6-27B-4bit 之外 **Gemma 4-31B-it**（已锁定）复现 session KV warm TTFT 改善 + 非 cache 路径 N≥5 prompt 字节等价（同时关闭 §VI 4-gate G1 Cache Parity） |
+| **B-1a · 第二模型 / 第二形状** | ✅ | Gemma 4-31B-it 已复现 session KV warm TTFT 改善（2.246×，RuntimeKernel 路径）+ 非 cache 路径 N≥5 prompt 字节等价；§VI 4-gate G1 Cache Parity 已关闭 |
 | **B-1b · `cache=on` × settle barrier 无回归** | ❌ | N=20 跑后 `failed_reclaim = 0` 报告 + cache=off 基线对齐 |
 | **B-1c §1 · 纯 soak（24h+）** | ❌ | 无人为 swap 的 24h+ 混合负载 soak；漂移 < `min(200 MB, 0.5% host budget)`；`no_swap_soak_stability = passed` |
 | **B-1c §2 · soak + swap（24h+）** | ❌ | §1 通过后；每 4h × 6 次 swap；累积 `failed_reclaim = 0` + 漂移 < §1 阈值；`soak_plus_swap_stability = passed` |
 
-**四条全过** → §1a Promotion Gate → `experimental` 升 `supported`。当前 0/4 达成。
+**四条全过** → §1a Promotion Gate → `experimental` 升 `supported`。当前 1/4 达成。
 
 **晋级越级红线**：
 
