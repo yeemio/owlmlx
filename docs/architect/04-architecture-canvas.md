@@ -116,7 +116,7 @@ flowchart TB
 
 ## 2. 功能架构 · Functional Architecture
 
-> Layer 02 内部展开。HTTP Gateway（`server.py · 2807 行`）是所有外部入口；RuntimeKernel（`kernel.py · 1694 行`）是中央协调器；下面挂 5 大子系统 + 2 cross-cutting + 1 实验路径。
+> Layer 02 内部展开。HTTP Gateway（`server.py · 2013 行` + `server_routes_openai.py · 829 行`）是所有外部入口；RuntimeKernel（`kernel.py · 1694 行`）是中央协调器；下面挂 5 大子系统 + 2 cross-cutting + 1 实验路径。
 
 ### 2.1 总览
 
@@ -127,7 +127,7 @@ flowchart TB
     classDef experimental fill:#f59e0b,stroke:#b45309,color:#fff
     classDef crosscut fill:#fbbf24,stroke:#b45309,color:#1f2937
 
-    subgraph GW["HTTP Gateway · server.py 2807 lines · port 8066"]
+    subgraph GW["HTTP Gateway · server.py 2013 lines + routes_openai 829 · port 8066"]
         OPENAI["OpenAI Compatible<br/>/v1/chat/completions<br/>/v1/completions<br/>/v1/embeddings"]:::supported
         ANTH["Anthropic Compatible<br/>/v1/messages [SSE]<br/>/v1/messages/count_tokens"]:::supported
         CRUD["Runtime CRUD<br/>/v1/load /v1/unload<br/>/v1/generate /v1/models"]:::supported
@@ -158,7 +158,7 @@ flowchart TB
 
 | 子系统 | 状态 | 关键文件 |
 |---|---|---|
-| HTTP Gateway | ✅ | `owlmlx/runtime/server.py` (2807 行 · Wave H 拆分目标) |
+| HTTP Gateway | ✅ | `owlmlx/runtime/server.py` (2013 行 · Wave H H1 后) + `owlmlx/runtime/server_routes_openai.py` (829 行) |
 | RuntimeKernel | ✅ | `owlmlx/runtime/kernel.py` (1694 行) |
 | Cache | 🟠/🟡 | `session_kv_cache.py` (EXP · 7.4×) · `cache_manager.py` (scaffold) · `cache_truth.py` · `cache_residency_tracker.py` |
 | Memory Governance | ✅ | `memory_watermark.py` · `settle_barrier_event.py` · `memory_pressure_classifier.py` · `memory_pressure_eviction_policy.py` · `memory_budget.py` · `memory_actuator.py` |
@@ -180,7 +180,7 @@ flowchart TB
 | **E** OwlOps Consumption | `comparative_evidence_history.py` · `runtime_monitor_test_console.py` · 27-row ledger |
 | **F** Spec Path Safety | `gemma4_mtp_drafter.py` · `runtime/mlx_vlm_mtp_runner.py` · `speculative_execution_status` (待建) |
 | **Wave G** Governance | `docs/source-of-truth/ARCHITECTURE-TRUTH.md` · `product-definition.md` · `README.md` · phase45 命名治理 |
-| **Wave H** Server 拆分 | `owlmlx/runtime/server.py` → routes_openai / routes_runtime / routes_dev |
+| **Wave H** Server 拆分 | H1 done: `server_routes_openai.py`; next: routes_runtime / routes_dev |
 
 ---
 
@@ -330,7 +330,7 @@ gantt
     G5-G6 runtime-contracts              :g5, 2026-11-15, 180d
 
     section Wave H · Server 拆分
-    H1 routes_openai (与 B 并行)          :h1, 2026-05-16, 60d
+    H1 routes_openai (done 2026-05-16)   :done, h1, 2026-05-16, 1d
     H2 routes_runtime · H3 dev (B-1 后)  :h2, after h1, 90d
     H4 envelopes · H5 zero regress       :h4, 2026-11-15, 180d
 
@@ -349,7 +349,7 @@ gantt
 | **E · OwlOps Loop** | E1 reclaim stats · E2 TTFT · E3 classifier | spec accept/reject + tool-arg metric | RC3 >90d gap-free ledger · classifier partial |
 | **F · Spec Safety** | F1 status contract · F2 n-gram · F3 resident MTP | F4 正交矩阵 · F5 constraint · F6 MTP+KV combo | F7 DS4 MTP · F8 受控启用 · F9 RC2 强支撑 |
 | **Wave G · Governance** | G1 ARCH-TRUTH · G2 product-def · G3 README | G4 phase45 命名治理 · G5 contracts 统一 | 每 reopen condition 达成时同步刷新 matrix |
-| **Wave H · Server 拆分** | **H1 立即** · routes_openai 拆出（与 B 并行） | H2 routes_runtime · H3 dev · H4 envelopes | H5 零回归 · server.py ≤ 1200 行 · 新端点不回灌 |
+| **Wave H · Server 拆分** | **H1 已完成** · routes_openai 拆出（与 B 并行） | H2 routes_runtime · H3 dev · H4 envelopes | H5 零回归 · server.py ≤ 1200 行 · 新端点不回灌 |
 
 ### 4.3 `mlx_native_backend.py` 4-gate Promote-Path
 

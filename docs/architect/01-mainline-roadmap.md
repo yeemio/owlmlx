@@ -104,7 +104,7 @@
 ### III.2 实现代码现实（来自 Phase 1 代码扫描）
 
 - 顶层结构：owlmlx/ 40+ 模块 + runtime/ 14 文件
-- 关键文件 LOC：server.py 2807 / kernel.py 1694 / mlx_lm_subprocess_backend.py 2541 / **mlx_native_backend.py 1074**
+- 关键文件 LOC：server.py 2013（H1 后）/ server_routes_openai.py 829 / kernel.py 1694 / mlx_lm_subprocess_backend.py 2541 / **mlx_native_backend.py 1074**
 - 测试：73 test files / 835 test_ functions
 - 后端：subprocess（default · supported）+ native（experimental · session-scope opt-in）
 
@@ -303,7 +303,7 @@
 
 - **目标**：`owlmlx/runtime/server.py`（2807 行）按职责拆分；**保持 HTTP / SSE / contract bit-for-bit 不变**；服务 runtime 代码可维护性，**不**为治理 metric 好看
 - **节奏（决策 B1 · 2026-05-16）**：
-  - **H1 立即启动**（与 Campaign B-1 并行）：`server_routes_openai.py` —— OpenAI / Anthropic 兼容 endpoint + SSE 序列化（理由：最低耦合 + 最高复用收益，趁 B 不动 server 路由）
+  - **H1 已完成（2026-05-16）**：`server_routes_openai.py` —— OpenAI / Anthropic 兼容 endpoint + SSE 序列化已从 `server.py` 拆出；targeted route / hardening tests 通过
   - **H2 等 B-1 闭环后**：`server_routes_runtime.py` —— `/v1/runtime/*` status surface（理由：B-1 会向 status surface 加 hit/miss metrics + soak 端点，先稳定 B-1 再拆 H2）
   - **H3 与 H2 同期**：`server_routes_dev.py` —— test-console / admin / dev-only
 - **中期 / 远期**：H4 envelopes 共享 helper + H5 contract 零回归测试
@@ -349,7 +349,7 @@
 | R8 | DS4 上游 mlx_lm 集成漂移 | 中 | 中 | `.runtime-deepseek-v4-mlx` 隔离 |
 | R9 | 5 周文档漂移持续累积 | 高（已发生） | 中 | Wave G 持续约束 |
 | R10 | OwlCoda 消费就绪 gate 卡顿 | 中 | 中 | §IV.5 已明确"不在主线" |
-| R11 | `server.py` 单文件膨胀 | 高 | 中 | **Wave H 拆分**；CI 行数 lint |
+| R11 | `server.py` 单文件膨胀 | 高 | 中 | **Wave H 拆分**；H1 已把 OpenAI/Anthropic compat routes 拆到 `server_routes_openai.py`；H2/H3 后续推进；CI 行数 lint |
 | R12 | `llm_router` 被误当主线 | 中 | 高 | §IV.5 transitional；不向 `llm_router` 借入或反向依赖 |
 | R13 | Session KV gate **四条**偏短跑（B-1a + B-1b + B-1c §1 + B-1c §2） | 高 | 极高 | 必须**全部**满足；§1 / §2 独立 ledger；§2 必须 §1 通过后启动；**不允许**合并跑或缩短 |
 | R14 | B-1c §2 swap 失败归因混淆 | 中 | 高 | §1 / §2 独立 ledger；§2 失败不回溯 §1；归因清单（swap 触发 vs cache 长跑） |

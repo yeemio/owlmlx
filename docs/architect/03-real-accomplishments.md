@@ -22,7 +22,7 @@
 |---|---|---|
 | owlmlx/ 顶层 Python 模块 | 40+ | 代码扫描 |
 | owlmlx/runtime/ 子模块 | 14 文件 | 代码扫描 |
-| 主要文件 LOC | server.py 2807 / kernel.py 1694 / mlx_lm_subprocess_backend.py 2541 / mlx_native_backend.py 1074 / comparative_evidence_runner.py 41K / runtime_monitor_test_console.py 46K | 代码扫描 |
+| 主要文件 LOC | server.py 2013（Wave H H1 后）/ server_routes_openai.py 829 / kernel.py 1694 / mlx_lm_subprocess_backend.py 2541 / mlx_native_backend.py 1074 / comparative_evidence_runner.py 41K / runtime_monitor_test_console.py 46K | 代码扫描 |
 | 测试规模 | 73 test files / 835 test_ functions | `tests/` |
 | 测试运行时 | ~38s | README.md "1005 cases, ~38 s" |
 | source-of-truth 文档 | 200+ markdown files | `docs/source-of-truth/` ls |
@@ -391,7 +391,7 @@
 > ① Session KV cache supported gate **四条** 1/4（B-1a 第二模型已过；待 B-1b cache=on settle 无回归 + B-1c §1 纯 soak + B-1c §2 soak+swap） +
 > ② N≥20 host-stable repeatability + 队列尾延迟（主证据 #4） +
 > ③ Qwen35 TTFT default warmup + DeepSeek V4 lifecycle + speculative path safety 正交矩阵 +
-> ④ native backend 4-gate promote-path + `server.py` 工程化拆分（Wave H）。
+> ④ native backend 4-gate promote-path + `server.py` 工程化拆分（Wave H；H1 compat routes split 已落，H2/H3 未闭环）。
 >
 > **降权数据**：短提示 TPS（vs oMLX +45–94%、vs vMLX 持平）不是 runtime mainline 主叙事；Wave G README 刷新会降为附录。
 >

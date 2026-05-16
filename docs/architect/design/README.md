@@ -36,7 +36,7 @@
 | **B-1b** | [`B-1b-spec.md`](B-1b-spec.md) | 已起草 · 待 design-grade review | 同上 Campaign B-1b |
 | **B-1c §1** | _pending_ | B-1b 通过后启动 | 同上 Campaign B-1c §1 |
 | **B-1c §2** | _pending_ | §1 通过后启动 | 同上 Campaign B-1c §2 |
-| **Wave H · H1** | _pending_（与 B-1 并行 lane） | 独立 round 启动 | 同上 Wave H |
+| **Wave H · H1** | code-grade landed: `server_routes_openai.py` | 已完成 · OpenAI/Anthropic compat routes 拆出 | 同上 Wave H |
 
 ## 并行 Campaign Specs
 
