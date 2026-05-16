@@ -100,16 +100,18 @@ docs/handoff/                ← 轮次交接
 
 ---
 
-## 当前状态（2026-05-16 initial drop）
+## 当前状态（2026-05-16 consolidated drop）
 
-- **本目录文件**：4 份 plan-grade 文档（含本 README）
+- **本目录文件**：4 份 plan-grade 文档（含本 README 为目录说明）
 - **已 promote 到 source-of-truth/**：0 份
-- **承载迁移来源**：`~/.claude/plans/owlmlx-1-*`（Claude Code plan-mode 临时承载，本目录为 authoritative 副本）
+- **承载迁移来源**：`~/.claude/plans/owlmlx-1-*`（Claude Code plan-mode 临时承载；本目录为 authoritative plan-grade 副本）
+- **维护入口**：[01-mainline-roadmap.md](01-mainline-roadmap.md) 的"顶层维护入口"小节
 
 ---
 
 ## 维护规则
 
 - 每次架构方向变更（新设 Campaign / Wave、关键决策落地、reopen condition 调整等）必须同步刷新本目录对应章节
+- 先更新 [01-mainline-roadmap.md](01-mainline-roadmap.md)，再更新受影响 companion；不要只更新 `~/.claude/plans/`
 - 刷新提交集严格限定在 `docs/architect/**`；不混入 runtime code / bench evidence / source-of-truth/ 内的 untracked 文件
 - 决策落地时附 `决策 N · YYYY-MM-DD` 标记，便于追溯

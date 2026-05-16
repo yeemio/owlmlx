@@ -7,6 +7,27 @@
 
 ---
 
+## 顶层维护入口（Current Planning Source）
+
+本文件是 `owlmlx` 顶层 plan-grade 规划的项目内维护入口。`~/.claude/plans/owlmlx-1-*` 只作为 2026-05-16 初稿承载和导入来源；自本轮起，不再把临时承载文件当事实源或维护目标。
+
+| 角色 | 项目内文件 | 状态 |
+|---|---|---|
+| 顶层主规划 | [01-mainline-roadmap.md](01-mainline-roadmap.md) | **authoritative plan-grade** |
+| 现状 vs 市场差距 | [02-state-vs-market-gap.md](02-state-vs-market-gap.md) | companion · plan-grade |
+| 已完成真实情况 + 数据对比 | [03-real-accomplishments.md](03-real-accomplishments.md) | companion · plan-grade |
+| 架构画布（仓内可 diff 版） | [04-architecture-canvas.md](04-architecture-canvas.md) | companion · plan-grade |
+
+维护裁定：
+
+- 顶层规划由 Codex 在 `docs/architect/**` 内维护；每次架构方向变化先更新本文件，再更新对应 companion。
+- `docs/architect/**` 仍是 **plan-grade / architecture intent**，不进入 `docs/source-of-truth/master-outline.md`，除非经 runtime evidence + §1a Promotion Gate 晋级。
+- Wave / Campaign 结束时必须反推刷新：主规划结论、对应 companion、README 阅读顺序；不得只在聊天或临时 plan 文件里留下新事实。
+
+当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。近期最关键闭环是 B-1 Session KV cache `supported` 四条 gate（B-1a 已过，B-1b + B-1c §1/§2 待闭环）；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`，H2/H3 等 B-1 相关 status surface 稳定后推进；Campaign D 前置条件随 B-1a closeout 已解除，但仍保持隔离 backend lane。
+
+---
+
 ## 主线声明（Mainline Statement · 2026-05-16）
 
 当前唯一主线是 **`owlmlx` runtime engineering mainline**——把 `owlmlx` 从"有很多 runtime truth / evidence / contract"推进到 **0.3.0 前真正 replacement-grade 的本机 MLX runtime**：**可长期运行、可观测、内存纪律可靠、能承载本地大模型交互**。
@@ -32,7 +53,7 @@
 - **边界资产显式**：OwlRunKit + `llm_router`（§IV.5）
 - **bench / evidence 主叙事重组**：四主证据（详见 [03-real-accomplishments.md](03-real-accomplishments.md)）
 - **决策 A** · B-1a 锁定 Gemma 4-31B-it
-- **决策 B** · Wave H · H1 立即启动 / H2-H3 等 B-1 闭环
+- **决策 B** · Wave H · H1 已完成 / H2-H3 等 B-1 闭环
 - **决策 C** · 4-gate G1 通过条件 = B-1a 通过（含 N≥5 prompt 字节等价）
 - **决策 D = D3** · B-1c 拆 §1（24h 纯 soak）+ §2（24h soak+swap）；结论字段独立
 - **决策 E** · Campaign D 启动时点 = B-1a 完成后
@@ -196,6 +217,7 @@
 
 **锁定 Gemma 4-31B-it** 作为第二模型复现 session KV warm TTFT 改善。
 
+- **状态**：已通过 closeout（Gemma 4-31B-it RuntimeKernel 复现 2.246×，并通过 native/subprocess N≥5 UTF-8 byte equivalence）
 - 绝对倍率不强求 7.4×，只要 hit / miss / eviction / TTL / restart 语义一致 + warm TTFT 单调改善
 - **附加**（与 §VI G1 互锁，决策 C3）：包含"非 cache 路径下 generation tokens 字节等价 (N≥5 prompt)" 检查
 - **B-1a 通过即视为 G1（Cache Parity）通过**——单一来源避免重复造证
@@ -242,6 +264,8 @@
 - `B-1b · cache_on_no_regress = passed`
 - `B-1c · no_swap_soak_stability = passed`
 - `B-1c · soak_plus_swap_stability = passed`
+
+当前状态：**1/4 已过**（B-1a）；B-1b、B-1c §1、B-1c §2 仍是 supported 晋级前置。
 
 加 §1a Promotion Gate + `extraction-inventory.md` §8 → session KV cache 行从 `experimental` 升 `supported`。
 
@@ -301,7 +325,7 @@
 
 ### Wave H — Runtime Server 工程化拆分（Maintainability · 新设）
 
-- **目标**：`owlmlx/runtime/server.py`（2807 行）按职责拆分；**保持 HTTP / SSE / contract bit-for-bit 不变**；服务 runtime 代码可维护性，**不**为治理 metric 好看
+- **目标**：`owlmlx/runtime/server.py`（原 2807 行；H1 后约 2013 行）按职责拆分；**保持 HTTP / SSE / contract bit-for-bit 不变**；服务 runtime 代码可维护性，**不**为治理 metric 好看
 - **节奏（决策 B1 · 2026-05-16）**：
   - **H1 已完成（2026-05-16）**：`server_routes_openai.py` —— OpenAI / Anthropic 兼容 endpoint + SSE 序列化已从 `server.py` 拆出；targeted route / hardening tests 通过
   - **H2 等 B-1 闭环后**：`server_routes_runtime.py` —— `/v1/runtime/*` status surface（理由：B-1 会向 status surface 加 hit/miss metrics + soak 端点，先稳定 B-1 再拆 H2）
