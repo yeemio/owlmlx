@@ -23,12 +23,22 @@
 
 ## 阅读顺序
 
+### Plan-grade docs（路线图层 · 战略与框架）
+
 | # | 文档 | 内容 |
 |---|---|---|
 | 1 | [01-mainline-roadmap.md](01-mainline-roadmap.md) | 主线声明 + 12+ 月战略路线图（6 子战役 + Wave G / Wave H） |
 | 2 | [02-state-vs-market-gap.md](02-state-vs-market-gap.md) | 现状 vs 市场差距清单（12 维框架对照） |
 | 3 | [03-real-accomplishments.md](03-real-accomplishments.md) | 已完成真实情况 + 四主证据 |
 | 4 | [04-architecture-canvas.md](04-architecture-canvas.md) | 架构画布（系统 / 功能 / 业务逻辑 / 路线图，mermaid + 表格 + ASCII） |
+
+### Design-grade docs（gate 层 · 单 gate 可执行口径）
+
+| # | 路径 | 内容 |
+|---|---|---|
+| D | [design/](design/) | Design-grade specs per gate（**一次一个 gate** · 不批量预先撰写） · 见 [design/README.md](design/README.md) |
+
+design/ 在父目录之下作为 sub-grade 承载层；**与 plan-grade 同 architect 边界**（都不是 source-of-truth），但其下每份 spec 把单个 gate 从"目标 + 验收摘要"细化到形式化 contract + harness 改动点 + evidence 路径。
 
 ---
 

@@ -1,0 +1,70 @@
+# docs/architect/design/
+
+> **Design-grade specs for plan-grade campaigns.**
+> Downstream of plan-grade ([`../01-mainline-roadmap.md`](../01-mainline-roadmap.md)),
+> upstream of code-grade (实际 harness 脚本 + bench 运行)。
+
+---
+
+## 这一层做什么
+
+每个 design spec 把**一个 gate**（如 `B-1a`）从 plan-grade 的"目标 + 验收摘要"细化到可执行的口径：
+
+- **Verification contract** —— 形式化的 pass/fail 字段、阈值、独立结论命名
+- **Harness 改动点** —— 在现有 harness（`test_repeatability_campaign_harness.py` / `comparative_evidence_runner.py` / `repeatability_statistics.py` / `scripts/bench/eviction_soak.py`）上的**最小**扩展点；不新增 spec-as-code 模块
+- **Evidence output paths** —— jsonl ledger 落盘的具体目录与文件名约定
+- **Failure handling** —— gate 中途失败时的归因 / 重启 / 继续 / 上报口径
+- **Out-of-scope 提醒** —— 显式列出本 gate **不**承担的责任（防 scope creep）
+
+---
+
+## 这一层**不**做什么
+
+- ❌ 写代码（code-grade 是下一层，独立 round + PR）
+- ❌ 一次性展开多个 gate 的 spec（**严格一次一个 gate**）
+- ❌ 提前定 B-1b / B-1c / Wave H 的实施细节（依赖关系还没到）
+- ❌ 引用未被 runtime 消费的 spec-as-code 模块作为支撑（Stage 1 禁令）
+- ❌ 把 design 文档当 source-of-truth contract（promote 需走 §1a Gate）
+
+---
+
+## 当前 specs
+
+| Gate | Spec | 状态 | Plan-grade 来源 |
+|---|---|---|---|
+| **B-1a** | [`B-1a-spec.md`](B-1a-spec.md) | 已起草 · 待 design-grade review | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign B-1a |
+| **B-1b** | _pending_ | B-1a 通过且 review 通过后启动 | 同上 Campaign B-1b |
+| **B-1c §1** | _pending_ | B-1b 通过后启动 | 同上 Campaign B-1c §1 |
+| **B-1c §2** | _pending_ | §1 通过后启动 | 同上 Campaign B-1c §2 |
+| **Wave H · H1** | _pending_（与 B-1 并行 lane） | 独立 round 启动 | 同上 Wave H |
+
+**节奏纪律**：design spec **一次一个**，per round 落盘 + review；不允许批量预先撰写未启动的 gate。
+
+---
+
+## 与 plan-grade / source-of-truth 的关系
+
+```
+plan-grade (../*.md)                ← 战略 / 路线图 / 12 维框架 / 风险
+    ↓ derive (gate-by-gate)
+design-grade (./*.md)               ← 本目录：单 gate 的可执行口径
+    ↓ implement (code-grade)
+runtime code + harness scripts      ← bench 脚本 / 测试 / evidence runner
+    ↓ measurement output
+files/evidence/owlmlx/bench/...     ← jsonl ledger
+    ↓ promote (经 §1a Gate)
+docs/source-of-truth/               ← runtime evidence + contract truth
+```
+
+design-grade **不**直接被 runtime 代码 import；它指导 code-grade 写实际的 harness 脚本。harness 脚本产生 evidence；evidence 经 §1a Gate 才 promote 到 source-of-truth。
+
+---
+
+## 改动纪律
+
+继承 [`../README.md`](../README.md) 的所有纪律，并额外：
+
+- **每个 spec 一个 commit**（docs-only，不混入 runtime code 与 evidence）
+- 每个 spec **写明前置依赖与后置解锁**（哪个 gate 通过了才能启动我；我通过了能解锁哪些）
+- spec 中**字段命名**与 plan-grade 中的命名严格对齐（如 `no_swap_soak_stability` / `soak_plus_swap_stability` 不能换名）
+- spec 落盘后 code-grade 实施前，需要架构师 review + 用户签字两道
