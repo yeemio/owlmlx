@@ -26,6 +26,7 @@ def test_fake_session_kv_cache_ttft_writes_jsonl_and_warm_improves(tmp_path):
 
     assert summary["ok"] is True
     assert summary["gate"] == "baseline"
+    assert summary["execution_boundary"] == "runtime-kernel"
     assert summary["measurement_mode"] == "synthetic_native_prompt_cache_ttft_smoke"
     assert summary["evidence_strength"] == "smoke_only_no_real_model_or_allocator_claim"
     assert summary["warm_cache_p50_improvement_formula"] == (
@@ -74,6 +75,8 @@ def test_b1a_gemma4_fake_gate_writes_part_a_ledger_schema(tmp_path):
     assert summary["part"] == "A"
     assert summary["backend"] == "native"
     assert summary["backend_mode"] == "fake"
+    assert summary["execution_boundary"] == "runtime-kernel"
+    assert summary["config"]["execution_boundary"] == "runtime-kernel"
     assert "b1a-gemma4-31b-it-session-kv-ttft" in summary["run_id"]
     assert summary["config"]["max_tokens"] == 2
     assert summary["test_shape"]["rounds"] == 4
@@ -94,7 +97,43 @@ def test_b1a_gemma4_fake_gate_writes_part_a_ledger_schema(tmp_path):
     assert len(records) == 1
     assert records[0]["run_id"] == summary["run_id"]
     assert records[0]["schema_version"] == "b1a.v1"
+    assert records[0]["execution_boundary"] == "runtime-kernel"
     assert sorted(tmp_path.rglob("*.jsonl")) == [output_path]
+
+
+def test_b1a_gemma4_fake_direct_native_writes_boundary_and_restart_method(tmp_path):
+    summary = session_kv_cache_ttft.run_session_kv_cache_ttft(
+        runtime="owlmlx",
+        backend="fake",
+        model_id="fake-gemma4",
+        model_memory_gb=1.0,
+        rounds=4,
+        prompt_chars=512,
+        output_dir=tmp_path,
+        fake_cold_prefill_ms=24.0,
+        fake_warm_prefill_ms=2.0,
+        gate="b1a-gemma4",
+        execution_boundary="direct-native",
+    )
+
+    assert summary["ok"] is True
+    assert summary["execution_boundary"] == "direct-native"
+    assert summary["config"]["execution_boundary"] == "direct-native"
+    assert {round_["ok"] for round_ in summary["rounds"]} == {True}
+    assert summary["subprobes"]["A5_runtime_restart"]["passed"] is True
+    assert (
+        summary["subprobes"]["A5_runtime_restart"]["restart_method"]
+        == "direct_native_unload_load"
+    )
+    assert (
+        summary["subprobes"]["A5_runtime_restart"][
+            "runtime_kernel_restart_model_used"
+        ]
+        is False
+    )
+
+    records = _records(tmp_path / f"{summary['run_id']}.jsonl")
+    assert records[0]["execution_boundary"] == "direct-native"
 
 
 def test_b1a_gemma4_improvement_ratio_uses_disabled_over_enabled_warm_p50(tmp_path):
@@ -147,6 +186,43 @@ def test_session_kv_cache_ttft_cli_b1a_gate_applies_defaults(monkeypatch, tmp_pa
     assert captured["prompt_chars"] == 4200
     assert captured["max_tokens"] == 2
     assert captured["output_dir"] == tmp_path
+    assert captured["execution_boundary"] == "auto"
+
+
+def test_session_kv_cache_ttft_cli_auto_boundary_passes_through_for_b1a_native(
+    monkeypatch,
+    tmp_path,
+):
+    captured = {}
+
+    def fake_run(**kwargs):
+        captured.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(session_kv_cache_ttft, "run_session_kv_cache_ttft", fake_run)
+
+    code = session_kv_cache_ttft.main(
+        [
+            "--gate",
+            "b1a-gemma4",
+            "--backend",
+            "native",
+            "--output",
+            str(tmp_path),
+        ]
+    )
+
+    assert code == 0
+    assert captured["backend"] == "native"
+    assert captured["execution_boundary"] == "auto"
+    assert (
+        session_kv_cache_ttft._resolve_execution_boundary(
+            execution_boundary=captured["execution_boundary"],
+            gate=captured["gate"],
+            backend=captured["backend"],
+        )
+        == "direct-native"
+    )
 
 
 def test_session_kv_cache_ttft_requires_owlmlx_runtime(tmp_path):

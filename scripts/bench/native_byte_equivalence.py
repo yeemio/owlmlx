@@ -66,10 +66,11 @@ def _iso_timestamp(ts: datetime) -> str:
 
 
 def _model_slug(model_id: str) -> str:
-    if model_id == DEFAULT_MODEL_ID:
+    model_name = Path(model_id).name if Path(model_id).exists() else model_id
+    if model_name == DEFAULT_MODEL_ID:
         return "gemma4-31b-it"
     normalized = []
-    for char in model_id.lower():
+    for char in model_name.lower():
         if char.isalnum():
             normalized.append(char)
         elif normalized and normalized[-1] != "-":

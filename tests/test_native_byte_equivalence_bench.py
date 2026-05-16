@@ -67,6 +67,22 @@ def test_fake_native_byte_equivalence_writes_passing_b1a_record(tmp_path: Path) 
         )
 
 
+def test_native_byte_equivalence_model_path_slug_uses_directory_name(
+    tmp_path: Path,
+) -> None:
+    model_dir = tmp_path / "gemma-4-31B-it"
+    model_dir.mkdir()
+
+    summary = native_byte_equivalence.run_native_byte_equivalence(
+        model_id=str(model_dir),
+        output_dir=tmp_path / "evidence",
+        mode="fake",
+    )
+
+    output_path = Path(str(summary["output_path"]))
+    assert output_path.name.endswith("-b1a-gemma4-31b-it-byte-equiv-n5.jsonl")
+
+
 def test_fake_native_byte_equivalence_records_divergence_diagnostic(
     tmp_path: Path,
 ) -> None:

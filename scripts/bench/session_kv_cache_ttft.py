@@ -21,6 +21,7 @@ import time
 import types
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from inspect import isawaitable
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -46,6 +47,7 @@ B1A_DEFAULT_ROUNDS = 4
 B1A_DEFAULT_PROMPT_CHARS = 4200
 B1A_DEFAULT_MAX_TOKENS = 2
 B1A_SESSION_PREFIX = "b1a-gemma4-31b"
+EXECUTION_BOUNDARIES = ("auto", "runtime-kernel", "direct-native")
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,6 +143,23 @@ def _normalize_gate(gate: str) -> str:
     raise ValueError("--gate must be default, baseline, or b1a-gemma4")
 
 
+def _resolve_execution_boundary(
+    *,
+    execution_boundary: str,
+    gate: str,
+    backend: str,
+) -> str:
+    normalized = str(execution_boundary).strip().lower()
+    if normalized not in EXECUTION_BOUNDARIES:
+        choices = ", ".join(EXECUTION_BOUNDARIES)
+        raise ValueError(f"--execution-boundary must be one of: {choices}")
+    if normalized != "auto":
+        return normalized
+    if gate == B1A_GATE and backend == "native":
+        return "direct-native"
+    return "runtime-kernel"
+
+
 def _host_label() -> str:
     try:
         result = subprocess.run(
@@ -159,6 +178,10 @@ def _host_label() -> str:
 
 def _session_cache_status(kernel: RuntimeKernel) -> dict[str, Any]:
     return kernel.status_dict()["backend"]["detail"].get("session_kv_cache", {})
+
+
+def _native_session_cache_status(native: MlxNativeBackend) -> dict[str, Any]:
+    return native.status().detail.get("session_kv_cache", {})
 
 
 def _counter_value(counters: dict[str, Any], key: str) -> int:
@@ -257,7 +280,7 @@ def _fake_mlx_lm(
     fake = types.ModuleType("mlx_lm")
     models = types.ModuleType("mlx_lm.models")
     cache_mod = types.ModuleType("mlx_lm.models.cache")
-    seen_prompt_cache_ids: set[int] = set()
+    seen_prompt_caches: list[Any] = []
     created_cache_count = 0
 
     class FakeTokenizer:
@@ -300,13 +323,16 @@ def _fake_mlx_lm(
         **kwargs,
     ):
         _ = (model, tokenizer, prompt, max_tokens, kwargs)
-        cache_id = id(prompt_cache) if prompt_cache is not None else None
-        if cache_id is not None and cache_id in seen_prompt_cache_ids:
+        cache_seen = (
+            prompt_cache is not None
+            and any(prompt_cache is seen for seen in seen_prompt_caches)
+        )
+        if cache_seen:
             delay_ms = warm_prefill_ms
         else:
             delay_ms = cold_prefill_ms
-            if cache_id is not None:
-                seen_prompt_cache_ids.add(cache_id)
+            if prompt_cache is not None:
+                seen_prompt_caches.append(prompt_cache)
         generated_count = max(int(max_tokens), 1)
         if prompt_cache is not None and prompt_cache:
             state = prompt_cache[0]
@@ -334,7 +360,7 @@ def _fake_mlx_lm(
     fake.load = fake_load  # type: ignore[attr-defined]
     fake.stream_generate = fake_stream_generate  # type: ignore[attr-defined]
     fake._created_cache_count = lambda: created_cache_count  # type: ignore[attr-defined]
-    fake._seen_prompt_cache_count = lambda: len(seen_prompt_cache_ids)  # type: ignore[attr-defined]
+    fake._seen_prompt_cache_count = lambda: len(seen_prompt_caches)  # type: ignore[attr-defined]
 
     try:
         sys.modules["mlx_lm"] = fake
@@ -390,6 +416,47 @@ async def _measure_stream_ttft(
     }
 
 
+def _measure_direct_native_stream_ttft(
+    native: MlxNativeBackend,
+    *,
+    model_id: str,
+    prompt: str,
+    session_id: str,
+    max_tokens: int,
+) -> dict[str, Any]:
+    started = time.monotonic()
+    first_token_ms: float | None = None
+    completion_tokens = 0
+    generated_text: list[str] = []
+    error: dict[str, Any] | None = None
+    for event in native.stream_generate(
+        model_id,
+        prompt,
+        max_tokens=max_tokens,
+        session_id=session_id,
+    ):
+        if event.event == "token" and first_token_ms is None:
+            first_token_ms = round((time.monotonic() - started) * 1000.0, 3)
+        if event.event == "token":
+            generated_text.append(event.text)
+        if event.completion_tokens is not None:
+            completion_tokens = int(event.completion_tokens)
+        if event.event == "error":
+            error = {
+                "error_code": event.error_code.value if event.error_code is not None else None,
+                "detail": dict(event.detail),
+            }
+    total_ms = round((time.monotonic() - started) * 1000.0, 3)
+    return {
+        "ok": error is None and first_token_ms is not None,
+        "first_token_ms": first_token_ms,
+        "total_stream_ms": total_ms,
+        "completion_tokens": completion_tokens,
+        "generated_text": "".join(generated_text),
+        "error": error,
+    }
+
+
 async def _run_mode(
     *,
     backend: str,
@@ -403,6 +470,7 @@ async def _run_mode(
     session_id: str,
     measurement_mode: str,
     evidence_strength: str,
+    execution_boundary: str,
 ) -> list[dict[str, Any]]:
     _ = backend
     with _session_cache_env(cache_enabled):
@@ -441,6 +509,7 @@ async def _run_mode(
                         "backend": backend,
                         "measurement_mode": measurement_mode,
                         "evidence_strength": evidence_strength,
+                        "execution_boundary": execution_boundary,
                         "cache_enabled": cache_enabled,
                         "round": round_idx,
                         "phase": "cold" if round_idx == 1 else "warm",
@@ -468,6 +537,84 @@ async def _run_mode(
                     transcript = f"{prompt}{measurement['generated_text']}\n"
         finally:
             kernel.unload_model(model_id)
+        return records
+
+
+def _run_mode_direct_native(
+    *,
+    backend: str,
+    cache_enabled: bool,
+    runtime: str,
+    model_id: str,
+    model_memory_gb: float,
+    rounds: int,
+    prompt_chars: int,
+    max_tokens: int,
+    session_id: str,
+    measurement_mode: str,
+    evidence_strength: str,
+    execution_boundary: str,
+) -> list[dict[str, Any]]:
+    with _session_cache_env(cache_enabled):
+        native = MlxNativeBackend()
+        load = native.load(model_id, memory_gb=model_memory_gb)
+        if not load.ok:
+            raise RuntimeError(f"load failed for {model_id}: {load.message}")
+        records: list[dict[str, Any]] = []
+        transcript = ""
+        previous_counters = dict(_native_session_cache_status(native).get("counters", {}))
+        try:
+            for round_idx in range(1, rounds + 1):
+                prompt = _build_prompt(
+                    prompt_chars=prompt_chars,
+                    round_idx=round_idx,
+                    transcript=transcript,
+                )
+                measurement = _measure_direct_native_stream_ttft(
+                    native,
+                    model_id=model_id,
+                    prompt=prompt,
+                    session_id=session_id,
+                    max_tokens=max_tokens,
+                )
+                status = _native_session_cache_status(native)
+                counters = dict(status.get("counters", {}))
+                delta = _counter_delta(previous_counters, counters)
+                previous_counters = counters
+                records.append(
+                    {
+                        "runtime": runtime,
+                        "backend": backend,
+                        "measurement_mode": measurement_mode,
+                        "evidence_strength": evidence_strength,
+                        "execution_boundary": execution_boundary,
+                        "cache_enabled": cache_enabled,
+                        "round": round_idx,
+                        "phase": "cold" if round_idx == 1 else "warm",
+                        "model_id": model_id,
+                        "session_id": session_id,
+                        "prompt_chars": len(prompt),
+                        "max_tokens": max_tokens,
+                        "first_token_ms": measurement["first_token_ms"],
+                        "total_stream_ms": measurement["total_stream_ms"],
+                        "completion_tokens": measurement["completion_tokens"],
+                        "ok": measurement["ok"],
+                        "error": measurement["error"],
+                        "session_kv_cache": {
+                            "enabled": status.get("enabled"),
+                            "active_entries": status.get("active_entries"),
+                            "counters": status.get("counters", {}),
+                        },
+                        "session_kv_cache_counter_delta": delta,
+                        "hit": _counter_value(delta, "hits") > 0,
+                        "miss": _counter_value(delta, "misses") > 0,
+                        "drop": _counter_value(delta, "drops") > 0,
+                    }
+                )
+                if measurement["ok"]:
+                    transcript = f"{prompt}{measurement['generated_text']}\n"
+        finally:
+            native.unload(model_id)
         return records
 
 
@@ -582,6 +729,49 @@ async def _probe_request(
     )
 
 
+def _probe_request_direct_native(
+    native: MlxNativeBackend,
+    *,
+    model_id: str,
+    session_id: str,
+    label: str,
+    max_tokens: int,
+    previous_counters: dict[str, Any],
+    prompt_chars: int = 256,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    prompt = _build_prompt(prompt_chars=prompt_chars, round_idx=1, transcript="")
+    measurement = _measure_direct_native_stream_ttft(
+        native,
+        model_id=model_id,
+        prompt=prompt,
+        session_id=session_id,
+        max_tokens=max_tokens,
+    )
+    status = _native_session_cache_status(native)
+    counters = dict(status.get("counters", {}))
+    delta = _counter_delta(previous_counters, counters)
+    return (
+        {
+            "label": label,
+            "session_id": session_id,
+            "ok": bool(measurement["ok"]),
+            "first_token_ms": measurement["first_token_ms"],
+            "hit": _counter_value(delta, "hits") > 0,
+            "miss": _counter_value(delta, "misses") > 0,
+            "drop": _counter_value(delta, "drops") > 0,
+            "session_kv_cache": {
+                "enabled": status.get("enabled"),
+                "active_entries": status.get("active_entries"),
+                "counters": counters,
+                "entries": status.get("entries", []),
+            },
+            "session_kv_cache_counter_delta": delta,
+            "error": measurement["error"],
+        },
+        counters,
+    )
+
+
 def _load_probe_kernel(*, model_id: str, model_memory_gb: float) -> RuntimeKernel:
     native = MlxNativeBackend()
     kernel = RuntimeKernel(
@@ -592,6 +782,14 @@ def _load_probe_kernel(*, model_id: str, model_memory_gb: float) -> RuntimeKerne
     if not load.ok:
         raise RuntimeError(f"probe load failed for {model_id}: {load.message}")
     return kernel
+
+
+def _load_probe_native(*, model_id: str, model_memory_gb: float) -> MlxNativeBackend:
+    native = MlxNativeBackend()
+    load = native.load(model_id, memory_gb=model_memory_gb)
+    if not load.ok:
+        raise RuntimeError(f"probe load failed for {model_id}: {load.message}")
+    return native
 
 
 async def _run_b1a_lru_probe(
@@ -815,7 +1013,7 @@ async def _run_b1a_restart_probe(
             kernel.unload_model(model_id)
 
 
-async def _run_b1a_subprobes(
+def _run_b1a_lru_probe_direct_native(
     *,
     model_id: str,
     model_memory_gb: float,
@@ -823,9 +1021,247 @@ async def _run_b1a_subprobes(
     session_prefix: str,
     evidence_strength: str,
 ) -> dict[str, Any]:
+    with _session_cache_env(True, max_entries=1):
+        native = _load_probe_native(model_id=model_id, model_memory_gb=model_memory_gb)
+        previous = dict(_native_session_cache_status(native).get("counters", {}))
+        events: list[dict[str, Any]] = []
+        try:
+            event, previous = _probe_request_direct_native(
+                native,
+                model_id=model_id,
+                session_id=f"{session_prefix}-lru-a",
+                label="create_session_a",
+                max_tokens=max_tokens,
+                previous_counters=previous,
+            )
+            events.append(event)
+            event, previous = _probe_request_direct_native(
+                native,
+                model_id=model_id,
+                session_id=f"{session_prefix}-lru-b",
+                label="create_session_b_evict_a",
+                max_tokens=max_tokens,
+                previous_counters=previous,
+            )
+            events.append(event)
+            event, previous = _probe_request_direct_native(
+                native,
+                model_id=model_id,
+                session_id=f"{session_prefix}-lru-a",
+                label="retry_session_a_after_eviction",
+                max_tokens=max_tokens,
+                previous_counters=previous,
+            )
+            events.append(event)
+            counters = events[-1]["session_kv_cache"]["counters"]
+            evictions = _counter_value(counters, "evictions")
+            passed = (
+                all(bool(item["ok"]) for item in events)
+                and evictions >= 1
+                and bool(events[-1]["miss"])
+                and not bool(events[-1]["drop"])
+            )
+            return {
+                "passed": passed,
+                "status": "passed" if passed else "failed",
+                "evidence_strength": evidence_strength,
+                "execution_boundary": "direct-native",
+                "eviction_counter_increased": evictions >= 1,
+                "post_eviction_miss_recover": bool(events[-1]["miss"])
+                and bool(events[-1]["ok"]),
+                "watermark_fatal_observed": False,
+                "events": events,
+            }
+        finally:
+            native.unload(model_id)
+
+
+def _run_b1a_ttl_probe_direct_native(
+    *,
+    model_id: str,
+    model_memory_gb: float,
+    max_tokens: int,
+    session_prefix: str,
+    evidence_strength: str,
+) -> dict[str, Any]:
+    with _session_cache_env(True, ttl_s=0.001):
+        native = _load_probe_native(model_id=model_id, model_memory_gb=model_memory_gb)
+        previous = dict(_native_session_cache_status(native).get("counters", {}))
+        events: list[dict[str, Any]] = []
+        try:
+            event, previous = _probe_request_direct_native(
+                native,
+                model_id=model_id,
+                session_id=f"{session_prefix}-ttl",
+                label="create_session",
+                max_tokens=max_tokens,
+                previous_counters=previous,
+            )
+            events.append(event)
+            time.sleep(0.01)
+            event, previous = _probe_request_direct_native(
+                native,
+                model_id=model_id,
+                session_id=f"{session_prefix}-ttl",
+                label="request_after_ttl",
+                max_tokens=max_tokens,
+                previous_counters=previous,
+            )
+            events.append(event)
+            counters = events[-1]["session_kv_cache"]["counters"]
+            expirations = _counter_value(counters, "expirations")
+            passed = (
+                all(bool(item["ok"]) for item in events)
+                and expirations >= 1
+                and bool(events[-1]["miss"])
+            )
+            return {
+                "passed": passed,
+                "status": "passed" if passed else "failed",
+                "evidence_strength": evidence_strength,
+                "execution_boundary": "direct-native",
+                "expiration_counter_increased": expirations >= 1,
+                "post_expire_miss_new_session": bool(events[-1]["miss"])
+                and bool(events[-1]["ok"]),
+                "events": events,
+            }
+        finally:
+            native.unload(model_id)
+
+
+def _run_b1a_restart_probe_direct_native(
+    *,
+    model_id: str,
+    model_memory_gb: float,
+    max_tokens: int,
+    session_prefix: str,
+    evidence_strength: str,
+) -> dict[str, Any]:
+    with _session_cache_env(True):
+        native = _load_probe_native(model_id=model_id, model_memory_gb=model_memory_gb)
+        previous = dict(_native_session_cache_status(native).get("counters", {}))
+        events: list[dict[str, Any]] = []
+        restart_payload: dict[str, Any] = {}
+        try:
+            event, previous = _probe_request_direct_native(
+                native,
+                model_id=model_id,
+                session_id=f"{session_prefix}-restart",
+                label="create_session",
+                max_tokens=max_tokens,
+                previous_counters=previous,
+            )
+            events.append(event)
+            event, previous = _probe_request_direct_native(
+                native,
+                model_id=model_id,
+                session_id=f"{session_prefix}-restart",
+                label="warm_hit_before_restart",
+                max_tokens=max_tokens,
+                previous_counters=previous,
+            )
+            events.append(event)
+            before_restart = _native_session_cache_status(native)
+            before_restart_counters = dict(before_restart.get("counters", {}))
+            unload = native.unload(model_id)
+            after_unload = _native_session_cache_status(native)
+            after_unload_counters = dict(after_unload.get("counters", {}))
+            unload_delta = _counter_delta(before_restart_counters, after_unload_counters)
+            load = native.load(model_id, memory_gb=model_memory_gb)
+            if not load.ok:
+                raise RuntimeError(f"probe reload failed for {model_id}: {load.message}")
+            after_reload = _native_session_cache_status(native)
+            after_reload_counters = dict(after_reload.get("counters", {}))
+            restart_payload = {
+                "ok": bool(unload.ok and load.ok),
+                "method": "direct_native_unload_load",
+                "runtime_kernel_restart_model_used": False,
+                "unload": {
+                    "ok": unload.ok,
+                    "message": unload.message,
+                    "model_id": unload.model_id,
+                    "freed_gb": unload.freed_gb,
+                },
+                "load": {
+                    "ok": load.ok,
+                    "message": load.message,
+                },
+                "session_kv_cache_after_unload": {
+                    "active_entries": after_unload.get("active_entries"),
+                    "counters": after_unload_counters,
+                },
+                "session_kv_cache_after_reload": {
+                    "active_entries": after_reload.get("active_entries"),
+                    "counters": after_reload_counters,
+                },
+                "session_kv_cache_counter_delta": unload_delta,
+            }
+            previous = after_reload_counters
+            event, previous = _probe_request_direct_native(
+                native,
+                model_id=model_id,
+                session_id=f"{session_prefix}-restart",
+                label="post_restart_miss",
+                max_tokens=max_tokens,
+                previous_counters=previous,
+            )
+            events.append(event)
+            event, previous = _probe_request_direct_native(
+                native,
+                model_id=model_id,
+                session_id=f"{session_prefix}-restart",
+                label="post_restart_warm_hit",
+                max_tokens=max_tokens,
+                previous_counters=previous,
+            )
+            events.append(event)
+            old_entry_dropped = (
+                _counter_value(unload_delta, "drops") >= 1
+                and int(after_unload.get("active_entries") or 0) == 0
+            )
+            reclaim_verified = bool(unload.ok)
+            passed = (
+                bool(unload.ok and load.ok)
+                and old_entry_dropped
+                and bool(events[-2]["miss"])
+                and bool(events[-1]["hit"])
+                and reclaim_verified
+                and all(bool(item["ok"]) for item in events)
+            )
+            return {
+                "passed": passed,
+                "status": "passed" if passed else "failed",
+                "evidence_strength": evidence_strength,
+                "execution_boundary": "direct-native",
+                "restart_method": "direct_native_unload_load",
+                "runtime_kernel_restart_model_used": False,
+                "restart_success": bool(unload.ok and load.ok),
+                "old_session_entry_dropped": old_entry_dropped,
+                "post_restart_miss_new_session": bool(events[-2]["miss"]),
+                "second_post_restart_warm_hit": bool(events[-1]["hit"]),
+                "reclaim_verified": reclaim_verified,
+                "restart": restart_payload,
+                "events": events,
+            }
+        finally:
+            native.unload(model_id)
+
+
+async def _run_b1a_subprobes(
+    *,
+    model_id: str,
+    model_memory_gb: float,
+    max_tokens: int,
+    session_prefix: str,
+    evidence_strength: str,
+    execution_boundary: str,
+) -> dict[str, Any]:
     async def guarded(name: str, runner: Any) -> tuple[str, dict[str, Any]]:
         try:
-            return name, await runner()
+            result = runner()
+            if isawaitable(result):
+                result = await result
+            return name, result
         except Exception as exc:
             return name, {
                 "passed": False,
@@ -835,38 +1271,72 @@ async def _run_b1a_subprobes(
                 "events": [],
             }
 
-    results = [
-        await guarded(
-            "A3_session_lru_eviction",
-            lambda: _run_b1a_lru_probe(
-                model_id=model_id,
-                model_memory_gb=model_memory_gb,
-                max_tokens=max_tokens,
-                session_prefix=session_prefix,
-                evidence_strength=evidence_strength,
+    if execution_boundary == "direct-native":
+        results = [
+            await guarded(
+                "A3_session_lru_eviction",
+                lambda: _run_b1a_lru_probe_direct_native(
+                    model_id=model_id,
+                    model_memory_gb=model_memory_gb,
+                    max_tokens=max_tokens,
+                    session_prefix=session_prefix,
+                    evidence_strength=evidence_strength,
+                ),
             ),
-        ),
-        await guarded(
-            "A4_session_ttl",
-            lambda: _run_b1a_ttl_probe(
-                model_id=model_id,
-                model_memory_gb=model_memory_gb,
-                max_tokens=max_tokens,
-                session_prefix=session_prefix,
-                evidence_strength=evidence_strength,
+            await guarded(
+                "A4_session_ttl",
+                lambda: _run_b1a_ttl_probe_direct_native(
+                    model_id=model_id,
+                    model_memory_gb=model_memory_gb,
+                    max_tokens=max_tokens,
+                    session_prefix=session_prefix,
+                    evidence_strength=evidence_strength,
+                ),
             ),
-        ),
-        await guarded(
-            "A5_runtime_restart",
-            lambda: _run_b1a_restart_probe(
-                model_id=model_id,
-                model_memory_gb=model_memory_gb,
-                max_tokens=max_tokens,
-                session_prefix=session_prefix,
-                evidence_strength=evidence_strength,
+            await guarded(
+                "A5_runtime_restart",
+                lambda: _run_b1a_restart_probe_direct_native(
+                    model_id=model_id,
+                    model_memory_gb=model_memory_gb,
+                    max_tokens=max_tokens,
+                    session_prefix=session_prefix,
+                    evidence_strength=evidence_strength,
+                ),
             ),
-        ),
-    ]
+        ]
+    else:
+        results = [
+            await guarded(
+                "A3_session_lru_eviction",
+                lambda: _run_b1a_lru_probe(
+                    model_id=model_id,
+                    model_memory_gb=model_memory_gb,
+                    max_tokens=max_tokens,
+                    session_prefix=session_prefix,
+                    evidence_strength=evidence_strength,
+                ),
+            ),
+            await guarded(
+                "A4_session_ttl",
+                lambda: _run_b1a_ttl_probe(
+                    model_id=model_id,
+                    model_memory_gb=model_memory_gb,
+                    max_tokens=max_tokens,
+                    session_prefix=session_prefix,
+                    evidence_strength=evidence_strength,
+                ),
+            ),
+            await guarded(
+                "A5_runtime_restart",
+                lambda: _run_b1a_restart_probe(
+                    model_id=model_id,
+                    model_memory_gb=model_memory_gb,
+                    max_tokens=max_tokens,
+                    session_prefix=session_prefix,
+                    evidence_strength=evidence_strength,
+                ),
+            ),
+        ]
     return dict(results)
 
 
@@ -884,6 +1354,7 @@ def _build_b1a_ledger(
     subprobes: dict[str, Any],
     measurement_mode: str,
     evidence_strength: str,
+    execution_boundary: str,
     output_path: Path,
 ) -> dict[str, Any]:
     disabled_summary = _b1a_summary(disabled_records, cache_enabled=False)
@@ -923,11 +1394,13 @@ def _build_b1a_ledger(
         "runtime": runtime,
         "backend": "native" if backend == "fake" else backend,
         "backend_mode": backend,
+        "execution_boundary": execution_boundary,
         "measurement_mode": measurement_mode,
         "evidence_strength": evidence_strength,
         "model": _b1a_model_metadata(model_id=model_id, backend=backend),
         "config": {
             "OWLMLX_SESSION_CACHE_ENABLED": "1",
+            "execution_boundary": execution_boundary,
             "session_id": session_id,
             "temperature": 0.0,
             "seed": 42,
@@ -1001,6 +1474,7 @@ def run_session_kv_cache_ttft(
     fake_cold_prefill_ms: float = 20.0,
     fake_warm_prefill_ms: float = 2.0,
     gate: str = "baseline",
+    execution_boundary: str = "auto",
 ) -> dict[str, Any]:
     normalized_gate = _normalize_gate(gate)
     if runtime != "owlmlx":
@@ -1011,6 +1485,11 @@ def run_session_kv_cache_ttft(
         raise ValueError("--rounds must be >= 2 so warm-cache TTFT can be measured")
     if prompt_chars < 1:
         raise ValueError("--prompt-chars must be >= 1")
+    resolved_execution_boundary = _resolve_execution_boundary(
+        execution_boundary=execution_boundary,
+        gate=normalized_gate,
+        backend=backend,
+    )
 
     if normalized_gate == B1A_GATE:
         run_id = f"{_now_compact_utc()}-b1a-gemma4-31b-it-session-kv-ttft"
@@ -1048,6 +1527,7 @@ def run_session_kv_cache_ttft(
             session_id=session_id,
             measurement_mode=measurement_mode,
             evidence_strength=evidence_strength,
+            execution_boundary=resolved_execution_boundary,
         )
         enabled = await _run_mode(
             backend=backend,
@@ -1061,6 +1541,7 @@ def run_session_kv_cache_ttft(
             session_id=session_id,
             measurement_mode=measurement_mode,
             evidence_strength=evidence_strength,
+            execution_boundary=resolved_execution_boundary,
         )
         subprobes: dict[str, Any] = {}
         if normalized_gate == B1A_GATE:
@@ -1070,6 +1551,54 @@ def run_session_kv_cache_ttft(
                 max_tokens=max_tokens,
                 session_prefix=session_id,
                 evidence_strength=evidence_strength,
+                execution_boundary=resolved_execution_boundary,
+            )
+        return disabled, enabled, subprobes
+
+    def run_pair_direct_native() -> tuple[
+        list[dict[str, Any]],
+        list[dict[str, Any]],
+        dict[str, Any],
+    ]:
+        disabled = _run_mode_direct_native(
+            backend=backend,
+            cache_enabled=False,
+            runtime=runtime,
+            model_id=model_id,
+            model_memory_gb=model_memory_gb,
+            rounds=rounds,
+            prompt_chars=prompt_chars,
+            max_tokens=max_tokens,
+            session_id=session_id,
+            measurement_mode=measurement_mode,
+            evidence_strength=evidence_strength,
+            execution_boundary=resolved_execution_boundary,
+        )
+        enabled = _run_mode_direct_native(
+            backend=backend,
+            cache_enabled=True,
+            runtime=runtime,
+            model_id=model_id,
+            model_memory_gb=model_memory_gb,
+            rounds=rounds,
+            prompt_chars=prompt_chars,
+            max_tokens=max_tokens,
+            session_id=session_id,
+            measurement_mode=measurement_mode,
+            evidence_strength=evidence_strength,
+            execution_boundary=resolved_execution_boundary,
+        )
+        subprobes: dict[str, Any] = {}
+        if normalized_gate == B1A_GATE:
+            subprobes = asyncio.run(
+                _run_b1a_subprobes(
+                    model_id=model_id,
+                    model_memory_gb=model_memory_gb,
+                    max_tokens=max_tokens,
+                    session_prefix=session_id,
+                    evidence_strength=evidence_strength,
+                    execution_boundary=resolved_execution_boundary,
+                )
             )
         return disabled, enabled, subprobes
 
@@ -1078,9 +1607,15 @@ def run_session_kv_cache_ttft(
             cold_prefill_ms=fake_cold_prefill_ms,
             warm_prefill_ms=fake_warm_prefill_ms,
         ):
-            disabled_records, enabled_records, subprobes = asyncio.run(run_pair())
+            if resolved_execution_boundary == "direct-native":
+                disabled_records, enabled_records, subprobes = run_pair_direct_native()
+            else:
+                disabled_records, enabled_records, subprobes = asyncio.run(run_pair())
     else:
-        disabled_records, enabled_records, subprobes = asyncio.run(run_pair())
+        if resolved_execution_boundary == "direct-native":
+            disabled_records, enabled_records, subprobes = run_pair_direct_native()
+        else:
+            disabled_records, enabled_records, subprobes = asyncio.run(run_pair())
 
     records = disabled_records + enabled_records
 
@@ -1098,6 +1633,7 @@ def run_session_kv_cache_ttft(
             subprobes=subprobes,
             measurement_mode=measurement_mode,
             evidence_strength=evidence_strength,
+            execution_boundary=resolved_execution_boundary,
             output_path=output_path,
         )
         with output_path.open("w", encoding="utf-8") as stream:
@@ -1126,6 +1662,7 @@ def run_session_kv_cache_ttft(
         "run_id": run_id,
         "runtime": runtime,
         "backend": backend,
+        "execution_boundary": resolved_execution_boundary,
         "measurement_mode": measurement_mode,
         "evidence_strength": evidence_strength,
         "rounds": rounds,
@@ -1152,6 +1689,11 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--runtime", choices=("owlmlx", "omlx", "vmlx"), default="owlmlx")
     parser.add_argument("--backend", choices=("fake", "native"), default="fake")
+    parser.add_argument(
+        "--execution-boundary",
+        choices=EXECUTION_BOUNDARIES,
+        default="auto",
+    )
     parser.add_argument("--model", default=None)
     parser.add_argument("--model-gb", type=float, default=1.0)
     parser.add_argument("--rounds", type=int, default=None)
@@ -1193,6 +1735,7 @@ def main(argv: list[str] | None = None) -> int:
             fake_cold_prefill_ms=args.fake_cold_prefill_ms,
             fake_warm_prefill_ms=args.fake_warm_prefill_ms,
             gate=gate,
+            execution_boundary=args.execution_boundary,
         )
     except Exception as exc:
         print(f"session_kv_cache_ttft failed: {exc}", file=sys.stderr)
