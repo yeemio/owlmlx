@@ -11,7 +11,7 @@
 
 ## 1. Context（≤ 3 句）
 
-Qwen3.6-27B-4bit 已实证 session KV warm p50 TTFT 4026.099 ms → 543.389 ms（**7.409×**）。B-1a 验证同一 cache 机制在第二模型 / 第二形状（**Gemma 4-31B-it**）上**复现**，并同时关闭 §VI G1（Cache Parity = native 与 subprocess backend 在非 cache 路径下生成 tokens 字节等价 N≥5）。
+Qwen3.6-27B-4bit 已实证 session KV warm p50 TTFT 4026.099 ms → 543.389 ms（**7.409×**）。B-1a 验证同一 cache 机制在第二模型 / 第二形状（**Gemma 4-31B-it**）上**复现**，并同时关闭 §VI G1（Cache Parity = native 与 subprocess backend 在非 cache 路径下生成文本字节等价 N≥5；token IDs 仅在现有接口可获得时作为增强字段）。
 
 ---
 
@@ -20,7 +20,7 @@ Qwen3.6-27B-4bit 已实证 session KV warm p50 TTFT 4026.099 ms → 543.389 ms�
 ### 2.1 In Scope（本 gate 必做）
 
 - **Part A**：Gemma 4-31B-it 在 native backend + session KV 启用下的 warm TTFT 改善 + 5 类 cache 语义（hit / miss / eviction / TTL / restart）一致性
-- **Part B**：Gemma 4-31B-it 在 native backend 与 subprocess backend 之间，非 cache 路径下的 generation tokens 字节等价（N≥5 prompt）
+- **Part B**：Gemma 4-31B-it 在 native backend 与 subprocess backend 之间，非 cache 路径下的 generated text UTF-8 bytes 等价（N≥5 prompt）；若 backend 已暴露 token IDs，同步记录 token IDs 等价性
 
 ### 2.2 Out of Scope（**禁止**在本 gate 内做）
 
@@ -63,18 +63,18 @@ Qwen3.6-27B-4bit 已实证 session KV warm p50 TTFT 4026.099 ms → 543.389 ms�
 | Prompt 形态 | append-only multi-round 对话 |
 | Prompt 长度（最终轮） | ≈ 4 200 chars（与 baseline 一致） |
 | Rounds | 4（1 cold + 3 warm） |
-| `max_tokens` | 64（小输出，只验证 first_token 触发） |
+| `max_tokens` | 2（与 Qwen3.6 baseline `20260512T123316Z-owlmlx-native-session-kv-ttft-n4.jsonl` 保持一致；只验证 first-token / prefill 路径） |
 | Round 间间隔 | 与 baseline harness 一致；不主动延长 |
 
 #### 3.1.C 子探针（A.1 – A.5）
 
 | ID | 探针 | 内容 | 必通过条件 |
 |---|---|---|---|
-| **A.1** | Warm TTFT 改善 | 4 rounds enabled vs 4 rounds disabled（同 prompt / 同 host / 同 run） | `improvement_ratio_p50 >= 1.5`（绝对倍率不强求 7.4×，但必须明显单调改善） |
+| **A.1** | Warm TTFT 改善 | 4 rounds enabled vs 4 rounds disabled（同 prompt / 同 host / 同 run） | `improvement_ratio_p50 >= 1.5`；enabled warm p50 必须低于 disabled warm p50；记录 min / p50 / max，不要求逐轮单调 |
 | **A.2** | Hit / miss / drop 计数 | 在 A.1 enabled 跑期间持续观测 | warm rounds: `hit == true` ≥ 2 / 3；任意 round: `drop == 0`；cold round 必为 miss |
-| **A.3** | Eviction probe | 单独短跑：load Gemma 4 + load 第二个 model 触发 LRU eviction | eviction 事件 captured；evicted session 二次请求 = miss + recover；无 watermark→FATAL |
-| **A.4** | TTL probe | 单独短跑：`set_model_ttl()` 较短值后 `sweep_expired_models()` | session 状态正确过期；过期后请求 = miss + new session |
-| **A.5** | Restart probe | 单独短跑：触发一次显式 child restart（`POST /v1/runtime/restart`） | restart 后 session pathway 恢复；watermark 状态归位；reclaim 验证通过 |
+| **A.3** | Session LRU eviction probe | 单独短跑：设置 `OWLMLX_SESSION_CACHE_MAX_ENTRIES=1`，同模型创建两个 session，触发 session-cache LRU eviction | eviction counter 增长；被驱逐 session 二次请求 = miss + recover；无 watermark→FATAL |
+| **A.4** | Session TTL probe | 单独短跑：设置 `OWLMLX_SESSION_CACHE_TTL_S` 为短值，等待过期后发起同 session 请求 | session cache expiration counter 增长；过期后请求 = miss + new session |
+| **A.5** | Runtime restart probe | 单独短跑：通过 `RuntimeKernel.restart_model()` 或 `POST /v1/runtime/restart` 执行一次 model restart | restart 后旧 session entry 被 drop；首个请求 miss + new session，下一 warm 请求可 hit；watermark 状态归位；reclaim 验证通过 |
 
 **注**：A.3 / A.4 / A.5 是 smoke-level 探针（每个 ≤ 5 min host 时间），不是 soak。完整 soak 在 B-1c。
 
@@ -84,21 +84,24 @@ Qwen3.6-27B-4bit 已实证 session KV warm p50 TTFT 4026.099 ms → 543.389 ms�
 part_A_session_kv_second_model:
   A1_warm_ttft_improvement:
     improvement_ratio_p50: ">= 1.5"
-    monotonic_warm_ttft: true   # round 2/3/4 warm TTFT 不上升趋势
+    enabled_warm_p50_lt_disabled_warm_p50: true
+    warm_min_p50_max_recorded: true
   A2_hit_miss_counters:
     warm_hits_min: 2            # of 3 warm rounds
     drops_total: 0
     cold_round_miss: true
-  A3_eviction_probe:
-    eviction_event_captured: true
+  A3_session_lru_eviction_probe:
+    eviction_counter_increased: true
     post_eviction_miss_recover: true
     watermark_fatal_observed: false
-  A4_ttl_probe:
-    session_expired_after_sweep: true
+  A4_session_ttl_probe:
+    expiration_counter_increased: true
     post_expire_miss_new_session: true
-  A5_restart_probe:
+  A5_runtime_restart_probe:
     restart_success: true
-    post_restart_session_recover: true
+    old_session_entry_dropped: true
+    post_restart_miss_new_session: true
+    second_post_restart_warm_hit: true
     reclaim_verified: true
   conclusion: passed | failed   # 五个子探针全 passed 才可 passed
 ```
@@ -133,11 +136,11 @@ part_A_session_kv_second_model:
 
 对每个 prompt，分别通过两个 backend 调用 generation：
 
-1. 捕获 **token IDs 序列**（非文本；token IDs 是底层标准）
-2. 捕获文本（辅助 debug，非主判定）
-3. 捕获 generation 耗时（辅助元数据，非主判定）
+1. 捕获生成文本的 **UTF-8 byte sequence**（主判定；当前 runtime stream surface 可直接取得）
+2. 若 backend 已通过 `StreamEvent.detail` 或等价内部 harness 暴露 token IDs，则同步捕获 token IDs（增强字段，非首版 gate 阻塞项）
+3. 捕获文本与 generation 耗时（辅助 debug，耗时非主判定）
 
-**主判定**：token IDs 序列**字节等价**。
+**主判定**：生成文本 UTF-8 bytes **完全等价**。Token IDs 等价是增强证据，不作为首版 gate 必要条件，除非下一轮 code-grade 已经无契约漂移地暴露该字段。
 
 #### 3.2.D Part B pass criteria（rolled-up YAML）
 
@@ -146,17 +149,19 @@ part_B_non_cache_byte_equivalence:
   prompts_total: 5
   per_prompt:
     - id: p1
-      token_ids_equivalent: true | false
-      first_divergence_index: null | <int>
+      generated_text_utf8_equivalent: true | false
+      first_byte_divergence_index: null | <int>
+      token_ids_equivalent: true | false | null
+      first_token_id_divergence_index: null | <int>
     # ... p2..p5 同上
-  conclusion: passed | failed   # 5 个 prompt 全 token_ids_equivalent == true 才可 passed
+  conclusion: passed | failed   # 5 个 prompt 全 generated_text_utf8_equivalent == true 才可 passed
   divergence_diagnostic:
     # 仅当 conclusion = failed 时填
     first_failing_prompt: <p1..p5>
-    first_divergence_index: <int>
-    native_token_at_index: <int>
-    subprocess_token_at_index: <int>
-    suspected_root_cause: <one of: sampler / tokenizer / numeric / kv_state / unknown>
+    first_byte_divergence_index: <int>
+    native_byte_at_index: <int>
+    subprocess_byte_at_index: <int>
+    suspected_root_cause: <one of: sampler / tokenizer / numeric / stream_framing / unknown>
 ```
 
 ---
@@ -196,8 +201,8 @@ B_1a_second_model_byte_equiv:
 
 | 脚本路径 | 职责 | 输出 |
 |---|---|---|
-| `scripts/bench/session-kv-cache/b1a-gemma4-31b-session-kv.py` | Part A 全套（A.1 主跑 + A.2 计数 + A.3–A.5 短探针），enabled / disabled 双跑 | `files/evidence/owlmlx/bench/session-kv-cache/<ts>-b1a-gemma4-31b-it-session-kv-ttft.jsonl` |
-| `scripts/bench/native-byte-equivalence/b1a-gemma4-31b-byte-equiv.py` | Part B 全套（5 prompt × 2 backend × 1 run），token IDs 字节比对 | `files/evidence/owlmlx/bench/native-byte-equivalence/<ts>-b1a-gemma4-31b-it-byte-equiv-n5.jsonl` |
+| `scripts/bench/session_kv_cache_ttft.py`（扩展 `--gate b1a-gemma4` / 或轻量 wrapper） | Part A 全套（A.1 主跑 + A.2 计数 + A.3–A.5 短探针），enabled / disabled 双跑；优先复用现有脚本，避免新增平行 harness | `files/evidence/owlmlx/bench/session-kv-cache/<ts>-b1a-gemma4-31b-it-session-kv-ttft.jsonl` |
+| `scripts/bench/native_byte_equivalence.py` | Part B 全套（5 prompt × 2 backend × 1 run），generated text UTF-8 bytes 比对；token IDs 仅可得时记录 | `files/evidence/owlmlx/bench/native-byte-equivalence/<ts>-b1a-gemma4-31b-it-byte-equiv-n5.jsonl` |
 
 **两个脚本均不引入新 Python 模块到 `owlmlx/` 包内**；script-only。CI lint 自动豁免 scripts/。
 
@@ -205,7 +210,7 @@ B_1a_second_model_byte_equiv:
 
 | 风险点 | 排查 | 应对 |
 |---|---|---|
-| `MlxNativeBackend` / `MlxLmSubprocessBackend` 是否 expose **token IDs**（非纯文本） | code-grade 先查 backend 接口 | 如未 expose token IDs，本 gate 阻塞；先单独 round 给 backend 加 token IDs 字段（与 PR #649 vocabulary 风格保持一致），**不**修改任何 contract version |
+| `MlxNativeBackend` / `MlxLmSubprocessBackend` 是否 expose token IDs | code-grade 先查 backend 接口 | 不阻塞首版 gate；首版主判定使用 UTF-8 bytes。若 token IDs 可无契约漂移取得，则作为增强字段记录；若不可得，填 `null` |
 | Gemma 4-31B-it 的 seed 行为 | code-grade 跑 disabled-disabled 对照确认 deterministic | 若 seed 不稳定，本 gate 阻塞；先排查 mlx-lm sampler 配置 |
 | Gemma 4 context window vs ~4.2k baseline | code-grade 跑前确认 | 若 context window 不够，缩短 prompt 至 baseline 的 80%；记录 ledger |
 | Native backend session-scope 是否在 Gemma 4 上有效 | code-grade 第一轮 smoke | 若 native backend 路径在 Gemma 4 上有未知失败模式，先排查 `mlx_native_backend.py` 的模型加载分支 |
@@ -253,7 +258,7 @@ files/evidence/owlmlx/bench/native-byte-equivalence/   # 新建子目录
     "session_id": "b1a-gemma4-31b-<run-id>",
     "temperature": 0.0,
     "seed": 42,
-    "max_tokens": 64,
+    "max_tokens": 2,
     "max_generation_concurrency": 1
   },
   "test_shape": {
@@ -280,9 +285,9 @@ files/evidence/owlmlx/bench/native-byte-equivalence/   # 新建子目录
   },
   "improvement_ratio_p50": <float>,
   "subprobes": {
-    "A3_eviction": { "passed": <bool>, "events": [...] },
-    "A4_ttl":      { "passed": <bool>, "events": [...] },
-    "A5_restart":  { "passed": <bool>, "events": [...] }
+    "A3_session_lru_eviction": { "passed": <bool>, "events": [...] },
+    "A4_session_ttl":          { "passed": <bool>, "events": [...] },
+    "A5_runtime_restart":      { "passed": <bool>, "events": [...] }
   },
   "watermark_fatal_observed": false,
   "verdict": "passed | failed"
@@ -313,32 +318,36 @@ files/evidence/owlmlx/bench/native-byte-equivalence/   # 新建子目录
       "chars": 50,
       "category": "short_factual_qa",
       "native": {
-        "token_ids": [<int>, ...],
-        "text": "<str>",
+        "generated_text": "<str>",
+        "generated_text_utf8_sha256": "<sha256>",
+        "token_ids": [<int>, ...] | null,
         "duration_ms": <float>
       },
       "subprocess": {
-        "token_ids": [<int>, ...],
-        "text": "<str>",
+        "generated_text": "<str>",
+        "generated_text_utf8_sha256": "<sha256>",
+        "token_ids": [<int>, ...] | null,
         "duration_ms": <float>
       },
-      "token_ids_equivalent": <bool>,
-      "first_divergence_index": null | <int>
+      "generated_text_utf8_equivalent": <bool>,
+      "first_byte_divergence_index": null | <int>,
+      "token_ids_equivalent": <bool> | null,
+      "first_token_id_divergence_index": null | <int>
     }
     // p2..p5 同结构
   ],
   "summary": {
     "total_prompts": 5,
-    "equivalent_count": <int>,
+    "utf8_equivalent_count": <int>,
     "divergent_count": <int>
   },
   "verdict": "passed | failed",
   "divergence_diagnostic": null | {
     "first_failing_prompt": "p<N>",
-    "first_divergence_index": <int>,
-    "native_token_at_index": <int>,
-    "subprocess_token_at_index": <int>,
-    "suspected_root_cause": "<one of: sampler | tokenizer | numeric | kv_state | unknown>"
+    "first_byte_divergence_index": <int>,
+    "native_byte_at_index": <int>,
+    "subprocess_byte_at_index": <int>,
+    "suspected_root_cause": "<one of: sampler | tokenizer | numeric | stream_framing | unknown>"
   }
 }
 ```
@@ -353,7 +362,7 @@ files/evidence/owlmlx/bench/native-byte-equivalence/   # 新建子目录
 | **Part A · A.2** drops > 0 或 warm hits < 2/3 | cache 语义不一致 | B-1a 失败；不进入 Part B；归因到 session_kv_cache 的 hit logic 或 eviction policy |
 | **Part A · A.3 / A.4 / A.5** 任一子探针失败 | cache lifecycle 语义在 Gemma 4 上有差异 | B-1a 失败；记录失败子探针 + 归因；不进入 Part B |
 | **Part A 中 watermark→FATAL** | memory governance 紧急保护触发 | B-1a 失败；记录 watermark 跃迁；归因到 Gemma 4 模型尺寸 vs host budget；可能需要重选 baseline 模型 |
-| **Part B** 任一 prompt token IDs divergent | native 与 subprocess 在非 cache 路径下生成不一致 | B-1a 失败；§VI G1 不能关闭；记录 `first_divergence_index` + 怀疑 root cause；触发**单独的归因 round**（不属于 B-1a 范围） |
+| **Part B** 任一 prompt UTF-8 bytes divergent | native 与 subprocess 在非 cache 路径下生成不一致 | B-1a 失败；§VI G1 不能关闭；记录 `first_byte_divergence_index` + 怀疑 root cause；触发**单独的归因 round**（不属于 B-1a 范围） |
 | Harness 自身崩溃（非业务失败） | 工具问题，非 gate 结论 | 不计入 B-1a verdict；修 harness 后重跑；记录到 dev log，不污染 ledger |
 
 **关键纪律**：
@@ -386,7 +395,7 @@ files/evidence/owlmlx/bench/native-byte-equivalence/   # 新建子目录
 design-grade review 通过的条件：
 
 - [ ] Scope `in` / `out` 列表清晰，与 plan-grade 一致
-- [ ] Part A 五子探针字段命名与 plan-grade（`no_swap_soak_stability` 等）风格一致
+- [ ] Part A / Part B 字段命名与 plan-grade `B-1a · second_model_byte_equiv` 风格一致，且不复用 B-1c 的 soak 字段名
 - [ ] Part B 5 prompt 类别覆盖 short / medium / long / code / multi-turn-style
 - [ ] Pass criteria YAML 字段完整可机读
 - [ ] Harness 改动只复用既有，**0** 新 spec-as-code 模块
