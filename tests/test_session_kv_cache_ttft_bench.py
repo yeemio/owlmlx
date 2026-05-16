@@ -25,6 +25,7 @@ def test_fake_session_kv_cache_ttft_writes_jsonl_and_warm_improves(tmp_path):
     )
 
     assert summary["ok"] is True
+    assert summary["gate"] == "baseline"
     assert summary["measurement_mode"] == "synthetic_native_prompt_cache_ttft_smoke"
     assert summary["evidence_strength"] == "smoke_only_no_real_model_or_allocator_claim"
     assert summary["warm_cache_p50_improvement_formula"] == (
@@ -51,6 +52,101 @@ def test_fake_session_kv_cache_ttft_writes_jsonl_and_warm_improves(tmp_path):
     assert enabled[-1]["session_kv_cache"]["counters"]["entries_created"] == 1
     assert enabled[-1]["session_kv_cache"]["counters"]["hits"] == 3
     assert enabled[-1]["first_token_ms"] < disabled[-1]["first_token_ms"]
+
+
+def test_b1a_gemma4_fake_gate_writes_part_a_ledger_schema(tmp_path):
+    summary = session_kv_cache_ttft.run_session_kv_cache_ttft(
+        runtime="owlmlx",
+        backend="fake",
+        model_id="fake-gemma4",
+        model_memory_gb=1.0,
+        rounds=4,
+        prompt_chars=512,
+        output_dir=tmp_path,
+        fake_cold_prefill_ms=24.0,
+        fake_warm_prefill_ms=2.0,
+        gate="b1a-gemma4",
+    )
+
+    assert summary["ok"] is True
+    assert summary["schema_version"] == "b1a.v1"
+    assert summary["gate"] == "B-1a"
+    assert summary["part"] == "A"
+    assert summary["backend"] == "native"
+    assert summary["backend_mode"] == "fake"
+    assert "b1a-gemma4-31b-it-session-kv-ttft" in summary["run_id"]
+    assert summary["config"]["max_tokens"] == 2
+    assert summary["test_shape"]["rounds"] == 4
+    assert summary["model"]["id"] == "gemma-4-31B-it"
+    assert summary["model"]["runtime_model_id"] == "fake-gemma4"
+    assert summary["model"]["metadata_status"] == "not_sampled_fake_backend"
+    assert set(summary["subprobes"]) == {
+        "A3_session_lru_eviction",
+        "A4_session_ttl",
+        "A5_runtime_restart",
+    }
+    assert all(probe["passed"] for probe in summary["subprobes"].values())
+    assert summary["verdict"] == "passed"
+
+    output_path = tmp_path / f"{summary['run_id']}.jsonl"
+    assert summary["output_path"] == str(output_path)
+    records = _records(output_path)
+    assert len(records) == 1
+    assert records[0]["run_id"] == summary["run_id"]
+    assert records[0]["schema_version"] == "b1a.v1"
+    assert sorted(tmp_path.rglob("*.jsonl")) == [output_path]
+
+
+def test_b1a_gemma4_improvement_ratio_uses_disabled_over_enabled_warm_p50(tmp_path):
+    summary = session_kv_cache_ttft.run_session_kv_cache_ttft(
+        runtime="owlmlx",
+        backend="fake",
+        model_id="fake-gemma4",
+        model_memory_gb=1.0,
+        rounds=4,
+        prompt_chars=512,
+        output_dir=tmp_path,
+        fake_cold_prefill_ms=30.0,
+        fake_warm_prefill_ms=3.0,
+        gate="b1a-gemma4",
+    )
+
+    disabled_p50 = summary["disabled_baseline"]["warm_p50_first_token_ms"]
+    enabled_p50 = summary["summary"]["warm_p50_first_token_ms"]
+    assert disabled_p50 is not None
+    assert enabled_p50 is not None
+    assert summary["improvement_ratio_p50"] == round(disabled_p50 / enabled_p50, 3)
+    assert summary["summary"]["A1_warm_ttft_improvement"]["passed"] is True
+    assert summary["summary"]["A2_hit_miss_counters"]["passed"] is True
+
+
+def test_session_kv_cache_ttft_cli_b1a_gate_applies_defaults(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_run(**kwargs):
+        captured.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr(session_kv_cache_ttft, "run_session_kv_cache_ttft", fake_run)
+
+    code = session_kv_cache_ttft.main(
+        [
+            "--gate",
+            "b1a-gemma4",
+            "--backend",
+            "fake",
+            "--output",
+            str(tmp_path),
+        ]
+    )
+
+    assert code == 0
+    assert captured["gate"] == "b1a-gemma4"
+    assert captured["model_id"] == session_kv_cache_ttft.B1A_MODEL_PATH
+    assert captured["rounds"] == 4
+    assert captured["prompt_chars"] == 4200
+    assert captured["max_tokens"] == 2
+    assert captured["output_dir"] == tmp_path
 
 
 def test_session_kv_cache_ttft_requires_owlmlx_runtime(tmp_path):
