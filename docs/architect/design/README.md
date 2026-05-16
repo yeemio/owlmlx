@@ -32,11 +32,17 @@
 
 | Gate | Spec | 状态 | Plan-grade 来源 |
 |---|---|---|---|
-| **B-1a** | [`B-1a-spec.md`](B-1a-spec.md) | 已起草 · 待 design-grade review | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign B-1a |
-| **B-1b** | _pending_ | B-1a 通过且 review 通过后启动 | 同上 Campaign B-1b |
+| **B-1a** | [`B-1a-spec.md`](B-1a-spec.md) | 已通过 · closeout 已落盘 | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign B-1a |
+| **B-1b** | [`B-1b-spec.md`](B-1b-spec.md) | 已起草 · 待 design-grade review | 同上 Campaign B-1b |
 | **B-1c §1** | _pending_ | B-1b 通过后启动 | 同上 Campaign B-1c §1 |
 | **B-1c §2** | _pending_ | §1 通过后启动 | 同上 Campaign B-1c §2 |
 | **Wave H · H1** | _pending_（与 B-1 并行 lane） | 独立 round 启动 | 同上 Wave H |
+
+## 并行 Campaign Specs
+
+| Campaign | Spec | 状态 | Plan-grade 来源 |
+|---|---|---|---|
+| **D1** | [`D1-spec.md`](D1-spec.md) | 已起草 · 待 design-grade review | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
 
 **节奏纪律**：design spec **一次一个**，per round 落盘 + review；不允许批量预先撰写未启动的 gate。
 
