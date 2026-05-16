@@ -179,6 +179,40 @@ B_1a_second_model_byte_equiv:
     unblock_campaign_D_D1: true | false  # overall passed 即 D1 可启动
 ```
 
+#### 2026-05-16 closeout verdict
+
+```yaml
+B_1a_second_model_byte_equiv:
+  part_A_conclusion: passed
+  part_B_conclusion: passed
+  overall_conclusion: passed
+  graduates:
+    G1_cache_parity: true
+    unblock_B_1b: true
+    unblock_campaign_D_D1: true
+  evidence:
+    part_A_runtime_kernel:
+      path: files/evidence/owlmlx/bench/session-kv-cache/20260516T151100Z-b1a-gemma4-31b-it-session-kv-ttft.jsonl
+      execution_boundary: runtime-kernel
+      improvement_ratio_p50: 2.246
+      disabled_warm_p50_first_token_ms: 1542.972
+      enabled_warm_p50_first_token_ms: 687.102
+      warm_hits_total: 3
+      drops_total: 0
+      runtime_kernel_restart_model: completed
+    part_B_byte_equivalence:
+      path: files/evidence/owlmlx/bench/native-byte-equivalence/20260516T144845Z-b1a-gemma4-31b-it-byte-equiv-n5.jsonl
+      prompts: 5
+      utf8_equivalent_count: 5
+      divergent_count: 0
+```
+
+Earlier same-day Part A evidence
+`files/evidence/owlmlx/bench/session-kv-cache/20260516T143603Z-b1a-gemma4-31b-it-session-kv-ttft.jsonl`
+is retained as a failed diagnostic run for the RuntimeKernel/native MLX
+thread-affinity bug. The repaired closeout evidence above supersedes it for
+the B-1a verdict.
+
 ---
 
 ## 4. Harness 改动点（最小）
@@ -409,9 +443,9 @@ design-grade review 通过的条件：
 
 | 顺序 | Spec | 启动条件 |
 |---|---|---|
-| 1 | **`B-1a-spec.md`** ← 本文 · design-grade review 待 | — |
-| 2 | code-grade 实施（独立 round + PR）：scripts/bench/* + harness 微扩 | B-1a spec review 通过 |
-| 3 | B-1a 真实运行 + evidence 落 | code-grade 实施完成 |
-| 4 | B-1a verdict 判定（passed / failed）+ ledger commit | evidence 收齐 |
+| 1 | **`B-1a-spec.md`** design-grade review | completed |
+| 2 | code-grade 实施（独立 round + PR）：scripts/bench/* + harness 微扩 | completed |
+| 3 | B-1a 真实运行 + evidence 落 | completed |
+| 4 | B-1a verdict 判定（passed / failed）+ ledger commit | completed: `passed` |
 | 5 | passed 后：B-1b-spec.md 起草（独立 round） | B-1a verdict = passed |
 | 5' | failed 后：归因 round + 决定是否调整 plan-grade gate 阈值 | B-1a verdict = failed |

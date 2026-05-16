@@ -80,11 +80,13 @@ prefill evidence, not a decode-TPS claim.
 | Model | Backend | Prompt shape | Warm TTFT off | Warm TTFT on | Improvement |
 |---|---|---|---:|---:|---:|
 | Qwen3.6-27B-4bit | native | ~4.2k chars, append-only, 4 rounds | 3397.977 / 4026.099 / 4419.626 ms | 536.325 / 543.389 / 652.471 ms | 7.409x |
+| Gemma 4-31B-it | native via RuntimeKernel | ~4.2k chars, append-only, 4 rounds | 1537.596 / 1542.972 / 1558.077 ms | 679.811 / 687.102 / 695.413 ms | 2.246x |
 
 Warm TTFT columns are `min / p50 / max` across rounds 2-4. Improvement is
 `disabled.warm_p50_first_token_ms / enabled.warm_p50_first_token_ms`. Raw
 evidence:
-`files/evidence/owlmlx/bench/session-kv-cache/20260512T123316Z-owlmlx-native-session-kv-ttft-n4.jsonl`.
+- `files/evidence/owlmlx/bench/session-kv-cache/20260512T123316Z-owlmlx-native-session-kv-ttft-n4.jsonl`
+- `files/evidence/owlmlx/bench/session-kv-cache/20260516T151100Z-b1a-gemma4-31b-it-session-kv-ttft.jsonl`
 
 This remains `experimental`: native backend only, default off, explicit
 session id, append-only reuse for non-trimmable upstream caches.

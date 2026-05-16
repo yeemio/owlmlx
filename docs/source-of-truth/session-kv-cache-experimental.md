@@ -112,12 +112,21 @@ Until then, the default remains off.
 
 Current real-model evidence:
 
-- `files/evidence/owlmlx/bench/session-kv-cache/20260512T123316Z-owlmlx-native-session-kv-ttft-n4.jsonl`
-- Backend/model: native `MlxNativeBackend`, `Qwen3.6-27B-4bit`
-- Shape: 4k system prompt, append-only multi-turn stream, `max_tokens=2`
+- Qwen baseline:
+  `files/evidence/owlmlx/bench/session-kv-cache/20260512T123316Z-owlmlx-native-session-kv-ttft-n4.jsonl`
+  on native `MlxNativeBackend`, `Qwen3.6-27B-4bit`.
+- B-1a Gemma RuntimeKernel evidence:
+  `files/evidence/owlmlx/bench/session-kv-cache/20260516T151100Z-b1a-gemma4-31b-it-session-kv-ttft.jsonl`
+  on native `MlxNativeBackend` through `RuntimeKernel`, `Gemma 4-31B-it`.
+- Shape: 4k system prompt, append-only multi-turn stream, `max_tokens=2`.
 - Formula: `disabled.warm_p50_first_token_ms /
-  enabled.warm_p50_first_token_ms`, where warm means rounds 2-4
-- Result: disabled warm TTFT min/p50/max
-  `3397.977 / 4026.099 / 4419.626 ms`; enabled warm TTFT min/p50/max
-  `536.325 / 543.389 / 652.471 ms`; improvement ratio `7.409x`;
-  session cache counters end at `entries_created=1`, `hits=3`, `drops=0`
+  enabled.warm_p50_first_token_ms`, where warm means rounds 2-4.
+- Results:
+  - Qwen disabled warm TTFT min/p50/max
+    `3397.977 / 4026.099 / 4419.626 ms`; enabled warm TTFT min/p50/max
+    `536.325 / 543.389 / 652.471 ms`; improvement ratio `7.409x`;
+    session cache counters end at `entries_created=1`, `hits=3`, `drops=0`.
+  - Gemma disabled warm TTFT min/p50/max
+    `1537.596 / 1542.972 / 1558.077 ms`; enabled warm TTFT min/p50/max
+    `679.811 / 687.102 / 695.413 ms`; improvement ratio `2.246x`;
+    session cache counters end at `entries_created=1`, `hits=3`, `drops=0`.
