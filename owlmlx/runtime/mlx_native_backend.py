@@ -26,11 +26,13 @@ both backends can be swapped behind the same runtime kernel contract.
 from __future__ import annotations
 
 import os
+import queue
 import threading
 import time
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 from owlmlx.cache_manager import CacheManager, CachedRequestHandle
 from owlmlx.memory_actuator import (
@@ -54,6 +56,7 @@ from .types import (
 
 
 _BACKEND_NAME = "mlx-native"
+_T = TypeVar("_T")
 
 
 @dataclass(slots=True)
@@ -277,6 +280,11 @@ class MlxNativeBackend:
         self._registry_lock = threading.Lock()
         self._last_error: str | None = None
         self._admission = _TicketedAdmission()
+        self._worker = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="owlmlx-native-worker",
+        )
+        self._worker_thread_id: int | None = None
         # C-1.1 wiring: the cache_manager owns the in-process per-request KV
         # cache lifetime. ``_make_fresh_prompt_cache`` delegates to this
         # manager. ``_NativeSession`` cache fields remain populated as a
@@ -305,6 +313,17 @@ class MlxNativeBackend:
         # config (or ``None``) is observable on ``_last_allocator_floor_config``.
         self._allocator_floor_configured = False
         self._last_allocator_floor_config: AllocatorFloorConfig | None = None
+
+    def _run_worker_call(self, fn: Callable[[], _T]) -> _T:
+        self._worker_thread_id = threading.get_ident()
+        return fn()
+
+    def _run_on_worker(self, fn: Callable[[], _T]) -> _T:
+        """Run MLX-touching native work on the backend-owned worker thread."""
+
+        if self._worker_thread_id == threading.get_ident():
+            return fn()
+        return self._worker.submit(self._run_worker_call, fn).result()
 
     # ------------------------------------------------------------------ #
     # KV cache binding
@@ -546,6 +565,16 @@ class MlxNativeBackend:
         *,
         memory_gb: float | None = None,
     ) -> LoadResult:
+        return self._run_on_worker(
+            lambda: self._load_on_worker(model_id, memory_gb=memory_gb)
+        )
+
+    def _load_on_worker(
+        self,
+        model_id: str,
+        *,
+        memory_gb: float | None = None,
+    ) -> LoadResult:
         if not model_id:
             return LoadResult(
                 ok=False,
@@ -614,6 +643,9 @@ class MlxNativeBackend:
         return LoadResult(ok=True, message="loaded", model=info)
 
     def unload(self, model_id: str) -> UnloadResult:
+        return self._run_on_worker(lambda: self._unload_on_worker(model_id))
+
+    def _unload_on_worker(self, model_id: str) -> UnloadResult:
         with self._registry_lock:
             session = self._sessions.pop(model_id, None)
         if session is None:
@@ -765,14 +797,6 @@ class MlxNativeBackend:
                 error_code=RuntimeErrorCode.model_not_loaded,
                 model_id=model_id,
             )
-        mlx_lm, import_error = _import_mlx_lm()
-        if mlx_lm is None:
-            return GenerateResult(
-                ok=False,
-                message=import_error or "mlx_lm unavailable",
-                error_code=RuntimeErrorCode.backend_error,
-                model_id=model_id,
-            )
         max_tokens = int(kwargs.get("max_tokens") or 64)  # type: ignore[arg-type]
         session_id = _non_empty_string(kwargs.pop("session_id", None))
         memory_watermark = _non_empty_string(
@@ -783,21 +807,32 @@ class MlxNativeBackend:
         _ticket, was_queued = self._admission.acquire()
         wait_time_s = time.time() - wait_started
         try:
+            mlx_lm, import_error = self._run_on_worker(_import_mlx_lm)
+            if mlx_lm is None:
+                return GenerateResult(
+                    ok=False,
+                    message=import_error or "mlx_lm unavailable",
+                    error_code=RuntimeErrorCode.backend_error,
+                    model_id=model_id,
+                )
             try:
-                with session.lock:
-                    _ = (session_id, memory_watermark)
-                    prompt_cache = self._make_fresh_prompt_cache(mlx_lm, session)
-                    call_kwargs: dict[str, Any] = {
-                        "prompt": prompt,
-                        "max_tokens": max_tokens,
-                    }
-                    if prompt_cache is not None:
-                        call_kwargs["prompt_cache"] = prompt_cache
-                    text = mlx_lm.generate(
-                        session.model,
-                        session.tokenizer,
-                        **call_kwargs,
-                    )
+                def call_native_generate() -> Any:
+                    with session.lock:
+                        _ = (session_id, memory_watermark)
+                        prompt_cache = self._make_fresh_prompt_cache(mlx_lm, session)
+                        call_kwargs: dict[str, Any] = {
+                            "prompt": prompt,
+                            "max_tokens": max_tokens,
+                        }
+                        if prompt_cache is not None:
+                            call_kwargs["prompt_cache"] = prompt_cache
+                        return mlx_lm.generate(
+                            session.model,
+                            session.tokenizer,
+                            **call_kwargs,
+                        )
+
+                text = self._run_on_worker(call_native_generate)
             except Exception as exc:  # pragma: no cover - defensive
                 session.last_error = str(exc)
                 return GenerateResult(
@@ -810,8 +845,10 @@ class MlxNativeBackend:
             # C-1.2: release the active cache handle before releasing the
             # admission ticket so the manager observes the request as fully
             # closed before the next acquire fires under the gate.
-            self._release_active_cache(session)
-            self._admission.release()
+            try:
+                self._run_on_worker(lambda: self._release_active_cache(session))
+            finally:
+                self._admission.release()
         return GenerateResult(
             ok=True,
             message="generated",
@@ -863,29 +900,124 @@ class MlxNativeBackend:
                 detail={"message": f"model not loaded: {model_id}"},
             )
             return
-        mlx_lm, import_error = _import_mlx_lm()
+        wait_started = time.time()
+        _ticket, was_queued = self._admission.acquire()
+        wait_time_s = time.time() - wait_started
+        try:
+            mlx_lm, import_error = self._run_on_worker(_import_mlx_lm)
+        except BaseException:
+            self._admission.release()
+            raise
         if mlx_lm is None:
-            yield StreamEvent(
-                event="error",
-                model_id=model_id,
-                error_code=RuntimeErrorCode.backend_error,
-                detail={"message": import_error or "mlx_lm unavailable"},
-            )
+            try:
+                yield StreamEvent(
+                    event="error",
+                    model_id=model_id,
+                    error_code=RuntimeErrorCode.backend_error,
+                    detail={"message": import_error or "mlx_lm unavailable"},
+                )
+            finally:
+                self._admission.release()
             return
         max_tokens = int(kwargs.get("max_tokens") or 64)  # type: ignore[arg-type]
         session_id = _non_empty_string(kwargs.pop("session_id", None))
         memory_watermark = _non_empty_string(
             kwargs.pop("session_kv_cache_watermark", None)
         ) or _non_empty_string(kwargs.pop("memory_watermark", None))
+
+        if self._worker_thread_id == threading.get_ident():
+            try:
+                yield from self._stream_generate_on_worker(
+                    model_id,
+                    prompt,
+                    mlx_lm=mlx_lm,
+                    max_tokens=max_tokens,
+                    session_id=session_id,
+                    memory_watermark=memory_watermark,
+                    wait_time_s=wait_time_s,
+                    was_queued=was_queued,
+                )
+            finally:
+                self._admission.release()
+            return
+
+        events: queue.Queue[tuple[str, object | None]] = queue.Queue()
+        stop_requested = threading.Event()
+
+        def run_stream() -> None:
+            try:
+                for event in self._stream_generate_on_worker(
+                    model_id,
+                    prompt,
+                    mlx_lm=mlx_lm,
+                    max_tokens=max_tokens,
+                    session_id=session_id,
+                    memory_watermark=memory_watermark,
+                    wait_time_s=wait_time_s,
+                    was_queued=was_queued,
+                ):
+                    events.put(("event", event))
+                    if stop_requested.is_set():
+                        break
+            except BaseException as exc:  # pragma: no cover - defensive bridge
+                events.put(("error", exc))
+            finally:
+                events.put(("done", None))
+
+        future = self._worker.submit(self._run_worker_call, run_stream)
+        completed = False
+        try:
+            while True:
+                kind, payload = events.get()
+                if kind == "event":
+                    if not isinstance(payload, StreamEvent):
+                        raise RuntimeError("native worker returned invalid stream event")
+                    yield payload
+                    continue
+                if kind == "error":
+                    if isinstance(payload, BaseException):
+                        raise payload
+                    raise RuntimeError("native worker stream failed")
+                if kind == "done":
+                    future.result()
+                    completed = True
+                    break
+                raise RuntimeError(f"unexpected native worker queue item: {kind}")
+        finally:
+            try:
+                if not completed:
+                    stop_requested.set()
+                    future.result()
+            finally:
+                self._admission.release()
+
+    def _stream_generate_on_worker(
+        self,
+        model_id: str,
+        prompt: str,
+        *,
+        mlx_lm: Any,
+        max_tokens: int,
+        session_id: str | None,
+        memory_watermark: str | None,
+        wait_time_s: float,
+        was_queued: bool,
+    ) -> Iterator[StreamEvent]:
+        session = self._sessions.get(model_id)
+        if session is None:
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=RuntimeErrorCode.model_not_loaded,
+                detail={"message": f"model not loaded: {model_id}"},
+            )
+            return
         sequence = 0
         completion_tokens = 0
         finish_reason: str | None = None
         prepared_cache: _PreparedPromptCache | None = None
         generated_token_ids: list[int] = []
         stream_completed_ok = False
-        wait_started = time.time()
-        _ticket, was_queued = self._admission.acquire()
-        wait_time_s = time.time() - wait_started
         try:
             try:
                 with session.lock:
@@ -980,7 +1112,6 @@ class MlxNativeBackend:
                     model_id=session.info.model_id,
                 )
             self._release_active_cache(session)
-            self._admission.release()
 
     def stream_generate_messages(
         self,
@@ -1008,6 +1139,16 @@ class MlxNativeBackend:
                 "mlx_lm.sample_utils.make_sampler",
             ),
             "entry_points_owned_by_owlmlx": False,
+            "thread_affinity": {
+                "worker_owned_by_backend": True,
+                "worker_thread_id": self._worker_thread_id,
+                "mlx_lifecycle_operations": (
+                    "load",
+                    "generate",
+                    "stream_generate",
+                    "unload",
+                ),
+            },
         }
         if not healthy:
             detail["import_error"] = import_error

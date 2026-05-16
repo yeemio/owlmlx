@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
+import sys
+import threading
+import types
 
 from owlmlx.memory_budget import MachineMemoryProfile
 from owlmlx.runtime import FakeBackend, RuntimeErrorCode, RuntimeKernel
@@ -180,6 +184,101 @@ def test_generate_stream_after_load_uses_active_model() -> None:
     assert events[0].model_id == "fake-a"
     assert events[0].wait_time_s is not None
     assert kernel.status_dict()["generation_gate"]["total_served"] == 1
+
+
+def test_kernel_native_backend_lifecycle_stays_on_backend_worker(
+    monkeypatch,
+) -> None:
+    fake = types.ModuleType("mlx_lm")
+    observed: list[tuple[str, int]] = []
+    observed_lock = threading.Lock()
+
+    def record(operation: str) -> None:
+        with observed_lock:
+            observed.append((operation, threading.get_ident()))
+
+    def fake_load(model_id: str) -> tuple[object, object]:
+        record("load")
+        return (object(), object())
+
+    def fake_generate(model, tokenizer, *, prompt, max_tokens, **kwargs):
+        record("generate")
+        return f"generated:{prompt}:{max_tokens}"
+
+    class _FakeToken:
+        def __init__(self, text: str, finish_reason: str | None = None) -> None:
+            self.text = text
+            self.finish_reason = finish_reason
+
+    def fake_stream_generate(model, tokenizer, *, prompt, max_tokens, **kwargs):
+        record("stream_generate")
+        yield _FakeToken("tok", finish_reason="stop")
+
+    fake.load = fake_load  # type: ignore[attr-defined]
+    fake.generate = fake_generate  # type: ignore[attr-defined]
+    fake.stream_generate = fake_stream_generate  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "mlx_lm", fake)
+
+    import owlmlx.runtime.mlx_native_backend as mod
+
+    mod = importlib.reload(mod)
+    try:
+        backend = mod.MlxNativeBackend()
+        fake_core = types.SimpleNamespace(
+            get_active_memory=lambda: 0,
+            get_cache_memory=lambda: 0,
+            clear_cache=lambda: record("unload"),
+        )
+        monkeypatch.setattr(backend, "_try_import_mlx_core", lambda: fake_core)
+        caller_thread_id = threading.get_ident()
+        kernel = RuntimeKernel(
+            backend,
+            profile=_small_profile(),
+            host_pressure_sampler=lambda: {
+                "available": True,
+                "source": "test",
+                "classification": "normal",
+                "reason_code": "test_normal",
+                "reason_message": "test normal",
+            },
+        )
+
+        load = kernel.load_model("fake-native", memory_gb=1.0)
+
+        async def collect_stream():
+            return [
+                event
+                async for event in kernel.generate_stream("hello", max_tokens=2)
+            ]
+
+        stream_events = asyncio.run(collect_stream())
+        generated = asyncio.run(kernel.generate("hi", max_tokens=3))
+        unload = kernel.unload_model("fake-native")
+
+        assert load.ok is True
+        assert [event.event for event in stream_events] == ["token", "done"]
+        assert generated.ok is True
+        assert unload.ok is True
+
+        operation_threads = {
+            operation: thread_id for operation, thread_id in observed
+        }
+        assert set(operation_threads) == {
+            "load",
+            "stream_generate",
+            "generate",
+            "unload",
+        }
+        worker_thread_ids = set(operation_threads.values())
+        assert len(worker_thread_ids) == 1
+        assert caller_thread_id not in worker_thread_ids
+        assert (
+            backend.status().detail["thread_affinity"]["worker_thread_id"]
+            in worker_thread_ids
+        )
+    finally:
+        sys.modules.pop("mlx_lm", None)
+        importlib.reload(mod)
 
 
 def test_generate_stream_releases_gate_before_first_consumer_completes() -> None:
