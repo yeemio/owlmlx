@@ -77,12 +77,32 @@ class _FakeProcess:
             }
             if action == "generate_messages":
                 response["message_count"] = len(payload.get("messages") or [])
-        elif action == "stream_generate":
+        elif action in {"stream_generate", "stream_generate_messages"}:
             self.generation_count += 1
-            text = f"completion-{self.generation_count}"
+            text_prefix = (
+                "messages-stream-completion"
+                if action == "stream_generate_messages"
+                else "completion"
+            )
+            event_action = (
+                "stream_message_event"
+                if action == "stream_generate_messages"
+                else "stream_event"
+            )
+            done_action = (
+                "stream_message_done"
+                if action == "stream_generate_messages"
+                else "stream_done"
+            )
+            terminal_action = (
+                "stream_message_done"
+                if action == "stream_generate_messages"
+                else "stream_done"
+            )
+            text = f"{text_prefix}-{self.generation_count}"
             token = {
                 "ok": True,
-                "action": "stream_event",
+                "action": event_action,
                 "event": "token",
                 "model_id": payload["model_id"],
                 "text": text,
@@ -97,7 +117,7 @@ class _FakeProcess:
             }
             done = {
                 "ok": True,
-                "action": "stream_done",
+                "action": done_action,
                 "event": "done",
                 "model_id": payload["model_id"],
                 "finish_reason": "length",
@@ -113,7 +133,7 @@ class _FakeProcess:
             diagnostic = {
                 "ok": True,
                 "action": "stream_runtime_owned_terminal_boundary",
-                "terminal_action": "stream_done",
+                "terminal_action": terminal_action,
                 "model_id": payload["model_id"],
                 "pid": self.pid,
                 "sequence": 1,
@@ -653,6 +673,103 @@ def test_real_run_stream_surface_records_timing_from_fake_process(monkeypatch, t
     assert record["prompt_results"][0]["timing"]["stream_wall_ms"] == 25.0
     assert record["metrics"]["ttft_ms_by_prompt"] == {"p1_short_cn": 12.5}
     assert record["metrics"]["stream_wall_ms_by_prompt"] == {"p1_short_cn": 25.0}
+    assert record["metrics"]["decode_tps_by_prompt"] == {"p1_short_cn": 10160.0}
+    assert record["metrics"]["wall_tps_by_prompt"] == {"p1_short_cn": 5120.0}
+    assert record["verdict"] == "passed"
+
+
+def test_real_run_stream_messages_surface_records_rss_and_decode_metrics(
+    monkeypatch,
+    tmp_path,
+):
+    model_path = tmp_path / "model"
+    model_path.mkdir()
+    created: list[_FakeProcess] = []
+
+    monkeypatch.setattr(
+        d1,
+        "run_preflight",
+        lambda **kwargs: {"verdict": "passed", "preflight": "passed"},
+    )
+
+    def fake_popen(cmd: list[str], **kwargs: object) -> _FakeProcess:
+        proc = _FakeProcess(cmd, **kwargs)
+        created.append(proc)
+        return proc
+
+    summary = d1.run_real(
+        output_dir=tmp_path,
+        model_path=model_path,
+        run_id="stream-messages-fake",
+        max_prompts=1,
+        max_tokens_ladder=(128,),
+        generation_surface="stream",
+        prompt_surface="messages",
+        timeout_s=1.0,
+        popen_factory=fake_popen,
+        rss_sampler=lambda pid: 1.25,
+    )
+
+    records = _records(tmp_path / "stream-messages-fake.jsonl")
+    assert summary["verdict"] == "passed"
+    assert created[0].stdin.writes[1]["action"] == "stream_generate_messages"
+    record = records[0]
+    assert record["prompt_surface"] == "messages"
+    assert record["prompt_shape"]["surface"] == "chat_messages"
+    assert record["prompt_results"][0]["generation_surface"] == "stream_generate_messages"
+    assert record["prompt_results"][0]["completion_preview"].startswith(
+        "messages-stream-completion-"
+    )
+    assert record["metrics"]["ttft_ms_by_prompt"] == {"p1_short_cn": 12.5}
+    assert record["metrics"]["stream_wall_ms_by_prompt"] == {"p1_short_cn": 25.0}
+    assert record["metrics"]["decode_tps_by_prompt"] == {"p1_short_cn": 10160.0}
+    assert record["metrics"]["wall_tps_by_prompt"] == {"p1_short_cn": 5120.0}
+    assert record["metrics"]["peak_rss_gb"] == 1.25
+
+
+def test_run_metrics_writes_d2_ledger_from_fake_stream(monkeypatch, tmp_path):
+    model_path = tmp_path / "model"
+    model_path.mkdir()
+
+    monkeypatch.setattr(
+        d1,
+        "run_preflight",
+        lambda **kwargs: {"verdict": "passed", "preflight": "passed"},
+    )
+
+    summary = d1.run_metrics(
+        output_dir=tmp_path,
+        model_path=model_path,
+        run_id="metrics-fake",
+        prompt_ids=("p1_short_cn",),
+        max_tokens_ladder=(128,),
+        timeout_s=1.0,
+        popen_factory=lambda cmd, **kwargs: _FakeProcess(cmd, **kwargs),
+        rss_sampler=lambda pid: 1.5,
+    )
+
+    records = _records(tmp_path / "metrics-fake.jsonl")
+    source_records = _records(
+        tmp_path / "source-d1-stream" / "metrics-fake-source-d1-stream.jsonl"
+    )
+    assert summary["schema_version"] == "d2.metrics.run.v1"
+    assert summary["verdict"] == "passed"
+    assert summary["rows_written"] == 1
+    assert summary["passed_rows"] == 1
+    assert summary["missing_metrics"] == []
+    assert len(source_records) == 1
+    record = records[0]
+    assert record["schema_version"] == "d2.metrics.v1"
+    assert record["gate"] == "D2"
+    assert record["source"]["gate"] == "D1"
+    assert record["prompt_surface"] == "messages"
+    assert record["generation_surface"] == "stream_generate_messages"
+    assert record["metrics"]["ttft_ms"] == 12.5
+    assert record["metrics"]["stream_wall_ms"] == 25.0
+    assert record["metrics"]["decode_tps_after_first_token"] == 10160.0
+    assert record["metrics"]["wall_tps"] == 5120.0
+    assert record["metrics"]["peak_rss_gb"] == 1.5
+    assert record["backend_health"]["clean_health_after_unload"] is True
     assert record["verdict"] == "passed"
 
 
@@ -943,6 +1060,60 @@ def test_cli_compare_sampler_overrides_are_forwarded(monkeypatch, tmp_path):
         "min_p": None,
         "top_k": 40,
         "stop": ["<END>"],
+    }
+
+
+def test_cli_metrics_sampler_overrides_are_forwarded(monkeypatch, tmp_path):
+    captured: dict[str, object] = {}
+
+    def fake_metrics(**kwargs: object) -> dict:
+        captured.update(kwargs)
+        return {
+            "schema_version": "d2.metrics.run.v1",
+            "gate": "D2",
+            "runtime": "owlmlx",
+            "model_id": d1.MODEL_ID,
+            "verdict": "passed",
+        }
+
+    monkeypatch.setattr(d1, "run_metrics", fake_metrics)
+
+    code = d1.main(
+        [
+            "metrics",
+            "--output-dir",
+            str(tmp_path),
+            "--run-id",
+            "metrics-cli",
+            "--prompt-id",
+            "p1_short_cn",
+            "--max-tokens",
+            "128",
+            "--max-kv-size",
+            "2048",
+            "--temp",
+            "0.1",
+            "--top-p",
+            "0.8",
+            "--top-k",
+            "20",
+        ]
+    )
+
+    assert code == 0
+    assert captured["run_id"] == "metrics-cli"
+    assert captured["prompt_ids"] == ("p1_short_cn",)
+    assert captured["max_tokens_ladder"] == (128,)
+    assert captured["prompt_surface"] == "messages"
+    assert captured["generation_overrides"] == {
+        "max_kv_size": 2048,
+        "kv_bits": None,
+        "kv_group_size": None,
+        "temperature": 0.1,
+        "top_p": 0.8,
+        "min_p": None,
+        "top_k": 20,
+        "stop": None,
     }
 
 

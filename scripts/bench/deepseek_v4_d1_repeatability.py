@@ -47,6 +47,10 @@ D1_PROMPT_SURFACE_DEFAULT = "messages"
 DEFAULT_OUTPUT_DIR = (
     REPO_ROOT / "files" / "evidence" / "owlmlx" / "deepseek-v4" / "d1-isolated-repeatability"
 )
+D2_EVIDENCE_STRENGTH = "isolated_real_stream_metrics"
+D2_DEFAULT_OUTPUT_DIR = (
+    REPO_ROOT / "files" / "evidence" / "owlmlx" / "deepseek-v4" / "d2-metrics-ledger"
+)
 RUNNER_MODULE = "owlmlx.runtime.mlx_lm_runner"
 
 PROMPTS = (
@@ -495,6 +499,7 @@ def _child_stream_generate(
     *,
     timeout_s: float,
 ) -> dict[str, Any]:
+    request_action = str(request.get("action") or "stream_generate")
     _write_child_request(proc, request)
     text_parts: list[str] = []
     token_event_count = 0
@@ -505,7 +510,7 @@ def _child_stream_generate(
         if not payload.get("ok", False):
             return {
                 "ok": False,
-                "action": "stream_generate",
+                "action": request_action,
                 "text": "".join(text_parts),
                 "error": payload.get("error") or payload.get("message"),
                 "pid": payload.get("pid"),
@@ -517,16 +522,16 @@ def _child_stream_generate(
 
         action = str(payload.get("action") or "")
         event = str(payload.get("event") or "")
-        if action == "stream_event" and event == "token":
+        if action in {"stream_event", "stream_message_event"} and event == "token":
             text_parts.append(str(payload.get("text") or ""))
             token_event_count += 1
             last_token = payload
             continue
-        if action == "stream_done" and event == "done":
+        if action in {"stream_done", "stream_message_done"} and event == "done":
             timing = payload.get("timing") if isinstance(payload.get("timing"), dict) else {}
             return {
                 "ok": True,
-                "action": "stream_generate",
+                "action": request_action,
                 "text": "".join(text_parts),
                 "finish_reason": payload.get("finish_reason")
                 or (last_token or {}).get("finish_reason"),
@@ -649,6 +654,73 @@ def _generation_params(*, max_tokens: int, overrides: dict[str, Any]) -> dict[st
     return params
 
 
+def _as_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _decode_tps_after_first_token(
+    *,
+    completion_tokens: Any,
+    first_visible_token_ms: Any,
+    stream_wall_ms: Any,
+) -> float | None:
+    tokens = _as_float(completion_tokens)
+    ttft_ms = _as_float(first_visible_token_ms)
+    wall_ms = _as_float(stream_wall_ms)
+    if tokens is None or wall_ms is None or tokens <= 1:
+        return None
+    decode_ms = wall_ms - (ttft_ms or 0.0)
+    if decode_ms <= 0:
+        return None
+    return round((tokens - 1.0) / (decode_ms / 1000.0), 4)
+
+
+def _wall_tps(
+    *,
+    completion_tokens: Any,
+    stream_wall_ms: Any,
+) -> float | None:
+    tokens = _as_float(completion_tokens)
+    wall_ms = _as_float(stream_wall_ms)
+    if tokens is None or wall_ms is None or tokens <= 0 or wall_ms <= 0:
+        return None
+    return round(tokens / (wall_ms / 1000.0), 4)
+
+
+def _process_rss_gb(pid: Any, *, run_factory: Any = subprocess.run) -> float | None:
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return None
+    if pid_int <= 0:
+        return None
+    try:
+        proc = run_factory(
+            ["ps", "-o", "rss=", "-p", str(pid_int)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+        )
+    except Exception:
+        return None
+    if proc.returncode != 0:
+        return None
+    lines = str(proc.stdout or "").strip().splitlines()
+    if not lines:
+        return None
+    try:
+        rss_kb = float(lines[-1].strip())
+    except ValueError:
+        return None
+    return round(rss_kb / 1024.0 / 1024.0, 6)
+
+
 def _real_record(
     *,
     run_id: str,
@@ -666,13 +738,27 @@ def _real_record(
     unload_ok: bool,
     clean_health_after_unload: bool,
     load_time_s: float | None,
+    peak_rss_gb: float | None,
     result: dict[str, Any],
     load_pid: Any,
 ) -> dict[str, Any]:
     text = str(result.get("text") or "")
     result_pid = result.get("pid")
     generation_surface = str(result.get("action") or "generate")
-    if generation_surface == "stream_generate":
+    timing = result.get("timing") if isinstance(result.get("timing"), dict) else {}
+    first_visible_token_ms = timing.get("first_visible_token_ms")
+    stream_wall_ms = timing.get("stream_wall_ms")
+    completion_tokens = result.get("completion_tokens")
+    decode_tps = _decode_tps_after_first_token(
+        completion_tokens=completion_tokens,
+        first_visible_token_ms=first_visible_token_ms,
+        stream_wall_ms=stream_wall_ms,
+    )
+    wall_tps = _wall_tps(
+        completion_tokens=completion_tokens,
+        stream_wall_ms=stream_wall_ms,
+    )
+    if generation_surface in {"stream_generate", "stream_generate_messages"}:
         stop_reason = str(result.get("finish_reason") or "unknown")
         stop_reason_source = "stream_done"
     else:
@@ -724,13 +810,13 @@ def _real_record(
                     "stop_reason_source": stop_reason_source,
                     "generation_surface": generation_surface,
                     "prompt_tokens": result.get("prompt_tokens"),
-                    "completion_tokens": result.get("completion_tokens"),
+                    "completion_tokens": completion_tokens,
                     "stream_event_count": result.get("stream_event_count"),
                     "stream_diagnostic_count": result.get("stream_diagnostic_count"),
                     "stream_diagnostics": result.get("stream_diagnostics", []),
                     "stop_strings": stop_strings if isinstance(stop_strings, list) else [],
                     "stop_string_count": stop_string_count,
-                    "timing": result.get("timing") if isinstance(result.get("timing"), dict) else {},
+                    "timing": timing,
                     "restart_observed": restart_observed,
                     "repetition_flag": repetition_flag,
                     "repetition_diagnostics": repetition_diagnostics,
@@ -756,19 +842,22 @@ def _real_record(
             "metrics": {
                 "load_time_s": load_time_s,
                 "ttft_ms_by_prompt": {
-                    prompt_id: result.get("timing", {}).get("first_visible_token_ms")
+                    prompt_id: first_visible_token_ms
                 }
-                if isinstance(result.get("timing"), dict)
-                and result.get("timing", {}).get("first_visible_token_ms") is not None
+                if first_visible_token_ms is not None
                 else {},
-                "decode_tps_by_prompt": {},
+                "decode_tps_by_prompt": {prompt_id: decode_tps}
+                if decode_tps is not None
+                else {},
+                "wall_tps_by_prompt": {prompt_id: wall_tps}
+                if wall_tps is not None
+                else {},
                 "stream_wall_ms_by_prompt": {
-                    prompt_id: result.get("timing", {}).get("stream_wall_ms")
+                    prompt_id: stream_wall_ms
                 }
-                if isinstance(result.get("timing"), dict)
-                and result.get("timing", {}).get("stream_wall_ms") is not None
+                if stream_wall_ms is not None
                 else {},
-                "peak_rss_gb": None,
+                "peak_rss_gb": peak_rss_gb,
             },
             "verdict": "failed" if repetition_flag or not ok else "passed",
         }
@@ -851,6 +940,7 @@ def run_real(
     continue_on_failure: bool = False,
     timeout_s: float = 600.0,
     popen_factory: Any = subprocess.Popen,
+    rss_sampler: Any = _process_rss_gb,
 ) -> dict[str, Any]:
     preflight = run_preflight(
         isolated_python=isolated_python,
@@ -963,6 +1053,7 @@ def run_real(
                     )
                 else:
                     result = _child_exchange(proc, request, timeout_s=timeout_s)
+                peak_rss_gb = rss_sampler(result.get("pid"))
                 rows.append(
                     _real_record(
                         run_id=run_id,
@@ -980,6 +1071,7 @@ def run_real(
                         unload_ok=False,
                         clean_health_after_unload=False,
                         load_time_s=load_time_s,
+                        peak_rss_gb=peak_rss_gb,
                         result=result,
                         load_pid=load_pid,
                     )
@@ -1081,6 +1173,234 @@ def run_real(
         },
         "verdict": verdict,
         **({"error": run_error} if run_error else {}),
+    }
+
+
+def _read_jsonl_rows(path: str | Path | None) -> list[dict[str, Any]]:
+    if not path:
+        return []
+    candidate = Path(path)
+    if not candidate.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in candidate.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        parsed = json.loads(line)
+        if isinstance(parsed, dict):
+            rows.append(parsed)
+    return rows
+
+
+def _metric_from_prompt_map(
+    metrics: dict[str, Any],
+    key: str,
+    prompt_id: str,
+) -> Any:
+    value = metrics.get(key)
+    if isinstance(value, dict):
+        return value.get(prompt_id)
+    return None
+
+
+def _d2_record_from_d1_row(
+    *,
+    run_id: str,
+    output_path: Path,
+    source_run_id: str,
+    source_output_path: str,
+    row: dict[str, Any],
+) -> dict[str, Any]:
+    prompt_results = row.get("prompt_results")
+    first = dict(prompt_results[0]) if isinstance(prompt_results, list) and prompt_results else {}
+    prompt_id = str(row.get("prompt_id") or first.get("prompt_id") or "")
+    metrics = row.get("metrics") if isinstance(row.get("metrics"), dict) else {}
+    lifecycle = row.get("lifecycle") if isinstance(row.get("lifecycle"), dict) else {}
+
+    load_time_s = _as_float(metrics.get("load_time_s"))
+    ttft_ms = _as_float(_metric_from_prompt_map(metrics, "ttft_ms_by_prompt", prompt_id))
+    stream_wall_ms = _as_float(
+        _metric_from_prompt_map(metrics, "stream_wall_ms_by_prompt", prompt_id)
+    )
+    decode_tps = _as_float(
+        _metric_from_prompt_map(metrics, "decode_tps_by_prompt", prompt_id)
+    )
+    wall_tps = _as_float(_metric_from_prompt_map(metrics, "wall_tps_by_prompt", prompt_id))
+    peak_rss_gb = _as_float(metrics.get("peak_rss_gb"))
+    completion_tokens = first.get("completion_tokens")
+    prompt_tokens = first.get("prompt_tokens")
+
+    required = {
+        "load_time_s": load_time_s,
+        "ttft_ms": ttft_ms,
+        "stream_wall_ms": stream_wall_ms,
+        "completion_tokens": completion_tokens,
+        "decode_tps_after_first_token": decode_tps,
+        "peak_rss_gb": peak_rss_gb,
+    }
+    missing_metrics = [key for key, value in required.items() if value is None]
+    backend_health = {
+        "load_ok": bool(lifecycle.get("load_ok")),
+        "generate_ok": bool(lifecycle.get("generate_ok")),
+        "unload_ok": bool(lifecycle.get("unload_ok")),
+        "clean_health_after_unload": bool(lifecycle.get("clean_health_after_unload")),
+        "child_restart_observed": bool(
+            row.get("child_restart_detection", {}).get("restart_observed")
+        )
+        if isinstance(row.get("child_restart_detection"), dict)
+        else None,
+    }
+    verdict = (
+        "passed"
+        if row.get("verdict") == "passed"
+        and not missing_metrics
+        and all(
+            backend_health[key]
+            for key in (
+                "load_ok",
+                "generate_ok",
+                "unload_ok",
+                "clean_health_after_unload",
+            )
+        )
+        and backend_health["child_restart_observed"] is False
+        else "failed"
+    )
+    return {
+        "schema_version": "d2.metrics.v1",
+        "record_type": "metrics_result",
+        "run_id": run_id,
+        "created_at": _now_utc(),
+        "gate": "D2",
+        "runtime": "owlmlx",
+        "model_id": MODEL_ID,
+        "model_type": MODEL_TYPE,
+        "capability_label": "experimental_only",
+        "evidence_strength": D2_EVIDENCE_STRENGTH,
+        "output_path": str(output_path),
+        "source": {
+            "gate": "D1",
+            "schema_version": row.get("schema_version"),
+            "run_id": source_run_id,
+            "output_path": source_output_path,
+            "record_type": row.get("record_type"),
+        },
+        "prompt_index": row.get("prompt_index"),
+        "prompt_id": prompt_id,
+        "prompt_surface": row.get("prompt_surface"),
+        "generation_surface": first.get("generation_surface"),
+        "prompt_shape": row.get("prompt_shape"),
+        "max_tokens": row.get("max_tokens"),
+        "generation_params": row.get("generation_params"),
+        "metrics": {
+            "load_time_s": load_time_s,
+            "ttft_ms": ttft_ms,
+            "stream_wall_ms": stream_wall_ms,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "decode_tps_after_first_token": decode_tps,
+            "wall_tps": wall_tps,
+            "peak_rss_gb": peak_rss_gb,
+            "stream_event_count": first.get("stream_event_count"),
+            "stream_diagnostic_count": first.get("stream_diagnostic_count"),
+        },
+        "backend_health": backend_health,
+        "missing_metrics": missing_metrics,
+        "verdict": verdict,
+    }
+
+
+def run_metrics(
+    *,
+    output_dir: Path = D2_DEFAULT_OUTPUT_DIR,
+    isolated_runtime_path: Path = DEFAULT_ISOLATED_RUNTIME_PATH,
+    isolated_python: Path = DEFAULT_ISOLATED_PYTHON,
+    model_path: Path = DEFAULT_MODEL_PATH,
+    run_id: str | None = None,
+    max_prompts: int | None = None,
+    prompt_ids: tuple[str, ...] | None = None,
+    max_tokens_ladder: tuple[int, ...] = (128,),
+    generation_overrides: dict[str, Any] | None = None,
+    prompt_surface: str = D1_PROMPT_SURFACE_DEFAULT,
+    timeout_s: float = 900.0,
+    popen_factory: Any = subprocess.Popen,
+    rss_sampler: Any = _process_rss_gb,
+) -> dict[str, Any]:
+    output_dir = Path(output_dir)
+    run_id = run_id or f"{_compact_stamp()}-d2-deepseek-v4-metrics"
+    output_path = output_dir / f"{run_id}.jsonl"
+    source_output_dir = output_dir / "source-d1-stream"
+    source_run_id = f"{run_id}-source-d1-stream"
+    generation_overrides = dict(generation_overrides or {})
+    source_summary = run_real(
+        output_dir=source_output_dir,
+        isolated_runtime_path=isolated_runtime_path,
+        isolated_python=isolated_python,
+        model_path=model_path,
+        run_id=source_run_id,
+        max_prompts=max_prompts,
+        prompt_ids=prompt_ids,
+        max_tokens_ladder=max_tokens_ladder,
+        generation_overrides=generation_overrides,
+        generation_surface="stream",
+        prompt_surface=prompt_surface,
+        continue_on_failure=True,
+        timeout_s=timeout_s,
+        popen_factory=popen_factory,
+        rss_sampler=rss_sampler,
+    )
+    source_output_path = str(source_summary.get("output_path") or "")
+    source_rows = _read_jsonl_rows(source_output_path)
+    rows = [
+        _d2_record_from_d1_row(
+            run_id=run_id,
+            output_path=output_path,
+            source_run_id=source_run_id,
+            source_output_path=source_output_path,
+            row=row,
+        )
+        for row in source_rows
+    ]
+    _append_jsonl(output_path, rows)
+    passed_rows = sum(1 for row in rows if row.get("verdict") == "passed")
+    missing_metrics = sorted(
+        {
+            metric
+            for row in rows
+            for metric in list(row.get("missing_metrics") or [])
+        }
+    )
+    verdict = (
+        "passed"
+        if rows
+        and source_summary.get("verdict") == "passed"
+        and passed_rows == len(rows)
+        else "failed"
+    )
+    return {
+        "schema_version": "d2.metrics.run.v1",
+        "run_id": run_id,
+        "gate": "D2",
+        "runtime": "owlmlx",
+        "model_id": MODEL_ID,
+        "evidence_strength": D2_EVIDENCE_STRENGTH,
+        "output_path": str(output_path),
+        "source_output_path": source_output_path,
+        "rows_written": len(rows),
+        "passed_rows": passed_rows,
+        "missing_metrics": missing_metrics,
+        "prompt_surface": prompt_surface,
+        "generation_surface": "stream",
+        "token_ladder": list(max_tokens_ladder),
+        "source_summary": {
+            "schema_version": source_summary.get("schema_version"),
+            "run_id": source_summary.get("run_id"),
+            "verdict": source_summary.get("verdict"),
+            "rows_written": source_summary.get("rows_written"),
+            "coverage": source_summary.get("coverage"),
+            "lifecycle": source_summary.get("lifecycle"),
+        },
+        "verdict": verdict,
     }
 
 
@@ -1541,6 +1861,33 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     return 0 if payload["verdict"] == "diagnostic_passed" else 1
 
 
+def _cmd_metrics(args: argparse.Namespace) -> int:
+    payload = run_metrics(
+        output_dir=args.output_dir,
+        isolated_runtime_path=args.isolated_runtime_path,
+        isolated_python=args.isolated_python,
+        model_path=args.model_path,
+        run_id=args.run_id,
+        max_prompts=args.max_prompts,
+        prompt_ids=tuple(args.prompt_id or ()),
+        max_tokens_ladder=tuple(args.max_tokens),
+        generation_overrides={
+            "max_kv_size": args.max_kv_size,
+            "kv_bits": args.kv_bits,
+            "kv_group_size": args.kv_group_size,
+            "temperature": args.temp,
+            "top_p": args.top_p,
+            "min_p": args.min_p,
+            "top_k": args.top_k,
+            "stop": args.stop,
+        },
+        prompt_surface=args.prompt_surface,
+        timeout_s=args.timeout_s,
+    )
+    _json_print(payload)
+    return 0 if payload["verdict"] == "passed" else 1
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1680,6 +2027,58 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Experimental stop string passed through to both surfaces.",
     )
     compare.set_defaults(func=_cmd_compare)
+
+    metrics = sub.add_parser(
+        "metrics",
+        help="Run isolated D2 stream metrics ledger for DeepSeek V4",
+    )
+    add_common(metrics)
+    metrics.add_argument("--output-dir", type=Path, default=D2_DEFAULT_OUTPUT_DIR)
+    metrics.add_argument("--run-id", default=None)
+    metrics.add_argument(
+        "--max-prompts",
+        type=int,
+        default=None,
+        help="Optional smoke limiter; omit to run the selected prompt set.",
+    )
+    metrics.add_argument(
+        "--prompt-id",
+        action="append",
+        default=None,
+        help="Run only the selected D1 prompt id; repeat for multiple prompts.",
+    )
+    metrics.add_argument(
+        "--max-tokens",
+        type=int,
+        nargs="+",
+        default=[128],
+        help="Metric token ladder; defaults to 128 for a light D2 smoke.",
+    )
+    metrics.add_argument("--timeout-s", type=float, default=900.0)
+    metrics.add_argument(
+        "--prompt-surface",
+        choices=("raw", "messages"),
+        default=D1_PROMPT_SURFACE_DEFAULT,
+        help="Use adopted messages/chat-template prompt surface by default.",
+    )
+    metrics.add_argument(
+        "--max-kv-size",
+        type=int,
+        default=D1_GENERATION_DEFAULTS["max_kv_size"],
+    )
+    metrics.add_argument("--kv-bits", type=int, default=None)
+    metrics.add_argument("--kv-group-size", type=int, default=None)
+    metrics.add_argument("--temp", type=float, default=D1_GENERATION_DEFAULTS["temperature"])
+    metrics.add_argument("--top-p", type=float, default=None)
+    metrics.add_argument("--min-p", type=float, default=None)
+    metrics.add_argument("--top-k", type=int, default=None)
+    metrics.add_argument(
+        "--stop",
+        action="append",
+        default=None,
+        help="Experimental stop string passed through to the isolated runner.",
+    )
+    metrics.set_defaults(func=_cmd_metrics)
 
     return parser.parse_args(argv)
 
