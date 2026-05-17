@@ -1197,12 +1197,6 @@ def run_b1c1_no_swap_soak(
                 while True:
                     if max_samples is not None and len(records) >= max_samples:
                         break
-                    if (
-                        max_samples is None
-                        and records
-                        and time.monotonic() - started_monotonic_s >= duration_s
-                    ):
-                        break
                     sample_index = len(records) + 1
                     phase = (
                         "warmup"

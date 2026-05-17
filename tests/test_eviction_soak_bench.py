@@ -283,3 +283,19 @@ def test_b1c1_short_run_blocks_instead_of_claiming_24h_soak(tmp_path):
     assert summary["duration_requirement_met"] is False
     assert summary["no_swap_soak_stability"] == "blocked"
     assert summary["graduates"]["no_swap_soak_stability"] is False
+
+
+def test_b1c1_duration_clock_starts_after_warmup(tmp_path):
+    summary = eviction_soak.run_b1c1_no_swap_soak(
+        runtime="owlmlx",
+        backend="fake",
+        model=eviction_soak.ModelSpec("gemma-4-31B-it", 1.0),
+        output_dir=tmp_path,
+        duration_s=0.0,
+        required_duration_s=0.0,
+        sample_interval_s=0.0,
+    )
+
+    assert summary["warmup_samples"] == 3
+    assert summary["measurement_samples"] == 1
+    assert summary["duration_requirement_met"] is True
