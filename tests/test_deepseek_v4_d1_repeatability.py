@@ -321,6 +321,32 @@ def test_real_runner_command_uses_isolated_python_and_repo_pythonpath():
     assert env["X"] == "1"
 
 
+def test_read_json_payload_times_out_on_partial_line_without_blocking():
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import sys, time; sys.stdout.write('{'); sys.stdout.flush(); time.sleep(2)",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    try:
+        try:
+            d1._read_json_payload(proc, timeout_s=0.2)
+        except TimeoutError as exc:
+            assert "timed out waiting for child response" in str(exc)
+        else:
+            raise AssertionError("partial stdout line should time out")
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=1.0)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
 def test_real_run_uses_persistent_child_protocol_with_fake_process(monkeypatch, tmp_path):
     fake_python = tmp_path / ".runtime-deepseek-v4-mlx" / "bin" / "python"
     fake_python.parent.mkdir(parents=True)
@@ -771,6 +797,75 @@ def test_run_metrics_writes_d2_ledger_from_fake_stream(monkeypatch, tmp_path):
     assert record["metrics"]["peak_rss_gb"] == 1.5
     assert record["backend_health"]["clean_health_after_unload"] is True
     assert record["verdict"] == "passed"
+
+
+def test_real_run_stream_timeout_writes_failed_row_and_skips_unload(
+    monkeypatch,
+    tmp_path,
+):
+    model_path = tmp_path / "model"
+    model_path.mkdir()
+    created: list[_FakeProcess] = []
+
+    monkeypatch.setattr(
+        d1,
+        "run_preflight",
+        lambda **kwargs: {"verdict": "passed", "preflight": "passed"},
+    )
+
+    def fake_popen(cmd: list[str], **kwargs: object) -> _FakeProcess:
+        proc = _FakeProcess(cmd, **kwargs)
+        created.append(proc)
+        return proc
+
+    def fake_stream(proc: _FakeProcess, request: dict, *, timeout_s: float) -> dict:
+        return {
+            "ok": False,
+            "action": request["action"],
+            "text": "",
+            "error": "timed out waiting for child response",
+            "pid": proc.pid,
+            "finish_reason": "stream_timeout",
+            "stream_timeout": True,
+            "timeout_s": timeout_s,
+            "stream_event_count": 0,
+            "stream_diagnostic_count": 0,
+            "stream_diagnostics": [],
+        }
+
+    monkeypatch.setattr(d1, "_child_stream_generate", fake_stream)
+
+    summary = d1.run_real(
+        output_dir=tmp_path,
+        model_path=model_path,
+        run_id="stream-timeout-fake",
+        max_prompts=1,
+        max_tokens_ladder=(128,),
+        generation_surface="stream",
+        prompt_surface="messages",
+        timeout_s=1.0,
+        popen_factory=fake_popen,
+    )
+
+    records = _records(tmp_path / "stream-timeout-fake.jsonl")
+    assert summary["verdict"] == "failed"
+    assert summary["error"] == "stream generation timed out before terminal payload"
+    assert [item["action"] for item in created[0].stdin.writes] == [
+        "load",
+    ]
+    assert created[0].returncode == -15
+    record = records[0]
+    assert record["prompt_results"][0]["generation_surface"] == (
+        "stream_generate_messages"
+    )
+    assert record["prompt_results"][0]["error"] == (
+        "timed out waiting for child response"
+    )
+    assert record["prompt_results"][0]["stream_timeout"] is True
+    assert record["prompt_results"][0]["timeout_s"] == 1.0
+    assert record["lifecycle"]["unload_ok"] is False
+    assert record["lifecycle"]["clean_health_after_unload"] is False
+    assert record["verdict"] == "failed"
 
 
 def test_repetition_diagnostics_report_repeated_window() -> None:

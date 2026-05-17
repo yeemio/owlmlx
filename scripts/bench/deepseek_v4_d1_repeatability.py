@@ -442,6 +442,46 @@ def _read_json_payload(proc: subprocess.Popen[str], *, timeout_s: float) -> dict
 
     deadline = time.monotonic() + timeout_s
     discarded: list[str] = []
+    try:
+        stdout_fd = stdout.fileno()
+    except (AttributeError, OSError, ValueError):
+        stdout_fd = None
+
+    if stdout_fd is not None:
+        buffered = getattr(proc, "_owlmlx_stdout_buffer", "")
+        while True:
+            if "\n" in buffered:
+                line, buffered = buffered.split("\n", 1)
+                setattr(proc, "_owlmlx_stdout_buffer", buffered)
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    payload = json.loads(text)
+                except json.JSONDecodeError:
+                    discarded.append(text)
+                    continue
+                if isinstance(payload, dict):
+                    if discarded:
+                        payload["_discarded_stdout"] = discarded[-5:]
+                    return payload
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                setattr(proc, "_owlmlx_stdout_buffer", buffered)
+                raise TimeoutError("timed out waiting for child response")
+
+            ready, _, _ = select.select([stdout_fd], [], [], remaining)
+            if not ready:
+                setattr(proc, "_owlmlx_stdout_buffer", buffered)
+                raise TimeoutError("timed out waiting for child response")
+
+            chunk = os.read(stdout_fd, 4096)
+            if not chunk:
+                setattr(proc, "_owlmlx_stdout_buffer", buffered)
+                raise RuntimeError("child process produced no output")
+            buffered += chunk.decode("utf-8", errors="replace")
+
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
@@ -506,7 +546,22 @@ def _child_stream_generate(
     stream_diagnostics: list[dict[str, Any]] = []
     last_token: dict[str, Any] | None = None
     while True:
-        payload = _read_json_payload(proc, timeout_s=timeout_s)
+        try:
+            payload = _read_json_payload(proc, timeout_s=timeout_s)
+        except TimeoutError as exc:
+            return {
+                "ok": False,
+                "action": request_action,
+                "text": "".join(text_parts),
+                "error": str(exc),
+                "pid": proc.pid,
+                "finish_reason": "stream_timeout",
+                "stream_timeout": True,
+                "timeout_s": timeout_s,
+                "stream_event_count": token_event_count,
+                "stream_diagnostic_count": len(stream_diagnostics),
+                "stream_diagnostics": stream_diagnostics,
+            }
         if not payload.get("ok", False):
             return {
                 "ok": False,
@@ -814,6 +869,9 @@ def _real_record(
                     "stream_event_count": result.get("stream_event_count"),
                     "stream_diagnostic_count": result.get("stream_diagnostic_count"),
                     "stream_diagnostics": result.get("stream_diagnostics", []),
+                    "error": result.get("error"),
+                    "timeout_s": result.get("timeout_s"),
+                    "stream_timeout": bool(result.get("stream_timeout")),
                     "stop_strings": stop_strings if isinstance(stop_strings, list) else [],
                     "stop_string_count": stop_string_count,
                     "timing": timing,
@@ -992,6 +1050,7 @@ def run_real(
     load_time_s: float | None = None
     load_pid: Any = None
     run_error: str | None = None
+    stream_timeout_observed = False
     proc: subprocess.Popen[str] | None = None
 
     try:
@@ -1053,6 +1112,8 @@ def run_real(
                     )
                 else:
                     result = _child_exchange(proc, request, timeout_s=timeout_s)
+                if result.get("stream_timeout"):
+                    stream_timeout_observed = True
                 peak_rss_gb = rss_sampler(result.get("pid"))
                 rows.append(
                     _real_record(
@@ -1081,16 +1142,19 @@ def run_real(
             if rows and rows[-1]["verdict"] != "passed" and not continue_on_failure:
                 break
 
-        unload_result = _child_exchange(
-            proc,
-            {"action": "unload", "model_id": str(model_path)},
-            timeout_s=timeout_s,
-        )
-        unload_ok = bool(unload_result.get("ok"))
-        ping_result = _child_exchange(proc, {"action": "ping"}, timeout_s=timeout_s)
-        clean_health_after_unload = bool(ping_result.get("ok")) and (
-            ping_result.get("model_id") is None
-        )
+        if stream_timeout_observed:
+            run_error = "stream generation timed out before terminal payload"
+        else:
+            unload_result = _child_exchange(
+                proc,
+                {"action": "unload", "model_id": str(model_path)},
+                timeout_s=timeout_s,
+            )
+            unload_ok = bool(unload_result.get("ok"))
+            ping_result = _child_exchange(proc, {"action": "ping"}, timeout_s=timeout_s)
+            clean_health_after_unload = bool(ping_result.get("ok")) and (
+                ping_result.get("model_id") is None
+            )
     except Exception as exc:
         run_error = str(exc)
         if proc is not None and proc.poll() is None and load_ok:
@@ -1112,14 +1176,21 @@ def run_real(
             except Exception as unload_exc:
                 run_error = f"{run_error}; unload_after_error={unload_exc}"
     finally:
-        if proc is not None and proc.poll() is None:
+        if proc is not None and proc.poll() is None and not stream_timeout_observed:
             try:
                 _child_exchange(proc, {"action": "shutdown"}, timeout_s=5.0)
             except Exception:
                 pass
-            if proc.poll() is None:
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+            try:
+                proc.wait(timeout=5.0)
+            except Exception:
                 try:
-                    proc.terminate()
+                    proc.kill()
                 except Exception:
                     pass
 
