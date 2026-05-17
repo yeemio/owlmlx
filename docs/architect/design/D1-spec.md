@@ -195,6 +195,13 @@ localize repetition sensitivity. Such runs are diagnostic variants; the D1 pass
 claim remains tied to the declared default parameters unless the spec is updated
 first.
 
+Prompt-surface diagnostics may use `--prompt-surface messages` to route the
+same D1 prompt through `owlmlx.runtime.mlx_lm_runner`'s
+`generate_messages`/chat-template path instead of raw prompt text. This checks
+whether the p1/1024 repetition blocker is triggered by raw prompting. It is a
+diagnostic variant only; the D1 pass claim remains tied to the declared default
+surface until this spec is explicitly revised.
+
 If a long-output row fails on repetition after lifecycle stays clean, run a
 direct-vs-runner diagnostic before changing acceptance criteria:
 

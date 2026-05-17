@@ -63,17 +63,20 @@ class _FakeProcess:
                 "model_id": payload["model_id"],
                 "pid": self.pid,
             }
-        elif action == "generate":
+        elif action in {"generate", "generate_messages"}:
             self.generation_count += 1
+            text_prefix = "messages-completion" if action == "generate_messages" else "completion"
             response = {
                 "ok": True,
-                "action": "generate",
+                "action": action,
                 "model_id": payload["model_id"],
-                "text": f"completion-{self.generation_count}",
+                "text": f"{text_prefix}-{self.generation_count}",
                 "finish_reason": "stop",
                 "pid": self.pid,
                 "generation_count": self.generation_count,
             }
+            if action == "generate_messages":
+                response["message_count"] = len(payload.get("messages") or [])
         elif action == "stream_generate":
             self.generation_count += 1
             text = f"completion-{self.generation_count}"
@@ -408,6 +411,7 @@ def test_real_run_writes_jsonl_shape_from_fake_process(monkeypatch, tmp_path):
     assert record["prompt_results"][0]["completion_preview"].startswith("completion-")
     assert record["prompt_results"][0]["completion_tail"].startswith("completion-")
     assert record["prompt_shape"]["surface"] == "raw_text"
+    assert record["prompt_surface"] == "raw"
     assert record["prompt_shape"]["prompt_chars"] > 0
     assert len(record["prompt_shape"]["prompt_sha256"]) == 64
     assert record["prompt_results"][0]["generation_surface"] == "generate"
@@ -423,6 +427,51 @@ def test_real_run_writes_jsonl_shape_from_fake_process(monkeypatch, tmp_path):
     assert record["metrics"]["ttft_ms_by_prompt"] == {}
     assert record["metrics"]["stream_wall_ms_by_prompt"] == {}
     assert record["verdict"] == "passed"
+
+
+def test_real_run_messages_surface_uses_runner_chat_template_path(monkeypatch, tmp_path):
+    model_path = tmp_path / "model"
+    model_path.mkdir()
+    created: list[_FakeProcess] = []
+
+    monkeypatch.setattr(
+        d1,
+        "run_preflight",
+        lambda **kwargs: {"verdict": "passed", "preflight": "passed"},
+    )
+
+    def fake_popen(cmd: list[str], **kwargs: object) -> _FakeProcess:
+        proc = _FakeProcess(cmd, **kwargs)
+        created.append(proc)
+        return proc
+
+    summary = d1.run_real(
+        output_dir=tmp_path,
+        model_path=model_path,
+        run_id="messages-fake",
+        max_prompts=1,
+        max_tokens_ladder=(128,),
+        prompt_surface="messages",
+        timeout_s=1.0,
+        popen_factory=fake_popen,
+    )
+
+    records = _records(tmp_path / "messages-fake.jsonl")
+    assert summary["prompt_surface"] == "messages"
+    assert summary["verdict"] == "passed"
+    assert created[0].stdin.writes[1]["action"] == "generate_messages"
+    assert created[0].stdin.writes[1]["messages"] == [
+        {"role": "user", "content": dict(d1.PROMPTS)["p1_short_cn"]}
+    ]
+    record = records[0]
+    assert record["prompt_surface"] == "messages"
+    assert record["prompt_shape"]["surface"] == "chat_messages"
+    assert record["prompt_shape"]["message_count"] == 1
+    assert record["prompt_shape"]["roles"] == ["user"]
+    assert record["prompt_results"][0]["generation_surface"] == "generate_messages"
+    assert record["prompt_results"][0]["completion_preview"].startswith(
+        "messages-completion-"
+    )
 
 
 def test_real_run_coverage_reports_failed_and_missing_ladder(monkeypatch, tmp_path):
@@ -808,10 +857,13 @@ def test_cli_run_sampler_overrides_are_forwarded(monkeypatch, tmp_path):
             "0.05",
             "--top-k",
             "40",
+            "--prompt-surface",
+            "messages",
         ]
     )
 
     assert code == 1
+    assert captured["prompt_surface"] == "messages"
     assert captured["generation_overrides"] == {
         "max_kv_size": d1.D1_GENERATION_DEFAULTS["max_kv_size"],
         "kv_bits": None,

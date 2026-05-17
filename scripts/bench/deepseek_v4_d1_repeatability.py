@@ -616,6 +616,29 @@ def _prompt_shape(prompt: str) -> dict[str, Any]:
     }
 
 
+def _messages_for_prompt(prompt: str) -> list[dict[str, str]]:
+    return [{"role": "user", "content": prompt}]
+
+
+def _prompt_shape_for_surface(
+    *,
+    prompt: str,
+    prompt_surface: str,
+) -> dict[str, Any]:
+    if prompt_surface == "raw":
+        return _prompt_shape(prompt)
+    messages = _messages_for_prompt(prompt)
+    encoded = json.dumps(messages, ensure_ascii=False, sort_keys=True)
+    return {
+        "surface": "chat_messages",
+        "message_count": len(messages),
+        "roles": [message["role"] for message in messages],
+        "content_chars": sum(len(message["content"]) for message in messages),
+        "messages_sha256": hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
+        "first_user_content_preview": prompt[:160],
+    }
+
+
 def _generation_params(*, max_tokens: int, overrides: dict[str, Any]) -> dict[str, Any]:
     params = {**D1_GENERATION_DEFAULTS}
     params.update(
@@ -635,6 +658,7 @@ def _real_record(
     prompt_index: int,
     prompt_id: str,
     prompt: str,
+    prompt_surface: str,
     max_tokens: int,
     generation_params: dict[str, Any],
     load_ok: bool,
@@ -679,7 +703,11 @@ def _real_record(
             "evidence_strength": REAL_EVIDENCE_STRENGTH,
             "prompt_index": prompt_index,
             "prompt_id": prompt_id,
-            "prompt_shape": _prompt_shape(prompt),
+            "prompt_surface": prompt_surface,
+            "prompt_shape": _prompt_shape_for_surface(
+                prompt=prompt,
+                prompt_surface=prompt_surface,
+            ),
             "prompt_sha_hint": None,
             "max_tokens": max_tokens,
             "generation_params": generation_params,
@@ -818,6 +846,7 @@ def run_real(
     max_tokens_ladder: tuple[int, ...] = TOKEN_LADDER,
     generation_overrides: dict[str, Any] | None = None,
     generation_surface: str = "generate",
+    prompt_surface: str = "raw",
     continue_on_failure: bool = False,
     timeout_s: float = 600.0,
     popen_factory: Any = subprocess.Popen,
@@ -863,6 +892,8 @@ def run_real(
     generation_overrides = dict(generation_overrides or {})
     if generation_surface not in {"generate", "stream"}:
         raise ValueError("--generation-surface must be 'generate' or 'stream'")
+    if prompt_surface not in {"raw", "messages"}:
+        raise ValueError("--prompt-surface must be 'raw' or 'messages'")
     rows: list[dict[str, Any]] = []
     load_ok = False
     unload_ok = False
@@ -905,14 +936,24 @@ def run_real(
                     max_tokens=max_tokens,
                     overrides=generation_overrides,
                 )
-                request = {
-                    "action": "stream_generate"
-                    if generation_surface == "stream"
-                    else "generate",
-                    "model_id": str(model_path),
-                    "prompt": prompt,
-                    "params": generation_params,
-                }
+                if prompt_surface == "messages":
+                    request = {
+                        "action": "stream_generate_messages"
+                        if generation_surface == "stream"
+                        else "generate_messages",
+                        "model_id": str(model_path),
+                        "messages": _messages_for_prompt(prompt),
+                        "params": generation_params,
+                    }
+                else:
+                    request = {
+                        "action": "stream_generate"
+                        if generation_surface == "stream"
+                        else "generate",
+                        "model_id": str(model_path),
+                        "prompt": prompt,
+                        "params": generation_params,
+                    }
                 if generation_surface == "stream":
                     result = _child_stream_generate(
                         proc,
@@ -931,6 +972,7 @@ def run_real(
                         prompt_index=prompt_index,
                         prompt_id=prompt_id,
                         prompt=prompt,
+                        prompt_surface=prompt_surface,
                         max_tokens=max_tokens,
                         generation_params=generation_params,
                         load_ok=load_ok,
@@ -1026,6 +1068,7 @@ def run_real(
         "generation_defaults": D1_GENERATION_DEFAULTS,
         "generation_overrides": generation_overrides,
         "generation_surface": generation_surface,
+        "prompt_surface": prompt_surface,
         "failure_policy": (
             "continue_on_failure" if continue_on_failure else "stop_on_first_failure"
         ),
@@ -1454,6 +1497,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         prompt_ids=tuple(args.prompt_id or ()),
         max_tokens_ladder=tuple(args.max_tokens),
         generation_surface=args.generation_surface,
+        prompt_surface=args.prompt_surface,
         continue_on_failure=args.continue_on_failure,
         generation_overrides={
             "max_kv_size": args.max_kv_size,
@@ -1554,6 +1598,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         choices=("generate", "stream"),
         default="generate",
         help="Use non-stream generate for lifecycle runs; stream for timing diagnostics.",
+    )
+    run.add_argument(
+        "--prompt-surface",
+        choices=("raw", "messages"),
+        default="raw",
+        help="Use raw prompt text or runner chat-template messages.",
     )
     run.add_argument(
         "--continue-on-failure",
