@@ -74,6 +74,42 @@ class _FakeProcess:
                 "pid": self.pid,
                 "generation_count": self.generation_count,
             }
+        elif action == "stream_generate":
+            self.generation_count += 1
+            text = f"completion-{self.generation_count}"
+            token = {
+                "ok": True,
+                "action": "stream_event",
+                "event": "token",
+                "model_id": payload["model_id"],
+                "text": text,
+                "finish_reason": "length",
+                "pid": self.pid,
+                "prompt_tokens": 7,
+                "completion_tokens": payload["params"]["max_tokens"],
+                "timing": {
+                    "first_visible_token_ms": 12.5,
+                    "stream_wall_ms": 25.0,
+                },
+            }
+            done = {
+                "ok": True,
+                "action": "stream_done",
+                "event": "done",
+                "model_id": payload["model_id"],
+                "finish_reason": "length",
+                "pid": self.pid,
+                "generation_count": self.generation_count,
+                "prompt_tokens": 7,
+                "completion_tokens": payload["params"]["max_tokens"],
+                "timing": {
+                    "first_visible_token_ms": 12.5,
+                    "stream_wall_ms": 25.0,
+                },
+            }
+            self.stdout.lines.append(json.dumps(token) + "\n")
+            self.stdout.lines.append(json.dumps(done) + "\n")
+            return
         elif action == "unload":
             response = {
                 "ok": True,
@@ -297,6 +333,54 @@ def test_real_run_writes_jsonl_shape_from_fake_process(monkeypatch, tmp_path):
     assert len(record["prompt_results"][0]["completion_sha256"]) == 64
     assert record["prompt_results"][0]["completion_preview"].startswith("completion-")
     assert record["prompt_results"][0]["completion_tail"].startswith("completion-")
+    assert record["prompt_results"][0]["generation_surface"] == "generate"
+    assert record["prompt_results"][0]["stop_reason"] == "unknown_non_stream_text_only"
+    assert record["prompt_results"][0]["stop_reason_source"] == (
+        "non_stream_generate_text_only"
+    )
+    assert record["prompt_results"][0]["prompt_tokens"] is None
+    assert record["prompt_results"][0]["completion_tokens"] is None
+    assert record["prompt_results"][0]["timing"] == {}
+    assert record["metrics"]["ttft_ms_by_prompt"] == {}
+    assert record["metrics"]["stream_wall_ms_by_prompt"] == {}
+    assert record["verdict"] == "passed"
+
+
+def test_real_run_stream_surface_records_timing_from_fake_process(monkeypatch, tmp_path):
+    model_path = tmp_path / "model"
+    model_path.mkdir()
+
+    monkeypatch.setattr(
+        d1,
+        "run_preflight",
+        lambda **kwargs: {"verdict": "passed", "preflight": "passed"},
+    )
+
+    summary = d1.run_real(
+        output_dir=tmp_path,
+        model_path=model_path,
+        run_id="stream-fake",
+        max_prompts=1,
+        max_tokens_ladder=(128,),
+        generation_surface="stream",
+        timeout_s=1.0,
+        popen_factory=lambda cmd, **kwargs: _FakeProcess(cmd, **kwargs),
+    )
+
+    records = _records(tmp_path / "stream-fake.jsonl")
+    assert summary["generation_surface"] == "stream"
+    assert summary["verdict"] == "passed"
+    assert len(records) == 1
+    record = records[0]
+    assert record["prompt_results"][0]["generation_surface"] == "stream_generate"
+    assert record["prompt_results"][0]["stop_reason"] == "length"
+    assert record["prompt_results"][0]["stop_reason_source"] == "stream_done"
+    assert record["prompt_results"][0]["prompt_tokens"] == 7
+    assert record["prompt_results"][0]["completion_tokens"] == 128
+    assert record["prompt_results"][0]["stream_event_count"] == 1
+    assert record["prompt_results"][0]["timing"]["stream_wall_ms"] == 25.0
+    assert record["metrics"]["ttft_ms_by_prompt"] == {"p1_short_cn": 12.5}
+    assert record["metrics"]["stream_wall_ms_by_prompt"] == {"p1_short_cn": 25.0}
     assert record["verdict"] == "passed"
 
 

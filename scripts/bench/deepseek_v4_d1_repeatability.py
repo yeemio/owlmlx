@@ -358,19 +358,77 @@ def _read_json_payload(proc: subprocess.Popen[str], *, timeout_s: float) -> dict
             return payload
 
 
-def _child_exchange(
+def _write_child_request(
     proc: subprocess.Popen[str],
     request: dict[str, Any],
-    *,
-    timeout_s: float,
-) -> dict[str, Any]:
+) -> None:
     if proc.poll() is not None:
         raise RuntimeError(f"child process exited before request: {proc.returncode}")
     if proc.stdin is None:
         raise RuntimeError("child stdin pipe is unavailable")
     proc.stdin.write(json.dumps(request, sort_keys=True) + "\n")
     proc.stdin.flush()
+
+
+def _child_exchange(
+    proc: subprocess.Popen[str],
+    request: dict[str, Any],
+    *,
+    timeout_s: float,
+) -> dict[str, Any]:
+    _write_child_request(proc, request)
     return _read_json_payload(proc, timeout_s=timeout_s)
+
+
+def _child_stream_generate(
+    proc: subprocess.Popen[str],
+    request: dict[str, Any],
+    *,
+    timeout_s: float,
+) -> dict[str, Any]:
+    _write_child_request(proc, request)
+    text_parts: list[str] = []
+    token_event_count = 0
+    last_token: dict[str, Any] | None = None
+    while True:
+        payload = _read_json_payload(proc, timeout_s=timeout_s)
+        if not payload.get("ok", False):
+            return {
+                "ok": False,
+                "action": "stream_generate",
+                "text": "".join(text_parts),
+                "error": payload.get("error") or payload.get("message"),
+                "pid": payload.get("pid"),
+                "finish_reason": payload.get("finish_reason"),
+                "stream_event_count": token_event_count,
+            }
+
+        action = str(payload.get("action") or "")
+        event = str(payload.get("event") or "")
+        if action == "stream_event" and event == "token":
+            text_parts.append(str(payload.get("text") or ""))
+            token_event_count += 1
+            last_token = payload
+            continue
+        if action == "stream_done" and event == "done":
+            timing = payload.get("timing") if isinstance(payload.get("timing"), dict) else {}
+            return {
+                "ok": True,
+                "action": "stream_generate",
+                "text": "".join(text_parts),
+                "finish_reason": payload.get("finish_reason")
+                or (last_token or {}).get("finish_reason"),
+                "pid": payload.get("pid") or (last_token or {}).get("pid"),
+                "generation_count": payload.get("generation_count"),
+                "prompt_tokens": payload.get("prompt_tokens")
+                if payload.get("prompt_tokens") is not None
+                else (last_token or {}).get("prompt_tokens"),
+                "completion_tokens": payload.get("completion_tokens")
+                if payload.get("completion_tokens") is not None
+                else (last_token or {}).get("completion_tokens"),
+                "timing": timing,
+                "stream_event_count": token_event_count,
+            }
 
 
 def _looks_repetitive(text: str) -> bool:
@@ -420,6 +478,13 @@ def _real_record(
 ) -> dict[str, Any]:
     text = str(result.get("text") or "")
     result_pid = result.get("pid")
+    generation_surface = str(result.get("action") or "generate")
+    if generation_surface == "stream_generate":
+        stop_reason = str(result.get("finish_reason") or "unknown")
+        stop_reason_source = "stream_done"
+    else:
+        stop_reason = "unknown_non_stream_text_only"
+        stop_reason_source = "non_stream_generate_text_only"
     restart_observed = (
         load_pid is not None
         and result_pid is not None
@@ -454,7 +519,13 @@ def _real_record(
                     "ok": ok,
                     "completion_chars": len(text),
                     **completion_observation,
-                    "stop_reason": str(result.get("finish_reason") or "unknown"),
+                    "stop_reason": stop_reason,
+                    "stop_reason_source": stop_reason_source,
+                    "generation_surface": generation_surface,
+                    "prompt_tokens": result.get("prompt_tokens"),
+                    "completion_tokens": result.get("completion_tokens"),
+                    "stream_event_count": result.get("stream_event_count"),
+                    "timing": result.get("timing") if isinstance(result.get("timing"), dict) else {},
                     "restart_observed": restart_observed,
                     "repetition_flag": repetition_flag,
                     "child_pid": result_pid,
@@ -478,8 +549,19 @@ def _real_record(
             },
             "metrics": {
                 "load_time_s": load_time_s,
-                "ttft_ms_by_prompt": {},
+                "ttft_ms_by_prompt": {
+                    prompt_id: result.get("timing", {}).get("first_visible_token_ms")
+                }
+                if isinstance(result.get("timing"), dict)
+                and result.get("timing", {}).get("first_visible_token_ms") is not None
+                else {},
                 "decode_tps_by_prompt": {},
+                "stream_wall_ms_by_prompt": {
+                    prompt_id: result.get("timing", {}).get("stream_wall_ms")
+                }
+                if isinstance(result.get("timing"), dict)
+                and result.get("timing", {}).get("stream_wall_ms") is not None
+                else {},
                 "peak_rss_gb": None,
             },
             "verdict": "failed" if repetition_flag or not ok else "passed",
@@ -498,6 +580,7 @@ def run_real(
     max_prompts: int | None = None,
     max_tokens_ladder: tuple[int, ...] = TOKEN_LADDER,
     generation_overrides: dict[str, Any] | None = None,
+    generation_surface: str = "generate",
     timeout_s: float = 600.0,
     popen_factory: Any = subprocess.Popen,
 ) -> dict[str, Any]:
@@ -527,6 +610,8 @@ def run_real(
     prompt_slice = PROMPTS if max_prompts is None else PROMPTS[:max_prompts]
     token_ladder = tuple(int(value) for value in max_tokens_ladder)
     generation_overrides = dict(generation_overrides or {})
+    if generation_surface not in {"generate", "stream"}:
+        raise ValueError("--generation-surface must be 'generate' or 'stream'")
     rows: list[dict[str, Any]] = []
     load_ok = False
     unload_ok = False
@@ -569,16 +654,22 @@ def run_real(
                     max_tokens=max_tokens,
                     overrides=generation_overrides,
                 )
-                result = _child_exchange(
-                    proc,
-                    {
-                        "action": "generate",
-                        "model_id": str(model_path),
-                        "prompt": prompt,
-                        "params": generation_params,
-                    },
-                    timeout_s=timeout_s,
-                )
+                request = {
+                    "action": "stream_generate"
+                    if generation_surface == "stream"
+                    else "generate",
+                    "model_id": str(model_path),
+                    "prompt": prompt,
+                    "params": generation_params,
+                }
+                if generation_surface == "stream":
+                    result = _child_stream_generate(
+                        proc,
+                        request,
+                        timeout_s=timeout_s,
+                    )
+                else:
+                    result = _child_exchange(proc, request, timeout_s=timeout_s)
                 rows.append(
                     _real_record(
                         run_id=run_id,
@@ -674,6 +765,7 @@ def run_real(
         "tokenizer_config": D1_TOKENIZER_CONFIG,
         "generation_defaults": D1_GENERATION_DEFAULTS,
         "generation_overrides": generation_overrides,
+        "generation_surface": generation_surface,
         "preflight": preflight,
         "lifecycle": {
             "load_ok": load_ok,
@@ -716,6 +808,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         run_id=args.run_id,
         max_prompts=args.max_prompts,
         max_tokens_ladder=tuple(args.max_tokens),
+        generation_surface=args.generation_surface,
         generation_overrides={
             "max_kv_size": args.max_kv_size,
             "kv_bits": args.kv_bits,
@@ -775,6 +868,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Token ladder to execute; defaults to the full D1 ladder.",
     )
     run.add_argument("--timeout-s", type=float, default=600.0)
+    run.add_argument(
+        "--generation-surface",
+        choices=("generate", "stream"),
+        default="generate",
+        help="Use non-stream generate for lifecycle runs; stream for timing diagnostics.",
+    )
     run.add_argument("--max-kv-size", type=int, default=D1_GENERATION_DEFAULTS["max_kv_size"])
     run.add_argument("--kv-bits", type=int, default=None)
     run.add_argument(
