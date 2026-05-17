@@ -31,11 +31,11 @@
 | B-1b design spec | landed | `docs/architect/design/B-1b-spec.md` |
 | B-1b cache reclaim gate | passed · native N=20 | cache-off N=20 + cache-on N=20；20/20 warm hits；`failed_reclaim=0`；`failed_unload=0`；p50/p99 settle duration within threshold |
 | B-1c §1 no-swap soak runner | landed · 24h native evidence pending | fake/schema smoke now remains `blocked`; only native `mlx_core_active_memory` + required_duration ≥24h can graduate `no_swap_soak_stability` |
-| D1 DeepSeek repeatability runner | real runner landed · lifecycle clean · full gate blocked | persistent child `load -> generate -> unload -> ping -> shutdown`；p1 128/512 passed, p1/1024 failed with repetition; sampler variant and `max_kv_size=2048` did not clear it; p5/1024 with `<END>` stop also repeats; direct-vs-runner compare now classifies p1/1024 as `adapter_or_artifact_likely` because direct `mlx_lm.generate` and owlmlx runner produced the same completion hash and repeated-window hash; preflight shows Blaizzy `mlx-lm` fork `pc/add-deepseekv4flash-model` at `5c10538136b9038b9626c134612b08afc18d697a` |
+| D1 DeepSeek repeatability runner | real runner landed · lifecycle clean · prompt-policy candidate pass | raw prompt p1 128/512 passed but p1/1024 failed with repetition; sampler, `max_kv_size=2048`, and p5 `<END>` did not clear raw repetition; direct-vs-runner compare classifies raw p1/1024 as `adapter_or_artifact_likely`; `--prompt-surface messages` then passed the full 5 prompt × 128/512/1024 matrix with clean unload and no repetition; preflight shows Blaizzy `mlx-lm` fork `pc/add-deepseekv4flash-model` at `5c10538136b9038b9626c134612b08afc18d697a` |
 | H1 compat route split | landed | `server_routes_openai.py` 拆出 OpenAI / Anthropic compat routes |
 | Targeted tests | passed | B-1c/D1/session-cache focused suite = 39 passed；subprocess backend = 64 passed（上一轮） |
 
-下一条真实执行线二选一：**B-1c §1 no-swap 24h soak**（优先继续 Session KV supported gate）或 **D1 adapter/artifact repetition mitigation**（direct-vs-runner 已排除 runner-only call-path；下一步应查 DeepSeek adapter prompt/stop/sampler policy）。二者不得共享同一 GPU-heavy host 窗口。
+下一条真实执行线二选一：**B-1c §1 no-swap 24h soak**（优先继续 Session KV supported gate）或 **D1 prompt-policy adoption review**（messages/chat-template surface has a full diagnostic pass; raw surface remains failed, so D1 only closes if the gate explicitly adopts messages as the supported DeepSeek prompt surface）。二者不得共享同一 GPU-heavy host 窗口。
 
 ---
 
@@ -306,7 +306,7 @@
 - **目标**：DS4-Flash 2bit-DQ 从短烟测提升到"可重复验证 + clean health + load→generate→unload→clean health 全链"；**不**进入默认 model surface
 - **启动时点（决策 E3）**：D1 启动时点 = **Campaign B-1a 完成后**（host 进入 B-1b N=20 跑期间，DS4 隔离 venv 并行启动；不污染主 venv，主要竞争 CPU/GPU 时段）
 - **近期闭环（0–3 月，B-1a 完成后）**：
-  - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符。**当前状态**：design spec + real runner 已落；isolated preflight passed；p1 token ladder completed with `continue_on_failure`（128/512 passed，1024 failed on `repetition_flag=true`）；sampler variant and `max_kv_size=2048` still failed at p1/1024；p5 stop-marker prompt with `<END>` also failed at 1024；direct-vs-runner compare shows direct `mlx_lm.generate` and owlmlx runner produce the same `completion_sha256` / repeated-window hash at p1/1024, so current attribution is `adapter_or_artifact_likely` rather than runner-only；`restart_observed=false` and load/unload/clean-health remained true
+  - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符。**当前状态**：design spec + real runner 已落；isolated preflight passed；raw p1 token ladder completed with `continue_on_failure`（128/512 passed，1024 failed on `repetition_flag=true`）；sampler variant and `max_kv_size=2048` still failed at raw p1/1024；p5 stop-marker prompt with `<END>` also failed at raw 1024；direct-vs-runner compare shows direct `mlx_lm.generate` and owlmlx runner produce the same `completion_sha256` / repeated-window hash at raw p1/1024；`--prompt-surface messages` passed the full 15-row D1 ladder with no repetition and clean lifecycle, making prompt-policy adoption the next review decision
   - D2：load time / TTFT / decode TPS / peak RSS / backend health 完整 ledger
   - D3：checkpoint MTP 权重检查；如缺失写 `missingReason=mtp_weights_absent_or_stripped`
   - D4：失败必须 clean pre-load reject，不污染 8066 runtime health

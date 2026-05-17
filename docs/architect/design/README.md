@@ -42,7 +42,7 @@
 
 | Campaign | Spec | 状态 | Plan-grade 来源 |
 |---|---|---|---|
-| **D1** | [`D1-spec.md`](D1-spec.md) | p1 128/512 passed；p1/1024 repetition blocked；direct-vs-runner compare points to adapter/artifact lane | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
+| **D1** | [`D1-spec.md`](D1-spec.md) | raw p1/1024 repetition blocked；messages-surface full ladder diagnostic passed; prompt-policy adoption review needed | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
 
 **节奏纪律**：design spec **一次一个**，per round 落盘 + review；不允许批量预先撰写未启动的 gate。
 

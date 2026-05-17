@@ -298,11 +298,13 @@
 | `20260517T-d1-p1-1024-kv2048-diagnostic.jsonl` | p1 · 1024 · `max_kv_size=2048` | failed | same repeated-window hash as default 1024; not cleared by larger KV window |
 | `20260517T-d1-p5-1024-stop-diagnostic.jsonl` | p5 · 1024 · `stop=["<END>"]` | failed | stop-marker prompt still repeats; repeated-window count 9; clean lifecycle remains true |
 | `20260517T-d1-p1-1024-direct-vs-runner.jsonl` | p1 · 1024 · direct `mlx_lm.generate` vs owlmlx runner | diagnostic failed | `classification=adapter_or_artifact_likely`; direct and runner produced the same `completion_sha256=40070e0a...` and repeated-window hash `e4017c...`; runner lifecycle remained clean |
+| `20260517T-d1-p1-1024-messages-surface-diagnostic.jsonl` | p1 · 1024 · `--prompt-surface messages` | passed | runner `generate_messages`; `completion_chars=330`; `repetition_flag=false`; clean lifecycle |
+| `20260517T-d1-full-ladder-messages-surface-diagnostic.jsonl` | all 5 prompts · 128/512/1024 · `--prompt-surface messages` | passed | 15/15 passed; no repetition flags; load/unload/clean-health all true |
 
-Current D1 boundary: lifecycle is clean, but long-output quality/stop behavior is
-not repeatability-grade. The latest direct-vs-runner diagnostic points at the
-isolated DeepSeek adapter/artifact lane, not an owlmlx runner-only call-path
-bug. D1 remains blocked before D2.
+Current D1 boundary: raw prompt remains not repeatability-grade, but the
+messages/chat-template surface now has a full diagnostic pass. D1 should close
+only after an explicit prompt-policy adoption review; until then, the supported
+claim remains `experimental_only`.
 
 ### 5.8 Gemma 4 MTP drafter probe（附录数据）
 

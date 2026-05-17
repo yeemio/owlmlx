@@ -30,6 +30,11 @@ Observed status:
   `adapter_or_artifact_likely`; direct `mlx_lm.generate` and
   `owlmlx.runtime.mlx_lm_runner` produced the same completion hash and the same
   repeated-window hash for p1/1024
+- prompt-surface diagnostic:
+  `20260517T-d1-full-ladder-messages-surface-diagnostic.jsonl` passes the full
+  5 prompt x 128/512/1024 D1 matrix through `generate_messages` /
+  chat-template rendering with `repetition_flag=false` for all 15 rows and
+  clean load/unload health
 - lifecycle during the failed ladder remained clean:
   `restart_observed=false`, unload ok, backend health clean after unload
 - D1 evidence records now include prompt shape, completion preview/tail,
@@ -38,7 +43,9 @@ Observed status:
 
 This keeps DeepSeek V4 at `experimental_only`. It does not make
 `DeepSeek-V4-Flash-2bit-DQ` visible on the default model surface, does not
-adopt `ds4.c`, and does not claim supported DeepSeek V4 serving.
+adopt `ds4.c`, and does not claim supported DeepSeek V4 serving. The latest
+evidence supports a narrower next decision: whether D1 should adopt
+messages/chat-template rendering as the required DeepSeek prompt surface.
 
 **2026-05-11: Lifecycle complete via intermediate path.**
 
