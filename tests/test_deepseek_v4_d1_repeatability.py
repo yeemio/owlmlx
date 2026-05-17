@@ -12,6 +12,43 @@ def _records(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
+def _write_checkpoint_model(
+    path: Path,
+    *,
+    num_hidden_layers: int = 2,
+    num_nextn_predict_layers: int = 1,
+    weight_keys: tuple[str, ...] = (),
+) -> None:
+    path.mkdir()
+    (path / "config.json").write_text(
+        json.dumps(
+            {
+                "model_type": d1.MODEL_TYPE,
+                "architectures": ["DeepseekV4ForCausalLM"],
+                "num_hidden_layers": num_hidden_layers,
+                "num_nextn_predict_layers": num_nextn_predict_layers,
+                "max_position_embeddings": 1048576,
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    weight_map = {key: "model-00001-of-00001.safetensors" for key in weight_keys}
+    (path / "model.safetensors.index.json").write_text(
+        json.dumps(
+            {
+                "metadata": {
+                    "total_size": 1234,
+                    "total_parameters": 5678,
+                },
+                "weight_map": weight_map,
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+
 class _FakeStdout:
     def __init__(self) -> None:
         self.lines: list[str] = []
@@ -921,6 +958,72 @@ def test_d2_record_falls_back_from_legacy_peak_rss_field(tmp_path):
     assert record["metrics"]["rss_sample_timing"] == "after_generation_before_unload"
 
 
+def test_d3_checkpoint_inspection_records_missing_mtp_reason(tmp_path):
+    model_path = tmp_path / "model"
+    _write_checkpoint_model(
+        model_path,
+        num_hidden_layers=2,
+        num_nextn_predict_layers=1,
+        weight_keys=(
+            "model.layers.0.attn.wq.weight",
+            "model.layers.1.attn.wq.weight",
+            "lm_head.weight",
+        ),
+    )
+
+    summary = d1.run_mtp_checkpoint_inspection(
+        output_dir=tmp_path,
+        model_path=model_path,
+        adapter_path=tmp_path / "missing-adapter",
+        run_id="d3-missing",
+    )
+
+    records = _records(tmp_path / "d3-missing.jsonl")
+    assert summary["schema_version"] == "d3.checkpoint_inspection.run.v1"
+    assert summary["verdict"] == "passed"
+    assert summary["mtp_weight_status"] == "absent_or_stripped"
+    assert summary["missingReason"] == d1.D3_MTP_MISSING_REASON
+    record = records[0]
+    assert record["schema_version"] == "d3.checkpoint_inspection.v1"
+    assert record["gate"] == "D3"
+    assert record["inspection"]["config_declares_nextn_predict_layers"] is True
+    assert record["inspection"]["has_mtp_weight_candidates"] is False
+    assert record["inspection"]["missingReason"] == d1.D3_MTP_MISSING_REASON
+    assert record["capability_conclusion"] == "mtp_checkpoint_not_available"
+    assert record["weight_index_summary"]["weight_key_count"] == 3
+    assert record["read_errors"] == []
+
+
+def test_d3_checkpoint_inspection_detects_mtp_candidate_keys(tmp_path):
+    model_path = tmp_path / "model"
+    _write_checkpoint_model(
+        model_path,
+        num_hidden_layers=2,
+        num_nextn_predict_layers=1,
+        weight_keys=(
+            "model.layers.0.attn.wq.weight",
+            "model.layers.2.attn.wq.weight",
+            "mtp.fc.weight",
+        ),
+    )
+
+    summary = d1.run_mtp_checkpoint_inspection(
+        output_dir=tmp_path,
+        model_path=model_path,
+        adapter_path=tmp_path / "missing-adapter",
+        run_id="d3-present",
+    )
+
+    record = _records(tmp_path / "d3-present.jsonl")[0]
+    assert summary["verdict"] == "passed"
+    assert summary["mtp_weight_status"] == "present"
+    assert summary["missingReason"] is None
+    assert record["inspection"]["has_mtp_weight_candidates"] is True
+    assert record["weight_index_summary"]["matched_mtp_weight_key_count"] == 1
+    assert record["weight_index_summary"]["extra_layer_key_count"] == 1
+    assert record["capability_conclusion"] == "mtp_checkpoint_candidate_present"
+
+
 def test_real_run_stream_timeout_writes_failed_row_and_skips_unload(
     monkeypatch,
     tmp_path,
@@ -1335,6 +1438,42 @@ def test_cli_metrics_sampler_overrides_are_forwarded(monkeypatch, tmp_path):
         "top_k": 20,
         "stop": None,
     }
+
+
+def test_cli_checkpoint_inspect_forwards_paths(monkeypatch, tmp_path):
+    captured: dict[str, object] = {}
+
+    def fake_inspect(**kwargs: object) -> dict:
+        captured.update(kwargs)
+        return {
+            "schema_version": "d3.checkpoint_inspection.run.v1",
+            "gate": "D3",
+            "runtime": "owlmlx",
+            "model_id": d1.MODEL_ID,
+            "verdict": "passed",
+        }
+
+    monkeypatch.setattr(d1, "run_mtp_checkpoint_inspection", fake_inspect)
+
+    code = d1.main(
+        [
+            "checkpoint-inspect",
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--model-path",
+            str(tmp_path / "model"),
+            "--adapter-path",
+            str(tmp_path / "adapter"),
+            "--run-id",
+            "d3-cli",
+        ]
+    )
+
+    assert code == 0
+    assert captured["run_id"] == "d3-cli"
+    assert captured["output_dir"] == tmp_path / "out"
+    assert captured["model_path"] == tmp_path / "model"
+    assert captured["adapter_path"] == tmp_path / "adapter"
 
 
 def test_cli_dry_run_exits_zero_and_writes_jsonl(tmp_path):

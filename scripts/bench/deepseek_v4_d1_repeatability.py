@@ -51,10 +51,32 @@ D2_EVIDENCE_STRENGTH = "isolated_real_stream_metrics"
 D2_DEFAULT_OUTPUT_DIR = (
     REPO_ROOT / "files" / "evidence" / "owlmlx" / "deepseek-v4" / "d2-metrics-ledger"
 )
+D3_EVIDENCE_STRENGTH = "local_checkpoint_metadata_inspection"
+D3_DEFAULT_OUTPUT_DIR = (
+    REPO_ROOT
+    / "files"
+    / "evidence"
+    / "owlmlx"
+    / "deepseek-v4"
+    / "d3-checkpoint-inspection"
+)
+D3_MTP_MISSING_REASON = "mtp_weights_absent_or_stripped"
 RSS_SAMPLE_SCOPE = "child_process"
 RSS_SAMPLE_SOURCE = "ps_rss_kb"
 RSS_SAMPLE_TIMING = "after_generation_before_unload"
 RUNNER_MODULE = "owlmlx.runtime.mlx_lm_runner"
+DEFAULT_DEEPSEEK_ADAPTER_PATH = Path("/tmp/mlx-lm-dsv4")
+MTP_WEIGHT_TERMS = (
+    "mtp",
+    "draft",
+    "eagle",
+    "medusa",
+    "nextn",
+    "next_n",
+    "next-token",
+    "next_token",
+    "speculative",
+)
 
 PROMPTS = (
     ("p1_short_cn", "用两句话说明 owlmlx 的运行时边界。"),
@@ -1292,6 +1314,59 @@ def _read_jsonl_rows(path: str | Path | None) -> list[dict[str, Any]]:
     return rows
 
 
+def _read_json_object(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _git_reference(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"path": str(path), "exists": False}
+    try:
+        branch = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        revision = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return {"path": str(path), "exists": True, "git": "unavailable"}
+    return {"path": str(path), "exists": True, "branch": branch, "revision": revision}
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_mtp_candidate_key(key: str) -> bool:
+    lowered = key.lower()
+    return any(term in lowered for term in MTP_WEIGHT_TERMS)
+
+
+def _layer_index_from_key(key: str) -> int | None:
+    parts = key.split(".")
+    for index, part in enumerate(parts[:-1]):
+        if part == "layers":
+            return _int_or_none(parts[index + 1])
+    return None
+
+
+def _sample(values: list[str], *, limit: int = 12) -> list[str]:
+    return values[:limit]
+
+
 def _metric_from_prompt_map(
     metrics: dict[str, Any],
     key: str,
@@ -1556,6 +1631,138 @@ def run_metrics(
         encoding="utf-8",
     )
     return summary
+
+
+def run_mtp_checkpoint_inspection(
+    *,
+    output_dir: Path = D3_DEFAULT_OUTPUT_DIR,
+    model_path: Path = DEFAULT_MODEL_PATH,
+    adapter_path: Path = DEFAULT_DEEPSEEK_ADAPTER_PATH,
+    run_id: str | None = None,
+) -> dict[str, Any]:
+    output_dir = Path(output_dir)
+    model_path = Path(model_path)
+    adapter_path = Path(adapter_path)
+    run_id = run_id or f"{_compact_stamp()}-d3-deepseek-v4-mtp-checkpoint"
+    output_path = output_dir / f"{run_id}.jsonl"
+
+    config_path = model_path / "config.json"
+    index_path = model_path / "model.safetensors.index.json"
+    config = _read_json_object(config_path)
+    index = _read_json_object(index_path)
+    weight_map = index.get("weight_map") if isinstance(index.get("weight_map"), dict) else {}
+    weight_keys = sorted(str(key) for key in weight_map)
+    num_hidden_layers = _int_or_none(config.get("num_hidden_layers"))
+    declared_nextn_layers = _int_or_none(config.get("num_nextn_predict_layers")) or 0
+
+    matched_weight_keys = [key for key in weight_keys if _is_mtp_candidate_key(key)]
+    extra_layer_keys = []
+    if num_hidden_layers is not None:
+        extra_layer_keys = [
+            key
+            for key in weight_keys
+            if (layer_index := _layer_index_from_key(key)) is not None
+            and layer_index >= num_hidden_layers
+        ]
+    candidate_files = sorted(
+        path.name
+        for path in model_path.iterdir()
+        if path.is_file() and _is_mtp_candidate_key(path.name)
+    ) if model_path.exists() else []
+    has_mtp_weight_candidates = bool(matched_weight_keys or extra_layer_keys or candidate_files)
+    config_declares_nextn = declared_nextn_layers > 0
+
+    if has_mtp_weight_candidates:
+        mtp_weight_status = "present"
+        missing_reason = None
+    elif config_declares_nextn:
+        mtp_weight_status = "absent_or_stripped"
+        missing_reason = D3_MTP_MISSING_REASON
+    else:
+        mtp_weight_status = "not_configured"
+        missing_reason = "num_nextn_predict_layers_not_declared"
+
+    read_errors = []
+    if not model_path.exists():
+        read_errors.append("model_path_missing")
+    if not config:
+        read_errors.append("config_json_missing_or_unreadable")
+    if not index:
+        read_errors.append("safetensors_index_missing_or_unreadable")
+    verdict = "passed" if not read_errors else "blocked"
+
+    payload = {
+        "schema_version": "d3.checkpoint_inspection.v1",
+        "record_type": "mtp_checkpoint_inspection",
+        "run_id": run_id,
+        "gate": "D3",
+        "runtime": "owlmlx",
+        "model_id": MODEL_ID,
+        "model_type": MODEL_TYPE,
+        "capability_label": "experimental_only",
+        "evidence_strength": D3_EVIDENCE_STRENGTH,
+        "created_at": _now_utc(),
+        "output_path": str(output_path),
+        "model_path": str(model_path),
+        "adapter_reference": _git_reference(adapter_path),
+        "config_summary": {
+            "model_type": config.get("model_type"),
+            "architectures": config.get("architectures"),
+            "num_hidden_layers": num_hidden_layers,
+            "num_nextn_predict_layers": declared_nextn_layers,
+            "max_position_embeddings": config.get("max_position_embeddings"),
+        },
+        "weight_index_summary": {
+            "metadata": index.get("metadata"),
+            "weight_key_count": len(weight_keys),
+            "safetensors_shard_count": len(
+                {
+                    str(value)
+                    for value in weight_map.values()
+                    if str(value).endswith(".safetensors")
+                }
+            ),
+            "matched_mtp_weight_key_count": len(matched_weight_keys),
+            "matched_mtp_weight_key_samples": _sample(matched_weight_keys),
+            "extra_layer_key_count": len(extra_layer_keys),
+            "extra_layer_key_samples": _sample(extra_layer_keys),
+            "candidate_file_names": candidate_files,
+        },
+        "inspection": {
+            "config_declares_nextn_predict_layers": config_declares_nextn,
+            "has_mtp_weight_candidates": has_mtp_weight_candidates,
+            "mtp_weight_status": mtp_weight_status,
+            "missingReason": missing_reason,
+            "expected_strip_patterns": [
+                "mtp.*",
+                "model.layers.<index >= num_hidden_layers>.*",
+                "layers.<index >= num_hidden_layers>.*",
+            ],
+        },
+        "read_errors": read_errors,
+        "verdict": verdict,
+        "capability_conclusion": (
+            "mtp_checkpoint_not_available"
+            if missing_reason == D3_MTP_MISSING_REASON
+            else "mtp_checkpoint_candidate_present"
+            if has_mtp_weight_candidates
+            else "mtp_not_configured"
+        ),
+    }
+    _append_jsonl(output_path, [payload])
+    return {
+        "schema_version": "d3.checkpoint_inspection.run.v1",
+        "run_id": run_id,
+        "gate": "D3",
+        "runtime": "owlmlx",
+        "model_id": MODEL_ID,
+        "evidence_strength": D3_EVIDENCE_STRENGTH,
+        "output_path": str(output_path),
+        "mtp_weight_status": mtp_weight_status,
+        "missingReason": missing_reason,
+        "capability_conclusion": payload["capability_conclusion"],
+        "verdict": verdict,
+    }
 
 
 _DIRECT_GENERATE_CODE = r"""
@@ -2048,6 +2255,17 @@ def _cmd_metrics(args: argparse.Namespace) -> int:
     return 0 if payload["verdict"] == "passed" else 1
 
 
+def _cmd_checkpoint_inspect(args: argparse.Namespace) -> int:
+    payload = run_mtp_checkpoint_inspection(
+        output_dir=args.output_dir,
+        model_path=args.model_path,
+        adapter_path=args.adapter_path,
+        run_id=args.run_id,
+    )
+    _json_print(payload)
+    return 0 if payload["verdict"] == "passed" else 1
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -2244,6 +2462,21 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Experimental stop string passed through to the isolated runner.",
     )
     metrics.set_defaults(func=_cmd_metrics)
+
+    inspect = sub.add_parser(
+        "checkpoint-inspect",
+        help="Inspect isolated DeepSeek V4 checkpoint metadata for D3 MTP weights",
+    )
+    add_common(inspect)
+    inspect.add_argument("--output-dir", type=Path, default=D3_DEFAULT_OUTPUT_DIR)
+    inspect.add_argument("--run-id", default=None)
+    inspect.add_argument(
+        "--adapter-path",
+        type=Path,
+        default=DEFAULT_DEEPSEEK_ADAPTER_PATH,
+        help="DeepSeek V4 adapter fork used for D1/D2 evidence.",
+    )
+    inspect.set_defaults(func=_cmd_checkpoint_inspect)
 
     return parser.parse_args(argv)
 
