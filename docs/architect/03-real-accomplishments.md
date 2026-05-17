@@ -296,6 +296,7 @@
 | `20260517T-d1-p1-token-ladder-continue.jsonl` | p1 · 128/512/1024 · default `max_kv_size=512` · `continue_on_failure` | 128/512 passed；1024 failed | 1024 `repetition_flag=true`；`max_repeated_window_count=4`；load/unload/clean-health all true |
 | `20260517T-d1-p1-1024-sampler-diagnostic.jsonl` | p1 · 1024 · `temp=0.2` · `top_p=0.9` · `top_k=40` | failed | sampler variant still repeats；not just deterministic temp=0 behavior |
 | `20260517T-d1-p1-1024-kv2048-diagnostic.jsonl` | p1 · 1024 · `max_kv_size=2048` | failed | same repeated-window hash as default 1024; not cleared by larger KV window |
+| `20260517T-d1-p5-1024-stop-diagnostic.jsonl` | p5 · 1024 · `stop=["<END>"]` | failed | stop-marker prompt still repeats; repeated-window count 9; clean lifecycle remains true |
 
 Current D1 boundary: lifecycle is clean, but long-output quality/stop behavior is
 not repeatability-grade. D1 remains blocked before D2.
