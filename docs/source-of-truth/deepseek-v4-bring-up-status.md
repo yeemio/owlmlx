@@ -50,6 +50,12 @@ This keeps DeepSeek V4 at `experimental_only`. It does not make
 adopt `ds4.c`, and does not claim supported DeepSeek V4 serving. It closes D1
 only for the isolated experimental lane and unlocks D2 metrics-ledger work.
 
+**D2 follow-up status:** the `metrics` subcommand now has fake-tested ledger
+coverage for `stream_generate_messages` timing and RSS fields, but the first
+real p1/128 DeepSeek smoke blocked before emitting a stream token/done payload.
+The child reached a loaded RSS band with 0 CPU before manual cleanup. Treat D2
+as runner-landed / real-streaming-blocked, not as a metrics pass.
+
 **2026-05-11: Lifecycle complete via intermediate path.**
 
 `DeepSeek-V4-Flash-2bit-DQ` completed load → generate → unload → clean health

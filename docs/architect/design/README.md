@@ -43,6 +43,7 @@
 | Campaign | Spec | 状态 | Plan-grade 来源 |
 |---|---|---|---|
 | **D1** | [`D1-spec.md`](D1-spec.md) | passed under adopted `messages` prompt policy; raw prompt remains diagnostic failure | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
+| **D2** | [`D2-spec.md`](D2-spec.md) | runner/ledger landed; real streaming smoke currently blocked | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
 
 **节奏纪律**：design spec **一次一个**，per round 落盘 + review；不允许批量预先撰写未启动的 gate。
 
