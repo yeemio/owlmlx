@@ -87,9 +87,15 @@ Warm TTFT columns are `min / p50 / max` across rounds 2-4. Improvement is
 evidence:
 - `files/evidence/owlmlx/bench/session-kv-cache/20260512T123316Z-owlmlx-native-session-kv-ttft-n4.jsonl`
 - `files/evidence/owlmlx/bench/session-kv-cache/20260516T151100Z-b1a-gemma4-31b-it-session-kv-ttft.jsonl`
+- `files/evidence/owlmlx/bench/cache-settle-no-regress/20260517T013342Z-b1b-gemma-4-31B-it-cache-on-no-regress-rollup.jsonl`
+
+B-1b no-regress evidence: Gemma 4-31B-it native cache-off N=20 and cache-on
+N=20 both completed; cache-on had 20/20 warm hits, `failed_reclaim=0`,
+`failed_unload=0`, and p50/p99 settle durations stayed within threshold.
 
 This remains `experimental`: native backend only, default off, explicit
-session id, append-only reuse for non-trimmable upstream caches.
+session id, append-only reuse for non-trimmable upstream caches. The 24h
+no-swap and swap soak gates remain open before any `supported` promotion.
 
 Short-prompt TPS on `Mac17,6` (`max_tokens=64`, `temperature=0`):
 

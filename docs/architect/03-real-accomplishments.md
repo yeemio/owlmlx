@@ -138,8 +138,8 @@
 
 | # | 主证据 | 状态 | 关键数据 / Gap |
 |---|---|---|---|
-| **①** Session KV TTFT 提升 | ✅ 已实证（Qwen3.6-27B-4bit, 7.409×；Gemma 4-31B-it, 2.246×） | 见 §5.1；supported gate 已过 B-1a，待 B-1b / B-1c §1 / B-1c §2 |
-| **②** 模型切换 reclaim 干净 | 🟡 部分实证（settle barrier + reclaim stats supported；分布数据待加入主叙事） | 见 §5.2 |
+| **①** Session KV TTFT 提升 | ✅ 已实证（Qwen3.6-27B-4bit, 7.409×；Gemma 4-31B-it, 2.246×） | 见 §5.1；supported gate 已过 B-1a + B-1b，待 B-1c §1 / B-1c §2 |
+| **②** 模型切换 reclaim 干净 | 🟡 部分实证（settle barrier + reclaim stats supported；B-1b cache-on no-regress 已过） | 见 §5.2 |
 | **③** 长上线稳定（48h+ 两段 soak） | 🔴 **缺** —— eviction_soak.py 已退出 placeholder，但无 24h+ 真实 soak 报告 | 见 §5.3；Campaign B-1c §1 + §2 |
 | **④** 队列尾延迟（p50/p99/p99.9） | 🔴 **缺** —— GenerationGate supported；serial 已证；N 并发下分布未公开 | 见 §5.4 |
 
@@ -174,10 +174,20 @@
 - `RuntimeKernel.reclaim_barrier_stats()` + `GET /v1/runtime/reclaim-barrier-event/stats`：unload-boundary duration 与 backend-reported reclaim 分布
 - `pre_load_check` 四值 verdict
 
+**新增 B-1b no-regress 证据（2026-05-17）**：
+
+- Evidence:
+  `files/evidence/owlmlx/bench/cache-settle-no-regress/20260517T013342Z-b1b-gemma-4-31B-it-cache-on-no-regress-rollup.jsonl`
+- Gemma 4-31B-it native cache-off baseline：N=20
+- Gemma 4-31B-it native cache-on candidate：N=20
+- cache-on warm hits：20/20
+- `failed_reclaim_events_total = 0`
+- `failed_unload_events_total = 0`
+- `failure_measurement_count = 0`
+- settle duration alignment：baseline p50/p99 = 1065.832 / 1115.409 ms；candidate p50/p99 = 1055.574 / 1473.198 ms；p50/p99 within threshold
+
 **当前缺**：
 
-- `failed_reclaim` 计数器虽已实装，但**未作为主叙事数据公开**——需把 N≥20 跑下 `failed_reclaim` 分布写入文档
-- `cache=on` 启用与 `cache=off` 基线的 reclaim 分布对比未公开（Campaign B-1b gate）
 - 模型切换（A→B→A）序列下累计 reclaim 漂移未公开（Campaign B-1c §2 gate）
 
 ### 5.3 🔴 主证据 ③ · 长上线稳定（48h+ 两段 soak · 缺）
@@ -240,18 +250,18 @@
 - 与 vMLX 在 Gemma 4 上基本持平，不构成差异化
 - README 把它当亮点会**误导外部对 owlmlx 战略价值的判断**——价值不在 raw throughput
 
-### 5.6 Session KV cache `supported` gate 四条状态（明确 · 当前未达）
+### 5.6 Session KV cache `supported` gate 四条状态（明确 · 当前 2/4）
 
 > 对应 Campaign B-1a / B-1b / B-1c §1 / B-1c §2
 
 | Gate | 状态 | 缺什么 |
 |---|---|---|
 | **B-1a · 第二模型 / 第二形状** | ✅ | Gemma 4-31B-it 已复现 session KV warm TTFT 改善（2.246×，RuntimeKernel 路径）+ 非 cache 路径 N≥5 prompt 字节等价；§VI 4-gate G1 Cache Parity 已关闭 |
-| **B-1b · `cache=on` × settle barrier 无回归** | ❌ | N=20 跑后 `failed_reclaim = 0` 报告 + cache=off 基线对齐 |
+| **B-1b · `cache=on` × settle barrier 无回归** | ✅ | Gemma 4-31B-it cache-off N=20 / cache-on N=20 passed；20/20 warm hits；`failed_reclaim=0`；cache=off 基线对齐 |
 | **B-1c §1 · 纯 soak（24h+）** | ❌ | 无人为 swap 的 24h+ 混合负载 soak；漂移 < `min(200 MB, 0.5% host budget)`；`no_swap_soak_stability = passed` |
 | **B-1c §2 · soak + swap（24h+）** | ❌ | §1 通过后；每 4h × 6 次 swap；累积 `failed_reclaim = 0` + 漂移 < §1 阈值；`soak_plus_swap_stability = passed` |
 
-**四条全过** → §1a Promotion Gate → `experimental` 升 `supported`。当前 1/4 达成。
+**四条全过** → §1a Promotion Gate → `experimental` 升 `supported`。当前 2/4 达成。
 
 **晋级越级红线**：
 
@@ -388,7 +398,7 @@
 > ④ 27-row OwlOps ledger live + comparative_evidence_history live。
 >
 > **runtime mainline 实测尚未闭环**（路线图工作面）：
-> ① Session KV cache supported gate **四条** 1/4（B-1a 第二模型已过；待 B-1b cache=on settle 无回归 + B-1c §1 纯 soak + B-1c §2 soak+swap） +
+> ① Session KV cache supported gate **四条** 2/4（B-1a 第二模型已过；B-1b cache=on settle 无回归已过；待 B-1c §1 纯 soak + B-1c §2 soak+swap） +
 > ② N≥20 host-stable repeatability + 队列尾延迟（主证据 #4） +
 > ③ Qwen35 TTFT default warmup + DeepSeek V4 lifecycle + speculative path safety 正交矩阵 +
 > ④ native backend 4-gate promote-path + `server.py` 工程化拆分（Wave H；H1 compat routes split 已落，H2/H3 未闭环）。
