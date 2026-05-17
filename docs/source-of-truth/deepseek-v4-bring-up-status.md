@@ -63,6 +63,15 @@ experimental lane, not as a supported DeepSeek serving claim. This
 child-process RSS sample is not comparable to the earlier 96.574 GB short-smoke
 peak-memory note.
 
+**D3 follow-up status:** the checkpoint/MTP inspection gate is complete for the
+current local artifact. `20260517T-d3-mtp-checkpoint-inspection.jsonl` records
+`num_nextn_predict_layers=1`, 2610 weight keys, 19 safetensors shards, zero
+matched MTP/draft/speculative weight keys, zero extra layer keys beyond
+`num_hidden_layers=43`, and
+`missingReason=mtp_weights_absent_or_stripped`. Treat this as
+`capability_conclusion=mtp_checkpoint_not_available`, not as DeepSeek MTP
+serving support.
+
 **2026-05-11: Lifecycle complete via intermediate path.**
 
 `DeepSeek-V4-Flash-2bit-DQ` completed load → generate → unload → clean health

@@ -43,7 +43,8 @@
 | Campaign | Spec | 状态 | Plan-grade 来源 |
 |---|---|---|---|
 | **D1** | [`D1-spec.md`](D1-spec.md) | passed under adopted `messages` prompt policy; raw prompt remains diagnostic failure | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
-| **D2** | [`D2-spec.md`](D2-spec.md) | p1/128 metrics smoke passed after fd-buffered stdout reader fix | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
+| **D2** | [`D2-spec.md`](D2-spec.md) | p1/p2/p4 × 128/512 metrics ladder passed | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
+| **D3** | [`D3-spec.md`](D3-spec.md) | inspection passed; `missingReason=mtp_weights_absent_or_stripped` | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
 
 **节奏纪律**：design spec **一次一个**，per round 落盘 + review；不允许批量预先撰写未启动的 gate。
 

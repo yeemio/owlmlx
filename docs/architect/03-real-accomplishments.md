@@ -321,6 +321,17 @@ documented as a diagnostic failure and does not define the D1 gate.
 Current D2 boundary: D2 is passed for this isolated experimental ladder, but it
 does not make DeepSeek V4 supported or visible on the default model surface.
 
+#### D3 checkpoint / MTP inspection（2026-05-17）
+
+> 出处：`files/evidence/owlmlx/deepseek-v4/d3-checkpoint-inspection/`
+
+| Run | 参数 | 结果 | 关键观察 |
+|---|---|---|---|
+| `20260517T-d3-mtp-checkpoint-inspection.jsonl` | local artifact metadata inspection | passed | `num_nextn_predict_layers=1`；2610 weight keys / 19 shards；MTP key candidates = 0；extra layer keys = 0；`missingReason=mtp_weights_absent_or_stripped` |
+
+Current D3 boundary: current local artifact has no usable MTP checkpoint path;
+DeepSeek V4 stays `experimental_only`.
+
 ### 5.8 Gemma 4 MTP drafter probe（附录数据）
 
 > 出处：`docs/source-of-truth/gemma4-mtp-drafter-probe-20260506.md`
