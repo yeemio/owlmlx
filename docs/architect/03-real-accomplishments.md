@@ -287,6 +287,19 @@
 - 严格维持 `experimental`：依赖 PR runtime、未闭环 repeated serving、未闭环 long output、MTP 权重检查未做
 - 不进入 default `GET /v1/openai/models`
 
+#### D1 p1 token-ladder diagnostic（2026-05-17）
+
+> 出处：`files/evidence/owlmlx/deepseek-v4/d1-isolated-repeatability/`
+
+| Run | 参数 | 结果 | 关键观察 |
+|---|---|---|---|
+| `20260517T-d1-p1-token-ladder-continue.jsonl` | p1 · 128/512/1024 · default `max_kv_size=512` · `continue_on_failure` | 128/512 passed；1024 failed | 1024 `repetition_flag=true`；`max_repeated_window_count=4`；load/unload/clean-health all true |
+| `20260517T-d1-p1-1024-sampler-diagnostic.jsonl` | p1 · 1024 · `temp=0.2` · `top_p=0.9` · `top_k=40` | failed | sampler variant still repeats；not just deterministic temp=0 behavior |
+| `20260517T-d1-p1-1024-kv2048-diagnostic.jsonl` | p1 · 1024 · `max_kv_size=2048` | failed | same repeated-window hash as default 1024; not cleared by larger KV window |
+
+Current D1 boundary: lifecycle is clean, but long-output quality/stop behavior is
+not repeatability-grade. D1 remains blocked before D2.
+
 ### 5.8 Gemma 4 MTP drafter probe（附录数据）
 
 > 出处：`docs/source-of-truth/gemma4-mtp-drafter-probe-20260506.md`

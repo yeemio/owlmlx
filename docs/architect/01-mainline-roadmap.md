@@ -31,7 +31,7 @@
 | B-1b design spec | landed | `docs/architect/design/B-1b-spec.md` |
 | B-1b cache reclaim gate | passed · native N=20 | cache-off N=20 + cache-on N=20；20/20 warm hits；`failed_reclaim=0`；`failed_unload=0`；p50/p99 settle duration within threshold |
 | B-1c §1 no-swap soak runner | landed · 24h native evidence pending | fake/schema smoke now remains `blocked`; only native `mlx_core_active_memory` + required_duration ≥24h can graduate `no_swap_soak_stability` |
-| D1 DeepSeek repeatability runner | real runner landed · lifecycle clean · full gate blocked | persistent child `load -> generate -> unload -> ping -> shutdown`；ladder coverage summary + isolated provenance；preflight shows Blaizzy `mlx-lm` fork `pc/add-deepseekv4flash-model` at `5c10538136b9038b9626c134612b08afc18d697a`; p1/1024 diagnostic shows repetition |
+| D1 DeepSeek repeatability runner | real runner landed · lifecycle clean · full gate blocked | persistent child `load -> generate -> unload -> ping -> shutdown`；p1 128/512 passed, p1/1024 failed with repetition; sampler variant (`temp=0.2`, `top_p=0.9`, `top_k=40`) and `max_kv_size=2048` did not clear it; preflight shows Blaizzy `mlx-lm` fork `pc/add-deepseekv4flash-model` at `5c10538136b9038b9626c134612b08afc18d697a` |
 | H1 compat route split | landed | `server_routes_openai.py` 拆出 OpenAI / Anthropic compat routes |
 | Targeted tests | passed | B-1c/D1/session-cache focused suite = 39 passed；subprocess backend = 64 passed（上一轮） |
 
@@ -306,7 +306,7 @@
 - **目标**：DS4-Flash 2bit-DQ 从短烟测提升到"可重复验证 + clean health + load→generate→unload→clean health 全链"；**不**进入默认 model surface
 - **启动时点（决策 E3）**：D1 启动时点 = **Campaign B-1a 完成后**（host 进入 B-1b N=20 跑期间，DS4 隔离 venv 并行启动；不污染主 venv，主要竞争 CPU/GPU 时段）
 - **近期闭环（0–3 月，B-1a 完成后）**：
-  - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符。**当前状态**：design spec + real runner 已落；isolated preflight passed；1 prompt / 8 token tiny smoke passed（load_time_s ≈31.4，restart_observed=false，clean health=true）；full ladder reached p1/1024 then failed on `repetition_flag=true` while `restart_observed=false` and clean health remained true
+  - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符。**当前状态**：design spec + real runner 已落；isolated preflight passed；p1 token ladder completed with `continue_on_failure`（128/512 passed，1024 failed on `repetition_flag=true`）；sampler variant and `max_kv_size=2048` still failed at p1/1024；`restart_observed=false` and load/unload/clean-health remained true
   - D2：load time / TTFT / decode TPS / peak RSS / backend health 完整 ledger
   - D3：checkpoint MTP 权重检查；如缺失写 `missingReason=mtp_weights_absent_or_stripped`
   - D4：失败必须 clean pre-load reject，不污染 8066 runtime health
