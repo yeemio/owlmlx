@@ -32,6 +32,8 @@ graduation rule.
    - `segment_duration_s`
    - `interruption_reason`
    - `resumes_prior_segment`
+   - locked `OWLMLX_SESSION_CACHE_TTL_S` so session entries do not expire
+     during no-swap measurement
 2. Add an aggregate runner gate that consumes segment rollups and emits:
    - `schema_version=b1c1.rehearsal.v1`
    - `interrupted_no_swap_rehearsal=passed|failed|blocked`
@@ -44,6 +46,7 @@ graduation rule.
    - hard failure segments aggregate to rehearsal failed,
    - empty segment input is rejected,
    - no aggregate can graduate B-1c section 1.
+   - session cache expiration blocks rehearsal aggregation.
 4. Update B-1c design docs with the exact command shape.
 
 ## Verification

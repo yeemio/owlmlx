@@ -56,6 +56,7 @@ uv run python scripts/bench/eviction_soak.py \
   --required-duration-s 86400 \
   --sample-interval-s 60 \
   --warmup-cycles 1 \
+  --session-cache-ttl-s 90000 \
   --max-tokens 2
 ```
 
@@ -117,6 +118,7 @@ no_swap_soak_stability: passed | failed | blocked
 - `failure_measurement_count = 0`
 - `unresolved_reclaim_barrier_events = 0`
 - `session_cache_drops_total = 0`
+- `session_cache_expirations_total = 0`
 - `session_cache_rejects_total = 0`
 - every sample has `sample_verdict = passed`
 - final cleanup unload succeeds
@@ -150,6 +152,11 @@ interrupted_no_swap_rehearsal:
   no_swap_soak_stability: blocked
 ```
 
+B-1c runner defaults `OWLMLX_SESSION_CACHE_TTL_S` to at least 25h so session
+entries do not expire during a 24h no-swap measurement window. Rehearsal and
+graduation rollups must keep `session_cache_expirations_total = 0`; TTL expiry
+during measurement is a runner/configuration blocker, not a stable soak signal.
+
 Rehearsal evidence can support confidence statements such as
 `interrupted_no_swap_rehearsal = passed`, but it must not:
 
@@ -174,6 +181,7 @@ uv run python scripts/bench/eviction_soak.py \
   --required-duration-s 86400 \
   --sample-interval-s 60 \
   --warmup-cycles 1 \
+  --session-cache-ttl-s 90000 \
   --max-tokens 2 \
   --rehearsal-group-id b1c1-native-3x8h \
   --rehearsal-segment-id b1c1-native-3x8h-segment-1 \

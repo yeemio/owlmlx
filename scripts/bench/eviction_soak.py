@@ -296,16 +296,35 @@ def _make_kernel(*, backend: str, profile: MachineMemoryProfile) -> tuple[Runtim
 
 
 @contextlib.contextmanager
-def _session_cache_env(enabled: bool) -> Iterator[None]:
-    previous = os.environ.get("OWLMLX_SESSION_CACHE_ENABLED")
+def _session_cache_env(
+    enabled: bool,
+    *,
+    ttl_s: float | None = None,
+    max_entries: int | None = None,
+) -> Iterator[None]:
+    previous_enabled = os.environ.get("OWLMLX_SESSION_CACHE_ENABLED")
+    previous_ttl = os.environ.get("OWLMLX_SESSION_CACHE_TTL_S")
+    previous_max_entries = os.environ.get("OWLMLX_SESSION_CACHE_MAX_ENTRIES")
     os.environ["OWLMLX_SESSION_CACHE_ENABLED"] = "1" if enabled else "0"
+    if ttl_s is not None:
+        os.environ["OWLMLX_SESSION_CACHE_TTL_S"] = str(float(ttl_s))
+    if max_entries is not None:
+        os.environ["OWLMLX_SESSION_CACHE_MAX_ENTRIES"] = str(int(max_entries))
     try:
         yield
     finally:
-        if previous is None:
+        if previous_enabled is None:
             os.environ.pop("OWLMLX_SESSION_CACHE_ENABLED", None)
         else:
-            os.environ["OWLMLX_SESSION_CACHE_ENABLED"] = previous
+            os.environ["OWLMLX_SESSION_CACHE_ENABLED"] = previous_enabled
+        if previous_ttl is None:
+            os.environ.pop("OWLMLX_SESSION_CACHE_TTL_S", None)
+        else:
+            os.environ["OWLMLX_SESSION_CACHE_TTL_S"] = previous_ttl
+        if previous_max_entries is None:
+            os.environ.pop("OWLMLX_SESSION_CACHE_MAX_ENTRIES", None)
+        else:
+            os.environ["OWLMLX_SESSION_CACHE_MAX_ENTRIES"] = previous_max_entries
 
 
 def _percentile(values: list[float | int], percentile: float) -> float | None:
@@ -632,6 +651,19 @@ def _b1b_rollup(
 def _b1c1_max_drift_bytes(profile: MachineMemoryProfile) -> int:
     host_budget_bytes = int(profile.serving_budget_gb * BYTES_PER_GB * 0.005)
     return min(B1C1_DRIFT_BUDGET_BYTES, host_budget_bytes)
+
+
+def _b1c1_default_session_cache_ttl_s(
+    *,
+    duration_s: float,
+    required_duration_s: float,
+    sample_interval_s: float,
+) -> float:
+    return max(
+        float(B1C1_DURATION_S) + 3600.0,
+        float(required_duration_s) + 3600.0,
+        float(duration_s) + float(sample_interval_s) * len(B1C1_PROMPTS) + 3600.0,
+    )
 
 
 def _b1c1_round_verdict(
@@ -1078,6 +1110,15 @@ def _b1c1_rollup(
         int(record.get("session_cache", {}).get("counter_delta", {}).get("drops", 0) or 0)
         for record in records
     )
+    expirations_total = sum(
+        int(
+            record.get("session_cache", {})
+            .get("counter_delta", {})
+            .get("expirations", 0)
+            or 0
+        )
+        for record in records
+    )
     rejects_total = sum(
         int(record.get("session_cache", {}).get("counter_delta", {}).get("rejects", 0) or 0)
         for record in records
@@ -1111,6 +1152,7 @@ def _b1c1_rollup(
             or (max_drift_bytes is not None and not drift_ok)
             or fatal_watermark_count > 0
             or drops_total > 0
+            or expirations_total > 0
             or rejects_total > 0
             or failure_measurement_count > 0
             or unresolved_reclaim_barrier_events > 0
@@ -1129,6 +1171,7 @@ def _b1c1_rollup(
         and drift_ok
         and fatal_watermark_count == 0
         and drops_total == 0
+        and expirations_total == 0
         and rejects_total == 0
         and failure_measurement_count == 0
         and unresolved_reclaim_barrier_events == 0
@@ -1176,6 +1219,7 @@ def _b1c1_rollup(
         "max_drift_within_budget": drift_ok,
         "fatal_watermark_count": fatal_watermark_count,
         "session_cache_drops_total": drops_total,
+        "session_cache_expirations_total": expirations_total,
         "session_cache_rejects_total": rejects_total,
         "failure_measurement_count": failure_measurement_count,
         "unresolved_reclaim_barrier_events": unresolved_reclaim_barrier_events,
@@ -1230,6 +1274,7 @@ def run_b1c1_no_swap_soak(
     rehearsal_segment_id: str | None = None,
     resumes_prior_segment: bool = False,
     interruption_reason: str = "planned_stop",
+    session_cache_ttl_s: float | None = None,
 ) -> dict[str, Any]:
     if runtime != "owlmlx":
         raise ValueError("only --runtime owlmlx is implemented in this baseline round")
@@ -1248,6 +1293,8 @@ def run_b1c1_no_swap_soak(
             "--interruption-reason must be one of "
             + ", ".join(sorted(B1C1_INTERRUPTION_REASONS))
         )
+    if session_cache_ttl_s is not None and session_cache_ttl_s < 0:
+        raise ValueError("--session-cache-ttl-s must be >= 0")
 
     profile = MachineMemoryProfile(
         system_memory_gb=profile_memory_gb,
@@ -1262,8 +1309,17 @@ def run_b1c1_no_swap_soak(
     rollup_path = output_dir / _b1c1_rollup_filename(timestamp, model_id=model_label)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     settle_sleep_s = 0.0
+    effective_session_cache_ttl_s = (
+        float(session_cache_ttl_s)
+        if session_cache_ttl_s is not None
+        else _b1c1_default_session_cache_ttl_s(
+            duration_s=duration_s,
+            required_duration_s=required_duration_s,
+            sample_interval_s=sample_interval_s,
+        )
+    )
 
-    with _session_cache_env(True):
+    with _session_cache_env(True, ttl_s=effective_session_cache_ttl_s):
         kernel, sampler = _make_kernel(backend=backend, profile=profile)
         records: list[dict[str, Any]] = []
         started_monotonic_s = time.monotonic()
@@ -1375,6 +1431,7 @@ def run_b1c1_no_swap_soak(
                         },
                         "config": {
                             "OWLMLX_SESSION_CACHE_ENABLED": "1",
+                            "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
                             "session_id": session_id,
                             "temperature": 0.0,
                             "seed": 42,
@@ -1498,6 +1555,7 @@ def _b1c1_rehearsal_segment_ok(record: dict[str, Any]) -> bool:
         and record.get("max_drift_within_budget") is True
         and int(record.get("fatal_watermark_count", 0) or 0) == 0
         and int(record.get("session_cache_drops_total", 0) or 0) == 0
+        and int(record.get("session_cache_expirations_total", 0) or 0) == 0
         and int(record.get("session_cache_rejects_total", 0) or 0) == 0
         and int(record.get("failure_measurement_count", 0) or 0) == 0
         and int(record.get("unresolved_reclaim_barrier_events", 0) or 0) == 0
@@ -1633,6 +1691,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--sample-interval-s", type=float, default=B1C1_SAMPLE_INTERVAL_S)
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--warmup-cycles", type=int, default=B1C1_WARMUP_CYCLES)
+    parser.add_argument("--session-cache-ttl-s", type=float, default=None)
     parser.add_argument("--rehearsal-group-id", default=None)
     parser.add_argument("--rehearsal-segment-id", default=None)
     parser.add_argument("--resumes-prior-segment", action="store_true")
@@ -1688,6 +1747,7 @@ def main(argv: list[str] | None = None) -> int:
                 rehearsal_segment_id=args.rehearsal_segment_id,
                 resumes_prior_segment=args.resumes_prior_segment,
                 interruption_reason=args.interruption_reason,
+                session_cache_ttl_s=args.session_cache_ttl_s,
             )
         elif args.gate == B1C1_REHEARSAL_GATE:
             summary = run_b1c1_interrupted_rehearsal(

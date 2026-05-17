@@ -262,6 +262,10 @@ def test_b1c1_fake_no_swap_soak_writes_gap_free_blocked_ledger_and_rollup(tmp_pa
     assert {record["mode"] for record in ledger} == {"no_swap_soak"}
     assert {record["config"]["OWLMLX_SESSION_CACHE_ENABLED"] for record in ledger} == {"1"}
     assert all(
+        record["config"]["OWLMLX_SESSION_CACHE_TTL_S"] >= 90000.0
+        for record in ledger
+    )
+    assert all(
         record["operation"]["artificial_unload_or_swap_during_soak"] is False
         for record in ledger
     )
@@ -365,6 +369,7 @@ def _write_b1c1_segment_rollup(
     duration_s=28800.0,
     conclusion="blocked",
     hard_failure=False,
+    expirations_total=0,
 ):
     payload = {
         "schema_version": "b1c1.v1",
@@ -380,6 +385,7 @@ def _write_b1c1_segment_rollup(
         "max_drift_within_budget": True,
         "fatal_watermark_count": 0,
         "session_cache_drops_total": 0,
+        "session_cache_expirations_total": expirations_total,
         "session_cache_rejects_total": 0,
         "failure_measurement_count": 0,
         "unresolved_reclaim_barrier_events": 0,
@@ -451,6 +457,28 @@ def test_b1c1_interrupted_rehearsal_failure_stays_failed(tmp_path):
     assert summary["interrupted_no_swap_rehearsal"] == "failed"
     assert summary["no_swap_soak_stability"] == "blocked"
     assert summary["graduates"]["interrupted_no_swap_rehearsal"] is False
+
+
+def test_b1c1_interrupted_rehearsal_blocks_expiring_segments(tmp_path):
+    segment = tmp_path / "segment-expired-rollup.jsonl"
+    _write_b1c1_segment_rollup(
+        segment,
+        run_id="segment-expired",
+        duration_s=86400.0,
+        expirations_total=1,
+    )
+
+    summary = eviction_soak.run_b1c1_interrupted_rehearsal(
+        segment_rollups=[segment],
+        output_dir=tmp_path,
+        run_id="aggregate-expired",
+        required_total_duration_s=86400.0,
+    )
+
+    assert summary["ok"] is False
+    assert summary["interrupted_no_swap_rehearsal"] == "blocked"
+    assert summary["all_segments_ok_for_rehearsal"] is False
+    assert summary["no_swap_soak_stability"] == "blocked"
 
 
 def test_b1c1_interrupted_rehearsal_rejects_empty_segment_list(tmp_path):
