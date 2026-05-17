@@ -809,6 +809,7 @@ def run_real(
     max_tokens_ladder: tuple[int, ...] = TOKEN_LADDER,
     generation_overrides: dict[str, Any] | None = None,
     generation_surface: str = "generate",
+    continue_on_failure: bool = False,
     timeout_s: float = 600.0,
     popen_factory: Any = subprocess.Popen,
 ) -> dict[str, Any]:
@@ -931,9 +932,9 @@ def run_real(
                         load_pid=load_pid,
                     )
                 )
-                if rows[-1]["verdict"] != "passed":
+                if rows[-1]["verdict"] != "passed" and not continue_on_failure:
                     break
-            if rows and rows[-1]["verdict"] != "passed":
+            if rows and rows[-1]["verdict"] != "passed" and not continue_on_failure:
                 break
 
         unload_result = _child_exchange(
@@ -1016,6 +1017,9 @@ def run_real(
         "generation_defaults": D1_GENERATION_DEFAULTS,
         "generation_overrides": generation_overrides,
         "generation_surface": generation_surface,
+        "failure_policy": (
+            "continue_on_failure" if continue_on_failure else "stop_on_first_failure"
+        ),
         "preflight": preflight,
         "lifecycle": {
             "load_ok": load_ok,
@@ -1060,6 +1064,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         prompt_ids=tuple(args.prompt_id or ()),
         max_tokens_ladder=tuple(args.max_tokens),
         generation_surface=args.generation_surface,
+        continue_on_failure=args.continue_on_failure,
         generation_overrides={
             "max_kv_size": args.max_kv_size,
             "kv_bits": args.kv_bits,
@@ -1131,6 +1136,14 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         choices=("generate", "stream"),
         default="generate",
         help="Use non-stream generate for lifecycle runs; stream for timing diagnostics.",
+    )
+    run.add_argument(
+        "--continue-on-failure",
+        action="store_true",
+        help=(
+            "Diagnostic mode: keep running the requested prompt/token matrix after "
+            "a failed row. The run verdict still fails unless the full matrix passes."
+        ),
     )
     run.add_argument("--max-kv-size", type=int, default=D1_GENERATION_DEFAULTS["max_kv_size"])
     run.add_argument("--kv-bits", type=int, default=None)

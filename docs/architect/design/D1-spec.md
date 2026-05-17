@@ -185,6 +185,11 @@ requested prompt set across the requested token ladder. A run that stops after a
 failed prompt must keep the completed row evidence but set
 `full_ladder_completed = false` and list any unrun pairs in `missing_pairs`.
 
+Default D1 execution stops on the first failed row. Diagnostic reruns may use
+`--continue-on-failure` to fill the remaining prompt/token matrix after a
+failure; this improves attribution only and does **not** let the run pass unless
+every requested pair passes.
+
 ## 5. Harness Requirements
 
 Prefer extending the existing model-release-candidate tooling over adding a new
@@ -208,6 +213,7 @@ add `*_contract.py`, `*_evidence.py`, `*_harness.py`, or `*_ledger.py` modules.
 | unsupported `deepseek_v4` loader | `blocked` | keep experimental adapter lane; do not dirty main health |
 | process restart during five prompts | `failed` | D1 fails; D2 cannot start |
 | repetition / no stop at 1024 | `failed` | record prompt id + token level |
+| `--continue-on-failure` records later successful rows after an earlier failure | overall remains `failed` | use only to localize repetition / stop-policy boundaries |
 | host pressure fatal | `failed` | stop run; record host pressure snapshot |
 | unload fails | `failed` | record clean-health failure; do not run further prompts |
 

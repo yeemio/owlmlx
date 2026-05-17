@@ -469,6 +469,7 @@ def test_real_run_coverage_reports_failed_and_missing_ladder(monkeypatch, tmp_pa
     )
 
     assert summary["verdict"] == "failed"
+    assert summary["failure_policy"] == "stop_on_first_failure"
     assert summary["coverage"]["expected_generation_count"] == 3
     assert summary["coverage"]["completed_generation_count"] == 2
     assert summary["coverage"]["passed_generation_count"] == 1
@@ -486,6 +487,68 @@ def test_real_run_coverage_reports_failed_and_missing_ladder(monkeypatch, tmp_pa
     assert summary["coverage"]["missing_pairs"] == [
         {"prompt_id": "p1_short_cn", "max_tokens": 1024}
     ]
+
+
+def test_real_run_continue_on_failure_fills_diagnostic_matrix(monkeypatch, tmp_path):
+    class _FailingAfterFirstGenerationProcess(_FakeProcess):
+        def handle(self, payload: dict) -> None:
+            if payload["action"] == "generate" and self.generation_count >= 1:
+                self.generation_count += 1
+                self.stdout.lines.append(
+                    json.dumps(
+                        {
+                            "ok": False,
+                            "action": "generate",
+                            "model_id": payload["model_id"],
+                            "error": "synthetic generation failure",
+                            "pid": self.pid,
+                            "generation_count": self.generation_count,
+                        }
+                    )
+                    + "\n"
+                )
+                return
+            super().handle(payload)
+
+    model_path = tmp_path / "model"
+    model_path.mkdir()
+
+    monkeypatch.setattr(
+        d1,
+        "run_preflight",
+        lambda **kwargs: {"verdict": "passed", "preflight": "passed"},
+    )
+
+    summary = d1.run_real(
+        output_dir=tmp_path,
+        model_path=model_path,
+        run_id="coverage-continue-fake",
+        max_prompts=1,
+        max_tokens_ladder=(128, 512, 1024),
+        continue_on_failure=True,
+        timeout_s=1.0,
+        popen_factory=lambda cmd, **kwargs: _FailingAfterFirstGenerationProcess(
+            cmd,
+            **kwargs,
+        ),
+    )
+
+    records = _records(tmp_path / "coverage-continue-fake.jsonl")
+    assert len(records) == 3
+    assert summary["verdict"] == "failed"
+    assert summary["failure_policy"] == "continue_on_failure"
+    assert summary["coverage"]["expected_generation_count"] == 3
+    assert summary["coverage"]["completed_generation_count"] == 3
+    assert summary["coverage"]["passed_generation_count"] == 1
+    assert summary["coverage"]["full_ladder_completed"] is False
+    assert summary["coverage"]["prompt_token_matrix"] == {
+        "p1_short_cn": {
+            "128": "passed",
+            "512": "failed",
+            "1024": "failed",
+        }
+    }
+    assert summary["coverage"]["missing_pairs"] == []
 
 
 def test_real_run_stream_surface_records_timing_from_fake_process(monkeypatch, tmp_path):
