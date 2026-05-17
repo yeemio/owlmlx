@@ -32,11 +32,11 @@
 | B-1b cache reclaim gate | passed · native N=20 | cache-off N=20 + cache-on N=20；20/20 warm hits；`failed_reclaim=0`；`failed_unload=0`；p50/p99 settle duration within threshold |
 | B-1c §1 no-swap soak runner | landed · 24h native evidence pending | fake/schema smoke now remains `blocked`; only native `mlx_core_active_memory` + required_duration ≥24h can graduate `no_swap_soak_stability` |
 | D1 DeepSeek repeatability runner | passed · experimental lane · messages prompt policy adopted | default `messages` prompt surface passed the formal 5 prompt × 128/512/1024 matrix (`20260517T-d1-full-ladder-adopted-messages-policy.jsonl`) with 15/15 passed, no repetition, and clean load/unload health; raw prompt remains diagnostic failure at p1/1024 and is not the accepted D1 surface; preflight shows Blaizzy `mlx-lm` fork `pc/add-deepseekv4flash-model` at `5c10538136b9038b9626c134612b08afc18d697a` |
-| D2 DeepSeek metrics ledger | runner landed · real streaming smoke blocked | `metrics` subcommand writes D2 ledger from `stream_generate_messages` in fake tests; real p1/128 smoke reached loaded runner state but emitted no streaming token/done payload before manual cleanup, so D2 remains blocked rather than passed |
+| D2 DeepSeek metrics ledger | first smoke passed · p1/128 | fd-buffered child stdout reader fixed the previous stream block; `20260517T-d2-p1-128-metrics-fd-reader.jsonl` records load 15.656s, TTFT 30226ms, decode 32.392 tok/s after first token, peak RSS 12.426GB, clean unload |
 | H1 compat route split | landed | `server_routes_openai.py` 拆出 OpenAI / Anthropic compat routes |
 | Targeted tests | passed | B-1c/D1/session-cache focused suite = 39 passed；subprocess backend = 64 passed（上一轮） |
 
-下一条真实执行线二选一：**B-1c §1 no-swap 24h soak**（优先继续 Session KV supported gate）或 **D2 stream blocker isolation**（D2 runner exists, but real DeepSeek `stream_generate_messages` currently blocks before token/done output）。二者不得共享同一 GPU-heavy host 窗口。
+下一条真实执行线二选一：**B-1c §1 no-swap 24h soak**（优先继续 Session KV supported gate）或 **D2 metrics ladder expansion**（D2 p1/128 smoke passed; next is prompt/token expansion, not another stream-blocker loop）。二者不得共享同一 GPU-heavy host 窗口。
 
 ---
 
@@ -308,7 +308,7 @@
 - **启动时点（决策 E3）**：D1 启动时点 = **Campaign B-1a 完成后**（host 进入 B-1b N=20 跑期间，DS4 隔离 venv 并行启动；不污染主 venv，主要竞争 CPU/GPU 时段）
 - **近期闭环（0–3 月，B-1a 完成后）**：
   - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符。**当前状态**：passed under adopted `messages` prompt policy；formal default run `20260517T-d1-full-ladder-adopted-messages-policy.jsonl` completed 15/15 rows with `repetition_flag=false`, clean load/unload health, and no restart. Raw prompt p1/1024 remains a diagnostic failure and is not the accepted surface.
-  - D2：load time / TTFT / decode TPS / peak RSS / backend health 完整 ledger。**当前状态**：runner/ledger 已落，fake stream metrics pass；真实 p1/128 `stream_generate_messages` smoke 被阻塞（loaded child RSS band, 0 CPU, no token/done payload before manual cleanup），下一刀先隔离 stream blocker，不能把 D2 降级成 non-stream `generate_messages`
+  - D2：load time / TTFT / decode TPS / peak RSS / backend health 完整 ledger。**当前状态**：first p1/128 metrics smoke passed after replacing blocking `readline()` child stdout handling with fd-buffered reads; evidence `20260517T-d2-p1-128-metrics-fd-reader.jsonl` records load 15.656s, TTFT 30226ms, decode 32.392 tok/s after first token, peak RSS 12.426GB, clean unload. Next: expand prompt/token ladder without changing the experimental-only label.
   - D3：checkpoint MTP 权重检查；如缺失写 `missingReason=mtp_weights_absent_or_stripped`
   - D4：失败必须 clean pre-load reject，不污染 8066 runtime health
 - **中期 / 远期**：第二 DS4 variant；upstream mlx_lm `deepseek_v4` 合并跟踪；RC2 支撑

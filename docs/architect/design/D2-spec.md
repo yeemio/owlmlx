@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign D2 · DeepSeek V4 Flash isolated metrics ledger
 > **Plan-grade source**: [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D
-> **Status**: design-grade + code-grade runner landed; real streaming smoke currently blocked · 2026-05-17
+> **Status**: p1/128 metrics smoke passed after fd-buffered stdout reader fix · 2026-05-17
 > **Prerequisite**: D1 passed under the adopted `messages` / chat-template prompt policy.
 > **Non-goal**: this spec does not claim `owlmlx supports DeepSeek V4`.
 
@@ -101,40 +101,35 @@ D2_deepseek_v4_metrics_ledger:
 A missing required metric fails D2. A stream timeout or manual termination is a
 `blocked` / `failed` diagnostic, not a pass.
 
-## 5. Current Blocker
+## 5. Current Evidence
 
-The first real D2 smoke attempt on 2026-05-17 used:
+The first real D2 smoke attempt on 2026-05-17 initially blocked because the
+parent runner used `stdout.readline()` after `select`; partial child stdout
+could make the parent wait indefinitely even though a timeout was configured.
+After replacing that path with fd-buffered reads, the same D2 shape passed:
 
 ```bash
 uv run python scripts/bench/deepseek_v4_d1_repeatability.py metrics \
-  --run-id 20260517T-d2-p1-128-metrics-smoke \
+  --run-id 20260517T-d2-p1-128-metrics-fd-reader \
   --prompt-id p1_short_cn \
   --max-tokens 128 \
-  --timeout-s 900
+  --timeout-s 180
 ```
 
-It did not produce a D2 ledger row. The isolated runner child reached a loaded
-RSS band but emitted no streaming token/done payload before manual cleanup:
+Evidence:
 
-```text
-child command: python -m owlmlx.runtime.mlx_lm_runner
-observed elapsed: >150s
-observed rss: 17GB band
-observed cpu: 0.0%
-cleanup: own D2 attempt processes terminated; no residual D2 runner remains
-```
+| File | Verdict | Key metrics |
+|---|---|---|
+| `files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/20260517T-d2-p1-128-metrics-fd-reader.jsonl` | passed | load 15.656s · TTFT 30226ms · decode 32.392 tok/s after first token · peak RSS 12.426GB · clean unload |
 
-This classifies D2 as **runner landed / real streaming smoke blocked**, not
-metrics-pass.
+This is a first metrics smoke pass, not a full D2 ladder completion.
 
 ## 6. Next Debug Slice
 
-The next code-grade slice should isolate whether the blocker is:
+The next code-grade slice should expand the D2 ladder without changing the
+experimental-only label:
 
-1. `mlx_lm.stream_generate` for this DeepSeek adapter,
-2. chat-template rendered prompt shape,
-3. first-token latency far above D2 smoke assumptions, or
-4. missing/late terminal payload semantics.
-
-Do not weaken D2 into non-stream `generate_messages`: that would remove TTFT
-and decode TPS, which are the reason D2 exists.
+1. run at least p1/p2/p4 across `max_tokens` 128 / 512,
+2. preserve `messages` / `stream_generate_messages`,
+3. record min / p50 / max for TTFT and decode TPS when multiple rows exist,
+4. keep raw prompt stream rows diagnostic-only.
