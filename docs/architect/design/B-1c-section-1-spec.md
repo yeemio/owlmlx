@@ -127,6 +127,40 @@ conclusion must be `blocked`, not `passed`.
 Fake/schema runs and non-native measurement modes may validate ledger shape, but
 must not graduate `no_swap_soak_stability` or unblock section 2.
 
+## 5.1 Interruption-Tolerant Rehearsal
+
+If a continuous 24h native run is operationally difficult, run an interrupted
+rehearsal instead of weakening the pass criteria.
+
+Recommended rehearsal shapes:
+
+- `3 x 8h` native no-swap segments
+- `6 x 4h` native no-swap segments
+- shorter local smoke segments while tuning runner parameters
+
+Rehearsal segments must keep separate ledgers and record:
+
+```yaml
+interrupted_no_swap_rehearsal:
+  rehearsal_segment_id: <stable id>
+  segment_duration_s: <measured native duration>
+  interruption_reason: planned_stop | host_sleep | user_interrupt | failure | unknown
+  resumes_prior_segment: true | false
+  aggregate_measurement_duration_s: <sum of completed native segments>
+  no_swap_soak_stability: blocked
+```
+
+Rehearsal evidence can support confidence statements such as
+`interrupted_no_swap_rehearsal = passed`, but it must not:
+
+- set `no_swap_soak_stability = passed`
+- set `graduates.unblock_B_1c_section_2 = true`
+- count as the B-1c §1 supported gate
+- be merged into a single "24h continuous soak" claim
+
+The uninterrupted 24h native run remains the only §1 graduation path. The
+rehearsal path exists to make that run less blind, not to replace it.
+
 ## 6. Failure Semantics
 
 | Condition | Verdict | Meaning |
