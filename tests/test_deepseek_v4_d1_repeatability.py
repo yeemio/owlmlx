@@ -283,6 +283,15 @@ def test_real_run_uses_persistent_child_protocol_with_fake_process(monkeypatch, 
 
     assert summary["verdict"] == "passed"
     assert summary["rows_written"] == 1
+    assert summary["coverage"]["expected_generation_count"] == 1
+    assert summary["coverage"]["completed_generation_count"] == 1
+    assert summary["coverage"]["passed_generation_count"] == 1
+    assert summary["coverage"]["full_ladder_completed"] is True
+    assert summary["coverage"]["prompt_token_matrix"] == {
+        "p1_short_cn": {"128": "passed"}
+    }
+    assert summary["coverage"]["failed_pairs"] == []
+    assert summary["coverage"]["missing_pairs"] == []
     assert created[0].cmd == [str(fake_python), "-m", "owlmlx.runtime.mlx_lm_runner"]
     assert created[0].kwargs["cwd"] == str(d1.REPO_ROOT)
     assert str(d1.REPO_ROOT) in created[0].kwargs["env"]["PYTHONPATH"].split(":")
@@ -358,6 +367,69 @@ def test_real_run_writes_jsonl_shape_from_fake_process(monkeypatch, tmp_path):
     assert record["metrics"]["ttft_ms_by_prompt"] == {}
     assert record["metrics"]["stream_wall_ms_by_prompt"] == {}
     assert record["verdict"] == "passed"
+
+
+def test_real_run_coverage_reports_failed_and_missing_ladder(monkeypatch, tmp_path):
+    class _FailingSecondGenerationProcess(_FakeProcess):
+        def handle(self, payload: dict) -> None:
+            if payload["action"] == "generate" and self.generation_count >= 1:
+                self.generation_count += 1
+                self.stdout.lines.append(
+                    json.dumps(
+                        {
+                            "ok": False,
+                            "action": "generate",
+                            "model_id": payload["model_id"],
+                            "error": "synthetic generation failure",
+                            "pid": self.pid,
+                            "generation_count": self.generation_count,
+                        }
+                    )
+                    + "\n"
+                )
+                return
+            super().handle(payload)
+
+    model_path = tmp_path / "model"
+    model_path.mkdir()
+
+    monkeypatch.setattr(
+        d1,
+        "run_preflight",
+        lambda **kwargs: {"verdict": "passed", "preflight": "passed"},
+    )
+
+    summary = d1.run_real(
+        output_dir=tmp_path,
+        model_path=model_path,
+        run_id="coverage-fake",
+        max_prompts=1,
+        max_tokens_ladder=(128, 512, 1024),
+        timeout_s=1.0,
+        popen_factory=lambda cmd, **kwargs: _FailingSecondGenerationProcess(
+            cmd,
+            **kwargs,
+        ),
+    )
+
+    assert summary["verdict"] == "failed"
+    assert summary["coverage"]["expected_generation_count"] == 3
+    assert summary["coverage"]["completed_generation_count"] == 2
+    assert summary["coverage"]["passed_generation_count"] == 1
+    assert summary["coverage"]["full_ladder_completed"] is False
+    assert summary["coverage"]["prompt_token_matrix"] == {
+        "p1_short_cn": {
+            "128": "passed",
+            "512": "failed",
+            "1024": "not_run",
+        }
+    }
+    assert summary["coverage"]["failed_pairs"] == [
+        {"prompt_id": "p1_short_cn", "max_tokens": 512, "verdict": "failed"}
+    ]
+    assert summary["coverage"]["missing_pairs"] == [
+        {"prompt_id": "p1_short_cn", "max_tokens": 1024}
+    ]
 
 
 def test_real_run_stream_surface_records_timing_from_fake_process(monkeypatch, tmp_path):

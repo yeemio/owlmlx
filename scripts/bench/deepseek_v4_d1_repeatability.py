@@ -639,6 +639,65 @@ def _real_record(
     return record
 
 
+def _coverage_summary(
+    *,
+    rows: list[dict[str, Any]],
+    prompt_slice: tuple[tuple[str, str], ...],
+    token_ladder: tuple[int, ...],
+) -> dict[str, Any]:
+    requested_prompt_ids = [prompt_id for prompt_id, _prompt in prompt_slice]
+    requested_token_ladder = [int(value) for value in token_ladder]
+    matrix: dict[str, dict[str, str]] = {
+        prompt_id: {str(max_tokens): "not_run" for max_tokens in requested_token_ladder}
+        for prompt_id in requested_prompt_ids
+    }
+    for row in rows:
+        prompt_id = str(row.get("prompt_id") or "")
+        max_tokens = str(row.get("max_tokens"))
+        if prompt_id in matrix and max_tokens in matrix[prompt_id]:
+            matrix[prompt_id][max_tokens] = str(row.get("verdict") or "unknown")
+
+    completed_prompt_ids = [
+        prompt_id
+        for prompt_id in requested_prompt_ids
+        if any(value != "not_run" for value in matrix[prompt_id].values())
+    ]
+    passed_pairs = sum(
+        1
+        for prompt_results in matrix.values()
+        for verdict in prompt_results.values()
+        if verdict == "passed"
+    )
+    expected_generation_count = len(requested_prompt_ids) * len(requested_token_ladder)
+    failed_pairs = [
+        {"prompt_id": prompt_id, "max_tokens": int(max_tokens), "verdict": verdict}
+        for prompt_id, prompt_results in matrix.items()
+        for max_tokens, verdict in prompt_results.items()
+        if verdict not in {"passed", "not_run"}
+    ]
+    missing_pairs = [
+        {"prompt_id": prompt_id, "max_tokens": int(max_tokens)}
+        for prompt_id, prompt_results in matrix.items()
+        for max_tokens, verdict in prompt_results.items()
+        if verdict == "not_run"
+    ]
+
+    return {
+        "requested_prompt_ids": requested_prompt_ids,
+        "requested_token_ladder": requested_token_ladder,
+        "expected_generation_count": expected_generation_count,
+        "completed_generation_count": len(rows),
+        "passed_generation_count": passed_pairs,
+        "completed_prompt_ids": completed_prompt_ids,
+        "full_ladder_completed": (
+            expected_generation_count > 0 and passed_pairs == expected_generation_count
+        ),
+        "prompt_token_matrix": matrix,
+        "failed_pairs": failed_pairs,
+        "missing_pairs": missing_pairs,
+    }
+
+
 def run_real(
     *,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
@@ -830,9 +889,16 @@ def run_real(
             row["verdict"] = "failed"
 
     _append_jsonl(output_path, rows)
+    coverage = _coverage_summary(
+        rows=rows,
+        prompt_slice=prompt_slice,
+        token_ladder=token_ladder,
+    )
     verdict = (
         "passed"
-        if rows and all(row["verdict"] == "passed" for row in rows)
+        if rows
+        and all(row["verdict"] == "passed" for row in rows)
+        and coverage["full_ladder_completed"]
         else "failed"
     )
     return {
@@ -845,6 +911,7 @@ def run_real(
         "output_path": str(output_path),
         "rows_written": len(rows),
         "prompt_count": len(prompt_slice),
+        "coverage": coverage,
         "token_ladder": list(token_ladder),
         "tokenizer_config": D1_TOKENIZER_CONFIG,
         "generation_defaults": D1_GENERATION_DEFAULTS,

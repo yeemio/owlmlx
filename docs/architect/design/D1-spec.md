@@ -123,6 +123,19 @@ Minimum JSONL record:
     "default_model_surface_unchanged": true
   },
   "token_ladder": [128, 512, 1024],
+  "coverage": {
+    "expected_generation_count": 15,
+    "completed_generation_count": 15,
+    "passed_generation_count": 15,
+    "full_ladder_completed": true,
+    "prompt_token_matrix": {
+      "p1_short_cn": {
+        "128": "passed",
+        "512": "passed",
+        "1024": "passed"
+      }
+    }
+  },
   "prompt_results": [
     {
       "prompt_id": "p1_short_cn",
@@ -151,6 +164,11 @@ Minimum JSONL record:
 
 D2 will promote the `metrics` section from optional to required. D1 records it
 when cheaply available but does not fail only because a metric is absent.
+
+The summary-level `coverage` section is the authoritative check that D1 ran the
+requested prompt set across the requested token ladder. A run that stops after a
+failed prompt must keep the completed row evidence but set
+`full_ladder_completed = false` and list any unrun pairs in `missing_pairs`.
 
 ## 5. Harness Requirements
 
