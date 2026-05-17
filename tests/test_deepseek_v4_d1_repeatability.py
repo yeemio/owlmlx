@@ -107,7 +107,16 @@ class _FakeProcess:
                     "stream_wall_ms": 25.0,
                 },
             }
+            diagnostic = {
+                "ok": True,
+                "action": "stream_runtime_owned_terminal_boundary",
+                "terminal_action": "stream_done",
+                "model_id": payload["model_id"],
+                "pid": self.pid,
+                "sequence": 1,
+            }
             self.stdout.lines.append(json.dumps(token) + "\n")
+            self.stdout.lines.append(json.dumps(diagnostic) + "\n")
             self.stdout.lines.append(json.dumps(done) + "\n")
             return
         elif action == "unload":
@@ -333,6 +342,9 @@ def test_real_run_writes_jsonl_shape_from_fake_process(monkeypatch, tmp_path):
     assert len(record["prompt_results"][0]["completion_sha256"]) == 64
     assert record["prompt_results"][0]["completion_preview"].startswith("completion-")
     assert record["prompt_results"][0]["completion_tail"].startswith("completion-")
+    assert record["prompt_shape"]["surface"] == "raw_text"
+    assert record["prompt_shape"]["prompt_chars"] > 0
+    assert len(record["prompt_shape"]["prompt_sha256"]) == 64
     assert record["prompt_results"][0]["generation_surface"] == "generate"
     assert record["prompt_results"][0]["stop_reason"] == "unknown_non_stream_text_only"
     assert record["prompt_results"][0]["stop_reason_source"] == (
@@ -340,6 +352,8 @@ def test_real_run_writes_jsonl_shape_from_fake_process(monkeypatch, tmp_path):
     )
     assert record["prompt_results"][0]["prompt_tokens"] is None
     assert record["prompt_results"][0]["completion_tokens"] is None
+    assert record["prompt_results"][0]["stop_strings"] == []
+    assert record["prompt_results"][0]["stop_string_count"] == 0
     assert record["prompt_results"][0]["timing"] == {}
     assert record["metrics"]["ttft_ms_by_prompt"] == {}
     assert record["metrics"]["stream_wall_ms_by_prompt"] == {}
@@ -378,10 +392,65 @@ def test_real_run_stream_surface_records_timing_from_fake_process(monkeypatch, t
     assert record["prompt_results"][0]["prompt_tokens"] == 7
     assert record["prompt_results"][0]["completion_tokens"] == 128
     assert record["prompt_results"][0]["stream_event_count"] == 1
+    assert record["prompt_results"][0]["stream_diagnostic_count"] == 1
+    assert record["prompt_results"][0]["stream_diagnostics"][0]["terminal_action"] == (
+        "stream_done"
+    )
     assert record["prompt_results"][0]["timing"]["stream_wall_ms"] == 25.0
     assert record["metrics"]["ttft_ms_by_prompt"] == {"p1_short_cn": 12.5}
     assert record["metrics"]["stream_wall_ms_by_prompt"] == {"p1_short_cn": 25.0}
     assert record["verdict"] == "passed"
+
+
+def test_repetition_diagnostics_report_repeated_window() -> None:
+    repeated = "0123456789012345678901234567890123456789" * 5
+
+    payload = d1._repetition_diagnostics(repeated)
+
+    assert payload["repetition_flag"] is True
+    assert payload["method"] == "fixed_window_repeat_v1"
+    assert payload["max_repeated_window_count"] == 5
+    assert len(payload["repeated_window_sha256"]) == 64
+    assert payload["repeated_window_preview"].startswith("0123456789")
+
+
+def test_real_run_prompt_id_and_stop_strings_pass_through(monkeypatch, tmp_path):
+    model_path = tmp_path / "model"
+    model_path.mkdir()
+    created: list[_FakeProcess] = []
+
+    monkeypatch.setattr(
+        d1,
+        "run_preflight",
+        lambda **kwargs: {"verdict": "passed", "preflight": "passed"},
+    )
+
+    def fake_popen(cmd: list[str], **kwargs: object) -> _FakeProcess:
+        proc = _FakeProcess(cmd, **kwargs)
+        created.append(proc)
+        return proc
+
+    summary = d1.run_real(
+        output_dir=tmp_path,
+        model_path=model_path,
+        run_id="prompt-stop-fake",
+        prompt_ids=("p5_stop_marker",),
+        max_tokens_ladder=(1024,),
+        generation_overrides={"stop": ["<END>"]},
+        timeout_s=1.0,
+        popen_factory=fake_popen,
+    )
+
+    records = _records(tmp_path / "prompt-stop-fake.jsonl")
+    assert summary["verdict"] == "passed"
+    assert summary["prompt_count"] == 1
+    assert records[0]["prompt_id"] == "p5_stop_marker"
+    assert records[0]["max_tokens"] == 1024
+    assert records[0]["generation_params"]["stop"] == ["<END>"]
+    assert records[0]["prompt_results"][0]["stop_strings"] == ["<END>"]
+    assert records[0]["prompt_results"][0]["stop_string_count"] == 1
+    assert created[0].stdin.writes[1]["prompt"] == dict(d1.PROMPTS)["p5_stop_marker"]
+    assert created[0].stdin.writes[1]["params"]["stop"] == ["<END>"]
 
 
 def test_cli_dry_run_exits_zero_and_writes_jsonl(tmp_path):

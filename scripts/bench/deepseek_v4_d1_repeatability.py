@@ -389,6 +389,7 @@ def _child_stream_generate(
     _write_child_request(proc, request)
     text_parts: list[str] = []
     token_event_count = 0
+    stream_diagnostics: list[dict[str, Any]] = []
     last_token: dict[str, Any] | None = None
     while True:
         payload = _read_json_payload(proc, timeout_s=timeout_s)
@@ -401,6 +402,8 @@ def _child_stream_generate(
                 "pid": payload.get("pid"),
                 "finish_reason": payload.get("finish_reason"),
                 "stream_event_count": token_event_count,
+                "stream_diagnostic_count": len(stream_diagnostics),
+                "stream_diagnostics": stream_diagnostics,
             }
 
         action = str(payload.get("action") or "")
@@ -428,16 +431,62 @@ def _child_stream_generate(
                 else (last_token or {}).get("completion_tokens"),
                 "timing": timing,
                 "stream_event_count": token_event_count,
+                "stream_diagnostic_count": len(stream_diagnostics),
+                "stream_diagnostics": stream_diagnostics,
             }
+        diagnostic = {
+            key: payload.get(key)
+            for key in (
+                "action",
+                "event",
+                "terminal_action",
+                "model_id",
+                "pid",
+                "sequence",
+            )
+            if payload.get(key) is not None
+        }
+        if diagnostic and len(stream_diagnostics) < 16:
+            stream_diagnostics.append(diagnostic)
 
 
-def _looks_repetitive(text: str) -> bool:
+def _repetition_diagnostics(text: str) -> dict[str, Any]:
     normalized = " ".join(text.split())
+    method = "fixed_window_repeat_v1"
+    window_size = 40
+    minimum_repeat_count = 4
     if len(normalized) < 120:
-        return False
-    windows = [normalized[index : index + 40] for index in range(0, len(normalized), 40)]
+        return {
+            "method": method,
+            "repetition_flag": False,
+            "normalized_length": len(normalized),
+            "window_size": window_size,
+            "minimum_repeat_count": minimum_repeat_count,
+            "max_repeated_window_count": 0,
+            "repeated_window_sha256": None,
+            "repeated_window_preview": None,
+        }
+    windows = [
+        normalized[index : index + window_size]
+        for index in range(0, len(normalized), window_size)
+    ]
     counts = {window: windows.count(window) for window in windows if window}
-    return any(count >= 4 for count in counts.values())
+    repeated_window = max(counts, key=lambda item: counts[item]) if counts else None
+    max_count = counts.get(repeated_window, 0) if repeated_window is not None else 0
+    return {
+        "method": method,
+        "repetition_flag": max_count >= minimum_repeat_count,
+        "normalized_length": len(normalized),
+        "window_size": window_size,
+        "minimum_repeat_count": minimum_repeat_count,
+        "max_repeated_window_count": max_count,
+        "repeated_window_sha256": (
+            hashlib.sha256(repeated_window.encode("utf-8")).hexdigest()
+            if repeated_window is not None
+            else None
+        ),
+        "repeated_window_preview": repeated_window[:80] if repeated_window else None,
+    }
 
 
 def _completion_observation(text: str) -> dict[str, Any]:
@@ -446,6 +495,16 @@ def _completion_observation(text: str) -> dict[str, Any]:
         "completion_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
         "completion_preview": text[:preview_chars],
         "completion_tail": text[-preview_chars:] if len(text) > preview_chars else text,
+    }
+
+
+def _prompt_shape(prompt: str) -> dict[str, Any]:
+    preview_chars = 160
+    return {
+        "surface": "raw_text",
+        "prompt_chars": len(prompt),
+        "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        "prompt_preview": prompt[:preview_chars],
     }
 
 
@@ -467,6 +526,7 @@ def _real_record(
     model_path: Path,
     prompt_index: int,
     prompt_id: str,
+    prompt: str,
     max_tokens: int,
     generation_params: dict[str, Any],
     load_ok: bool,
@@ -491,8 +551,11 @@ def _real_record(
         and str(result_pid) != str(load_pid)
     )
     ok = bool(result.get("ok")) and bool(text) and not restart_observed
-    repetition_flag = _looks_repetitive(text)
+    repetition_diagnostics = _repetition_diagnostics(text)
+    repetition_flag = bool(repetition_diagnostics["repetition_flag"])
     completion_observation = _completion_observation(text)
+    stop_strings = generation_params.get("stop")
+    stop_string_count = len(stop_strings) if isinstance(stop_strings, list) else 0
 
     record = _base_record(
         run_id=run_id,
@@ -508,6 +571,7 @@ def _real_record(
             "evidence_strength": REAL_EVIDENCE_STRENGTH,
             "prompt_index": prompt_index,
             "prompt_id": prompt_id,
+            "prompt_shape": _prompt_shape(prompt),
             "prompt_sha_hint": None,
             "max_tokens": max_tokens,
             "generation_params": generation_params,
@@ -525,9 +589,14 @@ def _real_record(
                     "prompt_tokens": result.get("prompt_tokens"),
                     "completion_tokens": result.get("completion_tokens"),
                     "stream_event_count": result.get("stream_event_count"),
+                    "stream_diagnostic_count": result.get("stream_diagnostic_count"),
+                    "stream_diagnostics": result.get("stream_diagnostics", []),
+                    "stop_strings": stop_strings if isinstance(stop_strings, list) else [],
+                    "stop_string_count": stop_string_count,
                     "timing": result.get("timing") if isinstance(result.get("timing"), dict) else {},
                     "restart_observed": restart_observed,
                     "repetition_flag": repetition_flag,
+                    "repetition_diagnostics": repetition_diagnostics,
                     "child_pid": result_pid,
                     "generation_count": result.get("generation_count"),
                 }
@@ -578,6 +647,7 @@ def run_real(
     model_path: Path = DEFAULT_MODEL_PATH,
     run_id: str | None = None,
     max_prompts: int | None = None,
+    prompt_ids: tuple[str, ...] | None = None,
     max_tokens_ladder: tuple[int, ...] = TOKEN_LADDER,
     generation_overrides: dict[str, Any] | None = None,
     generation_surface: str = "generate",
@@ -607,7 +677,20 @@ def run_real(
     output_dir = Path(output_dir)
     run_id = run_id or f"{_compact_stamp()}-d1-deepseek-v4-real-run"
     output_path = output_dir / f"{run_id}.jsonl"
-    prompt_slice = PROMPTS if max_prompts is None else PROMPTS[:max_prompts]
+    prompt_slice = PROMPTS
+    if prompt_ids:
+        selected = set(prompt_ids)
+        known = {prompt_id for prompt_id, _prompt in PROMPTS}
+        unknown = sorted(selected - known)
+        if unknown:
+            raise ValueError(f"unknown --prompt-id value(s): {', '.join(unknown)}")
+        prompt_slice = tuple(
+            (prompt_id, prompt)
+            for prompt_id, prompt in PROMPTS
+            if prompt_id in selected
+        )
+    if max_prompts is not None:
+        prompt_slice = prompt_slice[:max_prompts]
     token_ladder = tuple(int(value) for value in max_tokens_ladder)
     generation_overrides = dict(generation_overrides or {})
     if generation_surface not in {"generate", "stream"}:
@@ -679,6 +762,7 @@ def run_real(
                         model_path=model_path,
                         prompt_index=prompt_index,
                         prompt_id=prompt_id,
+                        prompt=prompt,
                         max_tokens=max_tokens,
                         generation_params=generation_params,
                         load_ok=load_ok,
@@ -807,6 +891,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         model_path=args.model_path,
         run_id=args.run_id,
         max_prompts=args.max_prompts,
+        prompt_ids=tuple(args.prompt_id or ()),
         max_tokens_ladder=tuple(args.max_tokens),
         generation_surface=args.generation_surface,
         generation_overrides={
@@ -814,6 +899,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
             "kv_bits": args.kv_bits,
             "kv_group_size": args.kv_group_size,
             "temperature": args.temp,
+            "stop": args.stop,
         },
         timeout_s=args.timeout_s,
     )
@@ -861,6 +947,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Optional smoke limiter; omit for the full D1 prompt set.",
     )
     run.add_argument(
+        "--prompt-id",
+        action="append",
+        default=None,
+        help="Run only the selected D1 prompt id; repeat for multiple prompts.",
+    )
+    run.add_argument(
         "--max-tokens",
         type=int,
         nargs="+",
@@ -882,6 +974,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         default=None,
     )
     run.add_argument("--temp", type=float, default=D1_GENERATION_DEFAULTS["temperature"])
+    run.add_argument(
+        "--stop",
+        action="append",
+        default=None,
+        help="Experimental stop string passed through to the isolated runner.",
+    )
     run.set_defaults(func=_cmd_run)
 
     return parser.parse_args(argv)
