@@ -13,6 +13,7 @@ import contextlib
 import gc
 import json
 import os
+import signal
 import sys
 import time
 from dataclasses import dataclass
@@ -1318,194 +1319,242 @@ def run_b1c1_no_swap_soak(
             sample_interval_s=sample_interval_s,
         )
     )
+    stop_requested = False
+    stop_reason = interruption_reason
+    installed_signal_handlers: list[tuple[signal.Signals, Any]] = []
 
-    with _session_cache_env(True, ttl_s=effective_session_cache_ttl_s):
-        kernel, sampler = _make_kernel(backend=backend, profile=profile)
-        records: list[dict[str, Any]] = []
-        started_monotonic_s = time.monotonic()
-        measurement_started_monotonic_s: float | None = None
-        measurement_finished_monotonic_s: float | None = None
-        warmup_sample_count = warmup_cycles * len(B1C1_PROMPTS)
-        load = kernel.load_model(model.model_id, memory_gb=model.memory_gb)
-        first_sample_bytes: int | None = None
-        first_measurement_bytes: int | None = None
-        cleanup_unload: Any | None = None
-        cleanup_settle: SettleResult | None = None
+    def _request_stop(signum: int, _frame: object | None) -> None:
+        nonlocal stop_requested, stop_reason
+        stop_requested = True
+        if signum == signal.SIGINT:
+            stop_reason = "user_interrupt"
+        elif signum == signal.SIGTERM:
+            stop_reason = interruption_reason
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
         try:
-            with output_path.open("w", encoding="utf-8") as stream:
-                while True:
-                    if max_samples is not None and len(records) >= max_samples:
-                        break
-                    sample_index = len(records) + 1
-                    phase = (
-                        "warmup"
-                        if sample_index <= warmup_sample_count
-                        else "measurement"
-                    )
-                    if phase == "measurement" and measurement_started_monotonic_s is None:
-                        measurement_started_monotonic_s = time.monotonic()
-                    prompt_id, prompt = B1C1_PROMPTS[(sample_index - 1) % len(B1C1_PROMPTS)]
-                    session_id = f"{session_id_prefix}-{prompt_id}"
-                    cache_before = _session_cache_status(kernel)
-                    before_bytes = sampler.active_memory_bytes(kernel)
-                    try:
-                        generation = (
-                            asyncio.run(
-                                _stream_generate_once(
-                                    kernel,
+            previous = signal.getsignal(sig)
+            signal.signal(sig, _request_stop)
+            installed_signal_handlers.append((sig, previous))
+        except (ValueError, OSError):
+            # Signal handlers can only be installed from the main thread. The
+            # bench is normally run as a CLI; embedded test callers still work
+            # without graceful OS-signal handling.
+            continue
+
+    def _sleep_until_next_sample(sleep_for: float) -> None:
+        deadline = time.monotonic() + sleep_for
+        while not stop_requested:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(remaining, 1.0))
+
+    try:
+        with _session_cache_env(True, ttl_s=effective_session_cache_ttl_s):
+            kernel, sampler = _make_kernel(backend=backend, profile=profile)
+            records: list[dict[str, Any]] = []
+            started_monotonic_s = time.monotonic()
+            measurement_started_monotonic_s: float | None = None
+            measurement_finished_monotonic_s: float | None = None
+            warmup_sample_count = warmup_cycles * len(B1C1_PROMPTS)
+            load = kernel.load_model(model.model_id, memory_gb=model.memory_gb)
+            first_sample_bytes: int | None = None
+            first_measurement_bytes: int | None = None
+            cleanup_unload: Any | None = None
+            cleanup_settle: SettleResult | None = None
+            try:
+                with output_path.open("w", encoding="utf-8") as stream:
+                    while True:
+                        if stop_requested and records:
+                            break
+                        if max_samples is not None and len(records) >= max_samples:
+                            break
+                        sample_index = len(records) + 1
+                        phase = (
+                            "warmup"
+                            if sample_index <= warmup_sample_count
+                            else "measurement"
+                        )
+                        if (
+                            phase == "measurement"
+                            and measurement_started_monotonic_s is None
+                        ):
+                            measurement_started_monotonic_s = time.monotonic()
+                        prompt_id, prompt = B1C1_PROMPTS[
+                            (sample_index - 1) % len(B1C1_PROMPTS)
+                        ]
+                        session_id = f"{session_id_prefix}-{prompt_id}"
+                        cache_before = _session_cache_status(kernel)
+                        before_bytes = sampler.active_memory_bytes(kernel)
+                        try:
+                            generation = (
+                                asyncio.run(
+                                    _stream_generate_once(
+                                        kernel,
+                                        model_id=model.model_id,
+                                        prompt=prompt,
+                                        max_tokens=max_tokens,
+                                        session_id=session_id,
+                                    )
+                                )
+                                if load.ok
+                                else StreamGenerationResult(
+                                    ok=False,
+                                    message="model load failed",
+                                    error_code=RuntimeErrorCode.model_not_loaded,
                                     model_id=model.model_id,
-                                    prompt=prompt,
-                                    max_tokens=max_tokens,
-                                    session_id=session_id,
                                 )
                             )
-                            if load.ok
-                            else StreamGenerationResult(
+                        except Exception as exc:  # pragma: no cover - defensive real-run capture
+                            generation = StreamGenerationResult(
                                 ok=False,
-                                message="model load failed",
-                                error_code=RuntimeErrorCode.model_not_loaded,
+                                message=str(exc),
+                                error_code=RuntimeErrorCode.backend_error,
                                 model_id=model.model_id,
                             )
+                        after_bytes = sampler.active_memory_bytes(kernel)
+                        if first_sample_bytes is None and after_bytes is not None:
+                            first_sample_bytes = after_bytes
+                        if (
+                            phase == "measurement"
+                            and first_measurement_bytes is None
+                            and after_bytes is not None
+                        ):
+                            first_measurement_bytes = after_bytes
+                        drift_bytes = (
+                            abs(after_bytes - first_sample_bytes)
+                            if after_bytes is not None and first_sample_bytes is not None
+                            else None
                         )
-                    except Exception as exc:  # pragma: no cover - defensive real-run capture
-                        generation = StreamGenerationResult(
-                            ok=False,
-                            message=str(exc),
-                            error_code=RuntimeErrorCode.backend_error,
-                            model_id=model.model_id,
+                        measurement_drift_bytes = (
+                            abs(after_bytes - first_measurement_bytes)
+                            if after_bytes is not None and first_measurement_bytes is not None
+                            else None
                         )
-                    after_bytes = sampler.active_memory_bytes(kernel)
-                    if first_sample_bytes is None and after_bytes is not None:
-                        first_sample_bytes = after_bytes
-                    if (
-                        phase == "measurement"
-                        and first_measurement_bytes is None
-                        and after_bytes is not None
-                    ):
-                        first_measurement_bytes = after_bytes
-                    drift_bytes = (
-                        abs(after_bytes - first_sample_bytes)
-                        if after_bytes is not None and first_sample_bytes is not None
-                        else None
-                    )
-                    measurement_drift_bytes = (
-                        abs(after_bytes - first_measurement_bytes)
-                        if after_bytes is not None and first_measurement_bytes is not None
-                        else None
-                    )
-                    cache_after = _session_cache_status(kernel)
-                    counter_delta = _counter_delta(
-                        dict(cache_before.get("counters", {})),
-                        dict(cache_after.get("counters", {})),
-                    )
-                    watermark_after = _watermark(after_bytes, profile=profile)
-                    reclaim_stats = _reclaim_stats(kernel)
-                    settle_snapshot = _compact_settle_barrier(_settle_barrier_snapshot(kernel))
-                    sample_verdict = _b1c1_round_verdict(
-                        load_ok=bool(load.ok),
-                        generation=generation,
-                        watermark=watermark_after,
-                        reclaim_stats=reclaim_stats,
-                        settle_barrier=settle_snapshot,
-                    )
-                    record = {
-                        "schema_version": "b1c1.v1",
-                        "gate": "B-1c section 1",
-                        "run_id": run_id,
-                        "mode": "no_swap_soak",
-                        "phase": phase,
-                        "sample_index": sample_index,
-                        "timestamp_utc": _now_iso_utc(),
-                        "elapsed_s": round(time.monotonic() - started_monotonic_s, 3),
-                        "runtime": runtime,
-                        "backend": backend,
-                        "measurement_mode": sampler.measurement_mode,
-                        "evidence_strength": (
-                            "mlx_allocator_soak" if backend == "native" else "smoke_only_no_allocator_claim"
-                        ),
-                        "model": {
-                            "id": model_label,
-                            "path": model.model_id,
-                            "runtime_model_id": model.model_id,
-                            "memory_gb": model.memory_gb,
-                        },
-                        "config": {
-                            "OWLMLX_SESSION_CACHE_ENABLED": "1",
-                            "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
-                            "session_id": session_id,
-                            "temperature": 0.0,
-                            "seed": 42,
-                            "max_tokens": max_tokens,
-                            "duration_s": duration_s,
-                            "required_duration_s": required_duration_s,
-                            "sample_interval_s": sample_interval_s,
-                            "warmup_cycles": warmup_cycles,
-                            "max_generation_concurrency": 1,
-                            "artificial_unload_or_swap_during_soak": False,
-                        },
-                        "prompt_id": prompt_id,
-                        "session_cache": {
-                            "active_entries_before": cache_before.get("active_entries"),
-                            "active_entries_after": cache_after.get("active_entries"),
-                            "counter_delta": counter_delta,
-                            "synthetic": backend == "fake",
-                            "allocator_truth": backend == "native",
-                        },
-                        "operation": {
-                            "load_ok": bool(load.ok),
-                            "generation_ok": bool(generation.ok),
-                            "artificial_unload_or_swap_during_soak": False,
-                        },
-                        "memory": {
-                            "active_memory_before_sample_bytes": before_bytes,
-                            "active_memory_after_generation_bytes": after_bytes,
-                            "active_memory_after_generation_gb": _bytes_to_gb(after_bytes),
-                            "first_sample_active_memory_bytes": first_sample_bytes,
-                            "drift_from_first_sample_bytes": drift_bytes,
-                            "first_measurement_active_memory_bytes": first_measurement_bytes,
-                            "drift_from_measurement_start_bytes": measurement_drift_bytes,
-                            "drift_budget_bytes": drift_budget_bytes,
-                            "watermark_after_generation": watermark_after,
-                        },
-                        "settle_barrier_event": settle_snapshot,
-                        "reclaim_barrier_stats_after_sample": reclaim_stats,
-                        "load_result": _result_to_dict(load),
-                        "generate_result": _result_to_dict(generation),
-                        "sample_verdict": sample_verdict,
-                    }
-                    records.append(record)
-                    stream.write(json.dumps(record, sort_keys=True))
-                    stream.write("\n")
-                    if phase == "measurement":
-                        measurement_finished_monotonic_s = time.monotonic()
-                    if sample_verdict != "passed":
-                        break
-                    if max_samples is None:
-                        measurement_elapsed_s = (
-                            time.monotonic() - measurement_started_monotonic_s
-                            if measurement_started_monotonic_s is not None
-                            else 0.0
+                        cache_after = _session_cache_status(kernel)
+                        counter_delta = _counter_delta(
+                            dict(cache_before.get("counters", {})),
+                            dict(cache_after.get("counters", {})),
                         )
-                        if phase == "measurement" and measurement_elapsed_s >= duration_s:
+                        watermark_after = _watermark(after_bytes, profile=profile)
+                        reclaim_stats = _reclaim_stats(kernel)
+                        settle_snapshot = _compact_settle_barrier(
+                            _settle_barrier_snapshot(kernel)
+                        )
+                        sample_verdict = _b1c1_round_verdict(
+                            load_ok=bool(load.ok),
+                            generation=generation,
+                            watermark=watermark_after,
+                            reclaim_stats=reclaim_stats,
+                            settle_barrier=settle_snapshot,
+                        )
+                        record = {
+                            "schema_version": "b1c1.v1",
+                            "gate": "B-1c section 1",
+                            "run_id": run_id,
+                            "mode": "no_swap_soak",
+                            "phase": phase,
+                            "sample_index": sample_index,
+                            "timestamp_utc": _now_iso_utc(),
+                            "elapsed_s": round(time.monotonic() - started_monotonic_s, 3),
+                            "runtime": runtime,
+                            "backend": backend,
+                            "measurement_mode": sampler.measurement_mode,
+                            "evidence_strength": (
+                                "mlx_allocator_soak"
+                                if backend == "native"
+                                else "smoke_only_no_allocator_claim"
+                            ),
+                            "model": {
+                                "id": model_label,
+                                "path": model.model_id,
+                                "runtime_model_id": model.model_id,
+                                "memory_gb": model.memory_gb,
+                            },
+                            "config": {
+                                "OWLMLX_SESSION_CACHE_ENABLED": "1",
+                                "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
+                                "session_id": session_id,
+                                "temperature": 0.0,
+                                "seed": 42,
+                                "max_tokens": max_tokens,
+                                "duration_s": duration_s,
+                                "required_duration_s": required_duration_s,
+                                "sample_interval_s": sample_interval_s,
+                                "warmup_cycles": warmup_cycles,
+                                "max_generation_concurrency": 1,
+                                "artificial_unload_or_swap_during_soak": False,
+                            },
+                            "prompt_id": prompt_id,
+                            "session_cache": {
+                                "active_entries_before": cache_before.get("active_entries"),
+                                "active_entries_after": cache_after.get("active_entries"),
+                                "counter_delta": counter_delta,
+                                "synthetic": backend == "fake",
+                                "allocator_truth": backend == "native",
+                            },
+                            "operation": {
+                                "load_ok": bool(load.ok),
+                                "generation_ok": bool(generation.ok),
+                                "artificial_unload_or_swap_during_soak": False,
+                            },
+                            "memory": {
+                                "active_memory_before_sample_bytes": before_bytes,
+                                "active_memory_after_generation_bytes": after_bytes,
+                                "active_memory_after_generation_gb": _bytes_to_gb(after_bytes),
+                                "first_sample_active_memory_bytes": first_sample_bytes,
+                                "drift_from_first_sample_bytes": drift_bytes,
+                                "first_measurement_active_memory_bytes": first_measurement_bytes,
+                                "drift_from_measurement_start_bytes": measurement_drift_bytes,
+                                "drift_budget_bytes": drift_budget_bytes,
+                                "watermark_after_generation": watermark_after,
+                            },
+                            "settle_barrier_event": settle_snapshot,
+                            "reclaim_barrier_stats_after_sample": reclaim_stats,
+                            "load_result": _result_to_dict(load),
+                            "generate_result": _result_to_dict(generation),
+                            "sample_verdict": sample_verdict,
+                        }
+                        records.append(record)
+                        stream.write(json.dumps(record, sort_keys=True))
+                        stream.write("\n")
+                        if phase == "measurement":
+                            measurement_finished_monotonic_s = time.monotonic()
+                        if sample_verdict != "passed" or stop_requested:
                             break
-                        sleep_for = (
-                            0.0
-                            if phase == "warmup"
-                            else min(
-                                sample_interval_s,
-                                max(duration_s - measurement_elapsed_s, 0.0),
+                        if max_samples is None:
+                            measurement_elapsed_s = (
+                                time.monotonic() - measurement_started_monotonic_s
+                                if measurement_started_monotonic_s is not None
+                                else 0.0
                             )
-                        )
-                        if sleep_for > 0:
-                            time.sleep(sleep_for)
-        finally:
-            if load.ok:
-                cleanup_unload = kernel.unload_model(model.model_id)
-                cleanup_settle = sampler.settle(
-                    kernel,
-                    max_iterations=5,
-                    sleep_s=settle_sleep_s,
-                )
+                            if (
+                                phase == "measurement"
+                                and measurement_elapsed_s >= duration_s
+                            ):
+                                break
+                            sleep_for = (
+                                0.0
+                                if phase == "warmup"
+                                else min(
+                                    sample_interval_s,
+                                    max(duration_s - measurement_elapsed_s, 0.0),
+                                )
+                            )
+                            if sleep_for > 0:
+                                _sleep_until_next_sample(sleep_for)
+            finally:
+                if load.ok:
+                    cleanup_unload = kernel.unload_model(model.model_id)
+                    cleanup_settle = sampler.settle(
+                        kernel,
+                        max_iterations=5,
+                        sleep_s=settle_sleep_s,
+                    )
+    finally:
+        for sig, previous in reversed(installed_signal_handlers):
+            signal.signal(sig, previous)
 
     rollup = _b1c1_rollup(
         run_id=run_id,
@@ -1526,7 +1575,7 @@ def run_b1c1_no_swap_soak(
         rehearsal_group_id=rehearsal_group_id,
         rehearsal_segment_id=rehearsal_segment_id,
         resumes_prior_segment=resumes_prior_segment,
-        interruption_reason=interruption_reason,
+        interruption_reason=stop_reason,
     )
     rollup_path.parent.mkdir(parents=True, exist_ok=True)
     with rollup_path.open("w", encoding="utf-8") as stream:

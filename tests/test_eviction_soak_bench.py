@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+import time
+from pathlib import Path
 
 import pytest
 
@@ -360,6 +364,65 @@ def test_b1c1_generation_failure_is_failed_not_blocked(monkeypatch, tmp_path):
     assert summary["hard_failure"] is True
     assert summary["no_swap_soak_stability"] == "failed"
     assert summary["graduates"]["unblock_B_1c_section_2"] is False
+
+
+def test_cli_b1c1_sigterm_writes_blocked_segment_rollup(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "scripts/bench/eviction_soak.py",
+            "--gate",
+            eviction_soak.B1C1_GATE,
+            "--backend",
+            "fake",
+            "--output",
+            str(tmp_path),
+            "--duration-s",
+            "60",
+            "--required-duration-s",
+            "86400",
+            "--sample-interval-s",
+            "10",
+            "--warmup-cycles",
+            "1",
+            "--max-tokens",
+            "1",
+            "--interruption-reason",
+            "planned_stop",
+        ],
+        cwd=repo_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        ledger_path = None
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            ledgers = sorted(tmp_path.glob("*b1c1-*-no-swap-soak.jsonl"))
+            if ledgers:
+                ledger_path = ledgers[0]
+                if len(_records(ledger_path)) >= 4:
+                    break
+            time.sleep(0.05)
+        assert ledger_path is not None
+        process.terminate()
+        stdout, stderr = process.communicate(timeout=10)
+    finally:
+        if process.poll() is None:
+            process.kill()
+
+    assert process.returncode == 1, (stdout, stderr)
+    rollups = sorted(tmp_path.glob("*b1c1-*-no-swap-soak-rollup.jsonl"))
+    assert len(rollups) == 1
+    rollup = _records(rollups[0])[0]
+    assert rollup["conclusion"] == "blocked"
+    assert rollup["no_swap_soak_stability"] == "blocked"
+    assert rollup["graduates"]["no_swap_soak_stability"] is False
+    assert rollup["cleanup_unload_result"]["ok"] is True
+    assert rollup["interrupted_no_swap_rehearsal"]["interruption_reason"] == "planned_stop"
+    assert rollup["measurement_duration_s"] > 0
 
 
 def _write_b1c1_segment_rollup(

@@ -157,6 +157,13 @@ entries do not expire during a 24h no-swap measurement window. Rehearsal and
 graduation rollups must keep `session_cache_expirations_total = 0`; TTL expiry
 during measurement is a runner/configuration blocker, not a stable soak signal.
 
+The runner handles `SIGINT` and `SIGTERM` as graceful segment stops: finish the
+current sample, unload the model, settle, write the segment rollup, and keep
+`no_swap_soak_stability = blocked` unless the uninterrupted 24h criteria are
+actually met. This protects planned host shutdown / user interruption evidence
+from becoming an orphaned raw ledger, but it does not turn segmented evidence
+into the continuous 24h graduation path.
+
 Rehearsal evidence can support confidence statements such as
 `interrupted_no_swap_rehearsal = passed`, but it must not:
 
