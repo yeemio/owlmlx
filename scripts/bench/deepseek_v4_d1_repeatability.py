@@ -8,6 +8,7 @@ only writes synthetic schema smoke rows to an explicit output directory.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import select
@@ -381,6 +382,15 @@ def _looks_repetitive(text: str) -> bool:
     return any(count >= 4 for count in counts.values())
 
 
+def _completion_observation(text: str) -> dict[str, Any]:
+    preview_chars = 240
+    return {
+        "completion_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "completion_preview": text[:preview_chars],
+        "completion_tail": text[-preview_chars:] if len(text) > preview_chars else text,
+    }
+
+
 def _generation_params(*, max_tokens: int, overrides: dict[str, Any]) -> dict[str, Any]:
     params = {**D1_GENERATION_DEFAULTS}
     params.update(
@@ -417,6 +427,7 @@ def _real_record(
     )
     ok = bool(result.get("ok")) and bool(text) and not restart_observed
     repetition_flag = _looks_repetitive(text)
+    completion_observation = _completion_observation(text)
 
     record = _base_record(
         run_id=run_id,
@@ -442,6 +453,7 @@ def _real_record(
                     "max_tokens": max_tokens,
                     "ok": ok,
                     "completion_chars": len(text),
+                    **completion_observation,
                     "stop_reason": str(result.get("finish_reason") or "unknown"),
                     "restart_observed": restart_observed,
                     "repetition_flag": repetition_flag,

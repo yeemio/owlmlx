@@ -294,6 +294,9 @@ def test_real_run_writes_jsonl_shape_from_fake_process(monkeypatch, tmp_path):
     )
     assert record["prompt_results"][0]["restart_observed"] is False
     assert record["prompt_results"][0]["completion_chars"] > 0
+    assert len(record["prompt_results"][0]["completion_sha256"]) == 64
+    assert record["prompt_results"][0]["completion_preview"].startswith("completion-")
+    assert record["prompt_results"][0]["completion_tail"].startswith("completion-")
     assert record["verdict"] == "passed"
 
 
