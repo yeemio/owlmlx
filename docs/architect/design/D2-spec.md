@@ -15,7 +15,7 @@ DeepSeek V4 lane:
 isolated runtime preflight
   -> load
   -> stream_generate_messages
-  -> collect TTFT / wall time / decode TPS / RSS / health
+  -> collect TTFT / wall time / decode TPS / child-process RSS sample / health
   -> unload
   -> clean health
 ```
@@ -30,7 +30,7 @@ model surface and does not adopt `ds4.c`.
 | Runtime environment | Existing isolated `.runtime-deepseek-v4-mlx` only |
 | Prompt surface | adopted D1 `messages` / chat-template surface |
 | Generation surface | streaming only, because TTFT and decode TPS require token events |
-| Metrics | `load_time_s`, `ttft_ms`, `stream_wall_ms`, `decode_tps_after_first_token`, `wall_tps`, `peak_rss_gb`, backend health |
+| Metrics | `load_time_s`, `ttft_ms`, `stream_wall_ms`, `decode_tps_after_first_token`, `wall_tps`, `child_rss_gb`, RSS provenance, backend health |
 | Evidence | JSONL under `files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/` |
 | Capability label | `experimental_only` |
 
@@ -39,7 +39,7 @@ model surface and does not adopt `ds4.c`.
 Each row is a D2 metrics result:
 
 ```yaml
-schema_version: d2.metrics.v1
+schema_version: d2.metrics.v2
 record_type: metrics_result
 gate: D2
 model_id: DeepSeek-V4-Flash-2bit-DQ
@@ -53,7 +53,11 @@ metrics:
   completion_tokens: int
   decode_tps_after_first_token: float
   wall_tps: float
-  peak_rss_gb: float
+  child_rss_gb: float
+  rss_sample_scope: child_process
+  rss_sample_source: ps_rss_kb
+  rss_sample_timing: after_generation_before_unload
+  peak_rss_gb: float  # compatibility alias only; not a measured peak
 backend_health:
   load_ok: true
   generate_ok: true
@@ -75,6 +79,23 @@ verdict: passed | failed
 completion_tokens / (stream_wall_ms / 1000)
 ```
 
+`child_rss_gb` is a point-in-time RSS sample of the isolated child process
+after generation and before unload. It is not process-tree RSS, host aggregate
+RSS, or a measured peak. The legacy `peak_rss_gb` field is kept for one
+compatibility window and must be treated as the same child-process sample.
+
+Each run also writes `<run_id>.summary.json` beside the JSONL ledger:
+
+```yaml
+schema_version: d2.metrics.run.v2
+rows_written: int
+passed_rows: int
+metric_summary:
+  ttft_ms: {count: int, min: float, p50: float, max: float}
+  decode_tps_after_first_token: {count: int, min: float, p50: float, max: float}
+  child_rss_gb: {count: int, min: float, p50: float, max: float}
+```
+
 ## 4. Pass Criteria
 
 ```yaml
@@ -88,7 +109,10 @@ D2_deepseek_v4_metrics_ledger:
     - stream_wall_ms
     - completion_tokens
     - decode_tps_after_first_token
-    - peak_rss_gb
+    - child_rss_gb
+    - rss_sample_scope
+    - rss_sample_source
+    - rss_sample_timing
   backend_health:
     load: passed
     generate: passed
@@ -120,7 +144,7 @@ Evidence:
 
 | File | Verdict | Key metrics |
 |---|---|---|
-| `files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/20260517T-d2-p1-128-metrics-fd-reader.jsonl` | passed | load 15.656s · TTFT 30226ms · decode 32.392 tok/s after first token · peak RSS 12.426GB · clean unload |
+| `files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/20260517T-d2-p1-128-metrics-fd-reader.jsonl` | passed | load 15.656s · TTFT 30226ms · decode 32.392 tok/s after first token · child RSS sample 12.426GB (legacy v1 field name `peak_rss_gb`; not peak or aggregate) · clean unload |
 
 This is a first metrics smoke pass, not a full D2 ladder completion.
 
@@ -131,5 +155,5 @@ experimental-only label:
 
 1. run at least p1/p2/p4 across `max_tokens` 128 / 512,
 2. preserve `messages` / `stream_generate_messages`,
-3. record min / p50 / max for TTFT and decode TPS when multiple rows exist,
+3. record min / p50 / max for TTFT, decode TPS, and `child_rss_gb` when multiple rows exist,
 4. keep raw prompt stream rows diagnostic-only.

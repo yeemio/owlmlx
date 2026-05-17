@@ -51,6 +51,9 @@ D2_EVIDENCE_STRENGTH = "isolated_real_stream_metrics"
 D2_DEFAULT_OUTPUT_DIR = (
     REPO_ROOT / "files" / "evidence" / "owlmlx" / "deepseek-v4" / "d2-metrics-ledger"
 )
+RSS_SAMPLE_SCOPE = "child_process"
+RSS_SAMPLE_SOURCE = "ps_rss_kb"
+RSS_SAMPLE_TIMING = "after_generation_before_unload"
 RUNNER_MODULE = "owlmlx.runtime.mlx_lm_runner"
 
 PROMPTS = (
@@ -368,6 +371,10 @@ def _base_record(
             "load_time_s": None,
             "ttft_ms_by_prompt": {},
             "decode_tps_by_prompt": {},
+            "child_rss_gb": None,
+            "rss_sample_scope": RSS_SAMPLE_SCOPE,
+            "rss_sample_source": RSS_SAMPLE_SOURCE,
+            "rss_sample_timing": RSS_SAMPLE_TIMING,
             "peak_rss_gb": None,
         },
     }
@@ -793,7 +800,7 @@ def _real_record(
     unload_ok: bool,
     clean_health_after_unload: bool,
     load_time_s: float | None,
-    peak_rss_gb: float | None,
+    child_rss_gb: float | None,
     result: dict[str, Any],
     load_pid: Any,
 ) -> dict[str, Any]:
@@ -915,7 +922,13 @@ def _real_record(
                 }
                 if stream_wall_ms is not None
                 else {},
-                "peak_rss_gb": peak_rss_gb,
+                "child_rss_gb": child_rss_gb,
+                "rss_sample_scope": RSS_SAMPLE_SCOPE,
+                "rss_sample_source": RSS_SAMPLE_SOURCE,
+                "rss_sample_timing": RSS_SAMPLE_TIMING,
+                # Compatibility field for earlier D2 smoke rows. The value is
+                # a child-process RSS sample, not an aggregate or true peak.
+                "peak_rss_gb": child_rss_gb,
             },
             "verdict": "failed" if repetition_flag or not ok else "passed",
         }
@@ -1114,7 +1127,7 @@ def run_real(
                     result = _child_exchange(proc, request, timeout_s=timeout_s)
                 if result.get("stream_timeout"):
                     stream_timeout_observed = True
-                peak_rss_gb = rss_sampler(result.get("pid"))
+                child_rss_gb = rss_sampler(result.get("pid"))
                 rows.append(
                     _real_record(
                         run_id=run_id,
@@ -1132,7 +1145,7 @@ def run_real(
                         unload_ok=False,
                         clean_health_after_unload=False,
                         load_time_s=load_time_s,
-                        peak_rss_gb=peak_rss_gb,
+                        child_rss_gb=child_rss_gb,
                         result=result,
                         load_pid=load_pid,
                     )
@@ -1274,6 +1287,40 @@ def _metric_from_prompt_map(
     return None
 
 
+def _metric_distribution(rows: list[dict[str, Any]], metric_key: str) -> dict[str, Any]:
+    values = sorted(
+        value
+        for row in rows
+        if isinstance(row.get("metrics"), dict)
+        for value in [_as_float(row["metrics"].get(metric_key))]
+        if value is not None
+    )
+    if not values:
+        return {"count": 0, "min": None, "p50": None, "max": None}
+    midpoint = len(values) // 2
+    if len(values) % 2:
+        p50 = values[midpoint]
+    else:
+        p50 = (values[midpoint - 1] + values[midpoint]) / 2.0
+    return {
+        "count": len(values),
+        "min": round(values[0], 6),
+        "p50": round(p50, 6),
+        "max": round(values[-1], 6),
+    }
+
+
+def _d2_metric_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "ttft_ms": _metric_distribution(rows, "ttft_ms"),
+        "decode_tps_after_first_token": _metric_distribution(
+            rows,
+            "decode_tps_after_first_token",
+        ),
+        "child_rss_gb": _metric_distribution(rows, "child_rss_gb"),
+    }
+
+
 def _d2_record_from_d1_row(
     *,
     run_id: str,
@@ -1297,7 +1344,12 @@ def _d2_record_from_d1_row(
         _metric_from_prompt_map(metrics, "decode_tps_by_prompt", prompt_id)
     )
     wall_tps = _as_float(_metric_from_prompt_map(metrics, "wall_tps_by_prompt", prompt_id))
-    peak_rss_gb = _as_float(metrics.get("peak_rss_gb"))
+    child_rss_gb = _as_float(metrics.get("child_rss_gb"))
+    if child_rss_gb is None:
+        child_rss_gb = _as_float(metrics.get("peak_rss_gb"))
+    rss_sample_scope = metrics.get("rss_sample_scope") or RSS_SAMPLE_SCOPE
+    rss_sample_source = metrics.get("rss_sample_source") or RSS_SAMPLE_SOURCE
+    rss_sample_timing = metrics.get("rss_sample_timing") or RSS_SAMPLE_TIMING
     completion_tokens = first.get("completion_tokens")
     prompt_tokens = first.get("prompt_tokens")
 
@@ -1307,7 +1359,7 @@ def _d2_record_from_d1_row(
         "stream_wall_ms": stream_wall_ms,
         "completion_tokens": completion_tokens,
         "decode_tps_after_first_token": decode_tps,
-        "peak_rss_gb": peak_rss_gb,
+        "child_rss_gb": child_rss_gb,
     }
     missing_metrics = [key for key, value in required.items() if value is None]
     backend_health = {
@@ -1338,7 +1390,7 @@ def _d2_record_from_d1_row(
         else "failed"
     )
     return {
-        "schema_version": "d2.metrics.v1",
+        "schema_version": "d2.metrics.v2",
         "record_type": "metrics_result",
         "run_id": run_id,
         "created_at": _now_utc(),
@@ -1371,7 +1423,13 @@ def _d2_record_from_d1_row(
             "completion_tokens": completion_tokens,
             "decode_tps_after_first_token": decode_tps,
             "wall_tps": wall_tps,
-            "peak_rss_gb": peak_rss_gb,
+            "child_rss_gb": child_rss_gb,
+            "rss_sample_scope": rss_sample_scope,
+            "rss_sample_source": rss_sample_source,
+            "rss_sample_timing": rss_sample_timing,
+            # Compatibility field for older readers. This is the same
+            # child-process sample, not an aggregate or true peak.
+            "peak_rss_gb": child_rss_gb,
             "stream_event_count": first.get("stream_event_count"),
             "stream_diagnostic_count": first.get("stream_diagnostic_count"),
         },
@@ -1400,6 +1458,7 @@ def run_metrics(
     output_dir = Path(output_dir)
     run_id = run_id or f"{_compact_stamp()}-d2-deepseek-v4-metrics"
     output_path = output_dir / f"{run_id}.jsonl"
+    summary_path = output_dir / f"{run_id}.summary.json"
     source_output_dir = output_dir / "source-d1-stream"
     source_run_id = f"{run_id}-source-d1-stream"
     generation_overrides = dict(generation_overrides or {})
@@ -1448,18 +1507,20 @@ def run_metrics(
         and passed_rows == len(rows)
         else "failed"
     )
-    return {
-        "schema_version": "d2.metrics.run.v1",
+    summary = {
+        "schema_version": "d2.metrics.run.v2",
         "run_id": run_id,
         "gate": "D2",
         "runtime": "owlmlx",
         "model_id": MODEL_ID,
         "evidence_strength": D2_EVIDENCE_STRENGTH,
         "output_path": str(output_path),
+        "summary_output_path": str(summary_path),
         "source_output_path": source_output_path,
         "rows_written": len(rows),
         "passed_rows": passed_rows,
         "missing_metrics": missing_metrics,
+        "metric_summary": _d2_metric_summary(rows),
         "prompt_surface": prompt_surface,
         "generation_surface": "stream",
         "token_ladder": list(max_tokens_ladder),
@@ -1473,6 +1534,12 @@ def run_metrics(
         },
         "verdict": verdict,
     }
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return summary
 
 
 _DIRECT_GENERATE_CODE = r"""

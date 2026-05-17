@@ -174,6 +174,10 @@ Minimum JSONL record:
     "load_time_s": null,
     "ttft_ms_by_prompt": {},
     "decode_tps_by_prompt": {},
+    "child_rss_gb": null,
+    "rss_sample_scope": "child_process",
+    "rss_sample_source": "ps_rss_kb",
+    "rss_sample_timing": "after_generation_before_unload",
     "peak_rss_gb": null
   },
   "verdict": "passed"

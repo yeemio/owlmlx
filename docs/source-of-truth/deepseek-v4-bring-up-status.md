@@ -54,9 +54,12 @@ only for the isolated experimental lane and unlocks D2 metrics-ledger work.
 coverage after replacing blocking child stdout `readline()` handling with
 fd-buffered reads. `20260517T-d2-p1-128-metrics-fd-reader.jsonl` records
 `load_time_s=15.6564`, `ttft_ms=30226.211`,
-`decode_tps_after_first_token=32.3922`, `peak_rss_gb=12.426376`, and clean
-load / generate / unload / health. Treat this as a first metrics smoke pass,
-not as a full D2 ladder completion or supported DeepSeek serving claim.
+`decode_tps_after_first_token=32.3922`, `child_rss_gb=12.426376`,
+`rss_sample_scope=child_process`, `rss_sample_source=ps_rss_kb`,
+`rss_sample_timing=after_generation_before_unload`, and clean load / generate /
+unload / health. Treat this as a first metrics smoke pass, not as a full D2
+ladder completion or supported DeepSeek serving claim. This child-process RSS
+sample is not comparable to the earlier 96.574 GB short-smoke peak-memory note.
 
 **2026-05-11: Lifecycle complete via intermediate path.**
 

@@ -284,6 +284,10 @@
 | Stock mlx-lm 含 deepseek_v4.py | 当时 **不含** |
 | 4bit artifact 行为 | **exit 137** |
 
+注：这条早期峰值 RSS 使用的是短烟测内存口径；D2 metrics ledger 的
+`child_rss_gb` 是生成后、卸载前对子进程的单点 RSS 样本。两者 scope / timing
+不同，不能直接当作同一种内存指标比较。
+
 - 严格维持 `experimental`：依赖 PR runtime、未闭环 repeated serving、未闭环 long output、MTP 权重检查未做
 - 不进入 default `GET /v1/openai/models`
 

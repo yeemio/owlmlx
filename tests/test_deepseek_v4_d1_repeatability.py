@@ -750,6 +750,10 @@ def test_real_run_stream_messages_surface_records_rss_and_decode_metrics(
     assert record["metrics"]["stream_wall_ms_by_prompt"] == {"p1_short_cn": 25.0}
     assert record["metrics"]["decode_tps_by_prompt"] == {"p1_short_cn": 10160.0}
     assert record["metrics"]["wall_tps_by_prompt"] == {"p1_short_cn": 5120.0}
+    assert record["metrics"]["child_rss_gb"] == 1.25
+    assert record["metrics"]["rss_sample_scope"] == "child_process"
+    assert record["metrics"]["rss_sample_source"] == "ps_rss_kb"
+    assert record["metrics"]["rss_sample_timing"] == "after_generation_before_unload"
     assert record["metrics"]["peak_rss_gb"] == 1.25
 
 
@@ -778,14 +782,27 @@ def test_run_metrics_writes_d2_ledger_from_fake_stream(monkeypatch, tmp_path):
     source_records = _records(
         tmp_path / "source-d1-stream" / "metrics-fake-source-d1-stream.jsonl"
     )
-    assert summary["schema_version"] == "d2.metrics.run.v1"
+    assert summary["schema_version"] == "d2.metrics.run.v2"
     assert summary["verdict"] == "passed"
     assert summary["rows_written"] == 1
     assert summary["passed_rows"] == 1
     assert summary["missing_metrics"] == []
+    assert summary["summary_output_path"] == str(tmp_path / "metrics-fake.summary.json")
+    assert summary["metric_summary"] == {
+        "ttft_ms": {"count": 1, "min": 12.5, "p50": 12.5, "max": 12.5},
+        "decode_tps_after_first_token": {
+            "count": 1,
+            "min": 10160.0,
+            "p50": 10160.0,
+            "max": 10160.0,
+        },
+        "child_rss_gb": {"count": 1, "min": 1.5, "p50": 1.5, "max": 1.5},
+    }
     assert len(source_records) == 1
+    summary_record = json.loads((tmp_path / "metrics-fake.summary.json").read_text())
+    assert summary_record == summary
     record = records[0]
-    assert record["schema_version"] == "d2.metrics.v1"
+    assert record["schema_version"] == "d2.metrics.v2"
     assert record["gate"] == "D2"
     assert record["source"]["gate"] == "D1"
     assert record["prompt_surface"] == "messages"
@@ -794,9 +811,114 @@ def test_run_metrics_writes_d2_ledger_from_fake_stream(monkeypatch, tmp_path):
     assert record["metrics"]["stream_wall_ms"] == 25.0
     assert record["metrics"]["decode_tps_after_first_token"] == 10160.0
     assert record["metrics"]["wall_tps"] == 5120.0
+    assert record["metrics"]["child_rss_gb"] == 1.5
+    assert record["metrics"]["rss_sample_scope"] == "child_process"
+    assert record["metrics"]["rss_sample_source"] == "ps_rss_kb"
+    assert record["metrics"]["rss_sample_timing"] == "after_generation_before_unload"
     assert record["metrics"]["peak_rss_gb"] == 1.5
     assert record["backend_health"]["clean_health_after_unload"] is True
     assert record["verdict"] == "passed"
+
+
+def test_d2_metric_summary_reports_min_p50_max() -> None:
+    rows = [
+        {
+            "metrics": {
+                "ttft_ms": 30.0,
+                "decode_tps_after_first_token": 10.0,
+                "child_rss_gb": 3.0,
+            }
+        },
+        {
+            "metrics": {
+                "ttft_ms": 10.0,
+                "decode_tps_after_first_token": 30.0,
+                "child_rss_gb": 1.0,
+            }
+        },
+        {
+            "metrics": {
+                "ttft_ms": 20.0,
+                "decode_tps_after_first_token": 20.0,
+                "child_rss_gb": 2.0,
+            }
+        },
+        {
+            "metrics": {
+                "ttft_ms": 40.0,
+                "decode_tps_after_first_token": 40.0,
+                "child_rss_gb": 4.0,
+            }
+        },
+    ]
+
+    assert d1._d2_metric_summary(rows) == {
+        "ttft_ms": {"count": 4, "min": 10.0, "p50": 25.0, "max": 40.0},
+        "decode_tps_after_first_token": {
+            "count": 4,
+            "min": 10.0,
+            "p50": 25.0,
+            "max": 40.0,
+        },
+        "child_rss_gb": {"count": 4, "min": 1.0, "p50": 2.5, "max": 4.0},
+    }
+
+
+def test_d2_record_falls_back_from_legacy_peak_rss_field(tmp_path):
+    row = {
+        "schema_version": "d1.v1",
+        "record_type": "prompt_result",
+        "run_id": "legacy-source",
+        "prompt_index": 1,
+        "prompt_id": "p1_short_cn",
+        "prompt_surface": "messages",
+        "max_tokens": 128,
+        "generation_params": {"max_tokens": 128},
+        "prompt_shape": {"surface": "chat_messages"},
+        "prompt_results": [
+            {
+                "ok": True,
+                "generation_surface": "stream_generate_messages",
+                "prompt_tokens": 7,
+                "completion_tokens": 128,
+                "stream_event_count": 1,
+                "stream_diagnostic_count": 0,
+            }
+        ],
+        "metrics": {
+            "load_time_s": 1.0,
+            "ttft_ms_by_prompt": {"p1_short_cn": 2.0},
+            "stream_wall_ms_by_prompt": {"p1_short_cn": 12.0},
+            "decode_tps_by_prompt": {"p1_short_cn": 12.7},
+            "wall_tps_by_prompt": {"p1_short_cn": 10.6},
+            "peak_rss_gb": 0.75,
+        },
+        "lifecycle": {
+            "load_ok": True,
+            "generate_ok": True,
+            "unload_ok": True,
+            "clean_health_after_unload": True,
+        },
+        "child_restart_detection": {"restart_observed": False},
+        "verdict": "passed",
+    }
+
+    record = d1._d2_record_from_d1_row(
+        run_id="d2-legacy",
+        output_path=tmp_path / "d2-legacy.jsonl",
+        source_run_id="legacy-source",
+        source_output_path=str(tmp_path / "legacy-source.jsonl"),
+        row=row,
+    )
+
+    assert record["schema_version"] == "d2.metrics.v2"
+    assert record["verdict"] == "passed"
+    assert record["missing_metrics"] == []
+    assert record["metrics"]["child_rss_gb"] == 0.75
+    assert record["metrics"]["peak_rss_gb"] == 0.75
+    assert record["metrics"]["rss_sample_scope"] == "child_process"
+    assert record["metrics"]["rss_sample_source"] == "ps_rss_kb"
+    assert record["metrics"]["rss_sample_timing"] == "after_generation_before_unload"
 
 
 def test_real_run_stream_timeout_writes_failed_row_and_skips_unload(
