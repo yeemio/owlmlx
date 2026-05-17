@@ -34,6 +34,7 @@ capability matrix label.
 | Model artifact | `DeepSeek-V4-Flash-2bit-DQ` |
 | Repeat count | 5 consecutive prompts in the same isolated runtime session |
 | Token ladder | `max_tokens` in `{128, 512, 1024}` |
+| Prompt surface | `messages` / chat-template rendering is the D1 default and accepted surface |
 | Lifecycle | preflight -> load -> generate repeats -> unload -> clean health |
 | Evidence | JSONL ledger under `files/evidence/owlmlx/deepseek-v4/d1-isolated-repeatability/` |
 | Capability label | `experimental` / `experimental_only` |
@@ -120,6 +121,8 @@ Passing requires:
   level;
 - no fatal host-pressure event;
 - no dirty stock runtime health after failure or unload;
+- every row uses the accepted `messages` prompt surface unless explicitly marked
+  as a raw-prompt diagnostic;
 - final unload succeeds and clean health is observable.
 
 ## 4. Evidence Schema
@@ -195,12 +198,12 @@ localize repetition sensitivity. Such runs are diagnostic variants; the D1 pass
 claim remains tied to the declared default parameters unless the spec is updated
 first.
 
-Prompt-surface diagnostics may use `--prompt-surface messages` to route the
-same D1 prompt through `owlmlx.runtime.mlx_lm_runner`'s
-`generate_messages`/chat-template path instead of raw prompt text. This checks
-whether the p1/1024 repetition blocker is triggered by raw prompting. It is a
-diagnostic variant only; the D1 pass claim remains tied to the declared default
-surface until this spec is explicitly revised.
+D1 adopts `--prompt-surface messages` as the default and accepted prompt
+surface. Raw prompt text remains available with `--prompt-surface raw` for
+diagnostics, but raw-prompt rows do not define the D1 pass/fail gate. This
+decision follows the p1/1024 diagnostic sequence: raw direct `mlx_lm.generate`
+and raw owlmlx runner both repeated with the same completion hash, while
+`generate_messages`/chat-template rendering passed the full 15-row matrix.
 
 If a long-output row fails on repetition after lifecycle stays clean, run a
 direct-vs-runner diagnostic before changing acceptance criteria:

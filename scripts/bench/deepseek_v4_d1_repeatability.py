@@ -43,6 +43,7 @@ D1_GENERATION_DEFAULTS = {
     "max_kv_size": 512,
     "temperature": 0.0,
 }
+D1_PROMPT_SURFACE_DEFAULT = "messages"
 DEFAULT_OUTPUT_DIR = (
     REPO_ROOT / "files" / "evidence" / "owlmlx" / "deepseek-v4" / "d1-isolated-repeatability"
 )
@@ -846,7 +847,7 @@ def run_real(
     max_tokens_ladder: tuple[int, ...] = TOKEN_LADDER,
     generation_overrides: dict[str, Any] | None = None,
     generation_surface: str = "generate",
-    prompt_surface: str = "raw",
+    prompt_surface: str = D1_PROMPT_SURFACE_DEFAULT,
     continue_on_failure: bool = False,
     timeout_s: float = 600.0,
     popen_factory: Any = subprocess.Popen,
@@ -1602,8 +1603,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     run.add_argument(
         "--prompt-surface",
         choices=("raw", "messages"),
-        default="raw",
-        help="Use raw prompt text or runner chat-template messages.",
+        default=D1_PROMPT_SURFACE_DEFAULT,
+        help="Use runner chat-template messages by default; raw is diagnostic.",
     )
     run.add_argument(
         "--continue-on-failure",

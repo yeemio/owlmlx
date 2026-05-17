@@ -356,12 +356,15 @@ def test_real_run_uses_persistent_child_protocol_with_fake_process(monkeypatch, 
     assert str(d1.REPO_ROOT) in created[0].kwargs["env"]["PYTHONPATH"].split(":")
     assert [item["action"] for item in created[0].stdin.writes] == [
         "load",
-        "generate",
+        "generate_messages",
         "unload",
         "ping",
         "shutdown",
     ]
     assert created[0].stdin.writes[0]["tokenizer_config"] == d1.D1_TOKENIZER_CONFIG
+    assert created[0].stdin.writes[1]["messages"] == [
+        {"role": "user", "content": dict(d1.PROMPTS)["p1_short_cn"]}
+    ]
     assert created[0].stdin.writes[1]["params"] == {
         **d1.D1_GENERATION_DEFAULTS,
         "max_tokens": 128,
@@ -408,13 +411,17 @@ def test_real_run_writes_jsonl_shape_from_fake_process(monkeypatch, tmp_path):
     assert record["prompt_results"][0]["restart_observed"] is False
     assert record["prompt_results"][0]["completion_chars"] > 0
     assert len(record["prompt_results"][0]["completion_sha256"]) == 64
-    assert record["prompt_results"][0]["completion_preview"].startswith("completion-")
-    assert record["prompt_results"][0]["completion_tail"].startswith("completion-")
-    assert record["prompt_shape"]["surface"] == "raw_text"
-    assert record["prompt_surface"] == "raw"
-    assert record["prompt_shape"]["prompt_chars"] > 0
-    assert len(record["prompt_shape"]["prompt_sha256"]) == 64
-    assert record["prompt_results"][0]["generation_surface"] == "generate"
+    assert record["prompt_results"][0]["completion_preview"].startswith(
+        "messages-completion-"
+    )
+    assert record["prompt_results"][0]["completion_tail"].startswith(
+        "messages-completion-"
+    )
+    assert record["prompt_shape"]["surface"] == "chat_messages"
+    assert record["prompt_surface"] == "messages"
+    assert record["prompt_shape"]["content_chars"] > 0
+    assert len(record["prompt_shape"]["messages_sha256"]) == 64
+    assert record["prompt_results"][0]["generation_surface"] == "generate_messages"
     assert record["prompt_results"][0]["stop_reason"] == "unknown_non_stream_text_only"
     assert record["prompt_results"][0]["stop_reason_source"] == (
         "non_stream_generate_text_only"
@@ -477,13 +484,16 @@ def test_real_run_messages_surface_uses_runner_chat_template_path(monkeypatch, t
 def test_real_run_coverage_reports_failed_and_missing_ladder(monkeypatch, tmp_path):
     class _FailingSecondGenerationProcess(_FakeProcess):
         def handle(self, payload: dict) -> None:
-            if payload["action"] == "generate" and self.generation_count >= 1:
+            if (
+                payload["action"] in {"generate", "generate_messages"}
+                and self.generation_count >= 1
+            ):
                 self.generation_count += 1
                 self.stdout.lines.append(
                     json.dumps(
                         {
                             "ok": False,
-                            "action": "generate",
+                            "action": payload["action"],
                             "model_id": payload["model_id"],
                             "error": "synthetic generation failure",
                             "pid": self.pid,
@@ -541,13 +551,16 @@ def test_real_run_coverage_reports_failed_and_missing_ladder(monkeypatch, tmp_pa
 def test_real_run_continue_on_failure_fills_diagnostic_matrix(monkeypatch, tmp_path):
     class _FailingAfterFirstGenerationProcess(_FakeProcess):
         def handle(self, payload: dict) -> None:
-            if payload["action"] == "generate" and self.generation_count >= 1:
+            if (
+                payload["action"] in {"generate", "generate_messages"}
+                and self.generation_count >= 1
+            ):
                 self.generation_count += 1
                 self.stdout.lines.append(
                     json.dumps(
                         {
                             "ok": False,
-                            "action": "generate",
+                            "action": payload["action"],
                             "model_id": payload["model_id"],
                             "error": "synthetic generation failure",
                             "pid": self.pid,
@@ -617,6 +630,7 @@ def test_real_run_stream_surface_records_timing_from_fake_process(monkeypatch, t
         max_prompts=1,
         max_tokens_ladder=(128,),
         generation_surface="stream",
+        prompt_surface="raw",
         timeout_s=1.0,
         popen_factory=lambda cmd, **kwargs: _FakeProcess(cmd, **kwargs),
     )
@@ -809,6 +823,7 @@ def test_real_run_prompt_id_and_stop_strings_pass_through(monkeypatch, tmp_path)
         prompt_ids=("p5_stop_marker",),
         max_tokens_ladder=(1024,),
         generation_overrides={"stop": ["<END>"]},
+        prompt_surface="raw",
         timeout_s=1.0,
         popen_factory=fake_popen,
     )
