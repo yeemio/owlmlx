@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 1 · Session KV cache no-swap soak
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: runner landed; real 24h native run pending
+> **Status**: runner + interrupted rehearsal aggregation landed; real 24h native run pending
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -160,6 +160,48 @@ Rehearsal evidence can support confidence statements such as
 
 The uninterrupted 24h native run remains the only §1 graduation path. The
 rehearsal path exists to make that run less blind, not to replace it.
+
+Segment command shape:
+
+```bash
+uv run python scripts/bench/eviction_soak.py \
+  --gate b1c1-no-swap-soak \
+  --backend native \
+  --model /Users/yeemio/AI/Agent/models/gemma-4-31B-it \
+  --model-label gemma-4-31B-it \
+  --model-gb 60 \
+  --duration-s 28800 \
+  --required-duration-s 86400 \
+  --sample-interval-s 60 \
+  --warmup-cycles 1 \
+  --max-tokens 2 \
+  --rehearsal-group-id b1c1-native-3x8h \
+  --rehearsal-segment-id b1c1-native-3x8h-segment-1 \
+  --interruption-reason planned_stop
+```
+
+Aggregate command shape:
+
+```bash
+uv run python scripts/bench/eviction_soak.py \
+  --gate b1c1-interrupted-rehearsal \
+  --output files/evidence/owlmlx/bench/session-kv-soak \
+  --aggregate-required-duration-s 86400 \
+  --rehearsal-group-id b1c1-native-3x8h \
+  --segment-rollup <segment-1-rollup.jsonl> \
+  --segment-rollup <segment-2-rollup.jsonl> \
+  --segment-rollup <segment-3-rollup.jsonl>
+```
+
+The aggregate rollup uses `schema_version = "b1c1.rehearsal.v1"` and must
+always keep:
+
+```yaml
+no_swap_soak_stability: blocked
+graduates:
+  no_swap_soak_stability: false
+  unblock_B_1c_section_2: false
+```
 
 ## 6. Failure Semantics
 

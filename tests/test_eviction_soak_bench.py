@@ -356,3 +356,136 @@ def test_b1c1_generation_failure_is_failed_not_blocked(monkeypatch, tmp_path):
     assert summary["hard_failure"] is True
     assert summary["no_swap_soak_stability"] == "failed"
     assert summary["graduates"]["unblock_B_1c_section_2"] is False
+
+
+def _write_b1c1_segment_rollup(
+    path,
+    *,
+    run_id,
+    duration_s=28800.0,
+    conclusion="blocked",
+    hard_failure=False,
+):
+    payload = {
+        "schema_version": "b1c1.v1",
+        "gate": "B-1c section 1",
+        "run_id": run_id,
+        "backend": "native",
+        "measurement_mode": eviction_soak.MlxMemorySampler.measurement_mode,
+        "measurement_duration_s": duration_s,
+        "ledger_gap_free": True,
+        "warmup_cycle_complete": True,
+        "session_mix_complete": True,
+        "session_mix_balanced": True,
+        "max_drift_within_budget": True,
+        "fatal_watermark_count": 0,
+        "session_cache_drops_total": 0,
+        "session_cache_rejects_total": 0,
+        "failure_measurement_count": 0,
+        "unresolved_reclaim_barrier_events": 0,
+        "hard_failure": hard_failure,
+        "no_swap_soak_stability": conclusion,
+        "interrupted_no_swap_rehearsal": {
+            "rehearsal_group_id": "b1c1-rehearsal",
+            "rehearsal_segment_id": run_id,
+            "segment_duration_s": duration_s,
+            "interruption_reason": "planned_stop",
+            "resumes_prior_segment": run_id != "segment-1",
+            "aggregate_measurement_duration_s": duration_s,
+            "no_swap_soak_stability": "blocked",
+        },
+    }
+    path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def test_b1c1_interrupted_rehearsal_aggregates_segments_without_graduating(tmp_path):
+    rollups = []
+    for index in range(1, 4):
+        path = tmp_path / f"segment-{index}-rollup.jsonl"
+        _write_b1c1_segment_rollup(path, run_id=f"segment-{index}")
+        rollups.append(path)
+
+    summary = eviction_soak.run_b1c1_interrupted_rehearsal(
+        segment_rollups=rollups,
+        output_dir=tmp_path,
+        run_id="aggregate",
+        rehearsal_group_id="b1c1-rehearsal",
+        required_total_duration_s=86400.0,
+    )
+
+    assert summary["ok"] is True
+    assert summary["interrupted_no_swap_rehearsal"] == "passed"
+    assert summary["aggregate_measurement_duration_s"] == 86400.0
+    assert summary["duration_requirement_met"] is True
+    assert summary["all_segments_ok_for_rehearsal"] is True
+    assert summary["no_swap_soak_stability"] == "blocked"
+    assert summary["graduates"]["interrupted_no_swap_rehearsal"] is True
+    assert summary["graduates"]["no_swap_soak_stability"] is False
+    assert summary["graduates"]["unblock_B_1c_section_2"] is False
+
+    written = _records(tmp_path / summary["rollup_path"].split("/")[-1])
+    assert len(written) == 1
+    assert written[0]["schema_version"] == "b1c1.rehearsal.v1"
+    assert written[0]["segments"][1]["resumes_prior_segment"] is True
+
+
+def test_b1c1_interrupted_rehearsal_failure_stays_failed(tmp_path):
+    first = tmp_path / "segment-1-rollup.jsonl"
+    second = tmp_path / "segment-2-rollup.jsonl"
+    _write_b1c1_segment_rollup(first, run_id="segment-1")
+    _write_b1c1_segment_rollup(
+        second,
+        run_id="segment-2",
+        conclusion="failed",
+        hard_failure=True,
+    )
+
+    summary = eviction_soak.run_b1c1_interrupted_rehearsal(
+        segment_rollups=[first, second],
+        output_dir=tmp_path,
+        run_id="aggregate-failed",
+        required_total_duration_s=1.0,
+    )
+
+    assert summary["ok"] is False
+    assert summary["interrupted_no_swap_rehearsal"] == "failed"
+    assert summary["no_swap_soak_stability"] == "blocked"
+    assert summary["graduates"]["interrupted_no_swap_rehearsal"] is False
+
+
+def test_b1c1_interrupted_rehearsal_rejects_empty_segment_list(tmp_path):
+    with pytest.raises(ValueError, match="segment-rollup is required"):
+        eviction_soak.run_b1c1_interrupted_rehearsal(
+            segment_rollups=[],
+            output_dir=tmp_path,
+        )
+
+
+def test_cli_b1c1_interrupted_rehearsal_writes_aggregate_rollup(tmp_path):
+    segment = tmp_path / "segment-rollup.jsonl"
+    output_dir = tmp_path / "out"
+    _write_b1c1_segment_rollup(segment, run_id="segment-cli", duration_s=12.0)
+
+    code = eviction_soak.main(
+        [
+            "--gate",
+            eviction_soak.B1C1_REHEARSAL_GATE,
+            "--output",
+            str(output_dir),
+            "--segment-rollup",
+            str(segment),
+            "--aggregate-required-duration-s",
+            "1",
+            "--rehearsal-group-id",
+            "cli-rehearsal",
+        ]
+    )
+
+    assert code == 0
+    rollups = list(output_dir.glob("*interrupted-no-swap-rehearsal-rollup.jsonl"))
+    assert len(rollups) == 1
+    record = _records(rollups[0])[0]
+    assert record["schema_version"] == "b1c1.rehearsal.v1"
+    assert record["rehearsal_group_id"] == "cli-rehearsal"
+    assert record["interrupted_no_swap_rehearsal"] == "passed"
+    assert record["no_swap_soak_stability"] == "blocked"

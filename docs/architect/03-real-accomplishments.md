@@ -140,7 +140,7 @@
 |---|---|---|---|
 | **①** Session KV TTFT 提升 | ✅ 已实证（Qwen3.6-27B-4bit, 7.409×；Gemma 4-31B-it, 2.246×） | 见 §5.1；supported gate 已过 B-1a + B-1b，待 B-1c §1 / B-1c §2 |
 | **②** 模型切换 reclaim 干净 | 🟡 部分实证（settle barrier + reclaim stats supported；B-1b cache-on no-regress 已过） | 见 §5.2 |
-| **③** 长上线稳定（48h+ 两段 soak） | 🔴 **缺** —— B-1c §1 runner 已具备 24h/native-only graduation guard，但无 24h+ 真实 soak 报告 | 见 §5.3；Campaign B-1c §1 + §2 |
+| **③** 长上线稳定（48h+ 两段 soak） | 🔴 **缺** —— B-1c §1 runner 已具备 24h/native-only graduation guard 与 interrupted rehearsal aggregation，但无 24h+ 真实 soak 报告 | 见 §5.3；Campaign B-1c §1 + §2 |
 | **④** 队列尾延迟（p50/p99/p99.9） | 🔴 **缺** —— GenerationGate supported；serial 已证；N 并发下分布未公开 | 见 §5.4 |
 
 ### 5.1 ✅ 主证据 ① · Session KV cache TTFT 实测（Qwen + Gemma）
@@ -194,7 +194,7 @@
 
 **当前状态**：
 
-- `scripts/bench/eviction_soak.py` 已从 placeholder 切到 owlmlx-first soak runner（commit `6b0c1bfd`）
+- `scripts/bench/eviction_soak.py` 已从 placeholder 切到 owlmlx-first soak runner（commit `6b0c1bfd`），并已具备 B-1c §1 interrupted rehearsal aggregation
 - 但 **无 24h+ 真实 soak 报告**——`active_memory` 漂移、`failed_reclaim`、watermark 跃迁、ledger 连续性等关键指标未公开
 
 **晋级 gate · 两段 48h+ 拆分（决策 D3 · 2026-05-16）**：

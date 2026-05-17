@@ -38,6 +38,7 @@ DEFAULT_OUTPUT_DIR = (
 )
 B1B_GATE = "b1b-cache-on-no-regress"
 B1C1_GATE = "b1c1-no-swap-soak"
+B1C1_REHEARSAL_GATE = "b1c1-interrupted-rehearsal"
 B1B_OUTPUT_DIR = (
     Path(__file__).resolve().parents[2]
     / "files"
@@ -61,6 +62,13 @@ B1C1_DURATION_S = 24 * 60 * 60
 B1C1_SAMPLE_INTERVAL_S = 60.0
 B1C1_DRIFT_BUDGET_BYTES = 200 * 1024 * 1024
 B1C1_WARMUP_CYCLES = 1
+B1C1_INTERRUPTION_REASONS = {
+    "planned_stop",
+    "host_sleep",
+    "user_interrupt",
+    "failure",
+    "unknown",
+}
 B1B_SESSION_ID_PREFIX = "b1b-gemma4-31b"
 B1C1_SESSION_ID_PREFIX = "b1c1-no-swap"
 B1C1_PROMPTS: tuple[tuple[str, str], ...] = (
@@ -468,6 +476,21 @@ def _b1c1_filename(timestamp: str, *, model_id: str) -> str:
 def _b1c1_rollup_filename(timestamp: str, *, model_id: str) -> str:
     safe_model = model_id.strip("/").replace("/", "-")
     return f"{timestamp}-b1c1-{safe_model}-no-swap-soak-rollup.jsonl"
+
+
+def _b1c1_rehearsal_rollup_filename(timestamp: str) -> str:
+    return f"{timestamp}-b1c1-interrupted-no-swap-rehearsal-rollup.jsonl"
+
+
+def _read_first_jsonl_record(path: Path) -> dict[str, Any]:
+    with Path(path).open("r", encoding="utf-8") as stream:
+        for line in stream:
+            if line.strip():
+                value = json.loads(line)
+                if not isinstance(value, dict):
+                    raise ValueError(f"{path} first JSONL row is not an object")
+                return value
+    raise ValueError(f"{path} has no JSONL records")
 
 
 def _missing_signal_names(record: dict[str, Any]) -> set[str]:
@@ -1008,6 +1031,10 @@ def _b1c1_rollup(
     load: Any,
     cleanup_unload: Any | None,
     cleanup_settle: SettleResult | None,
+    rehearsal_group_id: str | None = None,
+    rehearsal_segment_id: str | None = None,
+    resumes_prior_segment: bool = False,
+    interruption_reason: str = "planned_stop",
 ) -> dict[str, Any]:
     total_duration_s = round(time.monotonic() - started_monotonic_s, 3)
     measurement_duration_s = (
@@ -1113,6 +1140,7 @@ def _b1c1_rollup(
         conclusion = "failed"
     else:
         conclusion = "blocked"
+    segment_id = rehearsal_segment_id or run_id
     return {
         "schema_version": "b1c1.v1",
         "gate": "B-1c section 1",
@@ -1165,6 +1193,15 @@ def _b1c1_rollup(
             if cleanup_settle is not None
             else None
         ),
+        "interrupted_no_swap_rehearsal": {
+            "rehearsal_group_id": rehearsal_group_id,
+            "rehearsal_segment_id": segment_id,
+            "segment_duration_s": measurement_duration_s,
+            "interruption_reason": interruption_reason,
+            "resumes_prior_segment": resumes_prior_segment,
+            "aggregate_measurement_duration_s": measurement_duration_s,
+            "no_swap_soak_stability": "blocked" if not ok else conclusion,
+        },
         "no_swap_soak_stability": conclusion,
         "conclusion": conclusion,
         "graduates": {
@@ -1189,6 +1226,10 @@ def run_b1c1_no_swap_soak(
     session_id_prefix: str = B1C1_SESSION_ID_PREFIX,
     max_tokens: int = 2,
     profile_memory_gb: float = 128.0,
+    rehearsal_group_id: str | None = None,
+    rehearsal_segment_id: str | None = None,
+    resumes_prior_segment: bool = False,
+    interruption_reason: str = "planned_stop",
 ) -> dict[str, Any]:
     if runtime != "owlmlx":
         raise ValueError("only --runtime owlmlx is implemented in this baseline round")
@@ -1202,6 +1243,11 @@ def run_b1c1_no_swap_soak(
         raise ValueError("--max-samples must be >= 1 when provided")
     if warmup_cycles < 0:
         raise ValueError("--warmup-cycles must be >= 0")
+    if interruption_reason not in B1C1_INTERRUPTION_REASONS:
+        raise ValueError(
+            "--interruption-reason must be one of "
+            + ", ".join(sorted(B1C1_INTERRUPTION_REASONS))
+        )
 
     profile = MachineMemoryProfile(
         system_memory_gb=profile_memory_gb,
@@ -1420,6 +1466,10 @@ def run_b1c1_no_swap_soak(
         load=load,
         cleanup_unload=cleanup_unload,
         cleanup_settle=cleanup_settle,
+        rehearsal_group_id=rehearsal_group_id,
+        rehearsal_segment_id=rehearsal_segment_id,
+        resumes_prior_segment=resumes_prior_segment,
+        interruption_reason=interruption_reason,
     )
     rollup_path.parent.mkdir(parents=True, exist_ok=True)
     with rollup_path.open("w", encoding="utf-8") as stream:
@@ -1433,9 +1483,132 @@ def run_b1c1_no_swap_soak(
     }
 
 
+def _b1c1_rehearsal_segment_ok(record: dict[str, Any]) -> bool:
+    return (
+        record.get("schema_version") == "b1c1.v1"
+        and record.get("gate") == "B-1c section 1"
+        and record.get("backend") == "native"
+        and record.get("measurement_mode") == MlxMemorySampler.measurement_mode
+        and record.get("no_swap_soak_stability") == "blocked"
+        and record.get("hard_failure") is False
+        and record.get("ledger_gap_free") is True
+        and record.get("warmup_cycle_complete") is True
+        and record.get("session_mix_complete") is True
+        and record.get("session_mix_balanced") is True
+        and record.get("max_drift_within_budget") is True
+        and int(record.get("fatal_watermark_count", 0) or 0) == 0
+        and int(record.get("session_cache_drops_total", 0) or 0) == 0
+        and int(record.get("session_cache_rejects_total", 0) or 0) == 0
+        and int(record.get("failure_measurement_count", 0) or 0) == 0
+        and int(record.get("unresolved_reclaim_barrier_events", 0) or 0) == 0
+        and float(record.get("measurement_duration_s", 0.0) or 0.0) > 0.0
+    )
+
+
+def run_b1c1_interrupted_rehearsal(
+    *,
+    segment_rollups: list[Path],
+    output_dir: Path,
+    run_id: str | None = None,
+    rehearsal_group_id: str | None = None,
+    required_total_duration_s: float = float(B1C1_DURATION_S),
+) -> dict[str, Any]:
+    if not segment_rollups:
+        raise ValueError("--segment-rollup is required for interrupted rehearsal")
+    if required_total_duration_s < 0:
+        raise ValueError("--aggregate-required-duration-s must be >= 0")
+
+    timestamp = _now_compact_utc()
+    run_id = run_id or f"{timestamp}-owlmlx-{B1C1_REHEARSAL_GATE}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / _b1c1_rehearsal_rollup_filename(timestamp)
+    segments: list[dict[str, Any]] = []
+    for index, path in enumerate(segment_rollups, start=1):
+        record = _read_first_jsonl_record(path)
+        rehearsal = record.get("interrupted_no_swap_rehearsal", {})
+        segment_ok = _b1c1_rehearsal_segment_ok(record)
+        segments.append(
+            {
+                "segment_index": index,
+                "source_rollup": str(path),
+                "source_run_id": record.get("run_id"),
+                "rehearsal_group_id": rehearsal.get("rehearsal_group_id"),
+                "rehearsal_segment_id": rehearsal.get("rehearsal_segment_id")
+                or record.get("run_id")
+                or Path(path).stem,
+                "segment_duration_s": float(record.get("measurement_duration_s", 0.0) or 0.0),
+                "interruption_reason": rehearsal.get("interruption_reason", "unknown"),
+                "resumes_prior_segment": bool(rehearsal.get("resumes_prior_segment", index > 1)),
+                "segment_ok_for_rehearsal": segment_ok,
+                "no_swap_soak_stability": record.get("no_swap_soak_stability"),
+                "hard_failure": bool(record.get("hard_failure")),
+                "backend": record.get("backend"),
+                "measurement_mode": record.get("measurement_mode"),
+            }
+        )
+
+    aggregate_duration_s = round(
+        sum(float(segment["segment_duration_s"]) for segment in segments),
+        3,
+    )
+    duration_requirement_met = aggregate_duration_s >= required_total_duration_s
+    any_failed = any(
+        segment.get("no_swap_soak_stability") == "failed"
+        or bool(segment.get("hard_failure"))
+        for segment in segments
+    )
+    all_segments_ok = all(bool(segment["segment_ok_for_rehearsal"]) for segment in segments)
+    if any_failed:
+        rehearsal_conclusion = "failed"
+    elif all_segments_ok and duration_requirement_met:
+        rehearsal_conclusion = "passed"
+    else:
+        rehearsal_conclusion = "blocked"
+
+    payload = {
+        "schema_version": "b1c1.rehearsal.v1",
+        "gate": "B-1c section 1 interrupted rehearsal",
+        "run_id": run_id,
+        "timestamp_utc": _now_iso_utc(),
+        "rehearsal_group_id": rehearsal_group_id,
+        "segment_rollups": [str(path) for path in segment_rollups],
+        "segment_count": len(segments),
+        "segments": segments,
+        "aggregate_measurement_duration_s": aggregate_duration_s,
+        "required_total_duration_s": required_total_duration_s,
+        "duration_requirement_met": duration_requirement_met,
+        "all_segments_ok_for_rehearsal": all_segments_ok,
+        "interrupted_no_swap_rehearsal": rehearsal_conclusion,
+        "no_swap_soak_stability": "blocked",
+        "conclusion": rehearsal_conclusion,
+        "graduates": {
+            "interrupted_no_swap_rehearsal": rehearsal_conclusion == "passed",
+            "no_swap_soak_stability": False,
+            "unblock_B_1c_section_2": False,
+        },
+        "notes": [
+            "Interrupted rehearsal is operational evidence only.",
+            "It must not be merged into a continuous 24h no-swap soak claim.",
+        ],
+    }
+    with output_path.open("w", encoding="utf-8") as stream:
+        stream.write(json.dumps(payload, sort_keys=True))
+        stream.write("\n")
+    return {
+        **payload,
+        "ok": rehearsal_conclusion == "passed",
+        "output_dir": str(output_dir),
+        "rollup_path": str(output_path),
+    }
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--gate", choices=("baseline", B1B_GATE, B1C1_GATE), default="baseline")
+    parser.add_argument(
+        "--gate",
+        choices=("baseline", B1B_GATE, B1C1_GATE, B1C1_REHEARSAL_GATE),
+        default="baseline",
+    )
     parser.add_argument("--runtime", choices=("owlmlx", "omlx", "vmlx"), default="owlmlx")
     parser.add_argument("--backend", choices=("fake", "native"), default="fake")
     parser.add_argument("--model-a", default="model-a")
@@ -1460,6 +1633,20 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--sample-interval-s", type=float, default=B1C1_SAMPLE_INTERVAL_S)
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--warmup-cycles", type=int, default=B1C1_WARMUP_CYCLES)
+    parser.add_argument("--rehearsal-group-id", default=None)
+    parser.add_argument("--rehearsal-segment-id", default=None)
+    parser.add_argument("--resumes-prior-segment", action="store_true")
+    parser.add_argument(
+        "--interruption-reason",
+        choices=tuple(sorted(B1C1_INTERRUPTION_REASONS)),
+        default="planned_stop",
+    )
+    parser.add_argument("--segment-rollup", type=Path, action="append", default=[])
+    parser.add_argument(
+        "--aggregate-required-duration-s",
+        type=float,
+        default=float(B1C1_DURATION_S),
+    )
     return parser.parse_args(argv)
 
 
@@ -1497,6 +1684,18 @@ def main(argv: list[str] | None = None) -> int:
                 session_id_prefix=args.session_id_prefix or B1C1_SESSION_ID_PREFIX,
                 max_tokens=args.max_tokens,
                 profile_memory_gb=args.profile_memory_gb,
+                rehearsal_group_id=args.rehearsal_group_id,
+                rehearsal_segment_id=args.rehearsal_segment_id,
+                resumes_prior_segment=args.resumes_prior_segment,
+                interruption_reason=args.interruption_reason,
+            )
+        elif args.gate == B1C1_REHEARSAL_GATE:
+            summary = run_b1c1_interrupted_rehearsal(
+                segment_rollups=args.segment_rollup,
+                output_dir=args.output or B1C1_OUTPUT_DIR,
+                run_id=None,
+                rehearsal_group_id=args.rehearsal_group_id,
+                required_total_duration_s=args.aggregate_required_duration_s,
             )
         else:
             summary = run_eviction_soak(
