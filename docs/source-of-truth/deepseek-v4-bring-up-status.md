@@ -7,7 +7,7 @@
 
 ## 1. Current Status
 
-**2026-05-17: D1 isolated repeatability runner landed; full repeatability gate remains blocked.**
+**2026-05-17: D1 isolated repeatability gate passed under adopted messages prompt policy.**
 
 `scripts/bench/deepseek_v4_d1_repeatability.py` now drives the existing
 isolated `.runtime-deepseek-v4-mlx` environment through a persistent child
@@ -23,8 +23,12 @@ Observed status:
   in `.runtime-deepseek-v4-mlx`)
 - tiny real smoke: passed for 1 prompt / 8 tokens; load / unload / clean health
   completed with no child restart
-- full D1 ladder: blocked at `p1_short_cn` / `max_tokens=1024` by
-  `repetition_flag=true`
+- formal D1 ladder under adopted default policy:
+  `20260517T-d1-full-ladder-adopted-messages-policy.jsonl` passed all 15 rows
+  (5 prompts x 128/512/1024) through `generate_messages` / chat-template
+  rendering with `repetition_flag=false` and clean load/unload health
+- raw prompt diagnostic: blocked at `p1_short_cn` / `max_tokens=1024` by
+  `repetition_flag=true`; raw prompt is no longer the accepted D1 gate surface
 - direct-vs-runner diagnostic:
   `20260517T-d1-p1-1024-direct-vs-runner.jsonl` classifies the blocker as
   `adapter_or_artifact_likely`; direct `mlx_lm.generate` and
@@ -43,9 +47,8 @@ Observed status:
 
 This keeps DeepSeek V4 at `experimental_only`. It does not make
 `DeepSeek-V4-Flash-2bit-DQ` visible on the default model surface, does not
-adopt `ds4.c`, and does not claim supported DeepSeek V4 serving. The latest
-evidence supports a narrower next decision: whether D1 should adopt
-messages/chat-template rendering as the required DeepSeek prompt surface.
+adopt `ds4.c`, and does not claim supported DeepSeek V4 serving. It closes D1
+only for the isolated experimental lane and unlocks D2 metrics-ledger work.
 
 **2026-05-11: Lifecycle complete via intermediate path.**
 

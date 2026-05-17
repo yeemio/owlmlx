@@ -265,7 +265,7 @@ The first live Model RC sweep has now produced four schema-valid records in
 | `Qwen3.6-27B` | mainline | `needs_optimization` | two live HTTP repeated runs completed; OwlOps observation and same-host reference comparison remain open |
 | `Qwen3.6-35B-A3B` | mainline | `needs_optimization` | two live HTTP repeated runs completed; OwlOps observation, same-host reference comparison, and short-generation quality caveat remain open |
 | `gemma-4-31B-it` | mainline | `needs_optimization` | two live HTTP repeated runs completed; OwlOps observation and same-host reference comparison remain open |
-| `DeepSeek-V4-Flash-2bit-DQ` | flagship experimental | `experimental_only` | one isolated `.runtime-deepseek-v4-mlx` / `mlx_lm.generate` pressure run completed; no owlmlx HTTP adapter, visibility registration, unload/reload adapter, or repeat adapter evidence yet |
+| `DeepSeek-V4-Flash-2bit-DQ` | flagship experimental | `experimental_only` | isolated D1 repeatability passed under the adopted `messages` / chat-template prompt surface; raw prompt remains a diagnostic p1/1024 repetition failure; no owlmlx HTTP adapter, visibility registration, unload/reload adapter, or supported serving claim yet |
 
 The cumulative ledger append order is A1, A2, A3, D1. Because D1 is newest,
 `GET /v1/runtime/model-release-candidates` returns the DeepSeek experimental

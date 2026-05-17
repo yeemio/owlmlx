@@ -24,18 +24,18 @@
 - `docs/architect/**` 仍是 **plan-grade / architecture intent**，不进入 `docs/source-of-truth/master-outline.md`，除非经 runtime evidence + §1a Promotion Gate 晋级。
 - Wave / Campaign 结束时必须反推刷新：主规划结论、对应 companion、README 阅读顺序；不得只在聊天或临时 plan 文件里留下新事实。
 
-当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。近期最关键闭环是 B-1 Session KV cache `supported` 四条 gate（B-1a 已过；B-1b N=20 cache-off/cache-on 已过；B-1c §1/§2 待闭环）；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`；B-1c §1 runner 已具备 warmup/measurement 分相、mix 完整性、24h/native-only graduation guard；Campaign D 的 D1 real runner 已具备 ladder coverage summary 与 isolated runtime provenance。Full D1 ladder 当前被 p1/1024 repetition 阻塞，但 load/unload/clean-health 通过。
+当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。近期最关键闭环是 B-1 Session KV cache `supported` 四条 gate（B-1a 已过；B-1b N=20 cache-off/cache-on 已过；B-1c §1/§2 待闭环）；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`；B-1c §1 runner 已具备 warmup/measurement 分相、mix 完整性、24h/native-only graduation guard；Campaign D 的 D1 prompt policy 已采纳 `messages` / chat-template surface，formal full ladder 15/15 passed with clean lifecycle。
 
 | 最新落点（2026-05-17） | 状态 | 证据边界 |
 |---|---|---|
 | B-1b design spec | landed | `docs/architect/design/B-1b-spec.md` |
 | B-1b cache reclaim gate | passed · native N=20 | cache-off N=20 + cache-on N=20；20/20 warm hits；`failed_reclaim=0`；`failed_unload=0`；p50/p99 settle duration within threshold |
 | B-1c §1 no-swap soak runner | landed · 24h native evidence pending | fake/schema smoke now remains `blocked`; only native `mlx_core_active_memory` + required_duration ≥24h can graduate `no_swap_soak_stability` |
-| D1 DeepSeek repeatability runner | real runner landed · lifecycle clean · prompt-policy candidate pass | raw prompt p1 128/512 passed but p1/1024 failed with repetition; sampler, `max_kv_size=2048`, and p5 `<END>` did not clear raw repetition; direct-vs-runner compare classifies raw p1/1024 as `adapter_or_artifact_likely`; `--prompt-surface messages` then passed the full 5 prompt × 128/512/1024 matrix with clean unload and no repetition; preflight shows Blaizzy `mlx-lm` fork `pc/add-deepseekv4flash-model` at `5c10538136b9038b9626c134612b08afc18d697a` |
+| D1 DeepSeek repeatability runner | passed · experimental lane · messages prompt policy adopted | default `messages` prompt surface passed the formal 5 prompt × 128/512/1024 matrix (`20260517T-d1-full-ladder-adopted-messages-policy.jsonl`) with 15/15 passed, no repetition, and clean load/unload health; raw prompt remains diagnostic failure at p1/1024 and is not the accepted D1 surface; preflight shows Blaizzy `mlx-lm` fork `pc/add-deepseekv4flash-model` at `5c10538136b9038b9626c134612b08afc18d697a` |
 | H1 compat route split | landed | `server_routes_openai.py` 拆出 OpenAI / Anthropic compat routes |
 | Targeted tests | passed | B-1c/D1/session-cache focused suite = 39 passed；subprocess backend = 64 passed（上一轮） |
 
-下一条真实执行线二选一：**B-1c §1 no-swap 24h soak**（优先继续 Session KV supported gate）或 **D1 prompt-policy adoption review**（messages/chat-template surface has a full diagnostic pass; raw surface remains failed, so D1 only closes if the gate explicitly adopts messages as the supported DeepSeek prompt surface）。二者不得共享同一 GPU-heavy host 窗口。
+下一条真实执行线二选一：**B-1c §1 no-swap 24h soak**（优先继续 Session KV supported gate）或 **D2 DeepSeek metrics ledger**（D1 has passed under adopted messages policy; D2 can collect load time / TTFT / decode TPS / peak RSS）。二者不得共享同一 GPU-heavy host 窗口。
 
 ---
 
@@ -306,7 +306,7 @@
 - **目标**：DS4-Flash 2bit-DQ 从短烟测提升到"可重复验证 + clean health + load→generate→unload→clean health 全链"；**不**进入默认 model surface
 - **启动时点（决策 E3）**：D1 启动时点 = **Campaign B-1a 完成后**（host 进入 B-1b N=20 跑期间，DS4 隔离 venv 并行启动；不污染主 venv，主要竞争 CPU/GPU 时段）
 - **近期闭环（0–3 月，B-1a 完成后）**：
-  - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符。**当前状态**：design spec + real runner 已落；isolated preflight passed；raw p1 token ladder completed with `continue_on_failure`（128/512 passed，1024 failed on `repetition_flag=true`）；sampler variant and `max_kv_size=2048` still failed at raw p1/1024；p5 stop-marker prompt with `<END>` also failed at raw 1024；direct-vs-runner compare shows direct `mlx_lm.generate` and owlmlx runner produce the same `completion_sha256` / repeated-window hash at raw p1/1024；`--prompt-surface messages` passed the full 15-row D1 ladder with no repetition and clean lifecycle, making prompt-policy adoption the next review decision
+  - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符。**当前状态**：passed under adopted `messages` prompt policy；formal default run `20260517T-d1-full-ladder-adopted-messages-policy.jsonl` completed 15/15 rows with `repetition_flag=false`, clean load/unload health, and no restart. Raw prompt p1/1024 remains a diagnostic failure and is not the accepted surface.
   - D2：load time / TTFT / decode TPS / peak RSS / backend health 完整 ledger
   - D3：checkpoint MTP 权重检查；如缺失写 `missingReason=mtp_weights_absent_or_stripped`
   - D4：失败必须 clean pre-load reject，不污染 8066 runtime health
