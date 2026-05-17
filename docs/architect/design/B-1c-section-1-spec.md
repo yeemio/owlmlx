@@ -25,6 +25,8 @@ In scope:
 
 - native backend no-swap soak with `OWLMLX_SESSION_CACHE_ENABLED=1`
 - one model loaded once at the beginning of the soak
+- one short / medium / long warmup cycle before measurement so initial cache
+  entry creation is not misclassified as drift
 - repeated `generate_stream` calls with explicit session ids
 - short / medium / long prompt mix at 1:1:1 balance
 - periodic `mlx.core.get_active_memory()` sampling
@@ -53,6 +55,7 @@ uv run python scripts/bench/eviction_soak.py \
   --duration-s 86400 \
   --required-duration-s 86400 \
   --sample-interval-s 60 \
+  --warmup-cycles 1 \
   --max-tokens 2
 ```
 
@@ -78,6 +81,14 @@ Expected files:
 Per-sample records use `schema_version = "b1c1.v1"` and `gate =
 "B-1c section 1"`.
 
+Each record carries a `phase`:
+
+- `warmup`: cache-entry establishment for the short / medium / long session
+  mix. Warmup records remain in the ledger and may fail the run, but they are
+  not the drift baseline.
+- `measurement`: the actual soak window. `measurement_duration_s` and
+  `drift_from_measurement_start_bytes` are computed from this phase only.
+
 Rollup conclusion field:
 
 ```yaml
@@ -90,6 +101,8 @@ no_swap_soak_stability: passed | failed | blocked
 
 - `duration_requirement_met = true`
 - `ledger_gap_free = true`
+- at least one full warmup cycle completed
+- measurement samples exist
 - short / medium / long prompt mix remains balanced
 - `max_drift_bytes <= min(200 MiB, 0.5% host serving budget)`
 - `fatal_watermark_count = 0`

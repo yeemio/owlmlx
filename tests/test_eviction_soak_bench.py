@@ -227,13 +227,15 @@ def test_b1c1_fake_no_swap_soak_writes_gap_free_ledger_and_rollup(tmp_path):
         duration_s=0.0,
         required_duration_s=0.0,
         sample_interval_s=0.0,
-        max_samples=3,
+        max_samples=6,
     )
 
     assert summary["ok"] is True
     assert summary["no_swap_soak_stability"] == "passed"
     assert summary["graduates"]["unblock_B_1c_section_2"] is True
-    assert summary["samples"] == 3
+    assert summary["samples"] == 6
+    assert summary["warmup_samples"] == 3
+    assert summary["measurement_samples"] == 3
     assert summary["ledger_gap_free"] is True
     assert summary["session_mix_balanced"] is True
     assert summary["prompt_mix_counts"] == {"short": 1, "medium": 1, "long": 1}
@@ -243,9 +245,15 @@ def test_b1c1_fake_no_swap_soak_writes_gap_free_ledger_and_rollup(tmp_path):
 
     ledger = _records(tmp_path / summary["ledger"].split("/")[-1])
     rollup = _records(tmp_path / summary["rollup_path"].split("/")[-1])
-    assert len(ledger) == 3
+    assert len(ledger) == 6
     assert len(rollup) == 1
-    assert [record["sample_index"] for record in ledger] == [1, 2, 3]
+    assert [record["sample_index"] for record in ledger] == [1, 2, 3, 4, 5, 6]
+    assert [record["phase"] for record in ledger[:3]] == ["warmup", "warmup", "warmup"]
+    assert [record["phase"] for record in ledger[3:]] == [
+        "measurement",
+        "measurement",
+        "measurement",
+    ]
     assert {record["mode"] for record in ledger} == {"no_swap_soak"}
     assert {record["config"]["OWLMLX_SESSION_CACHE_ENABLED"] for record in ledger} == {"1"}
     assert all(

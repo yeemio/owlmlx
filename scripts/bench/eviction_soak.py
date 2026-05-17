@@ -60,6 +60,7 @@ DEFAULT_PROMPT = "Reply with exactly: owlmlx eviction soak"
 B1C1_DURATION_S = 24 * 60 * 60
 B1C1_SAMPLE_INTERVAL_S = 60.0
 B1C1_DRIFT_BUDGET_BYTES = 200 * 1024 * 1024
+B1C1_WARMUP_CYCLES = 1
 B1B_SESSION_ID_PREFIX = "b1b-gemma4-31b"
 B1C1_SESSION_ID_PREFIX = "b1c1-no-swap"
 B1C1_PROMPTS: tuple[tuple[str, str], ...] = (
@@ -1000,25 +1001,37 @@ def _b1c1_rollup(
     output_path: Path,
     records: list[dict[str, Any]],
     started_monotonic_s: float,
+    measurement_started_monotonic_s: float | None,
     required_duration_s: float,
     drift_budget_bytes: int,
     load: Any,
     cleanup_unload: Any | None,
     cleanup_settle: SettleResult | None,
 ) -> dict[str, Any]:
-    observed_duration_s = round(time.monotonic() - started_monotonic_s, 3)
+    total_duration_s = round(time.monotonic() - started_monotonic_s, 3)
+    measurement_duration_s = (
+        round(time.monotonic() - measurement_started_monotonic_s, 3)
+        if measurement_started_monotonic_s is not None
+        else 0.0
+    )
+    measurement_records = [
+        record for record in records if record.get("phase") == "measurement"
+    ]
+    warmup_records = [record for record in records if record.get("phase") == "warmup"]
     sample_indices = [int(record["sample_index"]) for record in records]
     ledger_gap_free = sample_indices == list(range(1, len(records) + 1))
     prompt_mix_counts = {
-        prompt_id: sum(1 for record in records if record.get("prompt_id") == prompt_id)
+        prompt_id: sum(
+            1 for record in measurement_records if record.get("prompt_id") == prompt_id
+        )
         for prompt_id, _prompt in B1C1_PROMPTS
     }
     mix_values = list(prompt_mix_counts.values())
     session_mix_balanced = bool(mix_values) and max(mix_values) - min(mix_values) <= 1
     drift_values = [
-        int(record["memory"]["drift_from_first_sample_bytes"])
-        for record in records
-        if record.get("memory", {}).get("drift_from_first_sample_bytes") is not None
+        int(record["memory"]["drift_from_measurement_start_bytes"])
+        for record in measurement_records
+        if record.get("memory", {}).get("drift_from_measurement_start_bytes") is not None
     ]
     max_drift_bytes = max(drift_values) if drift_values else None
     fatal_watermark_count = sum(
@@ -1044,14 +1057,14 @@ def _b1c1_rollup(
     unresolved_reclaim_barrier_events = int(
         final_reclaim_summary.get("unresolved_event_count", 0) or 0
     )
-    duration_requirement_met = observed_duration_s >= required_duration_s
+    duration_requirement_met = measurement_duration_s >= required_duration_s
     operations_ok = bool(load.ok) and all(
         record.get("sample_verdict") == "passed" for record in records
     )
     drift_ok = max_drift_bytes is not None and max_drift_bytes <= drift_budget_bytes
     cleanup_ok = bool(cleanup_unload.ok) if cleanup_unload is not None else not bool(load.ok)
     ok = (
-        bool(records)
+        bool(measurement_records)
         and duration_requirement_met
         and ledger_gap_free
         and session_mix_balanced
@@ -1084,10 +1097,13 @@ def _b1c1_rollup(
         },
         "backend": backend,
         "measurement_mode": measurement_mode,
+        "total_duration_s": total_duration_s,
         "required_duration_s": required_duration_s,
-        "observed_duration_s": observed_duration_s,
+        "measurement_duration_s": measurement_duration_s,
         "duration_requirement_met": duration_requirement_met,
         "samples": len(records),
+        "warmup_samples": len(warmup_records),
+        "measurement_samples": len(measurement_records),
         "ledger_gap_free": ledger_gap_free,
         "prompt_mix_counts": prompt_mix_counts,
         "session_mix_balanced": session_mix_balanced,
@@ -1133,6 +1149,7 @@ def run_b1c1_no_swap_soak(
     required_duration_s: float = float(B1C1_DURATION_S),
     sample_interval_s: float = B1C1_SAMPLE_INTERVAL_S,
     max_samples: int | None = None,
+    warmup_cycles: int = B1C1_WARMUP_CYCLES,
     session_id_prefix: str = B1C1_SESSION_ID_PREFIX,
     max_tokens: int = 2,
     profile_memory_gb: float = 128.0,
@@ -1147,6 +1164,8 @@ def run_b1c1_no_swap_soak(
         raise ValueError("--sample-interval-s must be >= 0")
     if max_samples is not None and max_samples < 1:
         raise ValueError("--max-samples must be >= 1 when provided")
+    if warmup_cycles < 0:
+        raise ValueError("--warmup-cycles must be >= 0")
 
     profile = MachineMemoryProfile(
         system_memory_gb=profile_memory_gb,
@@ -1166,8 +1185,11 @@ def run_b1c1_no_swap_soak(
         kernel, sampler = _make_kernel(backend=backend, profile=profile)
         records: list[dict[str, Any]] = []
         started_monotonic_s = time.monotonic()
+        measurement_started_monotonic_s: float | None = None
+        warmup_sample_count = warmup_cycles * len(B1C1_PROMPTS)
         load = kernel.load_model(model.model_id, memory_gb=model.memory_gb)
         first_sample_bytes: int | None = None
+        first_measurement_bytes: int | None = None
         cleanup_unload: Any | None = None
         cleanup_settle: SettleResult | None = None
         try:
@@ -1182,6 +1204,13 @@ def run_b1c1_no_swap_soak(
                     ):
                         break
                     sample_index = len(records) + 1
+                    phase = (
+                        "warmup"
+                        if sample_index <= warmup_sample_count
+                        else "measurement"
+                    )
+                    if phase == "measurement" and measurement_started_monotonic_s is None:
+                        measurement_started_monotonic_s = time.monotonic()
                     prompt_id, prompt = B1C1_PROMPTS[(sample_index - 1) % len(B1C1_PROMPTS)]
                     session_id = f"{session_id_prefix}-{prompt_id}"
                     cache_before = _session_cache_status(kernel)
@@ -1215,9 +1244,20 @@ def run_b1c1_no_swap_soak(
                     after_bytes = sampler.active_memory_bytes(kernel)
                     if first_sample_bytes is None and after_bytes is not None:
                         first_sample_bytes = after_bytes
+                    if (
+                        phase == "measurement"
+                        and first_measurement_bytes is None
+                        and after_bytes is not None
+                    ):
+                        first_measurement_bytes = after_bytes
                     drift_bytes = (
                         abs(after_bytes - first_sample_bytes)
                         if after_bytes is not None and first_sample_bytes is not None
+                        else None
+                    )
+                    measurement_drift_bytes = (
+                        abs(after_bytes - first_measurement_bytes)
+                        if after_bytes is not None and first_measurement_bytes is not None
                         else None
                     )
                     cache_after = _session_cache_status(kernel)
@@ -1240,6 +1280,7 @@ def run_b1c1_no_swap_soak(
                         "gate": "B-1c section 1",
                         "run_id": run_id,
                         "mode": "no_swap_soak",
+                        "phase": phase,
                         "sample_index": sample_index,
                         "timestamp_utc": _now_iso_utc(),
                         "elapsed_s": round(time.monotonic() - started_monotonic_s, 3),
@@ -1264,6 +1305,7 @@ def run_b1c1_no_swap_soak(
                             "duration_s": duration_s,
                             "required_duration_s": required_duration_s,
                             "sample_interval_s": sample_interval_s,
+                            "warmup_cycles": warmup_cycles,
                             "max_generation_concurrency": 1,
                             "artificial_unload_or_swap_during_soak": False,
                         },
@@ -1286,6 +1328,8 @@ def run_b1c1_no_swap_soak(
                             "active_memory_after_generation_gb": _bytes_to_gb(after_bytes),
                             "first_sample_active_memory_bytes": first_sample_bytes,
                             "drift_from_first_sample_bytes": drift_bytes,
+                            "first_measurement_active_memory_bytes": first_measurement_bytes,
+                            "drift_from_measurement_start_bytes": measurement_drift_bytes,
                             "drift_budget_bytes": drift_budget_bytes,
                             "watermark_after_generation": watermark_after,
                         },
@@ -1301,10 +1345,21 @@ def run_b1c1_no_swap_soak(
                     if sample_verdict != "passed":
                         break
                     if max_samples is None:
-                        elapsed_s = time.monotonic() - started_monotonic_s
-                        if elapsed_s >= duration_s:
+                        measurement_elapsed_s = (
+                            time.monotonic() - measurement_started_monotonic_s
+                            if measurement_started_monotonic_s is not None
+                            else 0.0
+                        )
+                        if phase == "measurement" and measurement_elapsed_s >= duration_s:
                             break
-                        sleep_for = min(sample_interval_s, max(duration_s - elapsed_s, 0.0))
+                        sleep_for = (
+                            0.0
+                            if phase == "warmup"
+                            else min(
+                                sample_interval_s,
+                                max(duration_s - measurement_elapsed_s, 0.0),
+                            )
+                        )
                         if sleep_for > 0:
                             time.sleep(sleep_for)
         finally:
@@ -1325,6 +1380,7 @@ def run_b1c1_no_swap_soak(
         output_path=output_path,
         records=records,
         started_monotonic_s=started_monotonic_s,
+        measurement_started_monotonic_s=measurement_started_monotonic_s,
         required_duration_s=required_duration_s,
         drift_budget_bytes=drift_budget_bytes,
         load=load,
@@ -1369,6 +1425,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--required-duration-s", type=float, default=float(B1C1_DURATION_S))
     parser.add_argument("--sample-interval-s", type=float, default=B1C1_SAMPLE_INTERVAL_S)
     parser.add_argument("--max-samples", type=int, default=None)
+    parser.add_argument("--warmup-cycles", type=int, default=B1C1_WARMUP_CYCLES)
     return parser.parse_args(argv)
 
 
@@ -1402,6 +1459,7 @@ def main(argv: list[str] | None = None) -> int:
                 required_duration_s=args.required_duration_s,
                 sample_interval_s=args.sample_interval_s,
                 max_samples=args.max_samples,
+                warmup_cycles=args.warmup_cycles,
                 session_id_prefix=args.session_id_prefix or B1C1_SESSION_ID_PREFIX,
                 max_tokens=args.max_tokens,
                 profile_memory_gb=args.profile_memory_gb,
