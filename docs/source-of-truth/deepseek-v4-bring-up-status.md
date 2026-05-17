@@ -72,6 +72,16 @@ matched MTP/draft/speculative weight keys, zero extra layer keys beyond
 `capability_conclusion=mtp_checkpoint_not_available`, not as DeepSeek MTP
 serving support.
 
+**D4 follow-up status:** the MTP clean pre-load rejection gate is complete for
+the current local artifact. `20260517T-d4-mtp-clean-preload-reject.jsonl`
+records `schema_version=d4.preload_reject.v1`,
+`record_type=mtp_preload_reject`, `requested_capability=deepseek_v4_mtp`,
+`decision=rejected_pre_load`, `reason_code=mtp_weights_absent_or_stripped`,
+`load_attempted=false`, `child_process_started=false`,
+`default_model_surface_changed=false`, and stable 8066 `/healthz` fingerprints
+before and after. Treat this as failure isolation for an unavailable MTP path,
+not as DeepSeek MTP serving support.
+
 **2026-05-11: Lifecycle complete via intermediate path.**
 
 `DeepSeek-V4-Flash-2bit-DQ` completed load → generate → unload → clean health
@@ -160,10 +170,17 @@ ensures no premature parity or replacement claim can pass schema validation.
 
 ## 5. Test Contract
 
-`tests/test_mlx_native_backend.py` includes a test verifying the current clean
-rejection behavior: loading `DeepSeek-V4-Flash-2bit-DQ` returns an error event
-with `error_code=unsupported_model_family` without dirtying the backend's
-health state.
+`tests/test_mlx_native_backend.py` includes a test verifying the historical
+generic clean rejection behavior: loading `DeepSeek-V4-Flash-2bit-DQ` through
+an unsupported native model-family path returns an error event with
+`error_code=unsupported_model_family` without dirtying backend health state.
+
+`tests/test_deepseek_v4_d1_repeatability.py` now also covers the MTP-specific
+D4 gate: when D3 evidence says `missingReason=mtp_weights_absent_or_stripped`,
+the D4 runner emits `decision=rejected_pre_load`, keeps
+`load_attempted=false` and `child_process_started=false`, and fails if runtime
+health changes. This D4 path is about absent MTP checkpoint weights, not an
+absent `deepseek_v4` loader.
 
 When the bring-up is complete, a new test in
 `tests/test_mlx_native_backend_real_smoke.py` (env-gated) should verify the

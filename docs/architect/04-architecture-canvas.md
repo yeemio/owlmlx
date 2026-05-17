@@ -176,7 +176,7 @@ flowchart TB
 | **A** Repeatability | `test_repeatability_campaign_harness.py` · `repeatability_statistics.py` |
 | **B** Cache / Scheduler | `session_kv_cache.py` · `cache_manager.py` · `scheduler_admission.py` · `memory_pressure_eviction_policy.py` |
 | **C** TTFT Default | `mlx_lm_subprocess_backend.py` (child cold-start) · `scheduler_admission.py` (warmup decision) |
-| **D** DeepSeek V4 | `.runtime-deepseek-v4-mlx` venv · D1/D2 passed · D3 MTP checkpoint absent/stripped |
+| **D** DeepSeek V4 | `.runtime-deepseek-v4-mlx` venv · D1/D2 passed · D3 MTP checkpoint absent/stripped · D4 clean pre-load reject |
 | **E** OwlOps Consumption | `comparative_evidence_history.py` · `runtime_monitor_test_console.py` · 27-row ledger |
 | **F** Spec Path Safety | `gemma4_mtp_drafter.py` · `runtime/mlx_vlm_mtp_runner.py` · `speculative_execution_status` (待建) |
 | **Wave G** Governance | `docs/source-of-truth/ARCHITECTURE-TRUTH.md` · `product-definition.md` · `README.md` · phase45 命名治理 |
@@ -311,7 +311,7 @@ gantt
     section D · DeepSeek V4
     D1-D2 5×连续 + ledger                :done, d1, after b1a, 60d
     D3 MTP absent/stripped inspection    :done, d3, after d1, 10d
-    D4 clean fail isolation              :d4, after d3, 20d
+    D4 clean pre-load reject             :done, d4, after d3, 1d
     第二 DS4 variant                      :d5, 2026-08-15, 90d
     RC2 支撑                              :d6, 2026-11-15, 180d
 
@@ -346,7 +346,7 @@ gantt
 | **A · Repeatability** | A1 N→20 · A2 seed-byte · A3 reclaim stats | 扩 Qwen3.6-35B-A3B · dirty recovery | DS4 family · RC1 |
 | **B · Cache/Scheduler** | **B-1a Gemma 4 + G1 byte-equiv** · B-1b N=20 cache=on/off · **B-1c §1 24h pure soak + §2 24h soak+swap** · B2 cache_manager · B3 warmup | workspace-aware boundary · TTL/驱逐契约 | 跨模型版本 invalidation · 量化-cache 共享探针 |
 | **C · TTFT Default** | C1 五因素 · C2 warmup default · C3 thinking | Gemma 4 reasoning trace · verdict 解除 | ≥3 主线 verdict 解除 → RC1 |
-| **D · DS4** | D1-D2 5×连续 · D3 `missingReason=mtp_weights_absent_or_stripped` · D4 clean fail（**B-1a 完成后启动**） | 第二 DS4 variant · upstream tracking | RC2 native-only DS4 lifecycle |
+| **D · DS4** | D1-D2 passed · D3 `missingReason=mtp_weights_absent_or_stripped` · D4 clean pre-load reject passed | 第二 DS4 variant · upstream tracking | RC2 native-only DS4 lifecycle |
 | **E · OwlOps Loop** | E1 reclaim stats · E2 TTFT · E3 classifier | spec accept/reject + tool-arg metric | RC3 >90d gap-free ledger · classifier partial |
 | **F · Spec Safety** | F1 status contract · F2 n-gram · F3 resident MTP | F4 正交矩阵 · F5 constraint · F6 MTP+KV combo | F7 DS4 MTP · F8 受控启用 · F9 RC2 强支撑 |
 | **Wave G · Governance** | G1 ARCH-TRUTH · G2 product-def · G3 README | G4 phase45 命名治理 · G5 contracts 统一 | 每 reopen condition 达成时同步刷新 matrix |

@@ -24,7 +24,7 @@
 - `docs/architect/**` 仍是 **plan-grade / architecture intent**，不进入 `docs/source-of-truth/master-outline.md`，除非经 runtime evidence + §1a Promotion Gate 晋级。
 - Wave / Campaign 结束时必须反推刷新：主规划结论、对应 companion、README 阅读顺序；不得只在聊天或临时 plan 文件里留下新事实。
 
-当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。近期最关键闭环是 B-1 Session KV cache `supported` 四条 gate（B-1a 已过；B-1b N=20 cache-off/cache-on 已过；B-1c §1/§2 待闭环）；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`；B-1c §1 runner 已具备 warmup/measurement 分相、mix 完整性、24h/native-only graduation guard；Campaign D 的 D1 prompt policy 已采纳 `messages` / chat-template surface，formal full ladder 15/15 passed with clean lifecycle。
+当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。近期最关键闭环是 B-1 Session KV cache `supported` 四条 gate（B-1a 已过；B-1b N=20 cache-off/cache-on 已过；B-1c §1/§2 待闭环）；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`；B-1c §1 runner 已具备 warmup/measurement 分相、mix 完整性、24h/native-only graduation guard；Campaign D 的 DeepSeek D1-D4 experimental lane 已收口：D1/D2 可测，D3 明确 MTP checkpoint 缺失，D4 干净预拒绝且不污染 8066 runtime health。
 
 | 最新落点（2026-05-17） | 状态 | 证据边界 |
 |---|---|---|
@@ -34,10 +34,11 @@
 | D1 DeepSeek repeatability runner | passed · experimental lane · messages prompt policy adopted | default `messages` prompt surface passed the formal 5 prompt × 128/512/1024 matrix (`20260517T-d1-full-ladder-adopted-messages-policy.jsonl`) with 15/15 passed, no repetition, and clean load/unload health; raw prompt remains diagnostic failure at p1/1024 and is not the accepted D1 surface; preflight shows Blaizzy `mlx-lm` fork `pc/add-deepseekv4flash-model` at `5c10538136b9038b9626c134612b08afc18d697a` |
 | D2 DeepSeek metrics ledger | passed · p1/p2/p4 × 128/512 | fd-buffered child stdout reader fixed the previous stream block; `20260517T-d2-p1-p2-p4-128-512-metrics-v2.jsonl` records 6/6 passed rows, TTFT p50 593.840ms, decode p50 38.17885 tok/s after first token, child-process RSS p50 7.214432GB (not peak/process-tree aggregate), clean unload |
 | D3 DeepSeek MTP checkpoint inspection | passed · explicit missing reason | `20260517T-d3-mtp-checkpoint-inspection.jsonl` records `num_nextn_predict_layers=1`, 2610 weight keys / 19 shards, no MTP key candidates, no extra layer keys, `missingReason=mtp_weights_absent_or_stripped`; DeepSeek remains experimental-only |
+| D4 DeepSeek MTP pre-load reject | passed · clean failure isolation | `20260517T-d4-mtp-clean-preload-reject.jsonl` records `decision=rejected_pre_load`, `reason_code=mtp_weights_absent_or_stripped`, `load_attempted=false`, `child_process_started=false`, and stable 8066 health before/after |
 | H1 compat route split | landed | `server_routes_openai.py` 拆出 OpenAI / Anthropic compat routes |
 | Targeted tests | passed | B-1c/D1/session-cache focused suite = 39 passed；subprocess backend = 64 passed（上一轮） |
 
-下一条真实执行线二选一：**B-1c §1 no-swap 24h soak**（优先继续 Session KV supported gate）或 **D4 clean pre-load reject / failure isolation**（D3 已确认当前 DS4 artifact 无可用 MTP checkpoint；DeepSeek lane remains experimental-only）。二者不得共享同一 GPU-heavy host 窗口。
+下一条真实执行线：**B-1c §1 no-swap 24h soak**（优先继续 Session KV supported gate）。DeepSeek D1-D4 experimental lane 已闭环；只有新 DS4 artifact / adapter fork 改变 D3 checkpoint inspection 结果时，才启动 D5。
 
 ---
 
@@ -311,7 +312,7 @@
   - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符。**当前状态**：passed under adopted `messages` prompt policy；formal default run `20260517T-d1-full-ladder-adopted-messages-policy.jsonl` completed 15/15 rows with `repetition_flag=false`, clean load/unload health, and no restart. Raw prompt p1/1024 remains a diagnostic failure and is not the accepted surface.
   - D2：load time / TTFT / decode TPS / child-process RSS sample / backend health 完整 ledger。**当前状态**：passed for p1/p2/p4 × 128/512 after replacing blocking `readline()` child stdout handling with fd-buffered reads; evidence `20260517T-d2-p1-p2-p4-128-512-metrics-v2.jsonl` records 6/6 passed rows, TTFT p50 593.840ms, decode p50 38.17885 tok/s after first token, child-process RSS p50 7.214432GB (not peak/process-tree aggregate), clean unload. DeepSeek remains experimental-only.
   - D3：checkpoint MTP 权重检查。**当前状态**：passed as inspection gate; evidence `20260517T-d3-mtp-checkpoint-inspection.jsonl` records `num_nextn_predict_layers=1`, no `mtp` / draft / speculative weight keys, no extra layer keys beyond `num_hidden_layers=43`, and `missingReason=mtp_weights_absent_or_stripped`. This is not a DeepSeek MTP serving claim.
-  - D4：失败必须 clean pre-load reject，不污染 8066 runtime health
+  - D4：失败必须 clean pre-load reject，不污染 8066 runtime health。**当前状态**：passed; evidence `20260517T-d4-mtp-clean-preload-reject.jsonl` records `decision=rejected_pre_load`, `reason_code=mtp_weights_absent_or_stripped`, `load_attempted=false`, `child_process_started=false`, and stable 8066 `/healthz` before/after. This proves failure isolation, not DS4 native MTP serving.
 - **中期 / 远期**：第二 DS4 variant；upstream mlx_lm `deepseek_v4` 合并跟踪；RC2 支撑
 - **验收**：5×连续无重启通过；ledger 完整；失败链 clean；progressive max_tokens 通过
 

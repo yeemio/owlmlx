@@ -119,7 +119,7 @@
 |---|---|---|
 | Native MLX backend (in-process) | `experimental` | `owlmlx/runtime/mlx_native_backend.py` 1074 行；server.py:2088 `"scope": "native_backend_explicit_session_id_only"` |
 | Session-scoped native KV cache | `experimental` | `owlmlx/session_kv_cache.py` + `MlxNativeBackend`；env `OWLMLX_SESSION_CACHE_ENABLED=1` + header `X-Owlmlx-Session-Id` 双门 |
-| DeepSeek-V4-Flash 2bit-DQ adapter | `experimental` | 隔离 `.runtime-deepseek-v4-mlx` venv；首次短烟测通过 |
+| DeepSeek-V4-Flash 2bit-DQ adapter | `experimental` | 隔离 `.runtime-deepseek-v4-mlx` venv；D1/D2 passed；D3 MTP absent/stripped；D4 clean pre-load reject passed |
 | Bounded pre-gate admission ingress seam | `experimental` | `owlmlx/serving.py` |
 | Gemma 4 MTP drafter probe | `experimental` | `owlmlx/gemma4_mtp_drafter.py` CLI wrap |
 | Overflow / NVMe-tier execution path | `experimental` | Hypura 列为 external reference |
@@ -331,6 +331,17 @@ does not make DeepSeek V4 supported or visible on the default model surface.
 
 Current D3 boundary: current local artifact has no usable MTP checkpoint path;
 DeepSeek V4 stays `experimental_only`.
+
+#### D4 clean pre-load reject / failure isolation（2026-05-17）
+
+> 出处：`files/evidence/owlmlx/deepseek-v4/d4-preload-reject/`
+
+| Run | 参数 | 结果 | 关键观察 |
+|---|---|---|---|
+| `20260517T-d4-mtp-clean-preload-reject.jsonl` | consume D3 inspection + probe 8066 `/healthz` before/after | passed | `decision=rejected_pre_load`；`reason_code=mtp_weights_absent_or_stripped`；`load_attempted=false`；`child_process_started=false`；`default_model_surface_changed=false`；runtime health stable |
+
+Current D4 boundary: owlmlx cleanly rejects unavailable DeepSeek MTP before
+load. This is not generation evidence and does not make DeepSeek V4 supported.
 
 ### 5.8 Gemma 4 MTP drafter probe（附录数据）
 

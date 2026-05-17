@@ -100,7 +100,9 @@ uv run python scripts/bench/deepseek_v4_d1_repeatability.py checkpoint-inspect \
 Current D3 boundary: MTP checkpoint support is not available for this local
 artifact. The DeepSeek lane remains `experimental_only`.
 
-## 6. Next Debug Slice
+## 6. Follow-On Slice
 
-D3 unlocks D4 clean pre-load rejection / failure isolation. A future D3 rerun is
+D4 consumed this D3 conclusion and proved clean pre-load rejection for the
+unavailable MTP path. D3 remains only metadata inspection: a D3 pass means the
+current checkpoint state is explicit, not that MTP works. A future D3 rerun is
 only useful if a new DeepSeek artifact or adapter fork is introduced.
