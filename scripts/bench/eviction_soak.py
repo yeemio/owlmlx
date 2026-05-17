@@ -22,7 +22,7 @@ from typing import Any, Iterator, Protocol
 
 from owlmlx.memory_budget import MachineMemoryProfile
 from owlmlx.memory_watermark import MemoryWatermark
-from owlmlx.runtime import FakeBackend, RuntimeKernel
+from owlmlx.runtime import FakeBackend, RuntimeErrorCode, RuntimeKernel
 from owlmlx.runtime.mlx_native_backend import MlxNativeBackend
 from owlmlx.settle_barrier_event import build_settle_barrier_event, settle_barrier_event_to_dict
 
@@ -61,6 +61,18 @@ class SettleResult:
     active_memory_bytes: int | None
     iterations: int
     duration_ms: float
+
+
+@dataclass(frozen=True, slots=True)
+class StreamGenerationResult:
+    ok: bool
+    message: str
+    error_code: Any | None
+    model_id: str | None
+    text: str = ""
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    finish_reason: str | None = None
 
 
 class MemorySampler(Protocol):
@@ -181,6 +193,62 @@ def _result_to_dict(result: Any) -> dict[str, Any]:
         "active_memory_freed_bytes": getattr(result, "active_memory_freed_bytes", None),
         "cache_memory_freed_bytes": getattr(result, "cache_memory_freed_bytes", None),
     }
+
+
+async def _stream_generate_once(
+    kernel: RuntimeKernel,
+    *,
+    model_id: str,
+    prompt: str,
+    max_tokens: int,
+    session_id: str | None = None,
+) -> StreamGenerationResult:
+    text_parts: list[str] = []
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    finish_reason: str | None = None
+    saw_done = False
+    async for event in kernel.generate_stream(
+        prompt,
+        model_id=model_id,
+        max_tokens=max_tokens,
+        session_id=session_id,
+        temperature=0.0,
+        seed=42,
+    ):
+        if event.prompt_tokens is not None:
+            prompt_tokens = int(event.prompt_tokens)
+        if event.completion_tokens is not None:
+            completion_tokens = int(event.completion_tokens)
+        if event.finish_reason:
+            finish_reason = event.finish_reason
+        if event.event == "token":
+            text_parts.append(event.text)
+            continue
+        if event.event == "done":
+            saw_done = True
+            break
+        if event.event == "error":
+            return StreamGenerationResult(
+                ok=False,
+                message=str(event.detail.get("message", "stream generation failed")),
+                error_code=event.error_code,
+                model_id=event.model_id or model_id,
+                text="".join(text_parts),
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                finish_reason=finish_reason,
+            )
+    return StreamGenerationResult(
+        ok=saw_done,
+        message="stream generated" if saw_done else "stream ended before done",
+        error_code=None if saw_done else RuntimeErrorCode.backend_error,
+        model_id=model_id,
+        text="".join(text_parts),
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        finish_reason=finish_reason or "stop",
+    )
 
 
 def _make_kernel(*, backend: str, profile: MachineMemoryProfile) -> tuple[RuntimeKernel, MemorySampler]:
@@ -355,12 +423,12 @@ def _b1b_round_verdict(
 
 def _mode_filename(timestamp: str, *, model_id: str, mode: str, rounds: int) -> str:
     cache_part = "cache-off" if mode == "cache_off_baseline" else "cache-on"
-    safe_model = model_id.replace("/", "-")
+    safe_model = model_id.strip("/").replace("/", "-")
     return f"{timestamp}-b1b-{safe_model}-{cache_part}-n{rounds}.jsonl"
 
 
 def _rollup_filename(timestamp: str, *, model_id: str) -> str:
-    safe_model = model_id.replace("/", "-")
+    safe_model = model_id.strip("/").replace("/", "-")
     return f"{timestamp}-b1b-{safe_model}-cache-on-no-regress-rollup.jsonl"
 
 
@@ -630,6 +698,7 @@ def _run_b1b_mode(
     runtime: str,
     backend: str,
     model: ModelSpec,
+    model_label: str,
     mode: str,
     rounds: int,
     output_path: Path,
@@ -669,26 +738,24 @@ def _run_b1b_mode(
                 cache_after_warm: dict[str, Any] | None = None
                 if load.ok:
                     cold = asyncio.run(
-                        kernel.generate(
-                            prompt,
+                        _stream_generate_once(
+                            kernel,
                             model_id=model.model_id,
+                            prompt=prompt,
                             max_tokens=max_tokens,
                             session_id=session_id,
-                            temperature=0.0,
-                            seed=42,
                         )
                     )
                     generations.append(cold)
                     cache_after_cold = _session_cache_status(kernel)
                     if cache_enabled:
                         warm = asyncio.run(
-                            kernel.generate(
-                                prompt,
+                            _stream_generate_once(
+                                kernel,
                                 model_id=model.model_id,
+                                prompt=prompt,
                                 max_tokens=max_tokens,
                                 session_id=session_id,
-                                temperature=0.0,
-                                seed=42,
                             )
                         )
                         generations.append(warm)
@@ -722,8 +789,8 @@ def _run_b1b_mode(
                     "round": round_idx,
                     "timestamp_utc": _now_iso_utc(),
                     "model": {
-                        "id": B1B_MODEL_ID,
-                        "path": B1B_MODEL_PATH if model.model_id == B1B_MODEL_ID else model.model_id,
+                        "id": model_label,
+                        "path": model.model_id,
                         "runtime_model_id": model.model_id,
                         "hf_commit_sha": None,
                         "mlx_lm_version": None,
@@ -782,6 +849,7 @@ def run_b1b_cache_on_no_regress(
     runtime: str,
     backend: str,
     model: ModelSpec,
+    model_label: str = B1B_MODEL_ID,
     rounds: int,
     output_dir: Path,
     cache_mode: str = "both",
@@ -812,11 +880,12 @@ def run_b1b_cache_on_no_regress(
     baseline_path: Path | None = None
     candidate_path: Path | None = None
     for mode in modes:
-        path = output_dir / _mode_filename(timestamp, model_id=model.model_id, mode=mode, rounds=rounds)
+        path = output_dir / _mode_filename(timestamp, model_id=model_label, mode=mode, rounds=rounds)
         records = _run_b1b_mode(
             runtime=runtime,
             backend=backend,
             model=model,
+            model_label=model_label,
             mode=mode,
             rounds=rounds,
             output_path=path,
@@ -842,7 +911,7 @@ def run_b1b_cache_on_no_regress(
         baseline_ledger=baseline_path,
         candidate_ledger=candidate_path,
     )
-    rollup_path = output_dir / _rollup_filename(timestamp, model_id=model.model_id)
+    rollup_path = output_dir / _rollup_filename(timestamp, model_id=model_label)
     rollup_path.parent.mkdir(parents=True, exist_ok=True)
     with rollup_path.open("w", encoding="utf-8") as stream:
         stream.write(json.dumps(rollup, sort_keys=True))
@@ -864,7 +933,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--backend", choices=("fake", "native"), default="fake")
     parser.add_argument("--model-a", default="model-a")
     parser.add_argument("--model-b", default="model-b")
-    parser.add_argument("--model", default=B1B_MODEL_ID)
+    parser.add_argument("--model", default=B1B_MODEL_PATH)
+    parser.add_argument("--model-label", default=B1B_MODEL_ID)
     parser.add_argument("--model-gb", type=float, default=1.0)
     parser.add_argument("--model-a-gb", type=float, default=1.0)
     parser.add_argument("--model-b-gb", type=float, default=1.0)
@@ -889,6 +959,7 @@ def main(argv: list[str] | None = None) -> int:
                 runtime=args.runtime,
                 backend=args.backend,
                 model=ModelSpec(args.model, args.model_gb),
+                model_label=args.model_label,
                 rounds=args.rounds,
                 output_dir=args.output or B1B_OUTPUT_DIR,
                 cache_mode=args.cache_mode,
