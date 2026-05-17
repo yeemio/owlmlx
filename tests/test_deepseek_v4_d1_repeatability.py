@@ -1024,6 +1024,207 @@ def test_d3_checkpoint_inspection_detects_mtp_candidate_keys(tmp_path):
     assert record["capability_conclusion"] == "mtp_checkpoint_candidate_present"
 
 
+def _write_d3_missing_inspection(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "d3.checkpoint_inspection.v1",
+                "record_type": "mtp_checkpoint_inspection",
+                "run_id": "d3-source",
+                "gate": "D3",
+                "runtime": "owlmlx",
+                "model_id": d1.MODEL_ID,
+                "inspection": {
+                    "missingReason": d1.D3_MTP_MISSING_REASON,
+                    "has_mtp_weight_candidates": False,
+                },
+                "capability_conclusion": "mtp_checkpoint_not_available",
+                "verdict": "passed",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_d3_candidate_inspection(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "d3.checkpoint_inspection.v1",
+                "record_type": "mtp_checkpoint_inspection",
+                "run_id": "d3-source-candidate",
+                "gate": "D3",
+                "runtime": "owlmlx",
+                "model_id": d1.MODEL_ID,
+                "inspection": {
+                    "missingReason": None,
+                    "has_mtp_weight_candidates": True,
+                },
+                "capability_conclusion": "mtp_checkpoint_candidate_present",
+                "verdict": "passed",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_d4_mtp_preload_reject_blocks_missing_checkpoint_before_load(tmp_path):
+    inspection_path = tmp_path / "d3-source.jsonl"
+    _write_d3_missing_inspection(inspection_path)
+    health_calls: list[str | None] = []
+
+    def fake_health(url: str | None) -> dict:
+        health_calls.append(url)
+        return {
+            "url": url,
+            "observed": True,
+            "ok": True,
+            "status_code": 200,
+            "body": {
+                "readiness": "degraded",
+                "active_model_id": None,
+                "model_count": 0,
+                "backend_error": None,
+                "persistent_child": True,
+            },
+        }
+
+    summary = d1.run_mtp_preload_reject(
+        output_dir=tmp_path,
+        run_id="d4-reject",
+        inspection_path=inspection_path,
+        runtime_health_url="http://health",
+        health_probe=fake_health,
+    )
+
+    records = _records(tmp_path / "d4-reject.jsonl")
+    assert health_calls == ["http://health", "http://health"]
+    assert summary["schema_version"] == "d4.preload_reject.run.v1"
+    assert summary["verdict"] == "passed"
+    assert summary["decision"] == "rejected_pre_load"
+    assert summary["reason_code"] == d1.D3_MTP_MISSING_REASON
+    assert summary["load_attempted"] is False
+    assert summary["child_process_started"] is False
+    assert summary["runtime_health_stable"] is True
+
+    record = records[0]
+    assert record["schema_version"] == "d4.preload_reject.v1"
+    assert record["gate"] == "D4"
+    assert record["requested_capability"] == "deepseek_v4_mtp"
+    assert record["source_inspection"]["output_path"] == str(inspection_path)
+    assert record["source_inspection"]["missingReason"] == d1.D3_MTP_MISSING_REASON
+    assert record["decision"] == "rejected_pre_load"
+    assert record["reason_code"] == d1.D3_MTP_MISSING_REASON
+    assert record["load_attempted"] is False
+    assert record["child_process_started"] is False
+    assert record["default_model_surface_changed"] is False
+    assert record["runtime_health"]["stable"] is True
+    assert record["verdict"] == "passed"
+
+
+def test_d4_mtp_preload_reject_does_not_touch_child_process(
+    monkeypatch,
+    tmp_path,
+):
+    inspection_path = tmp_path / "d3-source.jsonl"
+    _write_d3_missing_inspection(inspection_path)
+
+    def fail_popen(*args: object, **kwargs: object) -> object:
+        raise AssertionError("D4 pre-load reject must not spawn a child process")
+
+    monkeypatch.setattr(d1.subprocess, "Popen", fail_popen)
+
+    summary = d1.run_mtp_preload_reject(
+        output_dir=tmp_path,
+        run_id="d4-no-child",
+        inspection_path=inspection_path,
+        runtime_health_url=None,
+    )
+
+    record = _records(tmp_path / "d4-no-child.jsonl")[0]
+    assert summary["verdict"] == "passed"
+    assert summary["load_attempted"] is False
+    assert summary["child_process_started"] is False
+    assert record["runtime_health"]["required"] is False
+
+
+def test_d4_mtp_preload_reject_fails_if_health_changes(tmp_path):
+    inspection_path = tmp_path / "d3-source.jsonl"
+    _write_d3_missing_inspection(inspection_path)
+    responses = [
+        {
+            "url": "http://health",
+            "observed": True,
+            "ok": True,
+            "status_code": 200,
+            "body": {
+                "readiness": "degraded",
+                "active_model_id": None,
+                "model_count": 0,
+                "backend_error": None,
+                "persistent_child": True,
+            },
+        },
+        {
+            "url": "http://health",
+            "observed": True,
+            "ok": True,
+            "status_code": 200,
+            "body": {
+                "readiness": "ready",
+                "active_model_id": d1.MODEL_ID,
+                "model_count": 1,
+                "backend_error": None,
+                "persistent_child": True,
+            },
+        },
+    ]
+
+    summary = d1.run_mtp_preload_reject(
+        output_dir=tmp_path,
+        run_id="d4-health-changed",
+        inspection_path=inspection_path,
+        runtime_health_url="http://health",
+        health_probe=lambda url: responses.pop(0),
+    )
+
+    record = _records(tmp_path / "d4-health-changed.jsonl")[0]
+    assert summary["verdict"] == "failed"
+    assert summary["decision"] == "rejected_pre_load"
+    assert summary["reason_code"] == d1.D3_MTP_MISSING_REASON
+    assert summary["runtime_health_stable"] is False
+    assert record["load_attempted"] is False
+    assert record["child_process_started"] is False
+    assert record["runtime_health"]["stable"] is False
+
+
+def test_d4_mtp_preload_reject_fails_when_checkpoint_candidate_present(tmp_path):
+    inspection_path = tmp_path / "d3-candidate.jsonl"
+    _write_d3_candidate_inspection(inspection_path)
+
+    summary = d1.run_mtp_preload_reject(
+        output_dir=tmp_path,
+        run_id="d4-candidate",
+        inspection_path=inspection_path,
+        runtime_health_url=None,
+    )
+
+    record = _records(tmp_path / "d4-candidate.jsonl")[0]
+    assert summary["verdict"] == "failed"
+    assert summary["decision"] == "not_rejected"
+    assert summary["reason_code"] is None
+    assert record["source_inspection"]["capability_conclusion"] == (
+        "mtp_checkpoint_candidate_present"
+    )
+    assert record["source_inspection"]["missingReason"] is None
+    assert record["load_attempted"] is False
+    assert record["child_process_started"] is False
+
+
 def test_real_run_stream_timeout_writes_failed_row_and_skips_unload(
     monkeypatch,
     tmp_path,
@@ -1474,6 +1675,81 @@ def test_cli_checkpoint_inspect_forwards_paths(monkeypatch, tmp_path):
     assert captured["output_dir"] == tmp_path / "out"
     assert captured["model_path"] == tmp_path / "model"
     assert captured["adapter_path"] == tmp_path / "adapter"
+
+
+def test_cli_mtp_preload_reject_forwards_inputs(monkeypatch, tmp_path):
+    captured: dict[str, object] = {}
+
+    def fake_reject(**kwargs: object) -> dict:
+        captured.update(kwargs)
+        return {
+            "schema_version": "d4.preload_reject.run.v1",
+            "gate": "D4",
+            "runtime": "owlmlx",
+            "model_id": d1.MODEL_ID,
+            "verdict": "passed",
+        }
+
+    monkeypatch.setattr(d1, "run_mtp_preload_reject", fake_reject)
+
+    code = d1.main(
+        [
+            "mtp-preload-reject",
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--model-path",
+            str(tmp_path / "model"),
+            "--adapter-path",
+            str(tmp_path / "adapter"),
+            "--inspection-path",
+            str(tmp_path / "d3.jsonl"),
+            "--runtime-health-url",
+            "http://health",
+            "--run-id",
+            "d4-cli",
+        ]
+    )
+
+    assert code == 0
+    assert captured["run_id"] == "d4-cli"
+    assert captured["output_dir"] == tmp_path / "out"
+    assert captured["model_path"] == tmp_path / "model"
+    assert captured["adapter_path"] == tmp_path / "adapter"
+    assert captured["inspection_path"] == tmp_path / "d3.jsonl"
+    assert captured["runtime_health_url"] == "http://health"
+
+
+def test_cli_mtp_preload_reject_can_disable_runtime_health(monkeypatch, tmp_path):
+    captured: dict[str, object] = {}
+
+    def fake_reject(**kwargs: object) -> dict:
+        captured.update(kwargs)
+        return {
+            "schema_version": "d4.preload_reject.run.v1",
+            "gate": "D4",
+            "runtime": "owlmlx",
+            "model_id": d1.MODEL_ID,
+            "verdict": "passed",
+        }
+
+    monkeypatch.setattr(d1, "run_mtp_preload_reject", fake_reject)
+
+    code = d1.main(
+        [
+            "mtp-preload-reject",
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--inspection-path",
+            str(tmp_path / "d3.jsonl"),
+            "--no-runtime-health",
+            "--run-id",
+            "d4-cli-no-health",
+        ]
+    )
+
+    assert code == 0
+    assert captured["run_id"] == "d4-cli-no-health"
+    assert captured["runtime_health_url"] is None
 
 
 def test_cli_dry_run_exits_zero_and_writes_jsonl(tmp_path):

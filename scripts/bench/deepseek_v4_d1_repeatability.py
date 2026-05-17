@@ -15,6 +15,8 @@ import select
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -61,6 +63,16 @@ D3_DEFAULT_OUTPUT_DIR = (
     / "d3-checkpoint-inspection"
 )
 D3_MTP_MISSING_REASON = "mtp_weights_absent_or_stripped"
+D4_EVIDENCE_STRENGTH = "clean_preload_reject_with_health_probe"
+D4_DEFAULT_OUTPUT_DIR = (
+    REPO_ROOT
+    / "files"
+    / "evidence"
+    / "owlmlx"
+    / "deepseek-v4"
+    / "d4-preload-reject"
+)
+DEFAULT_RUNTIME_HEALTH_URL = "http://127.0.0.1:8066/healthz"
 RSS_SAMPLE_SCOPE = "child_process"
 RSS_SAMPLE_SOURCE = "ps_rss_kb"
 RSS_SAMPLE_TIMING = "after_generation_before_unload"
@@ -1367,6 +1379,46 @@ def _sample(values: list[str], *, limit: int = 12) -> list[str]:
     return values[:limit]
 
 
+def _health_probe(url: str | None, *, timeout_s: float = 2.0) -> dict[str, Any]:
+    if not url:
+        return {"url": None, "observed": False, "reason": "not_configured"}
+    try:
+        with urllib.request.urlopen(url, timeout=timeout_s) as response:
+            raw = response.read(65536).decode("utf-8", errors="replace")
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError:
+                payload = None
+            return {
+                "url": url,
+                "observed": True,
+                "ok": 200 <= int(response.status) < 300,
+                "status_code": int(response.status),
+                "body": payload if isinstance(payload, dict) else raw,
+            }
+    except (OSError, urllib.error.URLError) as exc:
+        return {
+            "url": url,
+            "observed": False,
+            "ok": False,
+            "error": str(exc),
+        }
+
+
+def _health_fingerprint(probe: dict[str, Any]) -> dict[str, Any]:
+    body = probe.get("body") if isinstance(probe.get("body"), dict) else {}
+    return {
+        "observed": bool(probe.get("observed")),
+        "ok": probe.get("ok"),
+        "status_code": probe.get("status_code"),
+        "readiness": body.get("readiness"),
+        "active_model_id": body.get("active_model_id"),
+        "model_count": body.get("model_count"),
+        "backend_error": body.get("backend_error"),
+        "persistent_child": body.get("persistent_child"),
+    }
+
+
 def _metric_from_prompt_map(
     metrics: dict[str, Any],
     key: str,
@@ -1761,6 +1813,124 @@ def run_mtp_checkpoint_inspection(
         "mtp_weight_status": mtp_weight_status,
         "missingReason": missing_reason,
         "capability_conclusion": payload["capability_conclusion"],
+        "verdict": verdict,
+    }
+
+
+def _inspection_from_path(path: str | Path | None) -> dict[str, Any] | None:
+    row = _read_first_jsonl_row(path)
+    return row if isinstance(row, dict) else None
+
+
+def _inspection_missing_reason(inspection: dict[str, Any]) -> str | None:
+    nested = inspection.get("inspection")
+    if isinstance(nested, dict) and nested.get("missingReason"):
+        return str(nested["missingReason"])
+    if inspection.get("missingReason"):
+        return str(inspection["missingReason"])
+    return None
+
+
+def run_mtp_preload_reject(
+    *,
+    output_dir: Path = D4_DEFAULT_OUTPUT_DIR,
+    model_path: Path = DEFAULT_MODEL_PATH,
+    adapter_path: Path = DEFAULT_DEEPSEEK_ADAPTER_PATH,
+    run_id: str | None = None,
+    inspection_path: Path | None = None,
+    runtime_health_url: str | None = DEFAULT_RUNTIME_HEALTH_URL,
+    inspection_func: Any = run_mtp_checkpoint_inspection,
+    health_probe: Any = _health_probe,
+) -> dict[str, Any]:
+    output_dir = Path(output_dir)
+    run_id = run_id or f"{_compact_stamp()}-d4-deepseek-v4-mtp-preload-reject"
+    output_path = output_dir / f"{run_id}.jsonl"
+
+    health_before = health_probe(runtime_health_url)
+    source_inspection = _inspection_from_path(inspection_path)
+    source_output_path = str(inspection_path) if inspection_path else None
+    if source_inspection is None:
+        source_summary = inspection_func(
+            output_dir=output_dir / "source-d3-inspection",
+            model_path=model_path,
+            adapter_path=adapter_path,
+            run_id=f"{run_id}-source-d3-inspection",
+        )
+        source_output_path = str(source_summary.get("output_path") or "")
+        source_inspection = _inspection_from_path(source_output_path) or {}
+    health_after = health_probe(runtime_health_url)
+
+    missing_reason = _inspection_missing_reason(source_inspection)
+    inspection_conclusion = source_inspection.get("capability_conclusion")
+    should_reject = (
+        missing_reason == D3_MTP_MISSING_REASON
+        or inspection_conclusion == "mtp_checkpoint_not_available"
+    )
+    decision = "rejected_pre_load" if should_reject else "not_rejected"
+    reason_code = missing_reason if should_reject else None
+    before_fingerprint = _health_fingerprint(health_before)
+    after_fingerprint = _health_fingerprint(health_after)
+    health_stable = before_fingerprint == after_fingerprint
+    health_required = runtime_health_url is not None
+    health_ok = (not health_required) or (
+        bool(health_before.get("observed"))
+        and bool(health_after.get("observed"))
+        and health_stable
+    )
+    reject_ok = decision == "rejected_pre_load" and reason_code == D3_MTP_MISSING_REASON
+    verdict = "passed" if reject_ok and health_ok else "failed"
+
+    payload = {
+        "schema_version": "d4.preload_reject.v1",
+        "record_type": "mtp_preload_reject",
+        "run_id": run_id,
+        "gate": "D4",
+        "runtime": "owlmlx",
+        "model_id": MODEL_ID,
+        "model_type": MODEL_TYPE,
+        "capability_label": "experimental_only",
+        "evidence_strength": D4_EVIDENCE_STRENGTH,
+        "created_at": _now_utc(),
+        "output_path": str(output_path),
+        "requested_capability": "deepseek_v4_mtp",
+        "source_inspection": {
+            "schema_version": source_inspection.get("schema_version"),
+            "run_id": source_inspection.get("run_id"),
+            "output_path": source_output_path,
+            "capability_conclusion": inspection_conclusion,
+            "missingReason": missing_reason,
+            "verdict": source_inspection.get("verdict"),
+        },
+        "decision": decision,
+        "reason_code": reason_code,
+        "load_attempted": False,
+        "child_process_started": False,
+        "default_model_surface_changed": False,
+        "runtime_health": {
+            "url": runtime_health_url,
+            "before": health_before,
+            "after": health_after,
+            "before_fingerprint": before_fingerprint,
+            "after_fingerprint": after_fingerprint,
+            "stable": health_stable,
+            "required": health_required,
+        },
+        "verdict": verdict,
+    }
+    _append_jsonl(output_path, [payload])
+    return {
+        "schema_version": "d4.preload_reject.run.v1",
+        "run_id": run_id,
+        "gate": "D4",
+        "runtime": "owlmlx",
+        "model_id": MODEL_ID,
+        "evidence_strength": D4_EVIDENCE_STRENGTH,
+        "output_path": str(output_path),
+        "decision": decision,
+        "reason_code": reason_code,
+        "load_attempted": False,
+        "child_process_started": False,
+        "runtime_health_stable": health_stable,
         "verdict": verdict,
     }
 
@@ -2266,6 +2436,20 @@ def _cmd_checkpoint_inspect(args: argparse.Namespace) -> int:
     return 0 if payload["verdict"] == "passed" else 1
 
 
+def _cmd_mtp_preload_reject(args: argparse.Namespace) -> int:
+    runtime_health_url = None if args.no_runtime_health else args.runtime_health_url
+    payload = run_mtp_preload_reject(
+        output_dir=args.output_dir,
+        model_path=args.model_path,
+        adapter_path=args.adapter_path,
+        run_id=args.run_id,
+        inspection_path=args.inspection_path,
+        runtime_health_url=runtime_health_url,
+    )
+    _json_print(payload)
+    return 0 if payload["verdict"] == "passed" else 1
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -2477,6 +2661,37 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="DeepSeek V4 adapter fork used for D1/D2 evidence.",
     )
     inspect.set_defaults(func=_cmd_checkpoint_inspect)
+
+    reject = sub.add_parser(
+        "mtp-preload-reject",
+        help="Record D4 clean pre-load rejection for unavailable DeepSeek MTP",
+    )
+    add_common(reject)
+    reject.add_argument("--output-dir", type=Path, default=D4_DEFAULT_OUTPUT_DIR)
+    reject.add_argument("--run-id", default=None)
+    reject.add_argument(
+        "--adapter-path",
+        type=Path,
+        default=DEFAULT_DEEPSEEK_ADAPTER_PATH,
+        help="DeepSeek V4 adapter fork used for D1/D2/D3 evidence.",
+    )
+    reject.add_argument(
+        "--inspection-path",
+        type=Path,
+        default=None,
+        help="Existing D3 checkpoint-inspection JSONL row to consume.",
+    )
+    reject.add_argument(
+        "--runtime-health-url",
+        default=DEFAULT_RUNTIME_HEALTH_URL,
+        help="Optional runtime health URL to probe before and after rejection.",
+    )
+    reject.add_argument(
+        "--no-runtime-health",
+        action="store_true",
+        help="Skip runtime health probing; use only for offline shape tests.",
+    )
+    reject.set_defaults(func=_cmd_mtp_preload_reject)
 
     return parser.parse_args(argv)
 
