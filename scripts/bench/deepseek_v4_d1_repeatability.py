@@ -77,6 +77,22 @@ def _json_print(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
+def _token_ladder_from_cli(
+    values: list[int] | list[list[int]] | None,
+    *,
+    default: tuple[int, ...],
+) -> tuple[int, ...]:
+    if values is None:
+        return default
+    tokens: list[int] = []
+    for value in values:
+        if isinstance(value, list):
+            tokens.extend(int(item) for item in value)
+        else:
+            tokens.append(int(value))
+    return tuple(tokens)
+
+
 def _append_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as stream:
@@ -1954,7 +1970,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
         run_id=args.run_id,
         max_prompts=args.max_prompts,
         prompt_ids=tuple(args.prompt_id or ()),
-        max_tokens_ladder=tuple(args.max_tokens),
+        max_tokens_ladder=_token_ladder_from_cli(
+            args.max_tokens,
+            default=TOKEN_LADDER,
+        ),
         generation_surface=args.generation_surface,
         prompt_surface=args.prompt_surface,
         continue_on_failure=args.continue_on_failure,
@@ -2008,7 +2027,10 @@ def _cmd_metrics(args: argparse.Namespace) -> int:
         run_id=args.run_id,
         max_prompts=args.max_prompts,
         prompt_ids=tuple(args.prompt_id or ()),
-        max_tokens_ladder=tuple(args.max_tokens),
+        max_tokens_ladder=_token_ladder_from_cli(
+            args.max_tokens,
+            default=(128,),
+        ),
         generation_overrides={
             "max_kv_size": args.max_kv_size,
             "kv_bits": args.kv_bits,
@@ -2075,7 +2097,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         "--max-tokens",
         type=int,
         nargs="+",
-        default=list(TOKEN_LADDER),
+        action="append",
+        default=None,
         help="Token ladder to execute; defaults to the full D1 ladder.",
     )
     run.add_argument("--timeout-s", type=float, default=600.0)
@@ -2189,8 +2212,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         "--max-tokens",
         type=int,
         nargs="+",
-        default=[128],
-        help="Metric token ladder; defaults to 128 for a light D2 smoke.",
+        action="append",
+        default=None,
+        help=(
+            "Metric token ladder; defaults to 128 for a light D2 smoke. "
+            "Accepts either '--max-tokens 128 512' or repeated flags."
+        ),
     )
     metrics.add_argument("--timeout-s", type=float, default=900.0)
     metrics.add_argument(

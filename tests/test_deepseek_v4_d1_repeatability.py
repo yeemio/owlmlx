@@ -1286,7 +1286,7 @@ def test_cli_metrics_sampler_overrides_are_forwarded(monkeypatch, tmp_path):
     def fake_metrics(**kwargs: object) -> dict:
         captured.update(kwargs)
         return {
-            "schema_version": "d2.metrics.run.v1",
+            "schema_version": "d2.metrics.run.v2",
             "gate": "D2",
             "runtime": "owlmlx",
             "model_id": d1.MODEL_ID,
@@ -1306,6 +1306,9 @@ def test_cli_metrics_sampler_overrides_are_forwarded(monkeypatch, tmp_path):
             "p1_short_cn",
             "--max-tokens",
             "128",
+            "512",
+            "--max-tokens",
+            "1024",
             "--max-kv-size",
             "2048",
             "--temp",
@@ -1320,7 +1323,7 @@ def test_cli_metrics_sampler_overrides_are_forwarded(monkeypatch, tmp_path):
     assert code == 0
     assert captured["run_id"] == "metrics-cli"
     assert captured["prompt_ids"] == ("p1_short_cn",)
-    assert captured["max_tokens_ladder"] == (128,)
+    assert captured["max_tokens_ladder"] == (128, 512, 1024)
     assert captured["prompt_surface"] == "messages"
     assert captured["generation_overrides"] == {
         "max_kv_size": 2048,
