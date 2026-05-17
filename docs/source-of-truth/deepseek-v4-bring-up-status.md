@@ -25,6 +25,11 @@ Observed status:
   completed with no child restart
 - full D1 ladder: blocked at `p1_short_cn` / `max_tokens=1024` by
   `repetition_flag=true`
+- direct-vs-runner diagnostic:
+  `20260517T-d1-p1-1024-direct-vs-runner.jsonl` classifies the blocker as
+  `adapter_or_artifact_likely`; direct `mlx_lm.generate` and
+  `owlmlx.runtime.mlx_lm_runner` produced the same completion hash and the same
+  repeated-window hash for p1/1024
 - lifecycle during the failed ladder remained clean:
   `restart_observed=false`, unload ok, backend health clean after unload
 - D1 evidence records now include prompt shape, completion preview/tail,
