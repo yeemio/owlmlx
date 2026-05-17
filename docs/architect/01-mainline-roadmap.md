@@ -24,17 +24,17 @@
 - `docs/architect/**` 仍是 **plan-grade / architecture intent**，不进入 `docs/source-of-truth/master-outline.md`，除非经 runtime evidence + §1a Promotion Gate 晋级。
 - Wave / Campaign 结束时必须反推刷新：主规划结论、对应 companion、README 阅读顺序；不得只在聊天或临时 plan 文件里留下新事实。
 
-当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。近期最关键闭环是 B-1 Session KV cache `supported` 四条 gate（B-1a 已过；B-1b design + harness 已落并通过 native N=1 smoke，真实 N=20 cache-off/cache-on 仍待跑；B-1c §1/§2 待闭环）；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`；Campaign D 的 D1 design + real runner 已落，isolated preflight + tiny real smoke 通过，但 full 5×prompt × token ladder 尚未跑。
+当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。近期最关键闭环是 B-1 Session KV cache `supported` 四条 gate（B-1a 已过；B-1b design + harness 已落并通过 native N=1 smoke，真实 N=20 cache-off/cache-on 仍待跑；B-1c §1/§2 待闭环）；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`；Campaign D 的 D1 design + real runner 已落，isolated preflight + tiny real smoke 通过；full D1 ladder 当前被 p1/1024 repetition 阻塞，但 load/unload/clean-health 通过。
 
 | 最新落点（2026-05-17） | 状态 | 证据边界 |
 |---|---|---|
 | B-1b design spec | landed | `docs/architect/design/B-1b-spec.md` |
 | B-1b cache reclaim gate harness | landed · fake both + native N=1 smoke verified | `scripts/bench/eviction_soak.py --gate b1b-cache-on-no-regress` 可写 cache-off / cache-on / rollup；native smoke 证明 stream path 打到 session KV；不等于真实 native N=20 |
-| D1 DeepSeek repeatability runner | real runner landed · tiny real smoke passed | persistent child `load -> generate -> unload -> ping -> shutdown`；1 prompt / 8 token smoke 通过；不等于 full D1 5×prompt × `{128,512,1024}` |
+| D1 DeepSeek repeatability runner | real runner landed · lifecycle clean · full gate blocked | persistent child `load -> generate -> unload -> ping -> shutdown`；1 prompt / 8 token smoke 通过；p1/1024 diagnostic shows repetition; load/unload/clean-health remain true |
 | H1 compat route split | landed | `server_routes_openai.py` 拆出 OpenAI / Anthropic compat routes |
 | Targeted tests | passed | D1 runner + runner params = 19 passed；subprocess backend = 64 passed；B-1b bench/session TTFT = 17 passed |
 
-下一条真实执行线二选一：**B-1b real native N=20 cache-off/cache-on**（优先关闭 B gate）或 **D1 full ladder**（5 prompts × `{128,512,1024}`）。二者不得共享同一 GPU-heavy host 窗口。
+下一条真实执行线二选一：**B-1b real native N=20 cache-off/cache-on**（优先关闭 B gate）或 **D1 repetition mitigation**（stop / prompt / KV-window policy before re-running full ladder）。二者不得共享同一 GPU-heavy host 窗口。
 
 ---
 
@@ -305,7 +305,7 @@
 - **目标**：DS4-Flash 2bit-DQ 从短烟测提升到"可重复验证 + clean health + load→generate→unload→clean health 全链"；**不**进入默认 model surface
 - **启动时点（决策 E3）**：D1 启动时点 = **Campaign B-1a 完成后**（host 进入 B-1b N=20 跑期间，DS4 隔离 venv 并行启动；不污染主 venv，主要竞争 CPU/GPU 时段）
 - **近期闭环（0–3 月，B-1a 完成后）**：
-  - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符。**当前状态**：design spec + real runner 已落；isolated preflight passed；1 prompt / 8 token tiny smoke passed（load_time_s ≈31.4，restart_observed=false，clean health=true）；full D1 ladder 仍是下一步
+  - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符。**当前状态**：design spec + real runner 已落；isolated preflight passed；1 prompt / 8 token tiny smoke passed（load_time_s ≈31.4，restart_observed=false，clean health=true）；full ladder reached p1/1024 then failed on `repetition_flag=true` while `restart_observed=false` and clean health remained true
   - D2：load time / TTFT / decode TPS / peak RSS / backend health 完整 ledger
   - D3：checkpoint MTP 权重检查；如缺失写 `missingReason=mtp_weights_absent_or_stripped`
   - D4：失败必须 clean pre-load reject，不污染 8066 runtime health
