@@ -24,7 +24,17 @@
 - `docs/architect/**` 仍是 **plan-grade / architecture intent**，不进入 `docs/source-of-truth/master-outline.md`，除非经 runtime evidence + §1a Promotion Gate 晋级。
 - Wave / Campaign 结束时必须反推刷新：主规划结论、对应 companion、README 阅读顺序；不得只在聊天或临时 plan 文件里留下新事实。
 
-当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。近期最关键闭环是 B-1 Session KV cache `supported` 四条 gate（B-1a 已过，B-1b + B-1c §1/§2 待闭环）；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`，H2/H3 等 B-1 相关 status surface 稳定后推进；Campaign D 前置条件随 B-1a closeout 已解除，但仍保持隔离 backend lane。
+当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。近期最关键闭环是 B-1 Session KV cache `supported` 四条 gate（B-1a 已过；B-1b design + harness 已落并通过 native N=1 smoke，真实 N=20 cache-off/cache-on 仍待跑；B-1c §1/§2 待闭环）；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`；Campaign D 的 D1 design + real runner 已落，isolated preflight + tiny real smoke 通过，但 full 5×prompt × token ladder 尚未跑。
+
+| 最新落点（2026-05-17） | 状态 | 证据边界 |
+|---|---|---|
+| B-1b design spec | landed | `docs/architect/design/B-1b-spec.md` |
+| B-1b cache reclaim gate harness | landed · fake both + native N=1 smoke verified | `scripts/bench/eviction_soak.py --gate b1b-cache-on-no-regress` 可写 cache-off / cache-on / rollup；native smoke 证明 stream path 打到 session KV；不等于真实 native N=20 |
+| D1 DeepSeek repeatability runner | real runner landed · tiny real smoke passed | persistent child `load -> generate -> unload -> ping -> shutdown`；1 prompt / 8 token smoke 通过；不等于 full D1 5×prompt × `{128,512,1024}` |
+| H1 compat route split | landed | `server_routes_openai.py` 拆出 OpenAI / Anthropic compat routes |
+| Targeted tests | passed | D1 runner + runner params = 19 passed；subprocess backend = 64 passed；B-1b bench/session TTFT = 17 passed |
+
+下一条真实执行线二选一：**B-1b real native N=20 cache-off/cache-on**（优先关闭 B gate）或 **D1 full ladder**（5 prompts × `{128,512,1024}`）。二者不得共享同一 GPU-heavy host 窗口。
 
 ---
 
@@ -225,6 +235,8 @@
 
 #### B-1b · `cache=on` × settle barrier 无回归
 
+- **状态**：design-grade spec 已落；code-grade harness 已落并通过 fake `both` + native N=1 smoke；真实 native N=20 尚未跑，不能把 `cache_on_no_regress` 写成 passed
+- **入口**：`uv run python scripts/bench/eviction_soak.py --gate b1b-cache-on-no-regress --backend native --rounds 20 --cache-mode both ...`
 - N=20 跑后 `failed_reclaim = 0`（**不**走 N=10 探针）
 - session KV 启用不在 unload 路径上引入 reclaim mismatch
 - reclaim-barrier-event/stats 分布与 cache=off 基线对齐（中位数 / p99 / failed 计数）
@@ -265,7 +277,7 @@
 - `B-1c · no_swap_soak_stability = passed`
 - `B-1c · soak_plus_swap_stability = passed`
 
-当前状态：**1/4 已过**（B-1a）；B-1b、B-1c §1、B-1c §2 仍是 supported 晋级前置。
+当前状态：**1/4 已过**（B-1a）；B-1b harness ready 且 native smoke 过，但真实 N=20 verdict 未产生；B-1c §1、B-1c §2 仍是 supported 晋级前置。
 
 加 §1a Promotion Gate + `extraction-inventory.md` §8 → session KV cache 行从 `experimental` 升 `supported`。
 
@@ -293,7 +305,7 @@
 - **目标**：DS4-Flash 2bit-DQ 从短烟测提升到"可重复验证 + clean health + load→generate→unload→clean health 全链"；**不**进入默认 model surface
 - **启动时点（决策 E3）**：D1 启动时点 = **Campaign B-1a 完成后**（host 进入 B-1b N=20 跑期间，DS4 隔离 venv 并行启动；不污染主 venv，主要竞争 CPU/GPU 时段）
 - **近期闭环（0–3 月，B-1a 完成后）**：
-  - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符
+  - D1：同 isolated runtime 连续 5 次 prompt 无重启；max_tokens 阶梯 (128/512/1024) coherence / 重复 / 停止符。**当前状态**：design spec + real runner 已落；isolated preflight passed；1 prompt / 8 token tiny smoke passed（load_time_s ≈31.4，restart_observed=false，clean health=true）；full D1 ladder 仍是下一步
   - D2：load time / TTFT / decode TPS / peak RSS / backend health 完整 ledger
   - D3：checkpoint MTP 权重检查；如缺失写 `missingReason=mtp_weights_absent_or_stripped`
   - D4：失败必须 clean pre-load reject，不污染 8066 runtime health
