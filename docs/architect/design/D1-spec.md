@@ -190,6 +190,11 @@ Default D1 execution stops on the first failed row. Diagnostic reruns may use
 failure; this improves attribution only and does **not** let the run pass unless
 every requested pair passes.
 
+Sampler diagnostics may vary `--temp`, `--top-p`, `--min-p`, or `--top-k` to
+localize repetition sensitivity. Such runs are diagnostic variants; the D1 pass
+claim remains tied to the declared default parameters unless the spec is updated
+first.
+
 ## 5. Harness Requirements
 
 Prefer extending the existing model-release-candidate tooling over adding a new

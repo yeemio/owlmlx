@@ -1070,6 +1070,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
             "kv_bits": args.kv_bits,
             "kv_group_size": args.kv_group_size,
             "temperature": args.temp,
+            "top_p": args.top_p,
+            "min_p": args.min_p,
+            "top_k": args.top_k,
             "stop": args.stop,
         },
         timeout_s=args.timeout_s,
@@ -1153,6 +1156,24 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         default=None,
     )
     run.add_argument("--temp", type=float, default=D1_GENERATION_DEFAULTS["temperature"])
+    run.add_argument(
+        "--top-p",
+        type=float,
+        default=None,
+        help="Optional sampler top_p forwarded to the isolated runner.",
+    )
+    run.add_argument(
+        "--min-p",
+        type=float,
+        default=None,
+        help="Optional sampler min_p forwarded to the isolated runner.",
+    )
+    run.add_argument(
+        "--top-k",
+        type=int,
+        default=None,
+        help="Optional sampler top_k forwarded to the isolated runner.",
+    )
     run.add_argument(
         "--stop",
         action="append",

@@ -644,6 +644,54 @@ def test_real_run_prompt_id_and_stop_strings_pass_through(monkeypatch, tmp_path)
     assert created[0].stdin.writes[1]["params"]["stop"] == ["<END>"]
 
 
+def test_cli_run_sampler_overrides_are_forwarded(monkeypatch, tmp_path):
+    captured: dict[str, object] = {}
+
+    def fake_run_real(**kwargs: object) -> dict:
+        captured.update(kwargs)
+        return {
+            "schema_version": "d1.run.v1",
+            "gate": "D1",
+            "runtime": "owlmlx",
+            "model_id": d1.MODEL_ID,
+            "verdict": "failed",
+        }
+
+    monkeypatch.setattr(d1, "run_real", fake_run_real)
+
+    code = d1.main(
+        [
+            "run",
+            "--output-dir",
+            str(tmp_path),
+            "--prompt-id",
+            "p1_short_cn",
+            "--max-tokens",
+            "1024",
+            "--temp",
+            "0.2",
+            "--top-p",
+            "0.9",
+            "--min-p",
+            "0.05",
+            "--top-k",
+            "40",
+        ]
+    )
+
+    assert code == 1
+    assert captured["generation_overrides"] == {
+        "max_kv_size": d1.D1_GENERATION_DEFAULTS["max_kv_size"],
+        "kv_bits": None,
+        "kv_group_size": None,
+        "temperature": 0.2,
+        "top_p": 0.9,
+        "min_p": 0.05,
+        "top_k": 40,
+        "stop": None,
+    }
+
+
 def test_cli_dry_run_exits_zero_and_writes_jsonl(tmp_path):
     code = d1.main(["dry-run", "--output-dir", str(tmp_path), "--run-id", "cli-dry"])
 
