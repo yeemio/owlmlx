@@ -7,6 +7,7 @@ from owlmlx.runtime.mlx_lm_runner import (
     _StopStringStreamFilter,
     _chat_template_kwargs_from_params,
     _prepare_generation_params,
+    _prepare_tokenizer_config,
     _prompt_from_messages,
     _stop_strings_from_params,
     _truncate_at_stop_strings,
@@ -88,6 +89,31 @@ def test_prepare_generation_params_removes_chat_template_kwargs() -> None:
     )
 
     assert prepared == {"max_tokens": 4}
+
+
+def test_prepare_tokenizer_config_builds_pretrained_config(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    transformers_module = types.ModuleType("transformers")
+
+    class FakePreTrainedConfig:
+        pass
+
+    transformers_module.PreTrainedConfig = FakePreTrainedConfig  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "transformers", transformers_module)
+
+    prepared = _prepare_tokenizer_config(
+        {
+            "pretrained_config": {
+                "max_position_embeddings": 1048576,
+                "model_type": "deepseek_v4",
+            },
+            "padding_side": "left",
+        }
+    )
+
+    assert prepared["padding_side"] == "left"
+    assert isinstance(prepared["config"], FakePreTrainedConfig)
+    assert prepared["config"].max_position_embeddings == 1048576
+    assert prepared["config"].model_type == "deepseek_v4"
 
 
 def test_stop_strings_from_params_normalizes_string_and_list() -> None:

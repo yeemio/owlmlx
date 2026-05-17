@@ -135,6 +135,28 @@ def _prepare_generation_params(params: dict[str, Any]) -> dict[str, Any]:
     return prepared
 
 
+def _prepare_tokenizer_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Adapt JSON-safe tokenizer config to ``transformers`` objects.
+
+    Some experimental model adapters are known to the local ``mlx_lm`` fork but
+    not to the installed ``transformers`` auto config mapping. The parent can
+    pass a JSON-safe ``pretrained_config`` block to avoid AutoTokenizer falling
+    back through an incompatible config path, without mutating the model files.
+    """
+
+    prepared = dict(config)
+    pretrained_config = prepared.pop("pretrained_config", None)
+    if isinstance(pretrained_config, dict):
+        from transformers import PreTrainedConfig  # noqa: PLC0415
+
+        config_obj = PreTrainedConfig()
+        for key, value in pretrained_config.items():
+            if isinstance(key, str) and key:
+                setattr(config_obj, key, value)
+        prepared["config"] = config_obj
+    return prepared
+
+
 def _fallback_prompt_from_messages(messages: list[dict[str, Any]]) -> str:
     return "\n".join(
         f"{str(message.get('role') or 'user')}: {str(message.get('content') or '')}"
@@ -194,6 +216,10 @@ def main() -> int:
         prompt = request.get("prompt", "")
         messages = list(request.get("messages") or [])
         params = dict(request.get("params") or {})
+        tokenizer_config = _prepare_tokenizer_config(
+            dict(request.get("tokenizer_config") or {})
+        )
+        model_config = dict(request.get("model_config") or {})
 
         try:
             if action == "load":
@@ -215,7 +241,11 @@ def main() -> int:
                 import mlx_lm  # noqa: PLC0415
 
                 with redirect_stdout(sys.stderr):
-                    model, tokenizer = mlx_lm.load(str(model_id))
+                    model, tokenizer = mlx_lm.load(
+                        str(model_id),
+                        tokenizer_config=tokenizer_config or None,
+                        model_config=model_config or None,
+                    )
                 current_model_id = str(model_id)
                 generation_count = 0
                 _emit(

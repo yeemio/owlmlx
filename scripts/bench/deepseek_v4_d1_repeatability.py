@@ -1,4 +1,4 @@
-"""D1 DeepSeek V4 isolated repeatability runner skeleton.
+"""D1 DeepSeek V4 isolated repeatability runner.
 
 This script is intentionally isolated from the stock owlmlx runtime. Preflight
 checks the caller-selected DeepSeek V4 Python environment and model path; dry-run
@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import select
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -27,6 +30,21 @@ MODEL_TYPE = "deepseek_v4"
 DEEPSEEK_V4_MODULE = "mlx_lm.models.deepseek_v4"
 TOKEN_LADDER = (128, 512, 1024)
 EVIDENCE_STRENGTH = "synthetic_dry_run_no_model_claim"
+REAL_EVIDENCE_STRENGTH = "isolated_real_child_process"
+D1_TOKENIZER_CONFIG = {
+    "pretrained_config": {
+        "max_position_embeddings": 1048576,
+        "model_type": MODEL_TYPE,
+    }
+}
+D1_GENERATION_DEFAULTS = {
+    "max_kv_size": 512,
+    "temperature": 0.0,
+}
+DEFAULT_OUTPUT_DIR = (
+    REPO_ROOT / "files" / "evidence" / "owlmlx" / "deepseek-v4" / "d1-isolated-repeatability"
+)
+RUNNER_MODULE = "owlmlx.runtime.mlx_lm_runner"
 
 PROMPTS = (
     ("p1_short_cn", "用两句话说明 owlmlx 的运行时边界。"),
@@ -55,6 +73,19 @@ def _append_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
         for row in rows:
             stream.write(json.dumps(row, sort_keys=True))
             stream.write("\n")
+
+
+def _runner_command(isolated_python: Path) -> list[str]:
+    return [str(isolated_python), "-m", RUNNER_MODULE]
+
+
+def _runner_env(*, base_env: dict[str, str] | None = None) -> dict[str, str]:
+    env = dict(os.environ if base_env is None else base_env)
+    existing = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(REPO_ROOT), *([existing] if existing else [])]
+    )
+    return env
 
 
 def _relative_runtime_path(path: Path) -> str:
@@ -290,6 +321,358 @@ def run_dry_run(
     }
 
 
+def _read_json_payload(proc: subprocess.Popen[str], *, timeout_s: float) -> dict[str, Any]:
+    stdout = proc.stdout
+    if stdout is None:
+        raise RuntimeError("child stdout pipe is unavailable")
+
+    deadline = time.monotonic() + timeout_s
+    discarded: list[str] = []
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("timed out waiting for child response")
+
+        try:
+            ready, _, _ = select.select([stdout], [], [], remaining)
+        except (OSError, ValueError, TypeError):
+            ready = [stdout]
+        if not ready:
+            raise TimeoutError("timed out waiting for child response")
+
+        line = stdout.readline()
+        if not line:
+            raise RuntimeError("child process produced no output")
+        text = line.strip()
+        if not text:
+            continue
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            discarded.append(text)
+            continue
+        if isinstance(payload, dict):
+            if discarded:
+                payload["_discarded_stdout"] = discarded[-5:]
+            return payload
+
+
+def _child_exchange(
+    proc: subprocess.Popen[str],
+    request: dict[str, Any],
+    *,
+    timeout_s: float,
+) -> dict[str, Any]:
+    if proc.poll() is not None:
+        raise RuntimeError(f"child process exited before request: {proc.returncode}")
+    if proc.stdin is None:
+        raise RuntimeError("child stdin pipe is unavailable")
+    proc.stdin.write(json.dumps(request, sort_keys=True) + "\n")
+    proc.stdin.flush()
+    return _read_json_payload(proc, timeout_s=timeout_s)
+
+
+def _looks_repetitive(text: str) -> bool:
+    normalized = " ".join(text.split())
+    if len(normalized) < 120:
+        return False
+    windows = [normalized[index : index + 40] for index in range(0, len(normalized), 40)]
+    counts = {window: windows.count(window) for window in windows if window}
+    return any(count >= 4 for count in counts.values())
+
+
+def _generation_params(*, max_tokens: int, overrides: dict[str, Any]) -> dict[str, Any]:
+    params = {**D1_GENERATION_DEFAULTS}
+    params.update(
+        {key: value for key, value in overrides.items() if value is not None}
+    )
+    params["max_tokens"] = int(max_tokens)
+    return params
+
+
+def _real_record(
+    *,
+    run_id: str,
+    output_path: Path,
+    isolated_runtime_path: Path,
+    isolated_python: Path,
+    model_path: Path,
+    prompt_index: int,
+    prompt_id: str,
+    max_tokens: int,
+    generation_params: dict[str, Any],
+    load_ok: bool,
+    unload_ok: bool,
+    clean_health_after_unload: bool,
+    load_time_s: float | None,
+    result: dict[str, Any],
+    load_pid: Any,
+) -> dict[str, Any]:
+    text = str(result.get("text") or "")
+    result_pid = result.get("pid")
+    restart_observed = (
+        load_pid is not None
+        and result_pid is not None
+        and str(result_pid) != str(load_pid)
+    )
+    ok = bool(result.get("ok")) and bool(text) and not restart_observed
+    repetition_flag = _looks_repetitive(text)
+
+    record = _base_record(
+        run_id=run_id,
+        output_path=output_path,
+        isolated_runtime_path=isolated_runtime_path,
+        isolated_python=isolated_python,
+        model_path=model_path,
+    )
+    record.update(
+        {
+            "record_type": "prompt_result",
+            "capability_label": "experimental_only",
+            "evidence_strength": REAL_EVIDENCE_STRENGTH,
+            "prompt_index": prompt_index,
+            "prompt_id": prompt_id,
+            "prompt_sha_hint": None,
+            "max_tokens": max_tokens,
+            "generation_params": generation_params,
+            "prompt_results": [
+                {
+                    "prompt_index": prompt_index,
+                    "prompt_id": prompt_id,
+                    "max_tokens": max_tokens,
+                    "ok": ok,
+                    "completion_chars": len(text),
+                    "stop_reason": str(result.get("finish_reason") or "unknown"),
+                    "restart_observed": restart_observed,
+                    "repetition_flag": repetition_flag,
+                    "child_pid": result_pid,
+                    "generation_count": result.get("generation_count"),
+                }
+            ],
+            "lifecycle": {
+                "preflight": "passed",
+                "load_ok": load_ok,
+                "generate_ok": bool(result.get("ok")),
+                "unload_ok": unload_ok,
+                "clean_health_after_unload": clean_health_after_unload,
+                "health_after_unload": (
+                    "clean" if clean_health_after_unload else "not_observed"
+                ),
+            },
+            "child_restart_detection": {
+                "method": "pid_stability_across_persistent_child_session",
+                "load_pid": load_pid,
+                "restart_observed": restart_observed,
+            },
+            "metrics": {
+                "load_time_s": load_time_s,
+                "ttft_ms_by_prompt": {},
+                "decode_tps_by_prompt": {},
+                "peak_rss_gb": None,
+            },
+            "verdict": "failed" if repetition_flag or not ok else "passed",
+        }
+    )
+    return record
+
+
+def run_real(
+    *,
+    output_dir: Path = DEFAULT_OUTPUT_DIR,
+    isolated_runtime_path: Path = DEFAULT_ISOLATED_RUNTIME_PATH,
+    isolated_python: Path = DEFAULT_ISOLATED_PYTHON,
+    model_path: Path = DEFAULT_MODEL_PATH,
+    run_id: str | None = None,
+    max_prompts: int | None = None,
+    max_tokens_ladder: tuple[int, ...] = TOKEN_LADDER,
+    generation_overrides: dict[str, Any] | None = None,
+    timeout_s: float = 600.0,
+    popen_factory: Any = subprocess.Popen,
+) -> dict[str, Any]:
+    preflight = run_preflight(
+        isolated_python=isolated_python,
+        model_path=model_path,
+        isolated_runtime_path=isolated_runtime_path,
+    )
+    if preflight["verdict"] != "passed":
+        return {
+            "schema_version": "d1.run.v1",
+            "gate": "D1",
+            "runtime": "owlmlx",
+            "model_id": MODEL_ID,
+            "preflight": preflight,
+            "verdict": "blocked",
+            "rows_written": 0,
+            "message": (
+                "real D1 execution is blocked by preflight; this runner does "
+                "not repair venvs, install dependencies, or fall back to stock .venv"
+            ),
+        }
+
+    output_dir = Path(output_dir)
+    run_id = run_id or f"{_compact_stamp()}-d1-deepseek-v4-real-run"
+    output_path = output_dir / f"{run_id}.jsonl"
+    prompt_slice = PROMPTS if max_prompts is None else PROMPTS[:max_prompts]
+    token_ladder = tuple(int(value) for value in max_tokens_ladder)
+    generation_overrides = dict(generation_overrides or {})
+    rows: list[dict[str, Any]] = []
+    load_ok = False
+    unload_ok = False
+    clean_health_after_unload = False
+    load_time_s: float | None = None
+    load_pid: Any = None
+    run_error: str | None = None
+    proc: subprocess.Popen[str] | None = None
+
+    try:
+        proc = popen_factory(
+            _runner_command(Path(isolated_python)),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+            cwd=str(REPO_ROOT),
+            env=_runner_env(),
+        )
+        load_started = time.monotonic()
+        load_result = _child_exchange(
+            proc,
+            {
+                "action": "load",
+                "model_id": str(model_path),
+                "tokenizer_config": D1_TOKENIZER_CONFIG,
+            },
+            timeout_s=timeout_s,
+        )
+        load_time_s = round(time.monotonic() - load_started, 4)
+        load_ok = bool(load_result.get("ok"))
+        load_pid = load_result.get("pid")
+        if not load_ok:
+            raise RuntimeError(str(load_result.get("error") or "load failed"))
+
+        for prompt_index, (prompt_id, prompt) in enumerate(prompt_slice, start=1):
+            for max_tokens in token_ladder:
+                generation_params = _generation_params(
+                    max_tokens=max_tokens,
+                    overrides=generation_overrides,
+                )
+                result = _child_exchange(
+                    proc,
+                    {
+                        "action": "generate",
+                        "model_id": str(model_path),
+                        "prompt": prompt,
+                        "params": generation_params,
+                    },
+                    timeout_s=timeout_s,
+                )
+                rows.append(
+                    _real_record(
+                        run_id=run_id,
+                        output_path=output_path,
+                        isolated_runtime_path=isolated_runtime_path,
+                        isolated_python=isolated_python,
+                        model_path=model_path,
+                        prompt_index=prompt_index,
+                        prompt_id=prompt_id,
+                        max_tokens=max_tokens,
+                        generation_params=generation_params,
+                        load_ok=load_ok,
+                        unload_ok=False,
+                        clean_health_after_unload=False,
+                        load_time_s=load_time_s,
+                        result=result,
+                        load_pid=load_pid,
+                    )
+                )
+                if rows[-1]["verdict"] != "passed":
+                    break
+            if rows and rows[-1]["verdict"] != "passed":
+                break
+
+        unload_result = _child_exchange(
+            proc,
+            {"action": "unload", "model_id": str(model_path)},
+            timeout_s=timeout_s,
+        )
+        unload_ok = bool(unload_result.get("ok"))
+        ping_result = _child_exchange(proc, {"action": "ping"}, timeout_s=timeout_s)
+        clean_health_after_unload = bool(ping_result.get("ok")) and (
+            ping_result.get("model_id") is None
+        )
+    except Exception as exc:
+        run_error = str(exc)
+        if proc is not None and proc.poll() is None and load_ok:
+            try:
+                unload_result = _child_exchange(
+                    proc,
+                    {"action": "unload", "model_id": str(model_path)},
+                    timeout_s=min(timeout_s, 30.0),
+                )
+                unload_ok = bool(unload_result.get("ok"))
+                ping_result = _child_exchange(
+                    proc,
+                    {"action": "ping"},
+                    timeout_s=min(timeout_s, 30.0),
+                )
+                clean_health_after_unload = bool(ping_result.get("ok")) and (
+                    ping_result.get("model_id") is None
+                )
+            except Exception as unload_exc:
+                run_error = f"{run_error}; unload_after_error={unload_exc}"
+    finally:
+        if proc is not None and proc.poll() is None:
+            try:
+                _child_exchange(proc, {"action": "shutdown"}, timeout_s=5.0)
+            except Exception:
+                pass
+            if proc.poll() is None:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+
+    for row in rows:
+        row["lifecycle"]["unload_ok"] = unload_ok
+        row["lifecycle"]["clean_health_after_unload"] = clean_health_after_unload
+        row["lifecycle"]["health_after_unload"] = (
+            "clean" if clean_health_after_unload else "not_observed"
+        )
+        if not unload_ok or not clean_health_after_unload:
+            row["verdict"] = "failed"
+
+    _append_jsonl(output_path, rows)
+    verdict = (
+        "passed"
+        if rows and all(row["verdict"] == "passed" for row in rows)
+        else "failed"
+    )
+    return {
+        "schema_version": "d1.run.v1",
+        "run_id": run_id,
+        "gate": "D1",
+        "runtime": "owlmlx",
+        "model_id": MODEL_ID,
+        "evidence_strength": REAL_EVIDENCE_STRENGTH,
+        "output_path": str(output_path),
+        "rows_written": len(rows),
+        "prompt_count": len(prompt_slice),
+        "token_ladder": list(token_ladder),
+        "tokenizer_config": D1_TOKENIZER_CONFIG,
+        "generation_defaults": D1_GENERATION_DEFAULTS,
+        "generation_overrides": generation_overrides,
+        "preflight": preflight,
+        "lifecycle": {
+            "load_ok": load_ok,
+            "unload_ok": unload_ok,
+            "clean_health_after_unload": clean_health_after_unload,
+        },
+        "verdict": verdict,
+        **({"error": run_error} if run_error else {}),
+    }
+
+
 def _cmd_preflight(args: argparse.Namespace) -> int:
     payload = run_preflight(
         isolated_python=args.isolated_python,
@@ -313,37 +696,24 @@ def _cmd_dry_run(args: argparse.Namespace) -> int:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
-    preflight = run_preflight(
+    payload = run_real(
+        output_dir=args.output_dir,
+        isolated_runtime_path=args.isolated_runtime_path,
         isolated_python=args.isolated_python,
         model_path=args.model_path,
-        isolated_runtime_path=args.isolated_runtime_path,
+        run_id=args.run_id,
+        max_prompts=args.max_prompts,
+        max_tokens_ladder=tuple(args.max_tokens),
+        generation_overrides={
+            "max_kv_size": args.max_kv_size,
+            "kv_bits": args.kv_bits,
+            "kv_group_size": args.kv_group_size,
+            "temperature": args.temp,
+        },
+        timeout_s=args.timeout_s,
     )
-    if preflight["verdict"] != "passed":
-        payload = {
-            "schema_version": "d1.run.v1",
-            "gate": "D1",
-            "runtime": "owlmlx",
-            "model_id": MODEL_ID,
-            "preflight": preflight,
-            "verdict": "blocked",
-            "message": (
-                "real D1 execution is blocked by preflight; this skeleton does "
-                "not repair venvs, install dependencies, or fall back to stock .venv"
-            ),
-        }
-        _json_print(payload)
-        return 1
-    payload = {
-        "schema_version": "d1.run.v1",
-        "gate": "D1",
-        "runtime": "owlmlx",
-        "model_id": MODEL_ID,
-        "preflight": preflight,
-        "verdict": "blocked",
-        "message": "real D1 generation is intentionally not implemented in this skeleton",
-    }
     _json_print(payload)
-    return 1
+    return 0 if payload["verdict"] == "passed" else 1
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -375,8 +745,32 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     fake.add_argument("--run-id", default=None)
     fake.set_defaults(func=_cmd_dry_run)
 
-    run = sub.add_parser("run", help="Real D1 entrypoint placeholder")
+    run = sub.add_parser("run", help="Run real isolated D1 load/generate/unload")
     add_common(run)
+    run.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    run.add_argument("--run-id", default=None)
+    run.add_argument(
+        "--max-prompts",
+        type=int,
+        default=None,
+        help="Optional smoke limiter; omit for the full D1 prompt set.",
+    )
+    run.add_argument(
+        "--max-tokens",
+        type=int,
+        nargs="+",
+        default=list(TOKEN_LADDER),
+        help="Token ladder to execute; defaults to the full D1 ladder.",
+    )
+    run.add_argument("--timeout-s", type=float, default=600.0)
+    run.add_argument("--max-kv-size", type=int, default=D1_GENERATION_DEFAULTS["max_kv_size"])
+    run.add_argument("--kv-bits", type=int, default=None)
+    run.add_argument(
+        "--kv-group-size",
+        type=int,
+        default=None,
+    )
+    run.add_argument("--temp", type=float, default=D1_GENERATION_DEFAULTS["temperature"])
     run.set_defaults(func=_cmd_run)
 
     return parser.parse_args(argv)
