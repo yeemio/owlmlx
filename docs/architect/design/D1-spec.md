@@ -56,7 +56,18 @@ The runner must record:
 ```yaml
 preflight:
   isolated_runtime_path: .runtime-deepseek-v4-mlx
-  mlx_lm_source: <path or commit>
+  mlx_lm_source:
+    origin: <module path>
+    package_version: <version or null>
+    git_root: <best-effort checkout root or null>
+    git_commit: <best-effort commit or null>
+    git_branch: <best-effort branch or null>
+    git_remote: <best-effort remote or null>
+  runtime_source:
+    mlx_lm: <same shape as mlx_lm_source>
+    deepseek_v4:
+      origin: <module path>
+      git_commit: <best-effort commit or null>
   model_path: <absolute path>
   model_type: deepseek_v4
   stock_runtime_untouched: true
@@ -65,6 +76,10 @@ preflight:
 
 If the isolated runtime is missing, D1 must fail as `blocked`, not silently fall
 back to the stock `.venv`.
+
+Preflight provenance is best-effort and non-mutating: missing git metadata does
+not fail preflight, but the module origin and package version should be recorded
+whenever import succeeds.
 
 ### 3.2 Prompt Set
 

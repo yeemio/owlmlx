@@ -182,6 +182,62 @@ def test_preflight_reports_missing_deepseek_v4_import_as_blocked(monkeypatch, tm
     assert "deepseek_v4_import_missing" in payload["blocked_reasons"]
 
 
+def test_preflight_reports_isolated_runtime_source(monkeypatch, tmp_path):
+    fake_python = tmp_path / "python"
+    fake_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    model_path = tmp_path / "DeepSeek-V4-Flash-2bit-DQ"
+    model_path.mkdir()
+    runtime_source = {
+        "mlx_lm": {
+            "module": "mlx_lm",
+            "origin": "/tmp/mlx-lm-dsv4/mlx_lm/__init__.py",
+            "package_version": "0.0.test",
+            "git_root": "/tmp/mlx-lm-dsv4",
+            "git_commit": "abc123",
+            "git_branch": "pc/add-deepseekv4flash-model",
+            "git_remote": "https://example.invalid/mlx-lm.git",
+        },
+        "deepseek_v4": {
+            "module": d1.DEEPSEEK_V4_MODULE,
+            "origin": "/tmp/mlx-lm-dsv4/mlx_lm/models/deepseek_v4.py",
+            "git_root": "/tmp/mlx-lm-dsv4",
+            "git_commit": "abc123",
+            "git_branch": "pc/add-deepseekv4flash-model",
+            "git_remote": "https://example.invalid/mlx-lm.git",
+        },
+    }
+
+    monkeypatch.setattr(
+        d1,
+        "_check_isolated_imports",
+        lambda python_path, timeout_s=20.0: {
+            "ok": True,
+            "returncode": 0,
+            "imports": {"mlx_lm": True, d1.DEEPSEEK_V4_MODULE: True},
+            "module_origins": {
+                "mlx_lm": runtime_source["mlx_lm"]["origin"],
+                d1.DEEPSEEK_V4_MODULE: runtime_source["deepseek_v4"]["origin"],
+            },
+            "package_versions": {"mlx-lm": "0.0.test"},
+            "runtime_source": runtime_source,
+            "stderr": "",
+        },
+    )
+
+    payload = d1.run_preflight(
+        isolated_python=fake_python,
+        model_path=model_path,
+        isolated_runtime_path=tmp_path / ".runtime-deepseek-v4-mlx",
+    )
+
+    assert payload["verdict"] == "passed"
+    assert payload["runtime_source"] == runtime_source
+    assert payload["mlx_lm_source"] == runtime_source["mlx_lm"]
+    assert payload["import_check"]["module_origins"][d1.DEEPSEEK_V4_MODULE].endswith(
+        "deepseek_v4.py"
+    )
+
+
 def test_dry_run_writes_15_d1_rows_with_honest_synthetic_labels(tmp_path):
     summary = d1.run_dry_run(output_dir=tmp_path, run_id="d1-test")
 

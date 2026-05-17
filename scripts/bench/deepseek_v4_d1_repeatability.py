@@ -97,17 +97,86 @@ def _relative_runtime_path(path: Path) -> str:
 
 
 def _check_isolated_imports(python_path: Path, timeout_s: float = 20.0) -> dict[str, Any]:
-    code = (
-        "import importlib.util, json\n"
-        "mods = ['mlx_lm', 'mlx_lm.models.deepseek_v4']\n"
-        "results = {}\n"
-        "for mod in mods:\n"
-        "    try:\n"
-        "        results[mod] = importlib.util.find_spec(mod) is not None\n"
-        "    except ModuleNotFoundError:\n"
-        "        results[mod] = False\n"
-        "print(json.dumps(results, sort_keys=True))\n"
-    )
+    code = f"""
+import importlib.metadata
+import importlib.util
+import json
+import pathlib
+import subprocess
+
+mods = {json.dumps(["mlx_lm", DEEPSEEK_V4_MODULE])}
+imports = {{}}
+module_origins = {{}}
+git_sources = {{}}
+
+
+def _git(cwd, args):
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(cwd), *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=1.5,
+        )
+    except Exception:
+        return None
+    value = proc.stdout.strip()
+    return value or None
+
+
+def _git_source(origin):
+    if not origin:
+        return {{}}
+    path = pathlib.Path(origin)
+    cwd = path.parent if path.suffix else path
+    root = _git(cwd, ["rev-parse", "--show-toplevel"])
+    if not root:
+        return {{}}
+    return {{
+        "git_root": root,
+        "git_commit": _git(root, ["rev-parse", "HEAD"]),
+        "git_branch": _git(root, ["rev-parse", "--abbrev-ref", "HEAD"]),
+        "git_remote": _git(root, ["config", "--get", "remote.origin.url"]),
+    }}
+
+
+for mod in mods:
+    try:
+        spec = importlib.util.find_spec(mod)
+    except ModuleNotFoundError:
+        spec = None
+    imports[mod] = spec is not None
+    origin = getattr(spec, "origin", None) if spec is not None else None
+    module_origins[mod] = origin
+    git_sources[mod] = _git_source(origin)
+
+try:
+    mlx_lm_version = importlib.metadata.version("mlx-lm")
+except importlib.metadata.PackageNotFoundError:
+    mlx_lm_version = None
+
+runtime_source = {{
+    "mlx_lm": {{
+        "module": "mlx_lm",
+        "origin": module_origins.get("mlx_lm"),
+        "package_version": mlx_lm_version,
+        **git_sources.get("mlx_lm", {{}}),
+    }},
+    "deepseek_v4": {{
+        "module": {json.dumps(DEEPSEEK_V4_MODULE)},
+        "origin": module_origins.get({json.dumps(DEEPSEEK_V4_MODULE)}),
+        **git_sources.get({json.dumps(DEEPSEEK_V4_MODULE)}, {{}}),
+    }},
+}}
+
+print(json.dumps({{
+    "imports": imports,
+    "module_origins": module_origins,
+    "package_versions": {{"mlx-lm": mlx_lm_version}},
+    "runtime_source": runtime_source,
+}}, sort_keys=True))
+"""
     try:
         proc = subprocess.run(
             [str(python_path), "-c", code],
@@ -121,6 +190,9 @@ def _check_isolated_imports(python_path: Path, timeout_s: float = 20.0) -> dict[
             "ok": False,
             "returncode": None,
             "imports": {},
+            "module_origins": {},
+            "package_versions": {},
+            "runtime_source": {},
             "stderr": str(exc),
         }
     except subprocess.TimeoutExpired as exc:
@@ -128,14 +200,35 @@ def _check_isolated_imports(python_path: Path, timeout_s: float = 20.0) -> dict[
             "ok": False,
             "returncode": None,
             "imports": {},
+            "module_origins": {},
+            "package_versions": {},
+            "runtime_source": {},
             "stderr": f"import preflight timed out after {exc.timeout}s",
         }
 
     imports: dict[str, bool] = {}
+    module_origins: dict[str, str | None] = {}
+    package_versions: dict[str, str | None] = {}
+    runtime_source: dict[str, Any] = {}
     if proc.stdout.strip():
         try:
             parsed = json.loads(proc.stdout.strip().splitlines()[-1])
-            imports = {str(key): bool(value) for key, value in parsed.items()}
+            if isinstance(parsed, dict) and "imports" in parsed:
+                imports = {
+                    str(key): bool(value)
+                    for key, value in dict(parsed.get("imports", {})).items()
+                }
+                module_origins = {
+                    str(key): value
+                    for key, value in dict(parsed.get("module_origins", {})).items()
+                }
+                package_versions = {
+                    str(key): value
+                    for key, value in dict(parsed.get("package_versions", {})).items()
+                }
+                runtime_source = dict(parsed.get("runtime_source", {}))
+            else:
+                imports = {str(key): bool(value) for key, value in parsed.items()}
         except json.JSONDecodeError:
             imports = {}
     return {
@@ -145,6 +238,9 @@ def _check_isolated_imports(python_path: Path, timeout_s: float = 20.0) -> dict[
         )),
         "returncode": proc.returncode,
         "imports": imports,
+        "module_origins": module_origins,
+        "package_versions": package_versions,
+        "runtime_source": runtime_source,
         "stderr": proc.stderr.strip(),
     }
 
@@ -189,6 +285,7 @@ def run_preflight(
         blocked_reasons.append("deepseek_v4_import_missing")
 
     verdict = "passed" if not blocked_reasons and import_check["ok"] else "blocked"
+    runtime_source = dict(import_check.get("runtime_source", {}))
     return {
         "schema_version": "d1.preflight.v1",
         "gate": "D1",
@@ -200,6 +297,8 @@ def run_preflight(
         "blocked_reasons": blocked_reasons,
         "checks": checks,
         "import_check": import_check,
+        "runtime_source": runtime_source,
+        "mlx_lm_source": dict(runtime_source.get("mlx_lm", {})),
         "isolation": {
             "isolated_runtime_path": _relative_runtime_path(isolated_runtime_path),
             "isolated_python": str(isolated_python),
