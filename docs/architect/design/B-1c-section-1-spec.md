@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 1 · Session KV cache no-swap soak
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: runner + interrupted rehearsal aggregation landed; real 24h native run pending
+> **Status**: runner + interrupted rehearsal aggregation landed; 4h native rehearsal clean but blocked; real 24h native run pending
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose

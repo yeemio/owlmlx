@@ -196,6 +196,7 @@
 
 - `scripts/bench/eviction_soak.py` 已从 placeholder 切到 owlmlx-first soak runner（commit `6b0c1bfd`），并已具备 B-1c §1 interrupted rehearsal aggregation
 - 2026-05-17 短 native rehearsal 暴露默认 60s TTL 会在 measurement 内触发 session cache expiration，从而造成 237–247MB active-memory 摆动；runner 已锁定 B-1c TTL，随后 121s native segment 记录 `max_drift_bytes=0`、`session_cache_expirations_total=0`、clean unload，但因 duration 不足仍正确保持 `blocked`
+- 2026-05-17 4h TTL-locked native rehearsal (`20260517T090114Z`) 记录 `measurement_duration_s=14401.581`、`measurement_samples=235`、短/中/长 prompt mix `79/78/78`、`max_drift_bytes=0`、session cache expiration/drop/reject 全 0、FATAL 0、unresolved reclaim barrier 0、cleanup unload OK、settle 后 active memory 28 bytes；因 required duration 仍为 24h，`no_swap_soak_stability=blocked`，不产生 supported graduation claim
 - 但 **无 24h+ 真实 soak 报告**——`active_memory` 漂移、`failed_reclaim`、watermark 跃迁、ledger 连续性等关键指标未公开
 
 **晋级 gate · 两段 48h+ 拆分（决策 D3 · 2026-05-16）**：
@@ -259,7 +260,7 @@
 |---|---|---|
 | **B-1a · 第二模型 / 第二形状** | ✅ | Gemma 4-31B-it 已复现 session KV warm TTFT 改善（2.246×，RuntimeKernel 路径）+ 非 cache 路径 N≥5 prompt 字节等价；§VI 4-gate G1 Cache Parity 已关闭 |
 | **B-1b · `cache=on` × settle barrier 无回归** | ✅ | Gemma 4-31B-it cache-off N=20 / cache-on N=20 passed；20/20 warm hits；`failed_reclaim=0`；cache=off 基线对齐 |
-| **B-1c §1 · 纯 soak（24h+）** | ❌ | runner 已落且 fake/schema smoke 不可毕业；仍缺无人为 swap 的 24h+ native 混合负载 soak；漂移 < `min(200 MB, 0.5% host budget)`；`no_swap_soak_stability = passed` |
+| **B-1c §1 · 纯 soak（24h+）** | ❌ | runner 已落且 fake/schema smoke 不可毕业；4h TTL-locked native rehearsal 干净但仍为 `blocked`；仍缺无人为 swap 的 24h+ native 混合负载 soak；漂移 < `min(200 MB, 0.5% host budget)`；`no_swap_soak_stability = passed` |
 | **B-1c §2 · soak + swap（24h+）** | ❌ | §1 通过后；每 4h × 6 次 swap；累积 `failed_reclaim = 0` + 漂移 < §1 阈值；`soak_plus_swap_stability = passed` |
 
 **四条全过** → §1a Promotion Gate → `experimental` 升 `supported`。当前 2/4 达成。

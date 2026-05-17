@@ -34,7 +34,7 @@
 |---|---|---|---|
 | **B-1a** | [`B-1a-spec.md`](B-1a-spec.md) | 已通过 · closeout 已落盘 | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign B-1a |
 | **B-1b** | [`B-1b-spec.md`](B-1b-spec.md) | 已通过 · native N=20 evidence 已落盘 | 同上 Campaign B-1b |
-| **B-1c §1** | [`B-1c-section-1-spec.md`](B-1c-section-1-spec.md) | runner + interrupted rehearsal aggregation 已落；short native rehearsal 证明 TTL 需锁定；24h native no-swap soak 待真实运行 | 同上 Campaign B-1c §1 |
+| **B-1c §1** | [`B-1c-section-1-spec.md`](B-1c-section-1-spec.md) | runner + interrupted rehearsal aggregation 已落；4h TTL-locked native rehearsal 干净但 blocked；24h native no-swap soak 待真实运行 | 同上 Campaign B-1c §1 |
 | **B-1c §2** | _pending_ | §1 通过后启动 | 同上 Campaign B-1c §2 |
 | **Wave H · H1** | code-grade landed: `server_routes_openai.py` | 已完成 · OpenAI/Anthropic compat routes 拆出 | 同上 Wave H |
 

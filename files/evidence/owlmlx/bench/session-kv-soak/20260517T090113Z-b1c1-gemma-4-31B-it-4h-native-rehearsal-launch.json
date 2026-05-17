@@ -1,0 +1,20 @@
+{
+  "schema_version": "b1c1.rehearsal.launch.v2",
+  "gate": "B-1c section 1",
+  "launch_method": "tmux",
+  "created_at_utc": "2026-05-17T09:01:13Z",
+  "stamp": "20260517T090113Z",
+  "tmux_session": "owlmlx-b1c1-4h-20260517T090113Z",
+  "script": "/tmp/20260517T090113Z-owlmlx-b1c1-4h.sh",
+  "log": "files/evidence/owlmlx/bench/session-kv-soak/20260517T090113Z-b1c1-gemma-4-31B-it-4h-native-rehearsal.log",
+  "exit_file": "files/evidence/owlmlx/bench/session-kv-soak/20260517T090113Z-b1c1-gemma-4-31B-it-4h-native-rehearsal.exit",
+  "output_dir": "files/evidence/owlmlx/bench/session-kv-soak",
+  "rehearsal_group_id": "b1c1-native-4h-rehearsal-20260517",
+  "rehearsal_segment_id": "20260517T090113Z-b1c1-native-4h-segment-ttl-locked",
+  "model": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+  "duration_s": 14400,
+  "required_duration_s": 86400,
+  "sample_interval_s": 60,
+  "session_cache_ttl_s": 90000,
+  "expected_conclusion": "blocked_until_24h_continuous_run"
+}
