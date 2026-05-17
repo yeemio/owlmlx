@@ -217,7 +217,7 @@ def test_b1b_rollup_blocks_without_both_required_ledgers(tmp_path):
     assert summary["ok"] is False
 
 
-def test_b1c1_fake_no_swap_soak_writes_gap_free_ledger_and_rollup(tmp_path):
+def test_b1c1_fake_no_swap_soak_writes_gap_free_blocked_ledger_and_rollup(tmp_path):
     summary = eviction_soak.run_b1c1_no_swap_soak(
         runtime="owlmlx",
         backend="fake",
@@ -230,15 +230,19 @@ def test_b1c1_fake_no_swap_soak_writes_gap_free_ledger_and_rollup(tmp_path):
         max_samples=6,
     )
 
-    assert summary["ok"] is True
-    assert summary["no_swap_soak_stability"] == "passed"
-    assert summary["graduates"]["unblock_B_1c_section_2"] is True
+    assert summary["ok"] is False
+    assert summary["no_swap_soak_stability"] == "blocked"
+    assert summary["graduates"]["unblock_B_1c_section_2"] is False
     assert summary["samples"] == 6
     assert summary["warmup_samples"] == 3
     assert summary["measurement_samples"] == 3
     assert summary["ledger_gap_free"] is True
+    assert summary["warmup_cycle_complete"] is True
     assert summary["session_mix_complete"] is True
     assert summary["session_mix_balanced"] is True
+    assert summary["claimable_24h_duration"] is False
+    assert summary["allocator_truth_claimable"] is False
+    assert summary["hard_failure"] is False
     assert summary["prompt_mix_counts"] == {"short": 1, "medium": 1, "long": 1}
     assert summary["fatal_watermark_count"] == 0
     assert summary["failure_measurement_count"] == 0
@@ -265,7 +269,7 @@ def test_b1c1_fake_no_swap_soak_writes_gap_free_ledger_and_rollup(tmp_path):
         record["config"]["session_id"].startswith("b1c1-no-swap-")
         for record in ledger
     )
-    assert rollup[0]["no_swap_soak_stability"] == "passed"
+    assert rollup[0]["no_swap_soak_stability"] == "blocked"
 
 
 def test_b1c1_short_run_blocks_instead_of_claiming_24h_soak(tmp_path):
@@ -300,5 +304,55 @@ def test_b1c1_duration_clock_starts_after_warmup(tmp_path):
     assert summary["warmup_samples"] == 3
     assert summary["measurement_samples"] == 1
     assert summary["duration_requirement_met"] is True
+    assert summary["claimable_24h_duration"] is False
     assert summary["session_mix_complete"] is False
     assert summary["ok"] is False
+
+
+def test_b1c1_warmup_cycle_is_required_for_graduation(tmp_path):
+    summary = eviction_soak.run_b1c1_no_swap_soak(
+        runtime="owlmlx",
+        backend="fake",
+        model=eviction_soak.ModelSpec("gemma-4-31B-it", 1.0),
+        output_dir=tmp_path,
+        duration_s=0.0,
+        required_duration_s=0.0,
+        sample_interval_s=0.0,
+        max_samples=3,
+        warmup_cycles=0,
+    )
+
+    assert summary["warmup_samples"] == 0
+    assert summary["measurement_samples"] == 3
+    assert summary["warmup_cycle_complete"] is False
+    assert summary["session_mix_complete"] is True
+    assert summary["no_swap_soak_stability"] == "blocked"
+    assert summary["graduates"]["unblock_B_1c_section_2"] is False
+
+
+def test_b1c1_generation_failure_is_failed_not_blocked(monkeypatch, tmp_path):
+    async def failed_generation(*args, **kwargs):
+        return eviction_soak.StreamGenerationResult(
+            ok=False,
+            message="synthetic failure",
+            error_code=eviction_soak.RuntimeErrorCode.backend_error,
+            model_id="gemma-4-31B-it",
+        )
+
+    monkeypatch.setattr(eviction_soak, "_stream_generate_once", failed_generation)
+
+    summary = eviction_soak.run_b1c1_no_swap_soak(
+        runtime="owlmlx",
+        backend="fake",
+        model=eviction_soak.ModelSpec("gemma-4-31B-it", 1.0),
+        output_dir=tmp_path,
+        duration_s=0.0,
+        required_duration_s=24 * 60 * 60,
+        sample_interval_s=0.0,
+        max_samples=6,
+    )
+
+    assert summary["samples"] == 1
+    assert summary["hard_failure"] is True
+    assert summary["no_swap_soak_stability"] == "failed"
+    assert summary["graduates"]["unblock_B_1c_section_2"] is False

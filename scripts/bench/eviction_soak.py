@@ -1002,6 +1002,7 @@ def _b1c1_rollup(
     records: list[dict[str, Any]],
     started_monotonic_s: float,
     measurement_started_monotonic_s: float | None,
+    measurement_finished_monotonic_s: float | None,
     required_duration_s: float,
     drift_budget_bytes: int,
     load: Any,
@@ -1010,8 +1011,9 @@ def _b1c1_rollup(
 ) -> dict[str, Any]:
     total_duration_s = round(time.monotonic() - started_monotonic_s, 3)
     measurement_duration_s = (
-        round(time.monotonic() - measurement_started_monotonic_s, 3)
+        round(measurement_finished_monotonic_s - measurement_started_monotonic_s, 3)
         if measurement_started_monotonic_s is not None
+        and measurement_finished_monotonic_s is not None
         else 0.0
     )
     measurement_records = [
@@ -1026,6 +1028,11 @@ def _b1c1_rollup(
         )
         for prompt_id, _prompt in B1C1_PROMPTS
     }
+    warmup_mix_counts = {
+        prompt_id: sum(1 for record in warmup_records if record.get("prompt_id") == prompt_id)
+        for prompt_id, _prompt in B1C1_PROMPTS
+    }
+    warmup_cycle_complete = all(value > 0 for value in warmup_mix_counts.values())
     mix_values = list(prompt_mix_counts.values())
     session_mix_complete = bool(mix_values) and all(value > 0 for value in mix_values)
     session_mix_balanced = bool(mix_values) and max(mix_values) - min(mix_values) <= 1
@@ -1059,14 +1066,35 @@ def _b1c1_rollup(
         final_reclaim_summary.get("unresolved_event_count", 0) or 0
     )
     duration_requirement_met = measurement_duration_s >= required_duration_s
+    claimable_24h_duration = (
+        required_duration_s >= float(B1C1_DURATION_S) and duration_requirement_met
+    )
+    allocator_truth_claimable = (
+        backend == "native" and measurement_mode == MlxMemorySampler.measurement_mode
+    )
     operations_ok = bool(load.ok) and all(
         record.get("sample_verdict") == "passed" for record in records
     )
     drift_ok = max_drift_bytes is not None and max_drift_bytes <= drift_budget_bytes
     cleanup_ok = bool(cleanup_unload.ok) if cleanup_unload is not None else not bool(load.ok)
+    hard_failure = (
+        bool(records)
+        and (
+            not operations_ok
+            or (max_drift_bytes is not None and not drift_ok)
+            or fatal_watermark_count > 0
+            or drops_total > 0
+            or rejects_total > 0
+            or failure_measurement_count > 0
+            or unresolved_reclaim_barrier_events > 0
+            or not cleanup_ok
+        )
+    )
     ok = (
         bool(measurement_records)
-        and duration_requirement_met
+        and claimable_24h_duration
+        and allocator_truth_claimable
+        and warmup_cycle_complete
         and ledger_gap_free
         and session_mix_complete
         and session_mix_balanced
@@ -1081,10 +1109,10 @@ def _b1c1_rollup(
     )
     if ok:
         conclusion = "passed"
-    elif not records or not duration_requirement_met:
-        conclusion = "blocked"
-    else:
+    elif hard_failure:
         conclusion = "failed"
+    else:
+        conclusion = "blocked"
     return {
         "schema_version": "b1c1.v1",
         "gate": "B-1c section 1",
@@ -1107,9 +1135,14 @@ def _b1c1_rollup(
         "warmup_samples": len(warmup_records),
         "measurement_samples": len(measurement_records),
         "ledger_gap_free": ledger_gap_free,
+        "warmup_mix_counts": warmup_mix_counts,
+        "warmup_cycle_complete": warmup_cycle_complete,
         "prompt_mix_counts": prompt_mix_counts,
         "session_mix_complete": session_mix_complete,
         "session_mix_balanced": session_mix_balanced,
+        "claimable_24h_duration": claimable_24h_duration,
+        "allocator_truth_claimable": allocator_truth_claimable,
+        "hard_failure": hard_failure,
         "max_drift_bytes": max_drift_bytes,
         "drift_budget_bytes": drift_budget_bytes,
         "max_drift_within_budget": drift_ok,
@@ -1189,6 +1222,7 @@ def run_b1c1_no_swap_soak(
         records: list[dict[str, Any]] = []
         started_monotonic_s = time.monotonic()
         measurement_started_monotonic_s: float | None = None
+        measurement_finished_monotonic_s: float | None = None
         warmup_sample_count = warmup_cycles * len(B1C1_PROMPTS)
         load = kernel.load_model(model.model_id, memory_gb=model.memory_gb)
         first_sample_bytes: int | None = None
@@ -1339,6 +1373,8 @@ def run_b1c1_no_swap_soak(
                     records.append(record)
                     stream.write(json.dumps(record, sort_keys=True))
                     stream.write("\n")
+                    if phase == "measurement":
+                        measurement_finished_monotonic_s = time.monotonic()
                     if sample_verdict != "passed":
                         break
                     if max_samples is None:
@@ -1378,6 +1414,7 @@ def run_b1c1_no_swap_soak(
         records=records,
         started_monotonic_s=started_monotonic_s,
         measurement_started_monotonic_s=measurement_started_monotonic_s,
+        measurement_finished_monotonic_s=measurement_finished_monotonic_s,
         required_duration_s=required_duration_s,
         drift_budget_bytes=drift_budget_bytes,
         load=load,

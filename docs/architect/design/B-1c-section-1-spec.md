@@ -88,6 +88,7 @@ Each record carries a `phase`:
   not the drift baseline.
 - `measurement`: the actual soak window. `measurement_duration_s` and
   `drift_from_measurement_start_bytes` are computed from this phase only.
+  Cleanup unload / settle time must not extend the measured soak duration.
 
 Rollup conclusion field:
 
@@ -100,8 +101,13 @@ no_swap_soak_stability: passed | failed | blocked
 `no_swap_soak_stability = passed` requires all of:
 
 - `duration_requirement_met = true`
+- `claimable_24h_duration = true`: `required_duration_s >= 86400` and the
+  measurement phase met that requirement
+- `allocator_truth_claimable = true`: native backend with
+  `measurement_mode = mlx_core_active_memory`
 - `ledger_gap_free = true`
-- at least one full warmup cycle completed
+- `warmup_cycle_complete = true`: short / medium / long each appear at least
+  once in the warmup phase
 - measurement samples exist
 - `session_mix_complete = true`: short / medium / long each appear at least
   once in the measurement phase
@@ -118,12 +124,17 @@ no_swap_soak_stability: passed | failed | blocked
 If the runner completes but the required duration is shorter than 24h, the
 conclusion must be `blocked`, not `passed`.
 
+Fake/schema runs and non-native measurement modes may validate ledger shape, but
+must not graduate `no_swap_soak_stability` or unblock section 2.
+
 ## 6. Failure Semantics
 
 | Condition | Verdict | Meaning |
 |---|---|---|
 | Short smoke / schema run | `blocked` | Useful for harness validation only |
+| Native run shorter than 24h | `blocked` | Useful for rehearsal only |
 | Generation, watermark, or reclaim failure during 24h | `failed` | Section 1 failed; preserve raw ledger |
+| Generation, watermark, reclaim, cache drop/reject, or cleanup failure before 24h completes | `failed` | Hard failures are failures, not duration blocks |
 | Final cleanup unload fails | `failed` | Soak cannot claim clean lifecycle |
 | Section 1 passed but section 2 later fails | section 1 remains `passed` | Supported promotion still blocked |
 
