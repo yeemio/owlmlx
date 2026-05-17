@@ -1,0 +1,88 @@
+{
+  "evidence_strength": "isolated_real_stream_metrics",
+  "gate": "D2",
+  "generation_surface": "stream",
+  "metric_summary": {
+    "child_rss_gb": {
+      "count": 6,
+      "max": 7.299026,
+      "min": 7.171768,
+      "p50": 7.214432
+    },
+    "decode_tps_after_first_token": {
+      "count": 6,
+      "max": 40.2916,
+      "min": 36.0996,
+      "p50": 38.17885
+    },
+    "ttft_ms": {
+      "count": 6,
+      "max": 45034.106,
+      "min": 217.914,
+      "p50": 593.84
+    }
+  },
+  "missing_metrics": [],
+  "model_id": "DeepSeek-V4-Flash-2bit-DQ",
+  "output_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/20260517T-d2-p1-p2-p4-128-512-metrics-v2.jsonl",
+  "passed_rows": 6,
+  "prompt_surface": "messages",
+  "rows_written": 6,
+  "run_id": "20260517T-d2-p1-p2-p4-128-512-metrics-v2",
+  "runtime": "owlmlx",
+  "schema_version": "d2.metrics.run.v2",
+  "source_output_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/source-d1-stream/20260517T-d2-p1-p2-p4-128-512-metrics-v2-source-d1-stream.jsonl",
+  "source_summary": {
+    "coverage": {
+      "completed_generation_count": 6,
+      "completed_prompt_ids": [
+        "p1_short_cn",
+        "p2_short_en",
+        "p4_long_context"
+      ],
+      "expected_generation_count": 6,
+      "failed_pairs": [],
+      "full_ladder_completed": true,
+      "missing_pairs": [],
+      "passed_generation_count": 6,
+      "prompt_token_matrix": {
+        "p1_short_cn": {
+          "128": "passed",
+          "512": "passed"
+        },
+        "p2_short_en": {
+          "128": "passed",
+          "512": "passed"
+        },
+        "p4_long_context": {
+          "128": "passed",
+          "512": "passed"
+        }
+      },
+      "requested_prompt_ids": [
+        "p1_short_cn",
+        "p2_short_en",
+        "p4_long_context"
+      ],
+      "requested_token_ladder": [
+        128,
+        512
+      ]
+    },
+    "lifecycle": {
+      "clean_health_after_unload": true,
+      "load_ok": true,
+      "unload_ok": true
+    },
+    "rows_written": 6,
+    "run_id": "20260517T-d2-p1-p2-p4-128-512-metrics-v2-source-d1-stream",
+    "schema_version": "d1.run.v1",
+    "verdict": "passed"
+  },
+  "summary_output_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/20260517T-d2-p1-p2-p4-128-512-metrics-v2.summary.json",
+  "token_ladder": [
+    128,
+    512
+  ],
+  "verdict": "passed"
+}

@@ -50,16 +50,18 @@ This keeps DeepSeek V4 at `experimental_only`. It does not make
 adopt `ds4.c`, and does not claim supported DeepSeek V4 serving. It closes D1
 only for the isolated experimental lane and unlocks D2 metrics-ledger work.
 
-**D2 follow-up status:** the `metrics` subcommand now has real p1/128 ledger
-coverage after replacing blocking child stdout `readline()` handling with
-fd-buffered reads. `20260517T-d2-p1-128-metrics-fd-reader.jsonl` records
-`load_time_s=15.6564`, `ttft_ms=30226.211`,
-`decode_tps_after_first_token=32.3922`, `child_rss_gb=12.426376`,
-`rss_sample_scope=child_process`, `rss_sample_source=ps_rss_kb`,
-`rss_sample_timing=after_generation_before_unload`, and clean load / generate /
-unload / health. Treat this as a first metrics smoke pass, not as a full D2
-ladder completion or supported DeepSeek serving claim. This child-process RSS
-sample is not comparable to the earlier 96.574 GB short-smoke peak-memory note.
+**D2 follow-up status:** the `metrics` subcommand now has p1/p2/p4 × 128/512
+ledger coverage after replacing blocking child stdout `readline()` handling
+with fd-buffered reads.
+`20260517T-d2-p1-p2-p4-128-512-metrics-v2.jsonl` records 6/6 passed rows,
+`missing_metrics=[]`, `rss_sample_scope=child_process`,
+`rss_sample_source=ps_rss_kb`, `rss_sample_timing=after_generation_before_unload`,
+and clean load / generate / unload / health. The run summary records
+`ttft_ms.p50=593.840`, `decode_tps_after_first_token.p50=38.17885`, and
+`child_rss_gb.p50=7.214432`. Treat this as the D2 ladder pass for the isolated
+experimental lane, not as a supported DeepSeek serving claim. This
+child-process RSS sample is not comparable to the earlier 96.574 GB short-smoke
+peak-memory note.
 
 **2026-05-11: Lifecycle complete via intermediate path.**
 

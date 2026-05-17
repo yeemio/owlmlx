@@ -310,6 +310,17 @@ Current D1 boundary: D1 is passed for the isolated DeepSeek experimental lane
 under the adopted `messages` / chat-template prompt policy. Raw prompt remains
 documented as a diagnostic failure and does not define the D1 gate.
 
+#### D2 metrics ladder（2026-05-17）
+
+> 出处：`files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/`
+
+| Run | 参数 | 结果 | 关键观察 |
+|---|---|---|---|
+| `20260517T-d2-p1-p2-p4-128-512-metrics-v2.jsonl` | p1/p2/p4 · 128/512 · `messages` / `stream_generate_messages` | passed | 6/6 rows passed；`missing_metrics=[]`；TTFT p50 593.840ms；decode p50 38.17885 tok/s after first token；child RSS p50 7.214432GB |
+
+Current D2 boundary: D2 is passed for this isolated experimental ladder, but it
+does not make DeepSeek V4 supported or visible on the default model surface.
+
 ### 5.8 Gemma 4 MTP drafter probe（附录数据）
 
 > 出处：`docs/source-of-truth/gemma4-mtp-drafter-probe-20260506.md`

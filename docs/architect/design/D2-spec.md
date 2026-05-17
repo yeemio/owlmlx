@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign D2 · DeepSeek V4 Flash isolated metrics ledger
 > **Plan-grade source**: [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D
-> **Status**: p1/128 metrics smoke passed after fd-buffered stdout reader fix · 2026-05-17
+> **Status**: p1/p2/p4 × 128/512 metrics ladder passed after fd-buffered stdout reader fix · 2026-05-17
 > **Prerequisite**: D1 passed under the adopted `messages` / chat-template prompt policy.
 > **Non-goal**: this spec does not claim `owlmlx supports DeepSeek V4`.
 
@@ -145,15 +145,18 @@ Evidence:
 | File | Verdict | Key metrics |
 |---|---|---|
 | `files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/20260517T-d2-p1-128-metrics-fd-reader.jsonl` | passed | load 15.656s · TTFT 30226ms · decode 32.392 tok/s after first token · child RSS sample 12.426GB (legacy v1 field name `peak_rss_gb`; not peak or aggregate) · clean unload |
+| `files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/20260517T-d2-p1-p2-p4-128-512-metrics-v2.jsonl` | passed | 6/6 rows passed · p1/p2/p4 × 128/512 · TTFT p50 593.840ms · decode p50 38.17885 tok/s after first token · child RSS p50 7.214432GB · clean unload |
 
-This is a first metrics smoke pass, not a full D2 ladder completion.
+The first row remains useful as the fd-reader smoke proof. The second row set is
+the current D2 ladder evidence for the isolated experimental lane.
 
 ## 6. Next Debug Slice
 
-The next code-grade slice should expand the D2 ladder without changing the
-experimental-only label:
+The next code-grade slice should either expand D2 to a second DeepSeek variant /
+longer output tier, or move to D3 checkpoint / MTP inspection. Keep the
+experimental-only label until the broader Campaign D exit criteria pass:
 
-1. run at least p1/p2/p4 across `max_tokens` 128 / 512,
-2. preserve `messages` / `stream_generate_messages`,
-3. record min / p50 / max for TTFT, decode TPS, and `child_rss_gb` when multiple rows exist,
-4. keep raw prompt stream rows diagnostic-only.
+1. preserve `messages` / `stream_generate_messages`,
+2. keep raw prompt stream rows diagnostic-only,
+3. keep child RSS scoped as a point-in-time child-process sample,
+4. do not register DeepSeek V4 on the default model surface.
