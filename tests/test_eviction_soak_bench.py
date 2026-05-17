@@ -237,6 +237,7 @@ def test_b1c1_fake_no_swap_soak_writes_gap_free_ledger_and_rollup(tmp_path):
     assert summary["warmup_samples"] == 3
     assert summary["measurement_samples"] == 3
     assert summary["ledger_gap_free"] is True
+    assert summary["session_mix_complete"] is True
     assert summary["session_mix_balanced"] is True
     assert summary["prompt_mix_counts"] == {"short": 1, "medium": 1, "long": 1}
     assert summary["fatal_watermark_count"] == 0
@@ -299,3 +300,5 @@ def test_b1c1_duration_clock_starts_after_warmup(tmp_path):
     assert summary["warmup_samples"] == 3
     assert summary["measurement_samples"] == 1
     assert summary["duration_requirement_met"] is True
+    assert summary["session_mix_complete"] is False
+    assert summary["ok"] is False

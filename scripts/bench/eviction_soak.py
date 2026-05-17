@@ -1027,6 +1027,7 @@ def _b1c1_rollup(
         for prompt_id, _prompt in B1C1_PROMPTS
     }
     mix_values = list(prompt_mix_counts.values())
+    session_mix_complete = bool(mix_values) and all(value > 0 for value in mix_values)
     session_mix_balanced = bool(mix_values) and max(mix_values) - min(mix_values) <= 1
     drift_values = [
         int(record["memory"]["drift_from_measurement_start_bytes"])
@@ -1067,6 +1068,7 @@ def _b1c1_rollup(
         bool(measurement_records)
         and duration_requirement_met
         and ledger_gap_free
+        and session_mix_complete
         and session_mix_balanced
         and operations_ok
         and drift_ok
@@ -1106,6 +1108,7 @@ def _b1c1_rollup(
         "measurement_samples": len(measurement_records),
         "ledger_gap_free": ledger_gap_free,
         "prompt_mix_counts": prompt_mix_counts,
+        "session_mix_complete": session_mix_complete,
         "session_mix_balanced": session_mix_balanced,
         "max_drift_bytes": max_drift_bytes,
         "drift_budget_bytes": drift_budget_bytes,
