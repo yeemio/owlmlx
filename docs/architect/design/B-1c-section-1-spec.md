@@ -103,7 +103,9 @@ no_swap_soak_stability: passed | failed | blocked
 - `ledger_gap_free = true`
 - at least one full warmup cycle completed
 - measurement samples exist
-- short / medium / long prompt mix remains balanced
+- `session_mix_complete = true`: short / medium / long each appear at least
+  once in the measurement phase
+- `session_mix_balanced = true`: measurement prompt-count skew is at most one
 - `max_drift_bytes <= min(200 MiB, 0.5% host serving budget)`
 - `fatal_watermark_count = 0`
 - `failure_measurement_count = 0`
