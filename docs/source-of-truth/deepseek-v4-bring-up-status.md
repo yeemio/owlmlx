@@ -7,6 +7,34 @@
 
 ## 1. Current Status
 
+**2026-05-17: D1 isolated repeatability runner landed; full repeatability gate remains blocked.**
+
+`scripts/bench/deepseek_v4_d1_repeatability.py` now drives the existing
+isolated `.runtime-deepseek-v4-mlx` environment through a persistent child
+protocol:
+
+```text
+load -> generate -> unload -> ping -> shutdown
+```
+
+Observed status:
+
+- isolated preflight: passed (`mlx_lm` and `mlx_lm.models.deepseek_v4` import
+  in `.runtime-deepseek-v4-mlx`)
+- tiny real smoke: passed for 1 prompt / 8 tokens; load / unload / clean health
+  completed with no child restart
+- full D1 ladder: blocked at `p1_short_cn` / `max_tokens=1024` by
+  `repetition_flag=true`
+- lifecycle during the failed ladder remained clean:
+  `restart_observed=false`, unload ok, backend health clean after unload
+- D1 evidence records now include prompt shape, completion preview/tail,
+  structured repetition diagnostics, optional stop-string controls, and stream
+  diagnostic events when `--generation-surface stream` is used
+
+This keeps DeepSeek V4 at `experimental_only`. It does not make
+`DeepSeek-V4-Flash-2bit-DQ` visible on the default model surface, does not
+adopt `ds4.c`, and does not claim supported DeepSeek V4 serving.
+
 **2026-05-11: Lifecycle complete via intermediate path.**
 
 `DeepSeek-V4-Flash-2bit-DQ` completed load → generate → unload → clean health

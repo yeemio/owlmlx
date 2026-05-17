@@ -114,9 +114,9 @@ readiness gate. See `docs/source-of-truth/public-release-standard.md`.
 
 ```bash
 uv sync --extra runtime
-uv run pytest             # 1005 cases, ~38 s
-uv run python -m uvicorn 'owlmlx.runtime.server:create_app' --factory --port 8082
-curl http://127.0.0.1:8082/v1/runtime/monitor/snapshot
+uv run pytest
+uv run python -m uvicorn 'owlmlx.runtime.server:create_app' --factory --port 8066
+curl http://127.0.0.1:8066/v1/runtime/monitor/snapshot
 ```
 
 Project Python is **3.11.15** (pinned via `.python-version`). `pytest`
@@ -139,11 +139,12 @@ emits a loud warning if run outside `.venv/`.
 
 ## Development status
 
-Internal runtime milestone as of 2026-05-12. Public Python surface and HTTP
+Internal runtime milestone as of 2026-05-17. Public Python surface and HTTP
 routes are stable enough for the runtime engineering channel, while OwlCoda
 product readiness remains parked behind the npm local-model learning-loop
-gate. Internal kernel still under active refinement. Stage 1
-refactor (2026-05-11) archived 151 spec-as-code modules; Stage 2 (in
-progress) aligns landmark vocabulary with [PR #649][pr649]. See
+gate. Session KV cache remains experimental: B-1a and B-1b are passed, and
+B-1c no-swap / swap soak gates remain open. Stage 1 refactor (2026-05-11)
+archived 151 spec-as-code modules; Stage 2 aligned landmark vocabulary with
+[PR #649][pr649]. See
 `CHANGELOG.md` (when present) or recent `release(...)` / `refactor(...)`
 commits.

@@ -22,7 +22,7 @@
 
 - ❌ 写代码（code-grade 是下一层，独立 round + PR）
 - ❌ 一次性展开多个 gate 的 spec（**严格一次一个 gate**）
-- ❌ 提前定 B-1b / B-1c / Wave H 的实施细节（依赖关系还没到）
+- ❌ 在前置 gate 通过前批量展开后续 gate 的实施细节
 - ❌ 引用未被 runtime 消费的 spec-as-code 模块作为支撑（Stage 1 禁令）
 - ❌ 把 design 文档当 source-of-truth contract（promote 需走 §1a Gate）
 
@@ -33,8 +33,8 @@
 | Gate | Spec | 状态 | Plan-grade 来源 |
 |---|---|---|---|
 | **B-1a** | [`B-1a-spec.md`](B-1a-spec.md) | 已通过 · closeout 已落盘 | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign B-1a |
-| **B-1b** | [`B-1b-spec.md`](B-1b-spec.md) | 已起草 · 待 design-grade review | 同上 Campaign B-1b |
-| **B-1c §1** | _pending_ | B-1b 通过后启动 | 同上 Campaign B-1c §1 |
+| **B-1b** | [`B-1b-spec.md`](B-1b-spec.md) | 已通过 · native N=20 evidence 已落盘 | 同上 Campaign B-1b |
+| **B-1c §1** | _pending_ | code-grade runner 已落；24h no-swap soak 待真实运行 | 同上 Campaign B-1c §1 |
 | **B-1c §2** | _pending_ | §1 通过后启动 | 同上 Campaign B-1c §2 |
 | **Wave H · H1** | code-grade landed: `server_routes_openai.py` | 已完成 · OpenAI/Anthropic compat routes 拆出 | 同上 Wave H |
 
@@ -42,7 +42,7 @@
 
 | Campaign | Spec | 状态 | Plan-grade 来源 |
 |---|---|---|---|
-| **D1** | [`D1-spec.md`](D1-spec.md) | 已起草 · 待 design-grade review | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
+| **D1** | [`D1-spec.md`](D1-spec.md) | runner + diagnostics 已落；full ladder blocked by p1/1024 repetition | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
 
 **节奏纪律**：design spec **一次一个**，per round 落盘 + review；不允许批量预先撰写未启动的 gate。
 
