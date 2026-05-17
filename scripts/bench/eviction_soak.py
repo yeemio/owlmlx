@@ -37,6 +37,7 @@ DEFAULT_OUTPUT_DIR = (
     / "eviction_soak"
 )
 B1B_GATE = "b1b-cache-on-no-regress"
+B1C1_GATE = "b1c1-no-swap-soak"
 B1B_OUTPUT_DIR = (
     Path(__file__).resolve().parents[2]
     / "files"
@@ -45,9 +46,35 @@ B1B_OUTPUT_DIR = (
     / "bench"
     / "cache-settle-no-regress"
 )
+B1C1_OUTPUT_DIR = (
+    Path(__file__).resolve().parents[2]
+    / "files"
+    / "evidence"
+    / "owlmlx"
+    / "bench"
+    / "session-kv-soak"
+)
 B1B_MODEL_ID = "gemma-4-31B-it"
 B1B_MODEL_PATH = "/Users/yeemio/AI/Agent/models/gemma-4-31B-it"
 DEFAULT_PROMPT = "Reply with exactly: owlmlx eviction soak"
+B1C1_DURATION_S = 24 * 60 * 60
+B1C1_SAMPLE_INTERVAL_S = 60.0
+B1C1_DRIFT_BUDGET_BYTES = 200 * 1024 * 1024
+B1B_SESSION_ID_PREFIX = "b1b-gemma4-31b"
+B1C1_SESSION_ID_PREFIX = "b1c1-no-swap"
+B1C1_PROMPTS: tuple[tuple[str, str], ...] = (
+    ("short", "Reply with exactly: owlmlx session cache soak"),
+    (
+        "medium",
+        "You are validating a local runtime soak. Return one concise sentence "
+        "confirming that the session cache request completed.",
+    ),
+    (
+        "long",
+        "Summarize the runtime discipline in three short clauses: session reuse, "
+        "memory watermark discipline, and reclaim-barrier observation. Keep it brief.",
+    ),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -432,6 +459,16 @@ def _rollup_filename(timestamp: str, *, model_id: str) -> str:
     return f"{timestamp}-b1b-{safe_model}-cache-on-no-regress-rollup.jsonl"
 
 
+def _b1c1_filename(timestamp: str, *, model_id: str) -> str:
+    safe_model = model_id.strip("/").replace("/", "-")
+    return f"{timestamp}-b1c1-{safe_model}-no-swap-soak.jsonl"
+
+
+def _b1c1_rollup_filename(timestamp: str, *, model_id: str) -> str:
+    safe_model = model_id.strip("/").replace("/", "-")
+    return f"{timestamp}-b1c1-{safe_model}-no-swap-soak-rollup.jsonl"
+
+
 def _missing_signal_names(record: dict[str, Any]) -> set[str]:
     return {
         str(item.get("signal"))
@@ -566,6 +603,33 @@ def _b1b_rollup(
             "unblock_B_1c_section_1": ok,
         },
     }
+
+
+def _b1c1_max_drift_bytes(profile: MachineMemoryProfile) -> int:
+    host_budget_bytes = int(profile.serving_budget_gb * BYTES_PER_GB * 0.005)
+    return min(B1C1_DRIFT_BUDGET_BYTES, host_budget_bytes)
+
+
+def _b1c1_round_verdict(
+    *,
+    load_ok: bool,
+    generation: StreamGenerationResult,
+    watermark: str,
+    reclaim_stats: dict[str, Any],
+    settle_barrier: dict[str, Any],
+) -> str:
+    failure_measurements = int(
+        reclaim_stats.get("summary", {}).get("failure_measurement_count", 0) or 0
+    )
+    failed = (
+        not load_ok
+        or not generation.ok
+        or watermark == MemoryWatermark.FATAL.name
+        or failure_measurements > 0
+        or settle_barrier.get("barrier_state") in {"failed_unload", "failed_reclaim"}
+        or int(settle_barrier.get("unresolved_event_count") or 0) > 0
+    )
+    return "failed" if failed else "passed"
 
 
 def _record_summary(records: list[dict[str, Any]], *, max_drift_gb: float) -> dict[str, Any]:
@@ -853,7 +917,7 @@ def run_b1b_cache_on_no_regress(
     rounds: int,
     output_dir: Path,
     cache_mode: str = "both",
-    session_id_prefix: str = "b1b-gemma4-31b",
+    session_id_prefix: str = B1B_SESSION_ID_PREFIX,
     prompt: str = DEFAULT_PROMPT,
     max_tokens: int = 2,
     settle_iterations: int = 5,
@@ -926,9 +990,362 @@ def run_b1b_cache_on_no_regress(
     }
 
 
+def _b1c1_rollup(
+    *,
+    run_id: str,
+    model: ModelSpec,
+    model_label: str,
+    backend: str,
+    measurement_mode: str,
+    output_path: Path,
+    records: list[dict[str, Any]],
+    started_monotonic_s: float,
+    required_duration_s: float,
+    drift_budget_bytes: int,
+    load: Any,
+    cleanup_unload: Any | None,
+    cleanup_settle: SettleResult | None,
+) -> dict[str, Any]:
+    observed_duration_s = round(time.monotonic() - started_monotonic_s, 3)
+    sample_indices = [int(record["sample_index"]) for record in records]
+    ledger_gap_free = sample_indices == list(range(1, len(records) + 1))
+    prompt_mix_counts = {
+        prompt_id: sum(1 for record in records if record.get("prompt_id") == prompt_id)
+        for prompt_id, _prompt in B1C1_PROMPTS
+    }
+    mix_values = list(prompt_mix_counts.values())
+    session_mix_balanced = bool(mix_values) and max(mix_values) - min(mix_values) <= 1
+    drift_values = [
+        int(record["memory"]["drift_from_first_sample_bytes"])
+        for record in records
+        if record.get("memory", {}).get("drift_from_first_sample_bytes") is not None
+    ]
+    max_drift_bytes = max(drift_values) if drift_values else None
+    fatal_watermark_count = sum(
+        1
+        for record in records
+        if record.get("memory", {}).get("watermark_after_generation") == MemoryWatermark.FATAL.name
+    )
+    drops_total = sum(
+        int(record.get("session_cache", {}).get("counter_delta", {}).get("drops", 0) or 0)
+        for record in records
+    )
+    rejects_total = sum(
+        int(record.get("session_cache", {}).get("counter_delta", {}).get("rejects", 0) or 0)
+        for record in records
+    )
+    final_reclaim_stats = (
+        records[-1].get("reclaim_barrier_stats_after_sample", {}) if records else {}
+    )
+    final_reclaim_summary = final_reclaim_stats.get("summary", {})
+    failure_measurement_count = int(
+        final_reclaim_summary.get("failure_measurement_count", 0) or 0
+    )
+    unresolved_reclaim_barrier_events = int(
+        final_reclaim_summary.get("unresolved_event_count", 0) or 0
+    )
+    duration_requirement_met = observed_duration_s >= required_duration_s
+    operations_ok = bool(load.ok) and all(
+        record.get("sample_verdict") == "passed" for record in records
+    )
+    drift_ok = max_drift_bytes is not None and max_drift_bytes <= drift_budget_bytes
+    cleanup_ok = bool(cleanup_unload.ok) if cleanup_unload is not None else not bool(load.ok)
+    ok = (
+        bool(records)
+        and duration_requirement_met
+        and ledger_gap_free
+        and session_mix_balanced
+        and operations_ok
+        and drift_ok
+        and fatal_watermark_count == 0
+        and drops_total == 0
+        and rejects_total == 0
+        and failure_measurement_count == 0
+        and unresolved_reclaim_barrier_events == 0
+        and cleanup_ok
+    )
+    if ok:
+        conclusion = "passed"
+    elif not records or not duration_requirement_met:
+        conclusion = "blocked"
+    else:
+        conclusion = "failed"
+    return {
+        "schema_version": "b1c1.v1",
+        "gate": "B-1c section 1",
+        "run_id": run_id,
+        "timestamp_utc": _now_iso_utc(),
+        "ledger": str(output_path),
+        "model": {
+            "id": model_label,
+            "path": model.model_id,
+            "runtime_model_id": model.model_id,
+            "memory_gb": model.memory_gb,
+        },
+        "backend": backend,
+        "measurement_mode": measurement_mode,
+        "required_duration_s": required_duration_s,
+        "observed_duration_s": observed_duration_s,
+        "duration_requirement_met": duration_requirement_met,
+        "samples": len(records),
+        "ledger_gap_free": ledger_gap_free,
+        "prompt_mix_counts": prompt_mix_counts,
+        "session_mix_balanced": session_mix_balanced,
+        "max_drift_bytes": max_drift_bytes,
+        "drift_budget_bytes": drift_budget_bytes,
+        "max_drift_within_budget": drift_ok,
+        "fatal_watermark_count": fatal_watermark_count,
+        "session_cache_drops_total": drops_total,
+        "session_cache_rejects_total": rejects_total,
+        "failure_measurement_count": failure_measurement_count,
+        "unresolved_reclaim_barrier_events": unresolved_reclaim_barrier_events,
+        "load_result": _result_to_dict(load),
+        "cleanup_unload_result": (
+            _result_to_dict(cleanup_unload) if cleanup_unload is not None else None
+        ),
+        "cleanup_settle": (
+            {
+                "active_memory_bytes": cleanup_settle.active_memory_bytes,
+                "active_memory_gb": _bytes_to_gb(cleanup_settle.active_memory_bytes),
+                "iterations": cleanup_settle.iterations,
+                "duration_ms": cleanup_settle.duration_ms,
+            }
+            if cleanup_settle is not None
+            else None
+        ),
+        "no_swap_soak_stability": conclusion,
+        "conclusion": conclusion,
+        "graduates": {
+            "no_swap_soak_stability": ok,
+            "unblock_B_1c_section_2": ok,
+        },
+    }
+
+
+def run_b1c1_no_swap_soak(
+    *,
+    runtime: str,
+    backend: str,
+    model: ModelSpec,
+    model_label: str = B1B_MODEL_ID,
+    output_dir: Path,
+    duration_s: float = float(B1C1_DURATION_S),
+    required_duration_s: float = float(B1C1_DURATION_S),
+    sample_interval_s: float = B1C1_SAMPLE_INTERVAL_S,
+    max_samples: int | None = None,
+    session_id_prefix: str = B1C1_SESSION_ID_PREFIX,
+    max_tokens: int = 2,
+    profile_memory_gb: float = 128.0,
+) -> dict[str, Any]:
+    if runtime != "owlmlx":
+        raise ValueError("only --runtime owlmlx is implemented in this baseline round")
+    if duration_s < 0:
+        raise ValueError("--duration-s must be >= 0")
+    if required_duration_s < 0:
+        raise ValueError("--required-duration-s must be >= 0")
+    if sample_interval_s < 0:
+        raise ValueError("--sample-interval-s must be >= 0")
+    if max_samples is not None and max_samples < 1:
+        raise ValueError("--max-samples must be >= 1 when provided")
+
+    profile = MachineMemoryProfile(
+        system_memory_gb=profile_memory_gb,
+        system_reserve_gb=2.0,
+        serving_budget_gb=max(profile_memory_gb - 2.0, 1.0),
+        warning_threshold_gb=max(profile_memory_gb - 10.0, 1.0),
+    )
+    drift_budget_bytes = _b1c1_max_drift_bytes(profile)
+    timestamp = _now_compact_utc()
+    run_id = f"{timestamp}-{runtime}-{backend}-{B1C1_GATE}"
+    output_path = output_dir / _b1c1_filename(timestamp, model_id=model_label)
+    rollup_path = output_dir / _b1c1_rollup_filename(timestamp, model_id=model_label)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    settle_sleep_s = 0.0
+
+    with _session_cache_env(True):
+        kernel, sampler = _make_kernel(backend=backend, profile=profile)
+        records: list[dict[str, Any]] = []
+        started_monotonic_s = time.monotonic()
+        load = kernel.load_model(model.model_id, memory_gb=model.memory_gb)
+        first_sample_bytes: int | None = None
+        cleanup_unload: Any | None = None
+        cleanup_settle: SettleResult | None = None
+        try:
+            with output_path.open("w", encoding="utf-8") as stream:
+                while True:
+                    if max_samples is not None and len(records) >= max_samples:
+                        break
+                    if (
+                        max_samples is None
+                        and records
+                        and time.monotonic() - started_monotonic_s >= duration_s
+                    ):
+                        break
+                    sample_index = len(records) + 1
+                    prompt_id, prompt = B1C1_PROMPTS[(sample_index - 1) % len(B1C1_PROMPTS)]
+                    session_id = f"{session_id_prefix}-{prompt_id}"
+                    cache_before = _session_cache_status(kernel)
+                    before_bytes = sampler.active_memory_bytes(kernel)
+                    try:
+                        generation = (
+                            asyncio.run(
+                                _stream_generate_once(
+                                    kernel,
+                                    model_id=model.model_id,
+                                    prompt=prompt,
+                                    max_tokens=max_tokens,
+                                    session_id=session_id,
+                                )
+                            )
+                            if load.ok
+                            else StreamGenerationResult(
+                                ok=False,
+                                message="model load failed",
+                                error_code=RuntimeErrorCode.model_not_loaded,
+                                model_id=model.model_id,
+                            )
+                        )
+                    except Exception as exc:  # pragma: no cover - defensive real-run capture
+                        generation = StreamGenerationResult(
+                            ok=False,
+                            message=str(exc),
+                            error_code=RuntimeErrorCode.backend_error,
+                            model_id=model.model_id,
+                        )
+                    after_bytes = sampler.active_memory_bytes(kernel)
+                    if first_sample_bytes is None and after_bytes is not None:
+                        first_sample_bytes = after_bytes
+                    drift_bytes = (
+                        abs(after_bytes - first_sample_bytes)
+                        if after_bytes is not None and first_sample_bytes is not None
+                        else None
+                    )
+                    cache_after = _session_cache_status(kernel)
+                    counter_delta = _counter_delta(
+                        dict(cache_before.get("counters", {})),
+                        dict(cache_after.get("counters", {})),
+                    )
+                    watermark_after = _watermark(after_bytes, profile=profile)
+                    reclaim_stats = _reclaim_stats(kernel)
+                    settle_snapshot = _compact_settle_barrier(_settle_barrier_snapshot(kernel))
+                    sample_verdict = _b1c1_round_verdict(
+                        load_ok=bool(load.ok),
+                        generation=generation,
+                        watermark=watermark_after,
+                        reclaim_stats=reclaim_stats,
+                        settle_barrier=settle_snapshot,
+                    )
+                    record = {
+                        "schema_version": "b1c1.v1",
+                        "gate": "B-1c section 1",
+                        "run_id": run_id,
+                        "mode": "no_swap_soak",
+                        "sample_index": sample_index,
+                        "timestamp_utc": _now_iso_utc(),
+                        "elapsed_s": round(time.monotonic() - started_monotonic_s, 3),
+                        "runtime": runtime,
+                        "backend": backend,
+                        "measurement_mode": sampler.measurement_mode,
+                        "evidence_strength": (
+                            "mlx_allocator_soak" if backend == "native" else "smoke_only_no_allocator_claim"
+                        ),
+                        "model": {
+                            "id": model_label,
+                            "path": model.model_id,
+                            "runtime_model_id": model.model_id,
+                            "memory_gb": model.memory_gb,
+                        },
+                        "config": {
+                            "OWLMLX_SESSION_CACHE_ENABLED": "1",
+                            "session_id": session_id,
+                            "temperature": 0.0,
+                            "seed": 42,
+                            "max_tokens": max_tokens,
+                            "duration_s": duration_s,
+                            "required_duration_s": required_duration_s,
+                            "sample_interval_s": sample_interval_s,
+                            "max_generation_concurrency": 1,
+                            "artificial_unload_or_swap_during_soak": False,
+                        },
+                        "prompt_id": prompt_id,
+                        "session_cache": {
+                            "active_entries_before": cache_before.get("active_entries"),
+                            "active_entries_after": cache_after.get("active_entries"),
+                            "counter_delta": counter_delta,
+                            "synthetic": backend == "fake",
+                            "allocator_truth": backend == "native",
+                        },
+                        "operation": {
+                            "load_ok": bool(load.ok),
+                            "generation_ok": bool(generation.ok),
+                            "artificial_unload_or_swap_during_soak": False,
+                        },
+                        "memory": {
+                            "active_memory_before_sample_bytes": before_bytes,
+                            "active_memory_after_generation_bytes": after_bytes,
+                            "active_memory_after_generation_gb": _bytes_to_gb(after_bytes),
+                            "first_sample_active_memory_bytes": first_sample_bytes,
+                            "drift_from_first_sample_bytes": drift_bytes,
+                            "drift_budget_bytes": drift_budget_bytes,
+                            "watermark_after_generation": watermark_after,
+                        },
+                        "settle_barrier_event": settle_snapshot,
+                        "reclaim_barrier_stats_after_sample": reclaim_stats,
+                        "load_result": _result_to_dict(load),
+                        "generate_result": _result_to_dict(generation),
+                        "sample_verdict": sample_verdict,
+                    }
+                    records.append(record)
+                    stream.write(json.dumps(record, sort_keys=True))
+                    stream.write("\n")
+                    if sample_verdict != "passed":
+                        break
+                    if max_samples is None:
+                        elapsed_s = time.monotonic() - started_monotonic_s
+                        if elapsed_s >= duration_s:
+                            break
+                        sleep_for = min(sample_interval_s, max(duration_s - elapsed_s, 0.0))
+                        if sleep_for > 0:
+                            time.sleep(sleep_for)
+        finally:
+            if load.ok:
+                cleanup_unload = kernel.unload_model(model.model_id)
+                cleanup_settle = sampler.settle(
+                    kernel,
+                    max_iterations=5,
+                    sleep_s=settle_sleep_s,
+                )
+
+    rollup = _b1c1_rollup(
+        run_id=run_id,
+        model=model,
+        model_label=model_label,
+        backend=backend,
+        measurement_mode=sampler.measurement_mode,
+        output_path=output_path,
+        records=records,
+        started_monotonic_s=started_monotonic_s,
+        required_duration_s=required_duration_s,
+        drift_budget_bytes=drift_budget_bytes,
+        load=load,
+        cleanup_unload=cleanup_unload,
+        cleanup_settle=cleanup_settle,
+    )
+    rollup_path.parent.mkdir(parents=True, exist_ok=True)
+    with rollup_path.open("w", encoding="utf-8") as stream:
+        stream.write(json.dumps(rollup, sort_keys=True))
+        stream.write("\n")
+    return {
+        **rollup,
+        "ok": rollup["conclusion"] == "passed",
+        "output_dir": str(output_dir),
+        "rollup_path": str(rollup_path),
+    }
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--gate", choices=("baseline", B1B_GATE), default="baseline")
+    parser.add_argument("--gate", choices=("baseline", B1B_GATE, B1C1_GATE), default="baseline")
     parser.add_argument("--runtime", choices=("owlmlx", "omlx", "vmlx"), default="owlmlx")
     parser.add_argument("--backend", choices=("fake", "native"), default="fake")
     parser.add_argument("--model-a", default="model-a")
@@ -941,13 +1358,17 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--rounds", type=int, default=50)
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--cache-mode", choices=("off", "on", "both"), default="both")
-    parser.add_argument("--session-id-prefix", default="b1b-gemma4-31b")
+    parser.add_argument("--session-id-prefix", default=None)
     parser.add_argument("--max-drift-gb", type=float, default=0.5)
     parser.add_argument("--prompt", default=DEFAULT_PROMPT)
     parser.add_argument("--max-tokens", type=int, default=1)
     parser.add_argument("--settle-iterations", type=int, default=5)
     parser.add_argument("--settle-sleep-ms", type=float, default=0.0)
     parser.add_argument("--profile-memory-gb", type=float, default=128.0)
+    parser.add_argument("--duration-s", type=float, default=float(B1C1_DURATION_S))
+    parser.add_argument("--required-duration-s", type=float, default=float(B1C1_DURATION_S))
+    parser.add_argument("--sample-interval-s", type=float, default=B1C1_SAMPLE_INTERVAL_S)
+    parser.add_argument("--max-samples", type=int, default=None)
     return parser.parse_args(argv)
 
 
@@ -963,11 +1384,26 @@ def main(argv: list[str] | None = None) -> int:
                 rounds=args.rounds,
                 output_dir=args.output or B1B_OUTPUT_DIR,
                 cache_mode=args.cache_mode,
-                session_id_prefix=args.session_id_prefix,
+                session_id_prefix=args.session_id_prefix or B1B_SESSION_ID_PREFIX,
                 prompt=args.prompt,
                 max_tokens=args.max_tokens,
                 settle_iterations=args.settle_iterations,
                 settle_sleep_ms=args.settle_sleep_ms,
+                profile_memory_gb=args.profile_memory_gb,
+            )
+        elif args.gate == B1C1_GATE:
+            summary = run_b1c1_no_swap_soak(
+                runtime=args.runtime,
+                backend=args.backend,
+                model=ModelSpec(args.model, args.model_gb),
+                model_label=args.model_label,
+                output_dir=args.output or B1C1_OUTPUT_DIR,
+                duration_s=args.duration_s,
+                required_duration_s=args.required_duration_s,
+                sample_interval_s=args.sample_interval_s,
+                max_samples=args.max_samples,
+                session_id_prefix=args.session_id_prefix or B1C1_SESSION_ID_PREFIX,
+                max_tokens=args.max_tokens,
                 profile_memory_gb=args.profile_memory_gb,
             )
         else:

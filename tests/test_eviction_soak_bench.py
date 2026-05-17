@@ -215,3 +215,63 @@ def test_b1b_rollup_blocks_without_both_required_ledgers(tmp_path):
     assert summary["cache_on_no_regress"] == "blocked"
     assert summary["graduates"]["cache_on_no_regress"] is False
     assert summary["ok"] is False
+
+
+def test_b1c1_fake_no_swap_soak_writes_gap_free_ledger_and_rollup(tmp_path):
+    summary = eviction_soak.run_b1c1_no_swap_soak(
+        runtime="owlmlx",
+        backend="fake",
+        model=eviction_soak.ModelSpec("gemma-4-31B-it", 1.0),
+        model_label="gemma-4-31B-it",
+        output_dir=tmp_path,
+        duration_s=0.0,
+        required_duration_s=0.0,
+        sample_interval_s=0.0,
+        max_samples=3,
+    )
+
+    assert summary["ok"] is True
+    assert summary["no_swap_soak_stability"] == "passed"
+    assert summary["graduates"]["unblock_B_1c_section_2"] is True
+    assert summary["samples"] == 3
+    assert summary["ledger_gap_free"] is True
+    assert summary["session_mix_balanced"] is True
+    assert summary["prompt_mix_counts"] == {"short": 1, "medium": 1, "long": 1}
+    assert summary["fatal_watermark_count"] == 0
+    assert summary["failure_measurement_count"] == 0
+    assert summary["cleanup_unload_result"]["ok"] is True
+
+    ledger = _records(tmp_path / summary["ledger"].split("/")[-1])
+    rollup = _records(tmp_path / summary["rollup_path"].split("/")[-1])
+    assert len(ledger) == 3
+    assert len(rollup) == 1
+    assert [record["sample_index"] for record in ledger] == [1, 2, 3]
+    assert {record["mode"] for record in ledger} == {"no_swap_soak"}
+    assert {record["config"]["OWLMLX_SESSION_CACHE_ENABLED"] for record in ledger} == {"1"}
+    assert all(
+        record["operation"]["artificial_unload_or_swap_during_soak"] is False
+        for record in ledger
+    )
+    assert all(
+        record["config"]["session_id"].startswith("b1c1-no-swap-")
+        for record in ledger
+    )
+    assert rollup[0]["no_swap_soak_stability"] == "passed"
+
+
+def test_b1c1_short_run_blocks_instead_of_claiming_24h_soak(tmp_path):
+    summary = eviction_soak.run_b1c1_no_swap_soak(
+        runtime="owlmlx",
+        backend="fake",
+        model=eviction_soak.ModelSpec("gemma-4-31B-it", 1.0),
+        output_dir=tmp_path,
+        duration_s=0.0,
+        required_duration_s=24 * 60 * 60,
+        sample_interval_s=0.0,
+        max_samples=1,
+    )
+
+    assert summary["ok"] is False
+    assert summary["duration_requirement_met"] is False
+    assert summary["no_swap_soak_stability"] == "blocked"
+    assert summary["graduates"]["no_swap_soak_stability"] is False
