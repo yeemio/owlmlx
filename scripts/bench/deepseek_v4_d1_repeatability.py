@@ -32,6 +32,7 @@ DEEPSEEK_V4_MODULE = "mlx_lm.models.deepseek_v4"
 TOKEN_LADDER = (128, 512, 1024)
 EVIDENCE_STRENGTH = "synthetic_dry_run_no_model_claim"
 REAL_EVIDENCE_STRENGTH = "isolated_real_child_process"
+COMPARE_EVIDENCE_STRENGTH = "diagnostic_direct_vs_runner_compare"
 D1_TOKENIZER_CONFIG = {
     "pretrained_config": {
         "max_position_embeddings": 1048576,
@@ -87,6 +88,14 @@ def _runner_env(*, base_env: dict[str, str] | None = None) -> dict[str, str]:
         [str(REPO_ROOT), *([existing] if existing else [])]
     )
     return env
+
+
+def _prompt_by_id(prompt_id: str) -> tuple[int, str, str]:
+    for index, (known_id, prompt) in enumerate(PROMPTS, start=1):
+        if known_id == prompt_id:
+            return index, known_id, prompt
+    known = ", ".join(prompt_id for prompt_id, _prompt in PROMPTS)
+    raise ValueError(f"unknown prompt_id {prompt_id!r}; known values: {known}")
 
 
 def _relative_runtime_path(path: Path) -> str:
@@ -1031,6 +1040,387 @@ def run_real(
     }
 
 
+_DIRECT_GENERATE_CODE = r"""
+import gc
+import json
+import os
+import sys
+import time
+from contextlib import redirect_stdout
+
+
+def _emit(payload):
+    sys.__stdout__.write(json.dumps(payload, sort_keys=True) + "\n")
+    sys.__stdout__.flush()
+
+
+request = json.loads(sys.stdin.read() or "{}")
+model = None
+tokenizer = None
+try:
+    import mlx_lm
+    from owlmlx.runtime.mlx_lm_runner import (
+        _prepare_generation_params,
+        _prepare_tokenizer_config,
+        _stop_strings_from_params,
+        _truncate_at_stop_strings,
+    )
+
+    model_path = str(request["model_path"])
+    params = dict(request.get("params") or {})
+    tokenizer_config = _prepare_tokenizer_config(
+        dict(request.get("tokenizer_config") or {})
+    )
+    stop_strings = _stop_strings_from_params(params)
+
+    load_started = time.perf_counter()
+    with redirect_stdout(sys.stderr):
+        model, tokenizer = mlx_lm.load(
+            model_path,
+            tokenizer_config=tokenizer_config or None,
+        )
+    load_time_s = round(time.perf_counter() - load_started, 4)
+
+    generate_started = time.perf_counter()
+    with redirect_stdout(sys.stderr):
+        text = mlx_lm.generate(
+            model,
+            tokenizer,
+            prompt=str(request.get("prompt") or ""),
+            **_prepare_generation_params(params),
+        )
+    generate_time_s = round(time.perf_counter() - generate_started, 4)
+    text, stop_hit = _truncate_at_stop_strings(str(text), stop_strings)
+    _emit(
+        {
+            "ok": True,
+            "action": "direct_generate",
+            "surface": "direct_mlx_lm_generate",
+            "model_id": model_path,
+            "text": text,
+            "finish_reason": "stop" if stop_hit else "stop",
+            "pid": os.getpid(),
+            "load_time_s": load_time_s,
+            "generate_time_s": generate_time_s,
+        }
+    )
+except Exception as exc:
+    _emit(
+        {
+            "ok": False,
+            "action": "direct_generate",
+            "surface": "direct_mlx_lm_generate",
+            "model_id": str(request.get("model_path") or ""),
+            "text": "",
+            "error": str(exc),
+            "pid": os.getpid(),
+        }
+    )
+finally:
+    model = None
+    tokenizer = None
+    try:
+        gc.collect()
+    except Exception:
+        pass
+    try:
+        import mlx.core as mx
+
+        mx.clear_cache()
+    except Exception:
+        pass
+"""
+
+
+def _run_direct_generate(
+    *,
+    isolated_python: Path,
+    model_path: Path,
+    prompt: str,
+    generation_params: dict[str, Any],
+    timeout_s: float,
+    run_factory: Any = subprocess.run,
+) -> dict[str, Any]:
+    request = {
+        "model_path": str(model_path),
+        "prompt": prompt,
+        "params": generation_params,
+        "tokenizer_config": D1_TOKENIZER_CONFIG,
+    }
+    try:
+        proc = run_factory(
+            [str(isolated_python), "-c", _DIRECT_GENERATE_CODE],
+            input=json.dumps(request, sort_keys=True),
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=timeout_s,
+            cwd=str(REPO_ROOT),
+            env=_runner_env(),
+        )
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "ok": False,
+            "action": "direct_generate",
+            "surface": "direct_mlx_lm_generate",
+            "text": "",
+            "error": f"direct generate timed out after {exc.timeout}s",
+            "timeout_s": exc.timeout,
+        }
+    except OSError as exc:
+        return {
+            "ok": False,
+            "action": "direct_generate",
+            "surface": "direct_mlx_lm_generate",
+            "text": "",
+            "error": str(exc),
+        }
+
+    stdout = str(proc.stdout or "").strip()
+    payload: dict[str, Any] | None = None
+    if stdout:
+        for line in reversed(stdout.splitlines()):
+            try:
+                parsed = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                payload = parsed
+                break
+    if payload is None:
+        return {
+            "ok": False,
+            "action": "direct_generate",
+            "surface": "direct_mlx_lm_generate",
+            "text": "",
+            "error": "direct generate produced no JSON payload",
+            "returncode": proc.returncode,
+            "stdout_tail": stdout[-1000:],
+        }
+    payload["returncode"] = proc.returncode
+    if proc.returncode != 0:
+        payload["ok"] = False
+        payload.setdefault("error", f"direct generate exited {proc.returncode}")
+    return payload
+
+
+def _compare_surface_observation(
+    *,
+    surface: str,
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    text = str(result.get("text") or "")
+    repetition = _repetition_diagnostics(text)
+    observation = {
+        "surface": surface,
+        "ok": bool(result.get("ok")) and bool(text),
+        "completion_chars": len(text),
+        **_completion_observation(text),
+        "repetition_flag": bool(repetition["repetition_flag"]),
+        "repetition_diagnostics": repetition,
+        "pid": result.get("pid"),
+        "finish_reason": result.get("finish_reason"),
+        "timing": {
+            key: result.get(key)
+            for key in ("load_time_s", "generate_time_s")
+            if result.get(key) is not None
+        },
+    }
+    if result.get("error"):
+        observation["error"] = result.get("error")
+    if result.get("returncode") is not None:
+        observation["returncode"] = result.get("returncode")
+    return observation
+
+
+def _runner_compare_observation(row: dict[str, Any] | None) -> dict[str, Any]:
+    if not row:
+        return _compare_surface_observation(
+            surface="owlmlx_runner_generate",
+            result={"ok": False, "text": "", "error": "runner produced no row"},
+        )
+    prompt_results = row.get("prompt_results")
+    if isinstance(prompt_results, list) and prompt_results:
+        first = dict(prompt_results[0])
+    else:
+        first = {}
+    timing = first.get("timing") if isinstance(first.get("timing"), dict) else {}
+    return {
+        "surface": "owlmlx_runner_generate",
+        "ok": bool(first.get("ok")),
+        "completion_chars": int(first.get("completion_chars") or 0),
+        "completion_sha256": first.get("completion_sha256"),
+        "completion_preview": first.get("completion_preview"),
+        "completion_tail": first.get("completion_tail"),
+        "repetition_flag": bool(first.get("repetition_flag")),
+        "repetition_diagnostics": first.get("repetition_diagnostics", {}),
+        "pid": first.get("child_pid"),
+        "finish_reason": first.get("stop_reason"),
+        "timing": timing,
+        "row_verdict": row.get("verdict"),
+        "lifecycle": row.get("lifecycle", {}),
+    }
+
+
+def _compare_classification(
+    *,
+    direct: dict[str, Any],
+    runner: dict[str, Any],
+) -> str:
+    if not direct.get("ok") and not runner.get("ok"):
+        return "both_surfaces_failed"
+    if not direct.get("ok") and runner.get("ok"):
+        return "direct_surface_failed_runner_passed"
+    if direct.get("ok") and not runner.get("ok"):
+        return "runner_surface_failed_direct_passed"
+
+    direct_repeats = bool(direct.get("repetition_flag"))
+    runner_repeats = bool(runner.get("repetition_flag"))
+    if direct_repeats and runner_repeats:
+        return "adapter_or_artifact_likely"
+    if not direct_repeats and runner_repeats:
+        return "runner_call_path_suspect"
+    if direct_repeats and not runner_repeats:
+        return "runner_masks_direct_repetition"
+    return "no_repetition_observed"
+
+
+def _read_first_jsonl_row(path: str | Path | None) -> dict[str, Any] | None:
+    if not path:
+        return None
+    candidate = Path(path)
+    if not candidate.exists():
+        return None
+    for line in candidate.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        parsed = json.loads(line)
+        return parsed if isinstance(parsed, dict) else None
+    return None
+
+
+def run_direct_vs_runner(
+    *,
+    output_dir: Path = DEFAULT_OUTPUT_DIR,
+    isolated_runtime_path: Path = DEFAULT_ISOLATED_RUNTIME_PATH,
+    isolated_python: Path = DEFAULT_ISOLATED_PYTHON,
+    model_path: Path = DEFAULT_MODEL_PATH,
+    run_id: str | None = None,
+    prompt_id: str = "p1_short_cn",
+    max_tokens: int = 1024,
+    generation_overrides: dict[str, Any] | None = None,
+    timeout_s: float = 900.0,
+    direct_func: Any = _run_direct_generate,
+    runner_func: Any = run_real,
+) -> dict[str, Any]:
+    output_dir = Path(output_dir)
+    run_id = run_id or f"{_compact_stamp()}-d1-direct-vs-runner"
+    output_path = output_dir / f"{run_id}.jsonl"
+    prompt_index, prompt_id, prompt = _prompt_by_id(prompt_id)
+    generation_overrides = dict(generation_overrides or {})
+    generation_params = _generation_params(
+        max_tokens=max_tokens,
+        overrides=generation_overrides,
+    )
+    preflight = run_preflight(
+        isolated_python=isolated_python,
+        model_path=model_path,
+        isolated_runtime_path=isolated_runtime_path,
+    )
+    if preflight["verdict"] != "passed":
+        payload = {
+            "schema_version": "d1.compare.v1",
+            "record_type": "direct_vs_runner_compare",
+            "run_id": run_id,
+            "gate": "D1",
+            "runtime": "owlmlx",
+            "model_id": MODEL_ID,
+            "prompt_id": prompt_id,
+            "max_tokens": int(max_tokens),
+            "evidence_strength": COMPARE_EVIDENCE_STRENGTH,
+            "preflight": preflight,
+            "classification": "blocked_by_preflight",
+            "verdict": "blocked",
+            "output_path": str(output_path),
+        }
+        _append_jsonl(output_path, [payload])
+        return payload
+
+    direct_raw = direct_func(
+        isolated_python=Path(isolated_python),
+        model_path=Path(model_path),
+        prompt=prompt,
+        generation_params=generation_params,
+        timeout_s=timeout_s,
+    )
+    direct = _compare_surface_observation(
+        surface="direct_mlx_lm_generate",
+        result=dict(direct_raw),
+    )
+
+    runner_run_id = f"{run_id}-runner"
+    runner_summary = runner_func(
+        output_dir=output_dir,
+        isolated_runtime_path=isolated_runtime_path,
+        isolated_python=isolated_python,
+        model_path=model_path,
+        run_id=runner_run_id,
+        prompt_ids=(prompt_id,),
+        max_tokens_ladder=(int(max_tokens),),
+        generation_overrides=generation_overrides,
+        timeout_s=timeout_s,
+    )
+    runner_row = _read_first_jsonl_row(runner_summary.get("output_path"))
+    runner = _runner_compare_observation(runner_row)
+    classification = _compare_classification(direct=direct, runner=runner)
+    verdict = (
+        "diagnostic_passed"
+        if classification == "no_repetition_observed"
+        else "diagnostic_failed"
+    )
+    payload = {
+        "schema_version": "d1.compare.v1",
+        "record_type": "direct_vs_runner_compare",
+        "run_id": run_id,
+        "gate": "D1",
+        "runtime": "owlmlx",
+        "model_id": MODEL_ID,
+        "model_type": MODEL_TYPE,
+        "capability_label": "experimental_only",
+        "evidence_strength": COMPARE_EVIDENCE_STRENGTH,
+        "created_at": _now_utc(),
+        "output_path": str(output_path),
+        "runner_output_path": runner_summary.get("output_path"),
+        "prompt_index": prompt_index,
+        "prompt_id": prompt_id,
+        "prompt_shape": _prompt_shape(prompt),
+        "max_tokens": int(max_tokens),
+        "generation_params": generation_params,
+        "preflight": preflight,
+        "surfaces": {
+            "direct_mlx_lm_generate": direct,
+            "owlmlx_runner_generate": runner,
+        },
+        "runner_summary": {
+            "schema_version": runner_summary.get("schema_version"),
+            "run_id": runner_summary.get("run_id"),
+            "verdict": runner_summary.get("verdict"),
+            "rows_written": runner_summary.get("rows_written"),
+            "lifecycle": runner_summary.get("lifecycle"),
+            "coverage": runner_summary.get("coverage"),
+        },
+        "classification": classification,
+        "verdict": verdict,
+        "diagnostic_scope": (
+            "Localizes whether p1/max_tokens repetition is visible in direct "
+            "mlx_lm.generate or only through owlmlx.runtime.mlx_lm_runner."
+        ),
+    }
+    _append_jsonl(output_path, [payload])
+    return payload
+
+
 def _cmd_preflight(args: argparse.Namespace) -> int:
     payload = run_preflight(
         isolated_python=args.isolated_python,
@@ -1079,6 +1469,31 @@ def _cmd_run(args: argparse.Namespace) -> int:
     )
     _json_print(payload)
     return 0 if payload["verdict"] == "passed" else 1
+
+
+def _cmd_compare(args: argparse.Namespace) -> int:
+    payload = run_direct_vs_runner(
+        output_dir=args.output_dir,
+        isolated_runtime_path=args.isolated_runtime_path,
+        isolated_python=args.isolated_python,
+        model_path=args.model_path,
+        run_id=args.run_id,
+        prompt_id=args.prompt_id,
+        max_tokens=args.max_tokens,
+        generation_overrides={
+            "max_kv_size": args.max_kv_size,
+            "kv_bits": args.kv_bits,
+            "kv_group_size": args.kv_group_size,
+            "temperature": args.temp,
+            "top_p": args.top_p,
+            "min_p": args.min_p,
+            "top_k": args.top_k,
+            "stop": args.stop,
+        },
+        timeout_s=args.timeout_s,
+    )
+    _json_print(payload)
+    return 0 if payload["verdict"] == "diagnostic_passed" else 1
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -1181,6 +1596,39 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Experimental stop string passed through to the isolated runner.",
     )
     run.set_defaults(func=_cmd_run)
+
+    compare = sub.add_parser(
+        "compare",
+        help="Run direct mlx_lm.generate versus owlmlx runner for one D1 row",
+    )
+    add_common(compare)
+    compare.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    compare.add_argument("--run-id", default=None)
+    compare.add_argument(
+        "--prompt-id",
+        default="p1_short_cn",
+        help="Run a single D1 prompt id through both surfaces.",
+    )
+    compare.add_argument("--max-tokens", type=int, default=1024)
+    compare.add_argument("--timeout-s", type=float, default=900.0)
+    compare.add_argument(
+        "--max-kv-size",
+        type=int,
+        default=D1_GENERATION_DEFAULTS["max_kv_size"],
+    )
+    compare.add_argument("--kv-bits", type=int, default=None)
+    compare.add_argument("--kv-group-size", type=int, default=None)
+    compare.add_argument("--temp", type=float, default=D1_GENERATION_DEFAULTS["temperature"])
+    compare.add_argument("--top-p", type=float, default=None)
+    compare.add_argument("--min-p", type=float, default=None)
+    compare.add_argument("--top-k", type=int, default=None)
+    compare.add_argument(
+        "--stop",
+        action="append",
+        default=None,
+        help="Experimental stop string passed through to both surfaces.",
+    )
+    compare.set_defaults(func=_cmd_compare)
 
     return parser.parse_args(argv)
 

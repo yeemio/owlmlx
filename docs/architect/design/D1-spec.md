@@ -195,6 +195,33 @@ localize repetition sensitivity. Such runs are diagnostic variants; the D1 pass
 claim remains tied to the declared default parameters unless the spec is updated
 first.
 
+If a long-output row fails on repetition after lifecycle stays clean, run a
+direct-vs-runner diagnostic before changing acceptance criteria:
+
+```bash
+uv run python scripts/bench/deepseek_v4_d1_repeatability.py compare \
+  --run-id 20260517T-d1-p1-1024-direct-vs-runner \
+  --prompt-id p1_short_cn \
+  --max-tokens 1024 \
+  --timeout-s 900
+```
+
+The `compare` command executes the same prompt through direct
+`mlx_lm.generate` and through `owlmlx.runtime.mlx_lm_runner`, then writes a
+`d1.compare.v1` diagnostic row. Its `classification` field is attribution
+evidence only:
+
+| Classification | Meaning |
+|---|---|
+| `adapter_or_artifact_likely` | both direct `mlx_lm.generate` and owlmlx runner show repetition |
+| `runner_call_path_suspect` | direct generation is clean, but the owlmlx runner repeats |
+| `runner_masks_direct_repetition` | direct generation repeats, but the runner row does not |
+| `no_repetition_observed` | neither surface repeats for that row |
+
+This diagnostic never upgrades D1 to passed by itself. It only decides whether
+the next fix belongs in the isolated DeepSeek adapter/artifact lane or in the
+owlmlx runner call path.
+
 ## 5. Harness Requirements
 
 Prefer extending the existing model-release-candidate tooling over adding a new

@@ -605,6 +605,138 @@ def test_repetition_diagnostics_report_repeated_window() -> None:
     assert payload["repeated_window_preview"].startswith("0123456789")
 
 
+def _passed_preflight() -> dict:
+    return {
+        "schema_version": "d1.preflight.v1",
+        "gate": "D1",
+        "runtime": "owlmlx",
+        "model_id": d1.MODEL_ID,
+        "preflight": "passed",
+        "verdict": "passed",
+        "blocked_reasons": [],
+        "isolation": {},
+    }
+
+
+def _direct_result(text: str) -> dict:
+    return {
+        "ok": True,
+        "action": "direct_generate",
+        "surface": "direct_mlx_lm_generate",
+        "text": text,
+        "finish_reason": "stop",
+        "pid": 111,
+        "load_time_s": 0.1,
+        "generate_time_s": 0.2,
+    }
+
+
+def _runner_func_for_text(text: str):
+    def fake_runner(**kwargs: object) -> dict:
+        output_dir = Path(kwargs["output_dir"])
+        run_id = str(kwargs["run_id"])
+        prompt_id = str(kwargs["prompt_ids"][0])
+        max_tokens = int(kwargs["max_tokens_ladder"][0])
+        path = output_dir / f"{run_id}.jsonl"
+        repetition = d1._repetition_diagnostics(text)
+        row = {
+            "schema_version": "d1.v1",
+            "record_type": "prompt_result",
+            "run_id": run_id,
+            "prompt_id": prompt_id,
+            "max_tokens": max_tokens,
+            "prompt_results": [
+                {
+                    "ok": True,
+                    "completion_chars": len(text),
+                    **d1._completion_observation(text),
+                    "stop_reason": "unknown_non_stream_text_only",
+                    "repetition_flag": repetition["repetition_flag"],
+                    "repetition_diagnostics": repetition,
+                    "child_pid": 222,
+                    "timing": {},
+                }
+            ],
+            "lifecycle": {
+                "load_ok": True,
+                "unload_ok": True,
+                "clean_health_after_unload": True,
+            },
+            "verdict": "failed" if repetition["repetition_flag"] else "passed",
+        }
+        d1._append_jsonl(path, [row])
+        return {
+            "schema_version": "d1.run.v1",
+            "run_id": run_id,
+            "output_path": str(path),
+            "rows_written": 1,
+            "verdict": row["verdict"],
+            "lifecycle": row["lifecycle"],
+            "coverage": {},
+        }
+
+    return fake_runner
+
+
+def test_direct_vs_runner_compare_classifies_shared_repetition(monkeypatch, tmp_path):
+    repeated = "0123456789012345678901234567890123456789" * 5
+    monkeypatch.setattr(d1, "run_preflight", lambda **kwargs: _passed_preflight())
+
+    summary = d1.run_direct_vs_runner(
+        output_dir=tmp_path,
+        run_id="compare-shared",
+        prompt_id="p1_short_cn",
+        max_tokens=1024,
+        direct_func=lambda **kwargs: _direct_result(repeated),
+        runner_func=_runner_func_for_text(repeated),
+    )
+
+    records = _records(tmp_path / "compare-shared.jsonl")
+    assert len(records) == 1
+    assert summary["schema_version"] == "d1.compare.v1"
+    assert summary["classification"] == "adapter_or_artifact_likely"
+    assert summary["verdict"] == "diagnostic_failed"
+    assert summary["surfaces"]["direct_mlx_lm_generate"]["repetition_flag"] is True
+    assert summary["surfaces"]["owlmlx_runner_generate"]["repetition_flag"] is True
+    assert Path(summary["runner_output_path"]).name == "compare-shared-runner.jsonl"
+
+
+def test_direct_vs_runner_compare_flags_runner_call_path(monkeypatch, tmp_path):
+    repeated = "abcdefghijabcdefghijabcdefghijabcdefghij" * 5
+    monkeypatch.setattr(d1, "run_preflight", lambda **kwargs: _passed_preflight())
+
+    summary = d1.run_direct_vs_runner(
+        output_dir=tmp_path,
+        run_id="compare-runner-suspect",
+        prompt_id="p1_short_cn",
+        max_tokens=1024,
+        direct_func=lambda **kwargs: _direct_result("short clean completion"),
+        runner_func=_runner_func_for_text(repeated),
+    )
+
+    assert summary["classification"] == "runner_call_path_suspect"
+    assert summary["surfaces"]["direct_mlx_lm_generate"]["repetition_flag"] is False
+    assert summary["surfaces"]["owlmlx_runner_generate"]["repetition_flag"] is True
+
+
+def test_direct_vs_runner_compare_flags_runner_masking(monkeypatch, tmp_path):
+    repeated = "zyxwvutsrqponmlkjihgfedcba98765432101234" * 5
+    monkeypatch.setattr(d1, "run_preflight", lambda **kwargs: _passed_preflight())
+
+    summary = d1.run_direct_vs_runner(
+        output_dir=tmp_path,
+        run_id="compare-runner-masks",
+        prompt_id="p1_short_cn",
+        max_tokens=1024,
+        direct_func=lambda **kwargs: _direct_result(repeated),
+        runner_func=_runner_func_for_text("short clean completion"),
+    )
+
+    assert summary["classification"] == "runner_masks_direct_repetition"
+    assert summary["surfaces"]["direct_mlx_lm_generate"]["repetition_flag"] is True
+    assert summary["surfaces"]["owlmlx_runner_generate"]["repetition_flag"] is False
+
+
 def test_real_run_prompt_id_and_stop_strings_pass_through(monkeypatch, tmp_path):
     model_path = tmp_path / "model"
     model_path.mkdir()
@@ -689,6 +821,61 @@ def test_cli_run_sampler_overrides_are_forwarded(monkeypatch, tmp_path):
         "min_p": 0.05,
         "top_k": 40,
         "stop": None,
+    }
+
+
+def test_cli_compare_sampler_overrides_are_forwarded(monkeypatch, tmp_path):
+    captured: dict[str, object] = {}
+
+    def fake_compare(**kwargs: object) -> dict:
+        captured.update(kwargs)
+        return {
+            "schema_version": "d1.compare.v1",
+            "gate": "D1",
+            "runtime": "owlmlx",
+            "model_id": d1.MODEL_ID,
+            "verdict": "diagnostic_failed",
+        }
+
+    monkeypatch.setattr(d1, "run_direct_vs_runner", fake_compare)
+
+    code = d1.main(
+        [
+            "compare",
+            "--output-dir",
+            str(tmp_path),
+            "--run-id",
+            "compare-cli",
+            "--prompt-id",
+            "p1_short_cn",
+            "--max-tokens",
+            "1024",
+            "--max-kv-size",
+            "2048",
+            "--temp",
+            "0.2",
+            "--top-p",
+            "0.9",
+            "--top-k",
+            "40",
+            "--stop",
+            "<END>",
+        ]
+    )
+
+    assert code == 1
+    assert captured["run_id"] == "compare-cli"
+    assert captured["prompt_id"] == "p1_short_cn"
+    assert captured["max_tokens"] == 1024
+    assert captured["generation_overrides"] == {
+        "max_kv_size": 2048,
+        "kv_bits": None,
+        "kv_group_size": None,
+        "temperature": 0.2,
+        "top_p": 0.9,
+        "min_p": None,
+        "top_k": 40,
+        "stop": ["<END>"],
     }
 
 
