@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec only; runner pending; must not start before B-1c §1 current-Mac aggregate passes
+> **Status**: design-grade spec + fake/schema runner landed; native §2 runner pending; native execution must not start before a B-1c §1 prerequisite passes
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -217,11 +217,19 @@ scripts/bench/eviction_soak.py
   --gate b1c2-interrupted-soak-plus-swap
 ```
 
+The first code-grade slice has landed as a **fake/backend schema runner**. It
+validates the ledger shape, swap phase records, blocked rollup semantics, and
+the §1 prerequisite guard. It does not use native allocator truth and does not
+make §2 native-run evidence.
+
+Do not report B-1c §2 as native-run ready until the native execution slice
+lands and passes smoke validation after the §1 prerequisite is met.
+
 Do not create new `*_harness.py`, `*_ledger.py`, `*_evidence.py`, or
 `*_contract.py` modules for this work. Keep the bench runner in `scripts/bench/`
 and put durable claims in markdown or JSONL evidence.
 
-The first code-grade slice should be smoke-only:
+The landed smoke-only slice covers:
 
 - fake backend schema run
 - one swap boundary
@@ -232,6 +240,6 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-After B-1c §1 current-Mac aggregate reaches `interrupted_no_swap_rehearsal =
-passed`, implement the smoke runner for section 2 and run a short fake/backend
-schema proof. Native §2 segments come after that, not before.
+After a B-1c §1 prerequisite is met, implement the native section 2 execution
+slice and run a short native segment before attempting operator-interruptible
+§2 aggregate evidence.

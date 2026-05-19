@@ -592,6 +592,8 @@ def test_b1c1_interrupted_rehearsal_aggregates_segments_without_graduating(tmp_p
     assert summary["aggregate_measurement_duration_s"] == 86400.0
     assert summary["duration_requirement_met"] is True
     assert summary["all_segments_ok_for_rehearsal"] is True
+    assert summary["current_mac_section_1_prerequisite_met"] is True
+    assert summary["section_2_prerequisite_met"] is True
     assert summary["no_swap_soak_stability"] == "blocked"
     assert summary["graduates"]["interrupted_no_swap_rehearsal"] is True
     assert summary["graduates"]["no_swap_soak_stability"] is False
@@ -601,6 +603,8 @@ def test_b1c1_interrupted_rehearsal_aggregates_segments_without_graduating(tmp_p
     assert len(written) == 1
     assert written[0]["schema_version"] == "b1c1.rehearsal.v1"
     assert written[0]["segments"][1]["resumes_prior_segment"] is True
+    assert written[0]["segments"][1]["measurement_wall_clock_gap_free"] is True
+    assert written[0]["segments"][1]["wall_clock_continuity"] is None
 
 
 def test_b1c1_interrupted_rehearsal_failure_stays_failed(tmp_path):
@@ -677,6 +681,33 @@ def test_b1c1_interrupted_rehearsal_blocks_wall_clock_gap_segments(tmp_path):
     assert summary["no_swap_soak_stability"] == "blocked"
 
 
+def test_b1c1_interrupted_rehearsal_blocks_missing_wall_clock_gate(tmp_path):
+    segment = tmp_path / "segment-missing-wall-gate-rollup.jsonl"
+    _write_b1c1_segment_rollup(
+        segment,
+        run_id="segment-missing-wall-gate",
+        duration_s=86400.0,
+    )
+    payload = _records(segment)[0]
+    payload.pop("measurement_wall_clock_gap_free")
+    segment.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+    summary = eviction_soak.run_b1c1_interrupted_rehearsal(
+        segment_rollups=[segment],
+        output_dir=tmp_path,
+        run_id="aggregate-missing-wall-gate",
+        required_total_duration_s=86400.0,
+    )
+
+    assert summary["ok"] is False
+    assert summary["interrupted_no_swap_rehearsal"] == "blocked"
+    assert summary["current_mac_section_1_prerequisite_met"] is False
+    assert summary["section_2_prerequisite_met"] is False
+    assert summary["all_segments_ok_for_rehearsal"] is False
+    assert summary["segments"][0]["measurement_wall_clock_gap_free"] is None
+    assert summary["no_swap_soak_stability"] == "blocked"
+
+
 def test_b1c1_interrupted_rehearsal_rejects_empty_segment_list(tmp_path):
     with pytest.raises(ValueError, match="segment-rollup is required"):
         eviction_soak.run_b1c1_interrupted_rehearsal(
@@ -713,3 +744,68 @@ def test_cli_b1c1_interrupted_rehearsal_writes_aggregate_rollup(tmp_path):
     assert record["rehearsal_group_id"] == "cli-rehearsal"
     assert record["interrupted_no_swap_rehearsal"] == "passed"
     assert record["no_swap_soak_stability"] == "blocked"
+
+
+def test_b1c2_fake_soak_plus_swap_writes_swap_phase_and_blocked_rollup(tmp_path):
+    summary = eviction_soak.run_b1c2_soak_plus_swap(
+        runtime="owlmlx",
+        backend="fake",
+        output_dir=tmp_path,
+        swap_count=1,
+        required_swap_count=eviction_soak.B1C2_REQUIRED_SWAP_COUNT,
+        required_duration_s=24 * 60 * 60,
+        sample_interval_s=0.0,
+    )
+
+    assert summary["ok"] is False
+    assert summary["schema_version"] == "b1c2.rollup.v1"
+    assert summary["soak_plus_swap_stability"] == "blocked"
+    assert summary["swap_count"] == 1
+    assert summary["swap_requirement_met"] is False
+    assert summary["duration_requirement_met"] is False
+    assert summary["allocator_truth_claimable"] is False
+    assert summary["graduates"]["soak_plus_swap_stability"] is False
+    assert summary["graduates"]["session_kv_supported"] is False
+
+    ledger = _records(tmp_path / summary["ledger"].split("/")[-1])
+    rollup = _records(tmp_path / summary["rollup_path"].split("/")[-1])
+    swap_records = [record for record in ledger if record["phase"] == "swap"]
+    assert len(rollup) == 1
+    assert len(swap_records) == 1
+    assert {record["schema_version"] for record in ledger} == {"b1c2.v1"}
+    assert {record["mode"] for record in ledger} == {"soak_plus_swap"}
+    assert [record["phase"] for record in ledger[:3]] == ["warmup", "warmup", "warmup"]
+    assert {record["prompt_id"] for record in ledger if record["phase"] == "measurement"} == {
+        "short",
+        "medium",
+        "long",
+    }
+    swap = swap_records[0]["swap"]
+    assert swap["index"] == 1
+    assert swap["from_model"] == "qwen3.6-27b"
+    assert swap["to_model"] == "gemma-4-31B-it"
+    assert swap["unload_ok"] is True
+    assert swap["settle_barrier_state"] == "clean"
+    assert swap["load_ok"] is True
+    assert rollup[0]["soak_plus_swap_stability"] == "blocked"
+
+
+def test_b1c2_missing_b1c1_prerequisite_blocks_promotion(tmp_path):
+    summary = eviction_soak.run_b1c2_soak_plus_swap(
+        runtime="owlmlx",
+        backend="fake",
+        output_dir=tmp_path,
+        swap_count=1,
+        required_swap_count=1,
+        required_duration_s=0.0,
+        sample_interval_s=0.0,
+        b1c1_prerequisite_satisfied=False,
+    )
+
+    assert summary["duration_requirement_met"] is True
+    assert summary["swap_requirement_met"] is True
+    assert summary["prerequisite_satisfied"] is False
+    assert summary["b1c1_prerequisite"]["satisfied"] is False
+    assert summary["soak_plus_swap_stability"] == "blocked"
+    assert summary["graduates"]["soak_plus_swap_stability"] is False
+    assert summary["graduates"]["session_kv_supported"] is False

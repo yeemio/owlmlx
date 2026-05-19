@@ -30,7 +30,8 @@
 |---|---|---|
 | B-1b design spec | landed | `docs/architect/design/B-1b-spec.md` |
 | B-1b cache reclaim gate | passed · native N=20 | cache-off N=20 + cache-on N=20；20/20 warm hits；`failed_reclaim=0`；`failed_unload=0`；p50/p99 settle duration within threshold |
-| B-1c §1 no-swap soak runner | landed · graceful interruption landed · paused rehearsal evidence blocked cleanly · 24h native evidence pending | first native rehearsal exposed default TTL expiry as drift; TTL-locked 121s native segment recorded `max_drift_bytes=0`; 4h segment `20260517T090114Z` recorded `measurement_duration_s=14401.581`; planned-shutdown segment `20260517T132938Z` recorded `measurement_duration_s=9988.399`, `max_drift_bytes=0`, cache expiration/drop/reject all 0, clean unload/settle, and `no_swap_soak_stability=blocked`; aggregate interrupted rehearsal `20260517T161707Z` is 24389.98s / all segments OK / still not graduation; only uninterrupted native `mlx_core_active_memory` + required_duration ≥24h can graduate |
+| B-1c §1 no-swap soak runner | landed · graceful interruption landed · paused rehearsal evidence blocked cleanly · current-Mac aggregate evidence pending | first native rehearsal exposed default TTL expiry as drift; TTL-locked 121s native segment recorded `max_drift_bytes=0`; 4h segment `20260517T090114Z` recorded `measurement_duration_s=14401.581`; planned-shutdown segment `20260517T132938Z` recorded `measurement_duration_s=9988.399`, `max_drift_bytes=0`, cache expiration/drop/reject all 0, clean unload/settle, and `no_swap_soak_stability=blocked`; aggregate interrupted rehearsal `20260517T161707Z` is 24389.98s / all segments OK / still not graduation; current Mac route requires aggregate `interrupted_no_swap_rehearsal = passed` / `current_mac_section_1_prerequisite_met = true` before §2 native execution; only dedicated/UPS continuous native `mlx_core_active_memory` + required_duration ≥24h can produce `no_swap_soak_stability = passed` |
+| B-1c §2 soak + swap runner | fake/schema slice landed · native execution pending §1 prerequisite | `scripts/bench/eviction_soak.py` now has `b1c2-soak-plus-swap` / `b1c2-interrupted-soak-plus-swap` fake-only schema paths, canonical 3-model rotation labels, swap phase records, and prerequisite guard; no native §2 evidence and no supported claim yet |
 | D1 DeepSeek repeatability runner | passed · experimental lane · messages prompt policy adopted | default `messages` prompt surface passed the formal 5 prompt × 128/512/1024 matrix (`20260517T-d1-full-ladder-adopted-messages-policy.jsonl`) with 15/15 passed, no repetition, and clean load/unload health; raw prompt remains diagnostic failure at p1/1024 and is not the accepted D1 surface; preflight shows Blaizzy `mlx-lm` fork `pc/add-deepseekv4flash-model` at `5c10538136b9038b9626c134612b08afc18d697a` |
 | D2 DeepSeek metrics ledger | passed · p1/p2/p4 × 128/512 | fd-buffered child stdout reader fixed the previous stream block; `20260517T-d2-p1-p2-p4-128-512-metrics-v2.jsonl` records 6/6 passed rows, TTFT p50 593.840ms, decode p50 38.17885 tok/s after first token, child-process RSS p50 7.214432GB (not peak/process-tree aggregate), clean unload |
 | D3 DeepSeek MTP checkpoint inspection | passed · explicit missing reason | `20260517T-d3-mtp-checkpoint-inspection.jsonl` records `num_nextn_predict_layers=1`, 2610 weight keys / 19 shards, no MTP key candidates, no extra layer keys, `missingReason=mtp_weights_absent_or_stripped`; DeepSeek remains experimental-only |
@@ -38,7 +39,7 @@
 | H1 compat route split | landed | `server_routes_openai.py` 拆出 OpenAI / Anthropic compat routes |
 | Targeted tests | passed | B-1c/D1/session-cache focused suite = 39 passed；subprocess backend = 64 passed（上一轮） |
 
-下一条真实执行线：**B-1c §1 no-swap 24h soak**（优先继续 Session KV supported gate）。DeepSeek D1-D4 experimental lane 已闭环；只有新 DS4 artifact / adapter fork 改变 D3 checkpoint inspection 结果时，才启动 D5。
+下一条真实执行线：**B-1c §1 no-swap current-Mac segment aggregate**（优先继续 Session KV supported gate 的 §2 前置，不宣告 supported）。DeepSeek D1-D4 experimental lane 已闭环；只有新 DS4 artifact / adapter fork 改变 D3 checkpoint inspection 结果时，才启动 D5。
 
 ---
 
@@ -267,8 +268,8 @@
 
 **两段编排纪律**：
 
-1. §1 的当前 Mac 路线达到 `interrupted_no_swap_rehearsal = passed` 后才启动 §2；若未来拿到 dedicated host，`no_swap_soak_stability = passed` 可作为更强证据补充
-2. **§2 失败不撤销 §1 结论**——§1 的 `no_swap_soak_stability = passed` 作为独立事实保留；但 supported / release gate **不能 graduate**（gate 要求 §1 + §2 同时 passed）
+1. §1 的当前 Mac 路线达到 `interrupted_no_swap_rehearsal = passed` 且 `current_mac_section_1_prerequisite_met = true` 后才启动 §2 native execution；若未来拿到 dedicated host / UPS，`no_swap_soak_stability = passed` 可作为更强证据补充
+2. **§2 失败不撤销 §1 结论**——当前 Mac 的 `interrupted_no_swap_rehearsal = passed` 或 dedicated host / UPS 的 `no_swap_soak_stability = passed` 都作为独立事实保留；但 supported / release gate **不能 graduate**（gate 要求 §1 + §2 同时 passed 且经 §1a Promotion Gate）
 3. §1 与 §2 各自产出**独立 ledger**，不混合（防归因混淆，R14）
 4. **不允许**"§1 §2 合并跑 36h"假装通过 48h；**不允许**"§1 失败重启后接续 §2"——§1 失败时 §2 必须重头
 5. 总占用 ≥48h host 时间，建议夜间 / 周末启动
@@ -279,7 +280,7 @@
 
 - `B-1a · second_model_byte_equiv = passed`
 - `B-1b · cache_on_no_regress = passed`
-- `B-1c · no_swap_soak_stability = passed`
+- `B-1c §1 · interrupted_no_swap_rehearsal = passed`（current Mac 的 §2 前置）或 `no_swap_soak_stability = passed`（dedicated host / UPS continuous 更强证据）；任一 §1 结论都不单独 promotion
 - `B-1c · soak_plus_swap_stability = passed`
 
 当前状态：**2/4 已过**（B-1a、B-1b）；B-1c §1、B-1c §2 仍是 supported 晋级前置。

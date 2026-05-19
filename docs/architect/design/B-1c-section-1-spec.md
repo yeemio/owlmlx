@@ -99,7 +99,7 @@ no_swap_soak_stability: passed | failed | blocked
 
 ## 5. Pass Criteria
 
-`no_swap_soak_stability = passed` requires all of:
+Dedicated-host/UPS `no_swap_soak_stability = passed` requires all of:
 
 - `duration_requirement_met = true`
 - `claimable_24h_duration = true`: `required_duration_s >= 86400` and the
@@ -107,6 +107,7 @@ no_swap_soak_stability: passed | failed | blocked
 - `allocator_truth_claimable = true`: native backend with
   `measurement_mode = mlx_core_active_memory`
 - `ledger_gap_free = true`
+- `measurement_wall_clock_gap_free = true`
 - `warmup_cycle_complete = true`: short / medium / long each appear at least
   once in the warmup phase
 - measurement samples exist
@@ -146,13 +147,13 @@ Recommended rehearsal shapes:
 Rehearsal segments must keep separate ledgers and record:
 
 ```yaml
-interrupted_no_swap_rehearsal:
-  rehearsal_segment_id: <stable id>
-  segment_duration_s: <measured native duration>
-  interruption_reason: planned_stop | host_sleep | user_interrupt | failure | unknown
-  resumes_prior_segment: true | false
-  aggregate_measurement_duration_s: <sum of completed native segments>
-  no_swap_soak_stability: blocked
+interrupted_no_swap_rehearsal: passed | failed | blocked
+rehearsal_segment_id: <stable id>
+segment_duration_s: <measured native duration>
+interruption_reason: planned_stop | host_sleep | user_interrupt | failure | unknown
+resumes_prior_segment: true | false
+aggregate_measurement_duration_s: <sum of completed native segments>
+no_swap_soak_stability: blocked
 ```
 
 `ledger_gap_free` only means `sample_index` is contiguous. It does **not** by
@@ -169,21 +170,21 @@ during measurement is a runner/configuration blocker, not a stable soak signal.
 
 The runner handles `SIGINT` and `SIGTERM` as graceful segment stops: finish the
 current sample, unload the model, settle, write the segment rollup, and keep
-`no_swap_soak_stability = blocked` unless the uninterrupted 24h criteria are
-actually met. This protects planned host shutdown / user interruption evidence
-from becoming an orphaned raw ledger, but it does not turn segmented evidence
-into the continuous 24h graduation path.
+`no_swap_soak_stability = blocked` unless the dedicated-host/UPS uninterrupted
+24h criteria are actually met. This protects planned host shutdown / user
+interruption evidence from becoming an orphaned raw ledger, but it does not turn
+segmented evidence into the continuous 24h graduation path.
 
 Rehearsal evidence can support confidence statements such as
 `interrupted_no_swap_rehearsal = passed`. On the current Mac route, that is the
-practical B-1c §1 prerequisite for starting the §2 soak+swap design/run. It must
+practical B-1c §1 prerequisite for starting §2 code-grade runner work. It must
 not:
 
 - set `no_swap_soak_stability = passed`
-- count as the B-1c §1 supported gate
+- by itself promote session KV cache or mark B-1c complete
 - be merged into a single "24h continuous soak" claim
 
-The uninterrupted 24h native run remains the only way to claim
+The dedicated-host/UPS uninterrupted 24h native run remains the only way to claim
 `no_swap_soak_stability = passed`. The interrupted route instead claims
 operator-realistic stability: cumulative clean native segments with explicit
 boundaries and no hidden wall-clock gaps inside any segment.
@@ -225,10 +226,13 @@ The aggregate rollup uses `schema_version = "b1c1.rehearsal.v1"` and must
 always keep:
 
 ```yaml
+interrupted_no_swap_rehearsal: passed | failed | blocked
 no_swap_soak_stability: blocked
 graduates:
   no_swap_soak_stability: false
-  unblock_B_1c_section_2: false
+  session_kv_supported: false
+current_mac_section_1_prerequisite_met: true | false
+section_2_prerequisite_met: true | false
 ```
 
 ## 6. Failure Semantics
@@ -242,11 +246,13 @@ graduates:
 | Generation, watermark, or reclaim failure during 24h | `failed` | Section 1 failed; preserve raw ledger |
 | Generation, watermark, reclaim, cache drop/reject, or cleanup failure before 24h completes | `failed` | Hard failures are failures, not duration blocks |
 | Final cleanup unload fails | `failed` | Soak cannot claim clean lifecycle |
-| Section 1 passed but section 2 later fails | section 1 remains `passed` | Supported promotion still blocked |
+| Section 1 prerequisite passed but section 2 later fails | section 1 conclusion remains as recorded | Supported promotion still blocked |
 
 ## 7. Next Step
 
-After one real native 24h section 1 run passes, update:
+After current-Mac `interrupted_no_swap_rehearsal = passed` or a dedicated-host /
+UPS continuous `no_swap_soak_stability = passed`, update the architecture
+status docs:
 
 - `docs/architect/01-mainline-roadmap.md`
 - `docs/architect/03-real-accomplishments.md`

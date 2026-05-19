@@ -40,6 +40,8 @@ DEFAULT_OUTPUT_DIR = (
 B1B_GATE = "b1b-cache-on-no-regress"
 B1C1_GATE = "b1c1-no-swap-soak"
 B1C1_REHEARSAL_GATE = "b1c1-interrupted-rehearsal"
+B1C2_GATE = "b1c2-soak-plus-swap"
+B1C2_INTERRUPTED_GATE = "b1c2-interrupted-soak-plus-swap"
 B1B_OUTPUT_DIR = (
     Path(__file__).resolve().parents[2]
     / "files"
@@ -63,6 +65,7 @@ B1C1_DURATION_S = 24 * 60 * 60
 B1C1_SAMPLE_INTERVAL_S = 60.0
 B1C1_DRIFT_BUDGET_BYTES = 200 * 1024 * 1024
 B1C1_WARMUP_CYCLES = 1
+B1C2_REQUIRED_SWAP_COUNT = 6
 B1C1_WALL_CLOCK_GAP_FACTOR = 3.0
 B1C1_MIN_WALL_CLOCK_GAP_BUDGET_S = 10.0
 B1C1_INTERRUPTION_REASONS = {
@@ -74,6 +77,13 @@ B1C1_INTERRUPTION_REASONS = {
 }
 B1B_SESSION_ID_PREFIX = "b1b-gemma4-31b"
 B1C1_SESSION_ID_PREFIX = "b1c1-no-swap"
+B1C2_SESSION_ID_PREFIX = "b1c2-soak-swap"
+B1C2_ROTATION_LABELS: tuple[str, ...] = (
+    "qwen3.6-27b",
+    "gemma-4-31B-it",
+    "qwen3.6-35b-a3b",
+)
+B1C2_ROTATION_LABEL = "-".join(B1C2_ROTATION_LABELS)
 B1C1_PROMPTS: tuple[tuple[str, str], ...] = (
     ("short", "Reply with exactly: owlmlx session cache soak"),
     (
@@ -515,6 +525,24 @@ def _b1c1_rollup_filename(timestamp: str, *, model_id: str) -> str:
 
 def _b1c1_rehearsal_rollup_filename(timestamp: str) -> str:
     return f"{timestamp}-b1c1-interrupted-no-swap-rehearsal-rollup.jsonl"
+
+
+def _b1c2_filename(timestamp: str, *, rotation_label: str) -> str:
+    safe_rotation = rotation_label.strip("/").replace("/", "-")
+    return f"{timestamp}-b1c2-{safe_rotation}-soak-swap.jsonl"
+
+
+def _b1c2_rollup_filename(timestamp: str, *, rotation_label: str) -> str:
+    safe_rotation = rotation_label.strip("/").replace("/", "-")
+    return f"{timestamp}-b1c2-{safe_rotation}-soak-swap-rollup.jsonl"
+
+
+def _b1c2_interrupted_rollup_filename(timestamp: str) -> str:
+    return f"{timestamp}-b1c2-interrupted-soak-swap-rollup.jsonl"
+
+
+def _default_b1c2_rotation() -> tuple[ModelSpec, ...]:
+    return tuple(ModelSpec(model_id=label, memory_gb=1.0) for label in B1C2_ROTATION_LABELS)
 
 
 def _b1c1_sample_interval_from_records(records: list[dict[str, Any]]) -> float:
@@ -1757,6 +1785,11 @@ def run_b1c1_interrupted_rehearsal(
                 "hard_failure": bool(record.get("hard_failure")),
                 "backend": record.get("backend"),
                 "measurement_mode": record.get("measurement_mode"),
+                "ledger_gap_free": record.get("ledger_gap_free"),
+                "measurement_wall_clock_gap_free": record.get(
+                    "measurement_wall_clock_gap_free"
+                ),
+                "wall_clock_continuity": record.get("wall_clock_continuity"),
             }
         )
 
@@ -1777,6 +1810,7 @@ def run_b1c1_interrupted_rehearsal(
         rehearsal_conclusion = "passed"
     else:
         rehearsal_conclusion = "blocked"
+    current_mac_section_1_prerequisite_met = rehearsal_conclusion == "passed"
 
     payload = {
         "schema_version": "b1c1.rehearsal.v1",
@@ -1792,6 +1826,10 @@ def run_b1c1_interrupted_rehearsal(
         "duration_requirement_met": duration_requirement_met,
         "all_segments_ok_for_rehearsal": all_segments_ok,
         "interrupted_no_swap_rehearsal": rehearsal_conclusion,
+        "current_mac_section_1_prerequisite_met": (
+            current_mac_section_1_prerequisite_met
+        ),
+        "section_2_prerequisite_met": current_mac_section_1_prerequisite_met,
         "no_swap_soak_stability": "blocked",
         "conclusion": rehearsal_conclusion,
         "graduates": {
@@ -1815,11 +1853,744 @@ def run_b1c1_interrupted_rehearsal(
     }
 
 
+def _b1c2_last_expected_minus_observed_active_bytes(
+    reclaim_stats: dict[str, Any],
+) -> int | None:
+    measurements = reclaim_stats.get("measurements", [])
+    if not isinstance(measurements, list):
+        return None
+    for measurement in reversed(measurements):
+        if not isinstance(measurement, dict):
+            continue
+        value = measurement.get("expected_minus_observed_active_bytes")
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _b1c2_rollup(
+    *,
+    run_id: str,
+    rotation: tuple[ModelSpec, ...],
+    rotation_label: str,
+    backend: str,
+    measurement_mode: str,
+    output_path: Path,
+    records: list[dict[str, Any]],
+    started_monotonic_s: float,
+    measurement_started_monotonic_s: float | None,
+    measurement_finished_monotonic_s: float | None,
+    required_duration_s: float,
+    required_swap_count: int,
+    drift_budget_bytes: int,
+    initial_load: Any,
+    cleanup_unload: Any | None,
+    cleanup_settle: SettleResult | None,
+    b1c1_prerequisite_satisfied: bool,
+) -> dict[str, Any]:
+    total_duration_s = round(time.monotonic() - started_monotonic_s, 3)
+    measurement_duration_s = (
+        round(measurement_finished_monotonic_s - measurement_started_monotonic_s, 3)
+        if measurement_started_monotonic_s is not None
+        and measurement_finished_monotonic_s is not None
+        else 0.0
+    )
+    measurement_records = [
+        record for record in records if record.get("phase") == "measurement"
+    ]
+    sample_records = [
+        record for record in records if record.get("phase") in {"warmup", "measurement"}
+    ]
+    swap_records = [record for record in records if record.get("phase") == "swap"]
+    sample_indices = [int(record["sample_index"]) for record in records]
+    ledger_gap_free = sample_indices == list(range(1, len(records) + 1))
+    prompt_mix_counts = {
+        prompt_id: sum(
+            1 for record in measurement_records if record.get("prompt_id") == prompt_id
+        )
+        for prompt_id, _prompt in B1C1_PROMPTS
+    }
+    mix_values = list(prompt_mix_counts.values())
+    session_mix_complete = bool(mix_values) and all(value > 0 for value in mix_values)
+    session_mix_balanced = bool(mix_values) and max(mix_values) - min(mix_values) <= 1
+    wall_clock_continuity = _b1c1_wall_clock_continuity(records)
+    drift_values = [
+        int(record["memory"]["drift_from_measurement_start_bytes"])
+        for record in measurement_records
+        if record.get("memory", {}).get("drift_from_measurement_start_bytes") is not None
+    ]
+    max_drift_bytes = max(drift_values) if drift_values else None
+    fatal_watermark_count = sum(
+        1
+        for record in records
+        if record.get("memory", {}).get("watermark_after_generation") == MemoryWatermark.FATAL.name
+    )
+    drops_total = sum(
+        int(record.get("session_cache", {}).get("counter_delta", {}).get("drops", 0) or 0)
+        for record in records
+    )
+    expirations_total = sum(
+        int(
+            record.get("session_cache", {})
+            .get("counter_delta", {})
+            .get("expirations", 0)
+            or 0
+        )
+        for record in records
+    )
+    rejects_total = sum(
+        int(record.get("session_cache", {}).get("counter_delta", {}).get("rejects", 0) or 0)
+        for record in records
+    )
+    final_reclaim_stats = {}
+    for record in reversed(records):
+        stats = record.get("reclaim_barrier_stats_after_sample") or record.get(
+            "reclaim_barrier_stats_after_swap"
+        )
+        if isinstance(stats, dict):
+            final_reclaim_stats = stats
+            break
+    final_reclaim_summary = final_reclaim_stats.get("summary", {})
+    failure_measurement_count = int(
+        final_reclaim_summary.get("failure_measurement_count", 0) or 0
+    )
+    unresolved_reclaim_barrier_events = int(
+        final_reclaim_summary.get("unresolved_event_count", 0) or 0
+    )
+    all_swaps_clean = all(
+        bool(record.get("swap", {}).get("unload_ok"))
+        and record.get("swap", {}).get("settle_barrier_state") == "clean"
+        and bool(record.get("swap", {}).get("load_ok"))
+        for record in swap_records
+    )
+    duration_requirement_met = measurement_duration_s >= required_duration_s
+    swap_requirement_met = len(swap_records) >= required_swap_count
+    allocator_truth_claimable = (
+        backend == "native" and measurement_mode == MlxMemorySampler.measurement_mode
+    )
+    operations_ok = (
+        bool(initial_load.ok)
+        and all(record.get("sample_verdict") == "passed" for record in sample_records)
+        and all_swaps_clean
+    )
+    drift_ok = max_drift_bytes is not None and max_drift_bytes <= drift_budget_bytes
+    cleanup_ok = bool(cleanup_unload.ok) if cleanup_unload is not None else not bool(initial_load.ok)
+    hard_failure = (
+        bool(records)
+        and (
+            not operations_ok
+            or (max_drift_bytes is not None and not drift_ok)
+            or fatal_watermark_count > 0
+            or drops_total > 0
+            or expirations_total > 0
+            or rejects_total > 0
+            or failure_measurement_count > 0
+            or unresolved_reclaim_barrier_events > 0
+            or not cleanup_ok
+        )
+    )
+    ok = (
+        bool(measurement_records)
+        and b1c1_prerequisite_satisfied
+        and allocator_truth_claimable
+        and duration_requirement_met
+        and swap_requirement_met
+        and ledger_gap_free
+        and bool(wall_clock_continuity["measurement_wall_clock_gap_free"])
+        and session_mix_complete
+        and session_mix_balanced
+        and operations_ok
+        and drift_ok
+        and fatal_watermark_count == 0
+        and drops_total == 0
+        and expirations_total == 0
+        and rejects_total == 0
+        and failure_measurement_count == 0
+        and unresolved_reclaim_barrier_events == 0
+        and cleanup_ok
+    )
+    if ok:
+        conclusion = "passed"
+    elif hard_failure:
+        conclusion = "failed"
+    else:
+        conclusion = "blocked"
+    return {
+        "schema_version": "b1c2.rollup.v1",
+        "gate": "B-1c section 2",
+        "run_id": run_id,
+        "timestamp_utc": _now_iso_utc(),
+        "ledger": str(output_path),
+        "rotation_label": rotation_label,
+        "models": [model.model_id for model in rotation],
+        "backend": backend,
+        "measurement_mode": measurement_mode,
+        "total_duration_s": total_duration_s,
+        "required_duration_s": required_duration_s,
+        "measurement_duration_s": measurement_duration_s,
+        "duration_requirement_met": duration_requirement_met,
+        "required_swap_count": required_swap_count,
+        "swap_count": len(swap_records),
+        "swap_requirement_met": swap_requirement_met,
+        "ledger_gap_free": ledger_gap_free,
+        "wall_clock_continuity": wall_clock_continuity,
+        "measurement_wall_clock_gap_free": wall_clock_continuity[
+            "measurement_wall_clock_gap_free"
+        ],
+        "prompt_mix_counts": prompt_mix_counts,
+        "session_mix_complete": session_mix_complete,
+        "session_mix_balanced": session_mix_balanced,
+        "allocator_truth_claimable": allocator_truth_claimable,
+        "prerequisite_satisfied": b1c1_prerequisite_satisfied,
+        "b1c1_prerequisite": {
+            "accepted_paths": [
+                "interrupted_no_swap_rehearsal=passed with cumulative clean native segments >= 24h",
+                "no_swap_soak_stability=passed",
+            ],
+            "satisfied": b1c1_prerequisite_satisfied,
+        },
+        "hard_failure": hard_failure,
+        "max_drift_bytes": max_drift_bytes,
+        "drift_budget_bytes": drift_budget_bytes,
+        "max_drift_within_budget": drift_ok,
+        "fatal_watermark_count": fatal_watermark_count,
+        "failure_measurement_count": failure_measurement_count,
+        "unresolved_reclaim_barrier_events": unresolved_reclaim_barrier_events,
+        "session_cache_drops_total": drops_total,
+        "session_cache_expirations_total": expirations_total,
+        "session_cache_rejects_total": rejects_total,
+        "swap_boundaries_clean": all_swaps_clean,
+        "load_result": _result_to_dict(initial_load),
+        "cleanup_unload_result": (
+            _result_to_dict(cleanup_unload) if cleanup_unload is not None else None
+        ),
+        "cleanup_settle": (
+            {
+                "active_memory_bytes": cleanup_settle.active_memory_bytes,
+                "active_memory_gb": _bytes_to_gb(cleanup_settle.active_memory_bytes),
+                "iterations": cleanup_settle.iterations,
+                "duration_ms": cleanup_settle.duration_ms,
+            }
+            if cleanup_settle is not None
+            else None
+        ),
+        "soak_plus_swap_stability": conclusion,
+        "conclusion": conclusion,
+        "graduates": {
+            "soak_plus_swap_stability": ok,
+            "session_kv_supported": False,
+        },
+    }
+
+
+def run_b1c2_soak_plus_swap(
+    *,
+    runtime: str,
+    backend: str,
+    output_dir: Path,
+    model_rotation: tuple[ModelSpec, ...] | None = None,
+    rotation_label: str = B1C2_ROTATION_LABEL,
+    swap_count: int = 1,
+    required_swap_count: int = B1C2_REQUIRED_SWAP_COUNT,
+    duration_s: float = 0.0,
+    required_duration_s: float = float(B1C1_DURATION_S),
+    sample_interval_s: float = 0.0,
+    session_id_prefix: str = B1C2_SESSION_ID_PREFIX,
+    max_tokens: int = 2,
+    profile_memory_gb: float = 128.0,
+    b1c1_prerequisite_satisfied: bool = False,
+) -> dict[str, Any]:
+    if runtime != "owlmlx":
+        raise ValueError("only --runtime owlmlx is implemented in this baseline round")
+    if backend != "fake":
+        raise ValueError("B-1c section 2 schema runner is fake-only in this slice")
+    if swap_count < 1:
+        raise ValueError("--swap-count must be >= 1")
+    if required_swap_count < 0:
+        raise ValueError("--required-swap-count must be >= 0")
+    if duration_s < 0:
+        raise ValueError("--duration-s must be >= 0")
+    if required_duration_s < 0:
+        raise ValueError("--required-duration-s must be >= 0")
+    if sample_interval_s < 0:
+        raise ValueError("--sample-interval-s must be >= 0")
+
+    rotation = model_rotation or _default_b1c2_rotation()
+    if len(rotation) != len(B1C2_ROTATION_LABELS):
+        raise ValueError("B-1c section 2 requires the canonical three-model rotation")
+
+    profile = MachineMemoryProfile(
+        system_memory_gb=profile_memory_gb,
+        system_reserve_gb=2.0,
+        serving_budget_gb=max(profile_memory_gb - 2.0, 1.0),
+        warning_threshold_gb=max(profile_memory_gb - 10.0, 1.0),
+    )
+    drift_budget_bytes = _b1c1_max_drift_bytes(profile)
+    timestamp = _now_compact_utc()
+    run_id = f"{timestamp}-{runtime}-{backend}-{B1C2_GATE}"
+    output_path = output_dir / _b1c2_filename(timestamp, rotation_label=rotation_label)
+    rollup_path = output_dir / _b1c2_rollup_filename(timestamp, rotation_label=rotation_label)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    effective_session_cache_ttl_s = _b1c1_default_session_cache_ttl_s(
+        duration_s=duration_s,
+        required_duration_s=required_duration_s,
+        sample_interval_s=sample_interval_s,
+    )
+
+    with _session_cache_env(True, ttl_s=effective_session_cache_ttl_s):
+        kernel, sampler = _make_kernel(backend=backend, profile=profile)
+        records: list[dict[str, Any]] = []
+        started_monotonic_s = time.monotonic()
+        measurement_started_monotonic_s: float | None = None
+        measurement_finished_monotonic_s: float | None = None
+        first_sample_bytes: int | None = None
+        first_measurement_bytes: int | None = None
+        current_index = 0
+        current_model = rotation[current_index]
+        initial_load = kernel.load_model(current_model.model_id, memory_gb=current_model.memory_gb)
+        current_load = initial_load
+        cleanup_unload: Any | None = None
+        cleanup_settle: SettleResult | None = None
+
+        def _write_generation_record(
+            stream: Any,
+            *,
+            phase: str,
+            prompt_id: str,
+            prompt: str,
+        ) -> str:
+            nonlocal first_sample_bytes
+            nonlocal first_measurement_bytes
+            nonlocal measurement_started_monotonic_s
+            nonlocal measurement_finished_monotonic_s
+            sample_index = len(records) + 1
+            if phase == "measurement" and measurement_started_monotonic_s is None:
+                measurement_started_monotonic_s = time.monotonic()
+            session_id = f"{session_id_prefix}-{prompt_id}"
+            cache_before = _session_cache_status(kernel)
+            before_bytes = sampler.active_memory_bytes(kernel)
+            try:
+                generation = (
+                    asyncio.run(
+                        _stream_generate_once(
+                            kernel,
+                            model_id=current_model.model_id,
+                            prompt=prompt,
+                            max_tokens=max_tokens,
+                            session_id=session_id,
+                        )
+                    )
+                    if current_load.ok
+                    else StreamGenerationResult(
+                        ok=False,
+                        message="model load failed",
+                        error_code=RuntimeErrorCode.model_not_loaded,
+                        model_id=current_model.model_id,
+                    )
+                )
+            except Exception as exc:  # pragma: no cover - defensive real-run capture
+                generation = StreamGenerationResult(
+                    ok=False,
+                    message=str(exc),
+                    error_code=RuntimeErrorCode.backend_error,
+                    model_id=current_model.model_id,
+                )
+            after_bytes = sampler.active_memory_bytes(kernel)
+            if first_sample_bytes is None and after_bytes is not None:
+                first_sample_bytes = after_bytes
+            if (
+                phase == "measurement"
+                and first_measurement_bytes is None
+                and after_bytes is not None
+            ):
+                first_measurement_bytes = after_bytes
+            drift_bytes = (
+                abs(after_bytes - first_sample_bytes)
+                if after_bytes is not None and first_sample_bytes is not None
+                else None
+            )
+            measurement_drift_bytes = (
+                abs(after_bytes - first_measurement_bytes)
+                if after_bytes is not None and first_measurement_bytes is not None
+                else None
+            )
+            cache_after = _session_cache_status(kernel)
+            counter_delta = _counter_delta(
+                dict(cache_before.get("counters", {})),
+                dict(cache_after.get("counters", {})),
+            )
+            watermark_after = _watermark(after_bytes, profile=profile)
+            reclaim_stats = _reclaim_stats(kernel)
+            settle_snapshot = _compact_settle_barrier(_settle_barrier_snapshot(kernel))
+            sample_verdict = _b1c1_round_verdict(
+                load_ok=bool(current_load.ok),
+                generation=generation,
+                watermark=watermark_after,
+                reclaim_stats=reclaim_stats,
+                settle_barrier=settle_snapshot,
+            )
+            record = {
+                "schema_version": "b1c2.v1",
+                "gate": "B-1c section 2",
+                "run_id": run_id,
+                "mode": "soak_plus_swap",
+                "phase": phase,
+                "sample_index": sample_index,
+                "timestamp_utc": _now_iso_utc(),
+                "elapsed_s": round(time.monotonic() - started_monotonic_s, 3),
+                "runtime": runtime,
+                "backend": backend,
+                "measurement_mode": sampler.measurement_mode,
+                "evidence_strength": "smoke_only_no_allocator_claim",
+                "model": {
+                    "id": current_model.model_id,
+                    "path": current_model.model_id,
+                    "runtime_model_id": current_model.model_id,
+                    "memory_gb": current_model.memory_gb,
+                },
+                "rotation": {
+                    "label": rotation_label,
+                    "models": [model.model_id for model in rotation],
+                    "current_index": current_index,
+                },
+                "config": {
+                    "OWLMLX_SESSION_CACHE_ENABLED": "1",
+                    "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
+                    "session_id": session_id,
+                    "temperature": 0.0,
+                    "seed": 42,
+                    "max_tokens": max_tokens,
+                    "duration_s": duration_s,
+                    "required_duration_s": required_duration_s,
+                    "sample_interval_s": sample_interval_s,
+                    "target_swap_count": swap_count,
+                    "required_swap_count": required_swap_count,
+                    "max_generation_concurrency": 1,
+                },
+                "prompt_id": prompt_id,
+                "session_cache": {
+                    "active_entries_before": cache_before.get("active_entries"),
+                    "active_entries_after": cache_after.get("active_entries"),
+                    "counter_delta": counter_delta,
+                    "synthetic": True,
+                    "allocator_truth": False,
+                },
+                "operation": {
+                    "load_ok": bool(current_load.ok),
+                    "generation_ok": bool(generation.ok),
+                },
+                "memory": {
+                    "active_memory_before_sample_bytes": before_bytes,
+                    "active_memory_after_generation_bytes": after_bytes,
+                    "active_memory_after_generation_gb": _bytes_to_gb(after_bytes),
+                    "first_sample_active_memory_bytes": first_sample_bytes,
+                    "drift_from_first_sample_bytes": drift_bytes,
+                    "first_measurement_active_memory_bytes": first_measurement_bytes,
+                    "drift_from_measurement_start_bytes": measurement_drift_bytes,
+                    "drift_budget_bytes": drift_budget_bytes,
+                    "watermark_after_generation": watermark_after,
+                },
+                "settle_barrier_event": settle_snapshot,
+                "reclaim_barrier_stats_after_sample": reclaim_stats,
+                "load_result": _result_to_dict(current_load),
+                "generate_result": _result_to_dict(generation),
+                "sample_verdict": sample_verdict,
+            }
+            records.append(record)
+            stream.write(json.dumps(record, sort_keys=True))
+            stream.write("\n")
+            if phase == "measurement":
+                measurement_finished_monotonic_s = time.monotonic()
+            return sample_verdict
+
+        try:
+            with output_path.open("w", encoding="utf-8") as stream:
+                for prompt_id, prompt in B1C1_PROMPTS:
+                    verdict = _write_generation_record(
+                        stream,
+                        phase="warmup",
+                        prompt_id=prompt_id,
+                        prompt=prompt,
+                    )
+                    if verdict != "passed":
+                        break
+                for swap_index in range(1, swap_count + 1):
+                    if records and records[-1].get("sample_verdict") == "failed":
+                        break
+                    for prompt_id, prompt in B1C1_PROMPTS:
+                        verdict = _write_generation_record(
+                            stream,
+                            phase="measurement",
+                            prompt_id=prompt_id,
+                            prompt=prompt,
+                        )
+                        if verdict != "passed":
+                            break
+                    if records and records[-1].get("sample_verdict") == "failed":
+                        break
+
+                    sample_index = len(records) + 1
+                    from_model = current_model
+                    to_index = (current_index + 1) % len(rotation)
+                    to_model = rotation[to_index]
+                    active_before_unload = sampler.active_memory_bytes(kernel)
+                    unload = kernel.unload_model(from_model.model_id) if current_load.ok else None
+                    settle = sampler.settle(kernel, max_iterations=5, sleep_s=0.0)
+                    reclaim_stats = _reclaim_stats(kernel)
+                    settle_snapshot = _compact_settle_barrier(_settle_barrier_snapshot(kernel))
+                    load_next = kernel.load_model(to_model.model_id, memory_gb=to_model.memory_gb)
+                    active_after_load = sampler.active_memory_bytes(kernel)
+                    swap = {
+                        "index": swap_index,
+                        "from_model": from_model.model_id,
+                        "to_model": to_model.model_id,
+                        "unload_ok": bool(unload.ok) if unload is not None else False,
+                        "settle_barrier_state": settle_snapshot.get("barrier_state", "unknown"),
+                        "load_ok": bool(load_next.ok),
+                        "active_memory_before_unload_bytes": active_before_unload,
+                        "active_memory_after_settle_bytes": settle.active_memory_bytes,
+                        "expected_minus_observed_active_bytes": (
+                            _b1c2_last_expected_minus_observed_active_bytes(reclaim_stats)
+                        ),
+                    }
+                    record = {
+                        "schema_version": "b1c2.v1",
+                        "gate": "B-1c section 2",
+                        "run_id": run_id,
+                        "mode": "soak_plus_swap",
+                        "phase": "swap",
+                        "sample_index": sample_index,
+                        "timestamp_utc": _now_iso_utc(),
+                        "elapsed_s": round(time.monotonic() - started_monotonic_s, 3),
+                        "runtime": runtime,
+                        "backend": backend,
+                        "measurement_mode": sampler.measurement_mode,
+                        "evidence_strength": "smoke_only_no_allocator_claim",
+                        "rotation": {
+                            "label": rotation_label,
+                            "models": [model.model_id for model in rotation],
+                            "current_index": to_index,
+                        },
+                        "config": {
+                            "OWLMLX_SESSION_CACHE_ENABLED": "1",
+                            "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
+                            "session_id": None,
+                            "duration_s": duration_s,
+                            "required_duration_s": required_duration_s,
+                            "sample_interval_s": sample_interval_s,
+                            "target_swap_count": swap_count,
+                            "required_swap_count": required_swap_count,
+                        },
+                        "session_cache": {
+                            "counter_delta": {},
+                            "synthetic": True,
+                            "allocator_truth": False,
+                        },
+                        "memory": {
+                            "active_memory_before_unload_bytes": active_before_unload,
+                            "active_memory_after_settle_bytes": settle.active_memory_bytes,
+                            "active_memory_after_load_bytes": active_after_load,
+                        },
+                        "settle_barrier_event": settle_snapshot,
+                        "reclaim_barrier_stats_after_swap": reclaim_stats,
+                        "unload_result": _result_to_dict(unload) if unload is not None else None,
+                        "load_result": _result_to_dict(load_next),
+                        "swap": swap,
+                    }
+                    records.append(record)
+                    stream.write(json.dumps(record, sort_keys=True))
+                    stream.write("\n")
+                    measurement_finished_monotonic_s = time.monotonic()
+                    current_index = to_index
+                    current_model = to_model
+                    current_load = load_next
+                    if not all(
+                        [
+                            swap["unload_ok"],
+                            swap["settle_barrier_state"] == "clean",
+                            swap["load_ok"],
+                        ]
+                    ):
+                        break
+        finally:
+            if current_load.ok:
+                cleanup_unload = kernel.unload_model(current_model.model_id)
+                cleanup_settle = sampler.settle(kernel, max_iterations=5, sleep_s=0.0)
+
+    rollup = _b1c2_rollup(
+        run_id=run_id,
+        rotation=rotation,
+        rotation_label=rotation_label,
+        backend=backend,
+        measurement_mode=sampler.measurement_mode,
+        output_path=output_path,
+        records=records,
+        started_monotonic_s=started_monotonic_s,
+        measurement_started_monotonic_s=measurement_started_monotonic_s,
+        measurement_finished_monotonic_s=measurement_finished_monotonic_s,
+        required_duration_s=required_duration_s,
+        required_swap_count=required_swap_count,
+        drift_budget_bytes=drift_budget_bytes,
+        initial_load=initial_load,
+        cleanup_unload=cleanup_unload,
+        cleanup_settle=cleanup_settle,
+        b1c1_prerequisite_satisfied=b1c1_prerequisite_satisfied,
+    )
+    rollup_path.parent.mkdir(parents=True, exist_ok=True)
+    with rollup_path.open("w", encoding="utf-8") as stream:
+        stream.write(json.dumps(rollup, sort_keys=True))
+        stream.write("\n")
+    return {
+        **rollup,
+        "ok": rollup["conclusion"] == "passed",
+        "output_dir": str(output_dir),
+        "rollup_path": str(rollup_path),
+    }
+
+
+def _b1c2_segment_ok_for_rehearsal(record: dict[str, Any]) -> bool:
+    return (
+        record.get("schema_version") == "b1c2.rollup.v1"
+        and record.get("gate") == "B-1c section 2"
+        and record.get("hard_failure") is False
+        and record.get("ledger_gap_free") is True
+        and record.get("measurement_wall_clock_gap_free") is True
+        and record.get("session_mix_complete") is True
+        and record.get("session_mix_balanced") is True
+        and record.get("max_drift_within_budget") is True
+        and record.get("swap_boundaries_clean") is True
+        and int(record.get("fatal_watermark_count", 0) or 0) == 0
+        and int(record.get("session_cache_drops_total", 0) or 0) == 0
+        and int(record.get("session_cache_expirations_total", 0) or 0) == 0
+        and int(record.get("session_cache_rejects_total", 0) or 0) == 0
+        and int(record.get("failure_measurement_count", 0) or 0) == 0
+        and int(record.get("unresolved_reclaim_barrier_events", 0) or 0) == 0
+        and float(record.get("measurement_duration_s", 0.0) or 0.0) > 0.0
+    )
+
+
+def run_b1c2_interrupted_soak_plus_swap(
+    *,
+    segment_rollups: list[Path],
+    output_dir: Path,
+    run_id: str | None = None,
+    required_total_duration_s: float = float(B1C1_DURATION_S),
+    required_swap_count: int = B1C2_REQUIRED_SWAP_COUNT,
+    b1c1_prerequisite_satisfied: bool = False,
+) -> dict[str, Any]:
+    if not segment_rollups:
+        raise ValueError("--segment-rollup is required for interrupted soak-plus-swap")
+    if required_total_duration_s < 0:
+        raise ValueError("--aggregate-required-duration-s must be >= 0")
+    if required_swap_count < 0:
+        raise ValueError("--required-swap-count must be >= 0")
+
+    timestamp = _now_compact_utc()
+    run_id = run_id or f"{timestamp}-owlmlx-{B1C2_INTERRUPTED_GATE}"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / _b1c2_interrupted_rollup_filename(timestamp)
+    segments: list[dict[str, Any]] = []
+    for index, path in enumerate(segment_rollups, start=1):
+        record = _read_first_jsonl_record(path)
+        segment_ok = _b1c2_segment_ok_for_rehearsal(record)
+        segments.append(
+            {
+                "segment_index": index,
+                "source_rollup": str(path),
+                "source_run_id": record.get("run_id"),
+                "segment_duration_s": float(record.get("measurement_duration_s", 0.0) or 0.0),
+                "swap_count": int(record.get("swap_count", 0) or 0),
+                "segment_ok_for_rehearsal": segment_ok,
+                "soak_plus_swap_stability": record.get("soak_plus_swap_stability"),
+                "hard_failure": bool(record.get("hard_failure")),
+                "backend": record.get("backend"),
+                "measurement_mode": record.get("measurement_mode"),
+                "prerequisite_satisfied": bool(record.get("prerequisite_satisfied")),
+            }
+        )
+
+    aggregate_duration_s = round(
+        sum(float(segment["segment_duration_s"]) for segment in segments),
+        3,
+    )
+    aggregate_swap_count = sum(int(segment["swap_count"]) for segment in segments)
+    duration_requirement_met = aggregate_duration_s >= required_total_duration_s
+    swap_requirement_met = aggregate_swap_count >= required_swap_count
+    any_failed = any(
+        segment.get("soak_plus_swap_stability") == "failed"
+        or bool(segment.get("hard_failure"))
+        for segment in segments
+    )
+    all_segments_ok = all(bool(segment["segment_ok_for_rehearsal"]) for segment in segments)
+    all_segments_allocator_truth = all(
+        segment.get("backend") == "native"
+        and segment.get("measurement_mode") == MlxMemorySampler.measurement_mode
+        for segment in segments
+    )
+    ok = (
+        b1c1_prerequisite_satisfied
+        and all_segments_allocator_truth
+        and all_segments_ok
+        and duration_requirement_met
+        and swap_requirement_met
+    )
+    if ok:
+        conclusion = "passed"
+    elif any_failed:
+        conclusion = "failed"
+    else:
+        conclusion = "blocked"
+    payload = {
+        "schema_version": "b1c2.aggregate.v1",
+        "gate": "B-1c section 2 interrupted soak plus swap",
+        "run_id": run_id,
+        "timestamp_utc": _now_iso_utc(),
+        "segment_rollups": [str(path) for path in segment_rollups],
+        "segments": segments,
+        "interrupted_soak_plus_swap": {
+            "aggregate_measurement_duration_s": aggregate_duration_s,
+            "aggregate_swap_count": aggregate_swap_count,
+            "segment_count": len(segments),
+            "all_segments_ok_for_rehearsal": all_segments_ok,
+            "prerequisite_satisfied": b1c1_prerequisite_satisfied,
+            "duration_requirement_met": duration_requirement_met,
+            "swap_requirement_met": swap_requirement_met,
+            "allocator_truth_claimable": all_segments_allocator_truth,
+        },
+        "soak_plus_swap_stability": conclusion,
+        "conclusion": conclusion,
+        "graduates": {
+            "soak_plus_swap_stability": ok,
+            "session_kv_supported": False,
+        },
+    }
+    with output_path.open("w", encoding="utf-8") as stream:
+        stream.write(json.dumps(payload, sort_keys=True))
+        stream.write("\n")
+    return {
+        **payload,
+        "ok": conclusion == "passed",
+        "output_dir": str(output_dir),
+        "rollup_path": str(output_path),
+    }
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--gate",
-        choices=("baseline", B1B_GATE, B1C1_GATE, B1C1_REHEARSAL_GATE),
+        choices=(
+            "baseline",
+            B1B_GATE,
+            B1C1_GATE,
+            B1C1_REHEARSAL_GATE,
+            B1C2_GATE,
+            B1C2_INTERRUPTED_GATE,
+        ),
         default="baseline",
     )
     parser.add_argument("--runtime", choices=("owlmlx", "omlx", "vmlx"), default="owlmlx")
@@ -1861,6 +2632,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         type=float,
         default=float(B1C1_DURATION_S),
     )
+    parser.add_argument("--swap-count", type=int, default=1)
+    parser.add_argument("--required-swap-count", type=int, default=B1C2_REQUIRED_SWAP_COUNT)
+    parser.add_argument("--b1c1-prerequisite-satisfied", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -1904,6 +2678,21 @@ def main(argv: list[str] | None = None) -> int:
                 interruption_reason=args.interruption_reason,
                 session_cache_ttl_s=args.session_cache_ttl_s,
             )
+        elif args.gate == B1C2_GATE:
+            summary = run_b1c2_soak_plus_swap(
+                runtime=args.runtime,
+                backend=args.backend,
+                output_dir=args.output or B1C1_OUTPUT_DIR,
+                swap_count=args.swap_count,
+                required_swap_count=args.required_swap_count,
+                duration_s=args.duration_s,
+                required_duration_s=args.required_duration_s,
+                sample_interval_s=args.sample_interval_s,
+                session_id_prefix=args.session_id_prefix or B1C2_SESSION_ID_PREFIX,
+                max_tokens=args.max_tokens,
+                profile_memory_gb=args.profile_memory_gb,
+                b1c1_prerequisite_satisfied=args.b1c1_prerequisite_satisfied,
+            )
         elif args.gate == B1C1_REHEARSAL_GATE:
             summary = run_b1c1_interrupted_rehearsal(
                 segment_rollups=args.segment_rollup,
@@ -1911,6 +2700,15 @@ def main(argv: list[str] | None = None) -> int:
                 run_id=None,
                 rehearsal_group_id=args.rehearsal_group_id,
                 required_total_duration_s=args.aggregate_required_duration_s,
+            )
+        elif args.gate == B1C2_INTERRUPTED_GATE:
+            summary = run_b1c2_interrupted_soak_plus_swap(
+                segment_rollups=args.segment_rollup,
+                output_dir=args.output or B1C1_OUTPUT_DIR,
+                run_id=None,
+                required_total_duration_s=args.aggregate_required_duration_s,
+                required_swap_count=args.required_swap_count,
+                b1c1_prerequisite_satisfied=args.b1c1_prerequisite_satisfied,
             )
         else:
             summary = run_eviction_soak(
