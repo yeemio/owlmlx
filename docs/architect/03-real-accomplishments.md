@@ -201,6 +201,7 @@
 - 2026-05-18 continuous-24h attempt (`20260518T004835Z`) 因 host sleep / power gap + planned stop 只能入账为 interrupted segment：raw rollup 记录 `measurement_duration_s=9315.302`、`measurement_samples=152`、短/中/长 prompt mix `51/51/50`、`max_drift_bytes=0`、session cache expiration/drop/reject 全 0、FATAL 0、unresolved reclaim barrier 0、cleanup unload OK、settle 后 active memory 28 bytes；人工复核 ledger timestamp 发现 measurement wall-clock gap：sample 136→137 gap `2974.612s`、sample 146→147 gap `726.108s`，因此该段保持 `blocked`，不计入 continuous 24h graduation
 - 2026-05-19 runner 已补 `measurement_wall_clock_gap_free` / `wall_clock_continuity` rollup 字段，后续 24h run 必须同时满足 ledger index 连续与 measurement wall-clock 连续
 - 2026-05-19 用户校准：当前 Mac / laptop 环境**肯定会中断**，因此 B-1c §1 当前路线改为可中断分段累计 ≥24h；continuous 24h 保留为 dedicated host / UPS 的更强证据，不再作为当前机器上的默认期待
+- 2026-05-19 planned-stop native segment (`20260519T014912Z`) 通过 SIGTERM graceful stop 落盘：`measurement_duration_s=28245.605`、`measurement_samples=461`、短/中/长 prompt mix `154/154/153`、`measurement_wall_clock_gap_free=true`、最大 measurement wall-clock gap `66.922s`、`max_drift_bytes=0`、session cache expiration/drop/reject 全 0、FATAL 0、unresolved reclaim barrier 0、cleanup unload OK、settle 后 active memory 28 bytes；aggregate `20260519T094117Z` 因累计 `28245.605s < 86400s` 正确保持 `blocked`
 - 2026-05-19 B-1c §2 fake/schema runner 已落：可生成 `b1c2-soak-plus-swap` / `b1c2-interrupted-soak-plus-swap` schema、swap phase 与 prerequisite guard；这只是 code/schema readiness，不是 native §2 evidence
 - 但 **无 24h+ operator-interruptible aggregate 报告**——`active_memory` 漂移、`failed_reclaim`、watermark 跃迁、ledger index 连续性、segment 内 wall-clock 连续性等关键指标尚未聚合通过
 
@@ -265,7 +266,7 @@
 |---|---|---|
 | **B-1a · 第二模型 / 第二形状** | ✅ | Gemma 4-31B-it 已复现 session KV warm TTFT 改善（2.246×，RuntimeKernel 路径）+ 非 cache 路径 N≥5 prompt 字节等价；§VI 4-gate G1 Cache Parity 已关闭 |
 | **B-1b · `cache=on` × settle barrier 无回归** | ✅ | Gemma 4-31B-it cache-off N=20 / cache-on N=20 passed；20/20 warm hits；`failed_reclaim=0`；cache=off 基线对齐 |
-| **B-1c §1 · 纯 soak（24h+）** | ❌ | runner 已落且 fake/schema smoke 不可毕业；4h + planned-shutdown native interrupted rehearsal 合计 24389.98s 干净但仍为 `blocked`；2026-05-18 continuous-24h attempt 因 host sleep / power gap 出现 `2974.612s` measurement wall-clock gap，只能作为 interrupted segment；当前 Mac 路线改为可中断分段累计 ≥24h，仍缺 aggregate `interrupted_no_swap_rehearsal = passed` |
+| **B-1c §1 · 纯 soak（24h+）** | ❌ | runner 已落且 fake/schema smoke 不可毕业；4h + planned-shutdown native interrupted rehearsal 合计 24389.98s 干净但仍为 `blocked`；2026-05-18 continuous-24h attempt 因 host sleep / power gap 出现 `2974.612s` measurement wall-clock gap，只能作为 interrupted segment；2026-05-19 clean planned-stop segment 28245.605s / wall-clock gap free / max drift 0，aggregate 仍 `blocked`；当前 Mac 路线改为可中断分段累计 ≥24h，仍缺 aggregate `interrupted_no_swap_rehearsal = passed` |
 | **B-1c §2 · soak + swap（24h+）** | ❌ | fake/schema runner 已落但 native evidence 未启动；§1 通过后；每 4h × 6 次 swap；累积 `failed_reclaim = 0` + 漂移 < §1 阈值；`soak_plus_swap_stability = passed` |
 
 **四条全过** → §1a Promotion Gate → `experimental` 升 `supported`。当前 2/4 达成。

@@ -1,0 +1,23 @@
+{
+  "schema_version": "b1c1.launch.v1",
+  "stamp_utc": "20260519T014912Z",
+  "tmux_session": "owlmlx-b1c1-24h-20260519T014912Z",
+  "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+  "model": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+  "git_commit": "4567ab491d4779c7b598888b0b95a57760bdf408",
+  "launch_manifest": "files/evidence/owlmlx/bench/session-kv-soak/20260519T014912Z-b1c1-gemma-4-31B-it-24h-native-no-swap-launch.json",
+  "log": "files/evidence/owlmlx/bench/session-kv-soak/20260519T014912Z-b1c1-gemma-4-31B-it-24h-native-no-swap.log",
+  "exit_file": "files/evidence/owlmlx/bench/session-kv-soak/20260519T014912Z-b1c1-gemma-4-31B-it-24h-native-no-swap.exit",
+  "duration_s": 86400,
+  "required_duration_s": 86400,
+  "sample_interval_s": 60,
+  "warmup_cycles": 1,
+  "max_tokens": 2,
+  "backend": "native",
+  "gate": "b1c1-no-swap-soak",
+  "rehearsal_group_id": "b1c1-native-24h-continuous-20260519",
+  "notes": [
+    "Continuous 24h attempt from zero after wall-clock gap guard landed.",
+    "If host sleeps or powers off, rollup measurement_wall_clock_gap_free must stay false and no supported graduation claim is allowed."
+  ]
+}
