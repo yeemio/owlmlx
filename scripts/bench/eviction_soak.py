@@ -63,6 +63,8 @@ B1C1_DURATION_S = 24 * 60 * 60
 B1C1_SAMPLE_INTERVAL_S = 60.0
 B1C1_DRIFT_BUDGET_BYTES = 200 * 1024 * 1024
 B1C1_WARMUP_CYCLES = 1
+B1C1_WALL_CLOCK_GAP_FACTOR = 3.0
+B1C1_MIN_WALL_CLOCK_GAP_BUDGET_S = 10.0
 B1C1_INTERRUPTION_REASONS = {
     "planned_stop",
     "host_sleep",
@@ -205,6 +207,19 @@ def _now_compact_utc() -> str:
 
 def _now_iso_utc() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _parse_iso_utc(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _bytes_to_gb(value: int | None) -> float | None:
@@ -500,6 +515,90 @@ def _b1c1_rollup_filename(timestamp: str, *, model_id: str) -> str:
 
 def _b1c1_rehearsal_rollup_filename(timestamp: str) -> str:
     return f"{timestamp}-b1c1-interrupted-no-swap-rehearsal-rollup.jsonl"
+
+
+def _b1c1_sample_interval_from_records(records: list[dict[str, Any]]) -> float:
+    for record in records:
+        value = record.get("config", {}).get("sample_interval_s")
+        try:
+            return max(float(value), 0.0)
+        except (TypeError, ValueError):
+            continue
+    return float(B1C1_SAMPLE_INTERVAL_S)
+
+
+def _b1c1_wall_clock_continuity(records: list[dict[str, Any]]) -> dict[str, Any]:
+    sample_interval_s = _b1c1_sample_interval_from_records(records)
+    gap_budget_s = max(
+        sample_interval_s * B1C1_WALL_CLOCK_GAP_FACTOR,
+        B1C1_MIN_WALL_CLOCK_GAP_BUDGET_S,
+    )
+    timestamped: list[tuple[dict[str, Any], datetime]] = []
+    missing_timestamp_count = 0
+    for record in records:
+        timestamp = _parse_iso_utc(record.get("timestamp_utc"))
+        if timestamp is None:
+            missing_timestamp_count += 1
+            continue
+        timestamped.append((record, timestamp))
+
+    sample_gaps: list[float] = []
+    measurement_gaps: list[float] = []
+    sample_gap_violations: list[dict[str, Any]] = []
+    measurement_gap_violations: list[dict[str, Any]] = []
+    for (previous_record, previous_ts), (record, timestamp) in zip(
+        timestamped,
+        timestamped[1:],
+    ):
+        gap_s = max((timestamp - previous_ts).total_seconds(), 0.0)
+        sample_gaps.append(gap_s)
+        violation = {
+            "previous_sample_index": previous_record.get("sample_index"),
+            "sample_index": record.get("sample_index"),
+            "previous_phase": previous_record.get("phase"),
+            "phase": record.get("phase"),
+            "gap_s": round(gap_s, 3),
+            "budget_s": round(gap_budget_s, 3),
+        }
+        if gap_s > gap_budget_s:
+            sample_gap_violations.append(violation)
+        if (
+            previous_record.get("phase") == "measurement"
+            and record.get("phase") == "measurement"
+        ):
+            measurement_gaps.append(gap_s)
+            if gap_s > gap_budget_s:
+                measurement_gap_violations.append(violation)
+
+    measurement_record_count = sum(
+        1 for record in records if record.get("phase") == "measurement"
+    )
+    timestamped_measurement_count = sum(
+        1 for record, _timestamp in timestamped if record.get("phase") == "measurement"
+    )
+    measurement_observable = timestamped_measurement_count == measurement_record_count
+    measurement_wall_clock_gap_free = (
+        measurement_observable and not measurement_gap_violations
+    )
+    return {
+        "sample_interval_s": sample_interval_s,
+        "sample_wall_clock_gap_budget_s": round(gap_budget_s, 3),
+        "timestamped_sample_count": len(timestamped),
+        "missing_timestamp_count": missing_timestamp_count,
+        "max_sample_wall_clock_gap_s": round(max(sample_gaps), 3) if sample_gaps else 0.0,
+        "max_measurement_wall_clock_gap_s": (
+            round(max(measurement_gaps), 3) if measurement_gaps else 0.0
+        ),
+        "sample_wall_clock_gap_free": missing_timestamp_count == 0
+        and not sample_gap_violations,
+        "measurement_wall_clock_gap_free": measurement_wall_clock_gap_free,
+        "sample_wall_clock_gap_violation_count": len(sample_gap_violations),
+        "measurement_wall_clock_gap_violation_count": len(
+            measurement_gap_violations
+        ),
+        "sample_wall_clock_gap_violations": sample_gap_violations[:8],
+        "measurement_wall_clock_gap_violations": measurement_gap_violations[:8],
+    }
 
 
 def _read_first_jsonl_record(path: Path) -> dict[str, Any]:
@@ -1096,6 +1195,7 @@ def _b1c1_rollup(
     mix_values = list(prompt_mix_counts.values())
     session_mix_complete = bool(mix_values) and all(value > 0 for value in mix_values)
     session_mix_balanced = bool(mix_values) and max(mix_values) - min(mix_values) <= 1
+    wall_clock_continuity = _b1c1_wall_clock_continuity(records)
     drift_values = [
         int(record["memory"]["drift_from_measurement_start_bytes"])
         for record in measurement_records
@@ -1166,6 +1266,7 @@ def _b1c1_rollup(
         and allocator_truth_claimable
         and warmup_cycle_complete
         and ledger_gap_free
+        and bool(wall_clock_continuity["measurement_wall_clock_gap_free"])
         and session_mix_complete
         and session_mix_balanced
         and operations_ok
@@ -1209,6 +1310,10 @@ def _b1c1_rollup(
         "ledger_gap_free": ledger_gap_free,
         "warmup_mix_counts": warmup_mix_counts,
         "warmup_cycle_complete": warmup_cycle_complete,
+        "wall_clock_continuity": wall_clock_continuity,
+        "measurement_wall_clock_gap_free": wall_clock_continuity[
+            "measurement_wall_clock_gap_free"
+        ],
         "prompt_mix_counts": prompt_mix_counts,
         "session_mix_complete": session_mix_complete,
         "session_mix_balanced": session_mix_balanced,
@@ -1598,6 +1703,7 @@ def _b1c1_rehearsal_segment_ok(record: dict[str, Any]) -> bool:
         and record.get("no_swap_soak_stability") == "blocked"
         and record.get("hard_failure") is False
         and record.get("ledger_gap_free") is True
+        and record.get("measurement_wall_clock_gap_free", True) is True
         and record.get("warmup_cycle_complete") is True
         and record.get("session_mix_complete") is True
         and record.get("session_mix_balanced") is True

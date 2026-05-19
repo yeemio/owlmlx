@@ -198,13 +198,15 @@
 - 2026-05-17 短 native rehearsal 暴露默认 60s TTL 会在 measurement 内触发 session cache expiration，从而造成 237–247MB active-memory 摆动；runner 已锁定 B-1c TTL，随后 121s native segment 记录 `max_drift_bytes=0`、`session_cache_expirations_total=0`、clean unload，但因 duration 不足仍正确保持 `blocked`
 - 2026-05-17 4h TTL-locked native rehearsal (`20260517T090114Z`) 记录 `measurement_duration_s=14401.581`、`measurement_samples=235`、短/中/长 prompt mix `79/78/78`、`max_drift_bytes=0`、session cache expiration/drop/reject 全 0、FATAL 0、unresolved reclaim barrier 0、cleanup unload OK、settle 后 active memory 28 bytes；因 required duration 仍为 24h，`no_swap_soak_stability=blocked`，不产生 supported graduation claim
 - 2026-05-17 planned-shutdown segment (`20260517T132938Z`) 通过 SIGTERM graceful stop 落盘：`measurement_duration_s=9988.399`、`measurement_samples=161`、短/中/长 prompt mix `54/54/53`、`max_drift_bytes=0`、session cache expiration/drop/reject 全 0、FATAL 0、unresolved reclaim barrier 0、cleanup unload OK、settle 后 active memory 28 bytes；与 4h segment 聚合为 `20260517T161707Z` interrupted rehearsal，合计 `24389.98s`、`all_segments_ok_for_rehearsal=true`、仍 `blocked`
+- 2026-05-18 continuous-24h attempt (`20260518T004835Z`) 因 host sleep / power gap + planned stop 只能入账为 interrupted segment：raw rollup 记录 `measurement_duration_s=9315.302`、`measurement_samples=152`、短/中/长 prompt mix `51/51/50`、`max_drift_bytes=0`、session cache expiration/drop/reject 全 0、FATAL 0、unresolved reclaim barrier 0、cleanup unload OK、settle 后 active memory 28 bytes；人工复核 ledger timestamp 发现 measurement wall-clock gap：sample 136→137 gap `2974.612s`、sample 146→147 gap `726.108s`，因此该段保持 `blocked`，不计入 continuous 24h graduation
+- 2026-05-19 runner 已补 `measurement_wall_clock_gap_free` / `wall_clock_continuity` rollup 字段，后续 24h run 必须同时满足 ledger index 连续与 measurement wall-clock 连续
 - 但 **无 24h+ 真实 soak 报告**——`active_memory` 漂移、`failed_reclaim`、watermark 跃迁、ledger 连续性等关键指标未公开
 
 **晋级 gate · 两段 48h+ 拆分（决策 D3 · 2026-05-16）**：
 
 | 段 | 时长 | 内容 | 干预 | 验收 | 结论字段 |
 |---|---|---|---|---|---|
-| **B-1c §1 · 纯 soak** | ≥24h | 混合负载（短/中/长 session = 1:1:1） | **无人为 swap** | `active_memory` 漂移 < `min(200 MB, 0.5% host budget)` + 中途无 watermark→FATAL + `failed_reclaim = 0` + ledger 连续无 gap | `no_swap_soak_stability = passed \| failed` |
+| **B-1c §1 · 纯 soak** | ≥24h | 混合负载（短/中/长 session = 1:1:1） | **无人为 swap** | `active_memory` 漂移 < `min(200 MB, 0.5% host budget)` + 中途无 watermark→FATAL + `failed_reclaim = 0` + ledger index 连续 + measurement wall-clock sample gap 无 host sleep / power gap | `no_swap_soak_stability = passed \| failed` |
 | **B-1c §2 · soak + swap** | ≥24h（§1 通过后启动） | 同 §1 混合负载 | 每 4h × 6 次 Qwen3.6-27B ↔ Gemma 4-31B ↔ Qwen3.6-35B-A3B 轮换 | 每次 swap settle_barrier 通过 + 累积 `failed_reclaim = 0` + 漂移 < §1 阈值 + 任意 swap 触发 FATAL 即整 §2 失败 | `soak_plus_swap_stability = passed \| failed` |
 
 **结论独立陈述纪律（用户校准 2026-05-16）**：
@@ -261,7 +263,7 @@
 |---|---|---|
 | **B-1a · 第二模型 / 第二形状** | ✅ | Gemma 4-31B-it 已复现 session KV warm TTFT 改善（2.246×，RuntimeKernel 路径）+ 非 cache 路径 N≥5 prompt 字节等价；§VI 4-gate G1 Cache Parity 已关闭 |
 | **B-1b · `cache=on` × settle barrier 无回归** | ✅ | Gemma 4-31B-it cache-off N=20 / cache-on N=20 passed；20/20 warm hits；`failed_reclaim=0`；cache=off 基线对齐 |
-| **B-1c §1 · 纯 soak（24h+）** | ❌ | runner 已落且 fake/schema smoke 不可毕业；4h + planned-shutdown native interrupted rehearsal 合计 24389.98s 干净但仍为 `blocked`；仍缺无人为 swap 的 24h+ native 混合负载 soak；漂移 < `min(200 MB, 0.5% host budget)`；`no_swap_soak_stability = passed` |
+| **B-1c §1 · 纯 soak（24h+）** | ❌ | runner 已落且 fake/schema smoke 不可毕业；4h + planned-shutdown native interrupted rehearsal 合计 24389.98s 干净但仍为 `blocked`；2026-05-18 continuous-24h attempt 因 host sleep / power gap 出现 `2974.612s` measurement wall-clock gap，只能作为 interrupted segment；仍缺无人为 swap 的 24h+ native 混合负载 soak；漂移 < `min(200 MB, 0.5% host budget)`；`no_swap_soak_stability = passed` |
 | **B-1c §2 · soak + swap（24h+）** | ❌ | §1 通过后；每 4h × 6 次 swap；累积 `failed_reclaim = 0` + 漂移 < §1 阈值；`soak_plus_swap_stability = passed` |
 
 **四条全过** → §1a Promotion Gate → `experimental` 升 `supported`。当前 2/4 达成。

@@ -253,7 +253,7 @@
 - **无人为 unload / swap**
 - 验证单一命题："`cache=on` 不破坏 `active_memory`"
 - 漂移阈值：`min(200 MB, 0.5% host budget)`
-- 验收：中途无 watermark→FATAL + `failed_reclaim = 0` 持续 24h + ledger 连续无 gap
+- 验收：中途无 watermark→FATAL + `failed_reclaim = 0` 持续 24h + ledger sample index 连续无 gap + measurement wall-clock sample gap 无 host sleep / power gap
 - **结论字段**：`no_swap_soak_stability = passed | failed`（独立陈述，**不**合并为 "48h soak passed"）
 
 **B-1c §2 · soak + swap（≥24h，§1 通过后启动）**
@@ -391,7 +391,7 @@
 | R10 | OwlCoda 消费就绪 gate 卡顿 | 中 | 中 | §IV.5 已明确"不在主线" |
 | R11 | `server.py` 单文件膨胀 | 高 | 中 | **Wave H 拆分**；H1 已把 OpenAI/Anthropic compat routes 拆到 `server_routes_openai.py`；H2/H3 后续推进；CI 行数 lint |
 | R12 | `llm_router` 被误当主线 | 中 | 高 | §IV.5 transitional；不向 `llm_router` 借入或反向依赖 |
-| R13 | Session KV gate **四条**偏短跑（B-1a + B-1b + B-1c §1 + B-1c §2） | 高 | 极高 | 必须**全部**满足；§1 / §2 独立 ledger；§2 必须 §1 通过后启动；**不允许**合并跑或缩短 |
+| R13 | Session KV gate **四条**偏短跑（B-1a + B-1b + B-1c §1 + B-1c §2） | 高 | 极高 | 必须**全部**满足；§1 / §2 独立 ledger；§2 必须 §1 通过后启动；**不允许**合并跑或缩短；B-1c §1 需要 ledger index + wall-clock continuity 双重连续 |
 | R14 | B-1c §2 swap 失败归因混淆 | 中 | 高 | §1 / §2 独立 ledger；§2 失败不回溯 §1；归因清单（swap 触发 vs cache 长跑） |
 | R15 | Wave H 拆迁中 contract 回归未发现 | 中 | 高 | 全套 835 test 强制通过；拆分 PR 分 "move only" / "behavior" 两轮 review |
 

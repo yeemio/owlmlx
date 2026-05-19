@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 1 · Session KV cache no-swap soak
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: runner + interrupted rehearsal aggregation landed; 4h native rehearsal clean but blocked; real 24h native run pending
+> **Status**: runner + interrupted rehearsal aggregation landed; 4h + planned-stop interrupted segments clean but blocked; wall-clock gap detection landed after a host sleep / power-gap attempt; real continuous 24h native run pending
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -152,6 +152,13 @@ interrupted_no_swap_rehearsal:
   no_swap_soak_stability: blocked
 ```
 
+`ledger_gap_free` only means `sample_index` is contiguous. It does **not** by
+itself prove the host stayed awake. B-1c §1 graduation also requires
+`measurement_wall_clock_gap_free = true`: consecutive measurement sample
+timestamps must stay within the runner's wall-clock gap budget. Host sleep,
+power loss, or any long wall-clock pause must keep the rollup `blocked` even if
+all individual samples pass and `max_drift_bytes = 0`.
+
 B-1c runner defaults `OWLMLX_SESSION_CACHE_TTL_S` to at least 25h so session
 entries do not expire during a 24h no-swap measurement window. Rehearsal and
 graduation rollups must keep `session_cache_expirations_total = 0`; TTL expiry
@@ -224,6 +231,7 @@ graduates:
 |---|---|---|
 | Short smoke / schema run | `blocked` | Useful for harness validation only |
 | Native run shorter than 24h | `blocked` | Useful for rehearsal only |
+| Native run has host sleep / power gap in measurement wall-clock samples | `blocked` | Operational interruption; not a runtime hard failure, not a continuous soak |
 | Generation, watermark, or reclaim failure during 24h | `failed` | Section 1 failed; preserve raw ledger |
 | Generation, watermark, reclaim, cache drop/reject, or cleanup failure before 24h completes | `failed` | Hard failures are failures, not duration blocks |
 | Final cleanup unload fails | `failed` | Soak cannot claim clean lifecycle |

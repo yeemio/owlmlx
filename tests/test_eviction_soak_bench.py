@@ -5,6 +5,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -317,6 +318,109 @@ def test_b1c1_duration_clock_starts_after_warmup(tmp_path):
     assert summary["ok"] is False
 
 
+def test_b1c1_rollup_blocks_when_measurement_wall_clock_has_sleep_gap(tmp_path):
+    now = time.monotonic()
+    base = {
+        "schema_version": "b1c1.v1",
+        "gate": "B-1c section 1",
+        "mode": "no_swap_soak",
+        "sample_verdict": "passed",
+        "config": {"sample_interval_s": 60.0},
+        "memory": {
+            "drift_from_measurement_start_bytes": 0,
+            "watermark_after_generation": "GREEN",
+        },
+        "session_cache": {"counter_delta": {}},
+        "reclaim_barrier_stats_after_sample": {
+            "summary": {
+                "failure_measurement_count": 0,
+                "unresolved_event_count": 0,
+            }
+        },
+    }
+    records = [
+        {
+            **base,
+            "sample_index": 1,
+            "phase": "warmup",
+            "prompt_id": "short",
+            "timestamp_utc": "2026-05-18T00:00:00Z",
+        },
+        {
+            **base,
+            "sample_index": 2,
+            "phase": "warmup",
+            "prompt_id": "medium",
+            "timestamp_utc": "2026-05-18T00:00:01Z",
+        },
+        {
+            **base,
+            "sample_index": 3,
+            "phase": "warmup",
+            "prompt_id": "long",
+            "timestamp_utc": "2026-05-18T00:00:02Z",
+        },
+        {
+            **base,
+            "sample_index": 4,
+            "phase": "measurement",
+            "prompt_id": "short",
+            "timestamp_utc": "2026-05-18T00:01:02Z",
+        },
+        {
+            **base,
+            "sample_index": 5,
+            "phase": "measurement",
+            "prompt_id": "medium",
+            "timestamp_utc": "2026-05-18T01:01:02Z",
+        },
+        {
+            **base,
+            "sample_index": 6,
+            "phase": "measurement",
+            "prompt_id": "long",
+            "timestamp_utc": "2026-05-18T01:02:02Z",
+        },
+    ]
+
+    rollup = eviction_soak._b1c1_rollup(
+        run_id="b1c1-wall-gap",
+        model=eviction_soak.ModelSpec("gemma-4-31B-it", 1.0),
+        model_label="gemma-4-31B-it",
+        backend="native",
+        measurement_mode=eviction_soak.MlxMemorySampler.measurement_mode,
+        output_path=tmp_path / "ledger.jsonl",
+        records=records,
+        started_monotonic_s=now - 90000.0,
+        measurement_started_monotonic_s=now - 90000.0,
+        measurement_finished_monotonic_s=now,
+        required_duration_s=86400.0,
+        drift_budget_bytes=eviction_soak.B1C1_DRIFT_BUDGET_BYTES,
+        load=SimpleNamespace(ok=True, message="loaded", error_code=None, model_id=None),
+        cleanup_unload=SimpleNamespace(
+            ok=True,
+            message="unloaded",
+            error_code=None,
+            model_id="gemma-4-31B-it",
+            freed_gb=1.0,
+        ),
+        cleanup_settle=eviction_soak.SettleResult(
+            active_memory_bytes=0,
+            iterations=1,
+            duration_ms=0.0,
+        ),
+    )
+
+    assert rollup["duration_requirement_met"] is True
+    assert rollup["ledger_gap_free"] is True
+    assert rollup["measurement_wall_clock_gap_free"] is False
+    assert rollup["wall_clock_continuity"]["measurement_wall_clock_gap_violation_count"] == 1
+    assert rollup["wall_clock_continuity"]["max_measurement_wall_clock_gap_s"] == 3600.0
+    assert rollup["hard_failure"] is False
+    assert rollup["no_swap_soak_stability"] == "blocked"
+    assert rollup["graduates"]["no_swap_soak_stability"] is False
+
+
 def test_b1c1_warmup_cycle_is_required_for_graduation(tmp_path):
     summary = eviction_soak.run_b1c1_no_swap_soak(
         runtime="owlmlx",
@@ -442,6 +546,7 @@ def _write_b1c1_segment_rollup(
         "measurement_mode": eviction_soak.MlxMemorySampler.measurement_mode,
         "measurement_duration_s": duration_s,
         "ledger_gap_free": True,
+        "measurement_wall_clock_gap_free": True,
         "warmup_cycle_complete": True,
         "session_mix_complete": True,
         "session_mix_balanced": True,
@@ -535,6 +640,34 @@ def test_b1c1_interrupted_rehearsal_blocks_expiring_segments(tmp_path):
         segment_rollups=[segment],
         output_dir=tmp_path,
         run_id="aggregate-expired",
+        required_total_duration_s=86400.0,
+    )
+
+    assert summary["ok"] is False
+    assert summary["interrupted_no_swap_rehearsal"] == "blocked"
+    assert summary["all_segments_ok_for_rehearsal"] is False
+    assert summary["no_swap_soak_stability"] == "blocked"
+
+
+def test_b1c1_interrupted_rehearsal_blocks_wall_clock_gap_segments(tmp_path):
+    segment = tmp_path / "segment-wall-gap-rollup.jsonl"
+    _write_b1c1_segment_rollup(
+        segment,
+        run_id="segment-wall-gap",
+        duration_s=86400.0,
+    )
+    payload = _records(segment)[0]
+    payload["measurement_wall_clock_gap_free"] = False
+    payload["wall_clock_continuity"] = {
+        "measurement_wall_clock_gap_violation_count": 1,
+        "max_measurement_wall_clock_gap_s": 3600.0,
+    }
+    segment.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+    summary = eviction_soak.run_b1c1_interrupted_rehearsal(
+        segment_rollups=[segment],
+        output_dir=tmp_path,
+        run_id="aggregate-wall-gap",
         required_total_duration_s=86400.0,
     )
 
