@@ -247,14 +247,15 @@
 
 #### B-1c · 长上线稳定 · 拆成两段 48h+（决策 D3 · 2026-05-16）
 
-**B-1c §1 · 纯 soak（≥24h）**
+**B-1c §1 · 纯 soak（当前 Mac 路线 = 可中断分段累计 ≥24h；dedicated host 可追加 continuous 24h）**
 
 - 混合负载：短 / 中 / 长 session = **1:1:1**
 - **无人为 unload / swap**
 - 验证单一命题："`cache=on` 不破坏 `active_memory`"
 - 漂移阈值：`min(200 MB, 0.5% host budget)`
-- 验收：中途无 watermark→FATAL + `failed_reclaim = 0` 持续 24h + ledger sample index 连续无 gap + measurement wall-clock sample gap 无 host sleep / power gap
-- **结论字段**：`no_swap_soak_stability = passed | failed`（独立陈述，**不**合并为 "48h soak passed"）
+- 当前 Mac / laptop 路线：多个可中断 native segment 累计 ≥24h；每个 segment 内无 hard failure、无 measurement wall-clock gap、ledger index 连续、cleanup unload / settle 干净；聚合结论字段 `interrupted_no_swap_rehearsal = passed | failed | blocked`
+- dedicated host / UPS 路线（可选更强证据）：单段 continuous ≥24h；额外产出 `no_swap_soak_stability = passed | failed`
+- **不再假设当前 Mac 能 continuous 24h**；host sleep / power gap 是运行环境事实，必须被记录为 segment boundary 或 gap，不许被抹平
 
 **B-1c §2 · soak + swap（≥24h，§1 通过后启动）**
 
@@ -266,7 +267,7 @@
 
 **两段编排纪律**：
 
-1. §1 通过才启动 §2
+1. §1 的当前 Mac 路线达到 `interrupted_no_swap_rehearsal = passed` 后才启动 §2；若未来拿到 dedicated host，`no_swap_soak_stability = passed` 可作为更强证据补充
 2. **§2 失败不撤销 §1 结论**——§1 的 `no_swap_soak_stability = passed` 作为独立事实保留；但 supported / release gate **不能 graduate**（gate 要求 §1 + §2 同时 passed）
 3. §1 与 §2 各自产出**独立 ledger**，不混合（防归因混淆，R14）
 4. **不允许**"§1 §2 合并跑 36h"假装通过 48h；**不允许**"§1 失败重启后接续 §2"——§1 失败时 §2 必须重头

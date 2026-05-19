@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 1 · Session KV cache no-swap soak
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: runner + interrupted rehearsal aggregation landed; 4h + planned-stop interrupted segments clean but blocked; wall-clock gap detection landed after a host sleep / power-gap attempt; real continuous 24h native run pending
+> **Status**: runner + interrupted rehearsal aggregation landed; 4h + planned-stop interrupted segments clean but blocked; wall-clock gap detection landed after a host sleep / power-gap attempt; current Mac route is operator-interruptible segment aggregation
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -131,8 +131,11 @@ must not graduate `no_swap_soak_stability` or unblock section 2.
 
 ## 5.1 Interruption-Tolerant Rehearsal
 
-If a continuous 24h native run is operationally difficult, run an interrupted
-rehearsal instead of weakening the pass criteria.
+The current Mac / laptop environment is expected to be interrupted. Do not
+design the local validation loop around an uninterrupted 24h assumption. Use an
+operator-interruptible rehearsal as the primary current-machine route, while
+preserving continuous 24h as an optional stronger result for a dedicated host or
+UPS-backed run.
 
 Recommended rehearsal shapes:
 
@@ -172,15 +175,18 @@ from becoming an orphaned raw ledger, but it does not turn segmented evidence
 into the continuous 24h graduation path.
 
 Rehearsal evidence can support confidence statements such as
-`interrupted_no_swap_rehearsal = passed`, but it must not:
+`interrupted_no_swap_rehearsal = passed`. On the current Mac route, that is the
+practical B-1c §1 prerequisite for starting the §2 soak+swap design/run. It must
+not:
 
 - set `no_swap_soak_stability = passed`
-- set `graduates.unblock_B_1c_section_2 = true`
 - count as the B-1c §1 supported gate
 - be merged into a single "24h continuous soak" claim
 
-The uninterrupted 24h native run remains the only §1 graduation path. The
-rehearsal path exists to make that run less blind, not to replace it.
+The uninterrupted 24h native run remains the only way to claim
+`no_swap_soak_stability = passed`. The interrupted route instead claims
+operator-realistic stability: cumulative clean native segments with explicit
+boundaries and no hidden wall-clock gaps inside any segment.
 
 Segment command shape:
 
@@ -230,8 +236,9 @@ graduates:
 | Condition | Verdict | Meaning |
 |---|---|---|
 | Short smoke / schema run | `blocked` | Useful for harness validation only |
-| Native run shorter than 24h | `blocked` | Useful for rehearsal only |
+| Native run shorter than 24h | `blocked` | Useful as one operator-interruptible segment |
 | Native run has host sleep / power gap in measurement wall-clock samples | `blocked` | Operational interruption; not a runtime hard failure, not a continuous soak |
+| Operator-interruptible aggregate reaches ≥24h with all segments clean | `interrupted_no_swap_rehearsal = passed` | Current Mac route may proceed to §2, but must not claim continuous 24h |
 | Generation, watermark, or reclaim failure during 24h | `failed` | Section 1 failed; preserve raw ledger |
 | Generation, watermark, reclaim, cache drop/reject, or cleanup failure before 24h completes | `failed` | Hard failures are failures, not duration blocks |
 | Final cleanup unload fails | `failed` | Soak cannot claim clean lifecycle |

@@ -1703,7 +1703,7 @@ def _b1c1_rehearsal_segment_ok(record: dict[str, Any]) -> bool:
         and record.get("no_swap_soak_stability") == "blocked"
         and record.get("hard_failure") is False
         and record.get("ledger_gap_free") is True
-        and record.get("measurement_wall_clock_gap_free", True) is True
+        and record.get("measurement_wall_clock_gap_free") is True
         and record.get("warmup_cycle_complete") is True
         and record.get("session_mix_complete") is True
         and record.get("session_mix_balanced") is True
