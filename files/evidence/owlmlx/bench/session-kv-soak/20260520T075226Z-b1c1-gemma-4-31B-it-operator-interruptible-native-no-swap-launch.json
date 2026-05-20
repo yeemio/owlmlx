@@ -1,0 +1,28 @@
+{
+  "schema_version": "b1c1.launch.v1",
+  "stamp_utc": "20260520T075226Z",
+  "runner_mode": "tmux_caffeinate_no_tmux_polling",
+  "tmux_session": "owlmlx-b1c1-operator-20260520T075226Z",
+  "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+  "model": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+  "git_commit": "95c46230492ebe45e879eccee6b8ad118b163485",
+  "launch_manifest": "files/evidence/owlmlx/bench/session-kv-soak/20260520T075226Z-b1c1-gemma-4-31B-it-operator-interruptible-native-no-swap-launch.json",
+  "runner_script": "files/evidence/owlmlx/bench/session-kv-soak/20260520T075226Z-b1c1-gemma-4-31B-it-operator-interruptible-native-no-swap.sh",
+  "log": "files/evidence/owlmlx/bench/session-kv-soak/20260520T075226Z-b1c1-gemma-4-31B-it-operator-interruptible-native-no-swap.log",
+  "exit_file": "files/evidence/owlmlx/bench/session-kv-soak/20260520T075226Z-b1c1-gemma-4-31B-it-operator-interruptible-native-no-swap.exit",
+  "duration_s": 86400,
+  "required_duration_s": 86400,
+  "sample_interval_s": 60,
+  "warmup_cycles": 1,
+  "session_cache_ttl_s": 90000,
+  "max_tokens": 2,
+  "backend": "native",
+  "gate": "b1c1-no-swap-soak",
+  "rehearsal_group_id": "b1c1-current-mac-operator-interruptible-20260520",
+  "rehearsal_segment_id": "20260520T075226Z-b1c1-current-mac-segment",
+  "notes": [
+    "Operator-interruptible current-Mac B-1c section 1 segment.",
+    "tmux is used only for process lifetime; monitoring should use pgrep/logs and avoid tmux inspection to prevent macOS privacy prompts.",
+    "Do not treat this as uninterrupted 24h unless wall-clock continuity and required_duration_s pass in the final rollup."
+  ]
+}
