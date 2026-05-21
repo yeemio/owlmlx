@@ -34,7 +34,7 @@
 |---|---|---|---|
 | **B-1a** | [`B-1a-spec.md`](B-1a-spec.md) | 已通过 · closeout 已落盘 | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign B-1a |
 | **B-1b** | [`B-1b-spec.md`](B-1b-spec.md) | 已通过 · native N=20 evidence 已落盘 | 同上 Campaign B-1b |
-| **B-1c §1** | [`B-1c-section-1-spec.md`](B-1c-section-1-spec.md) | runner + graceful interruption + interrupted rehearsal aggregation 已落；4h + planned-shutdown native rehearsal 干净但 blocked；2026-05-18 continuous attempt 因 host sleep / power gap 保持 blocked；2026-05-19 clean planned-stop segment 28245.605s 仍 blocked；wall-clock gap detection 已补；当前 Mac 路线改为 operator-interruptible segment aggregate ≥24h | 同上 Campaign B-1c §1 |
+| **B-1c §1** | [`B-1c-section-1-spec.md`](B-1c-section-1-spec.md) | runner + graceful interruption + interrupted rehearsal aggregation 已落；2026-05-18 continuous attempt 因 host sleep / power gap 保持 blocked；2026-05-19 / 2026-05-20 / 2026-05-21 三段 clean native segment 聚合 `20260521T064658Z` 已达到 `interrupted_no_swap_rehearsal=passed` / `current_mac_section_1_prerequisite_met=true`；continuous 24h `no_swap_soak_stability` 仍未声明 | 同上 Campaign B-1c §1 |
 | **B-1c §2** | [`B-1c-section-2-spec.md`](B-1c-section-2-spec.md) | design-grade spec + fake/schema runner 已落；native §2 runner pending；§1 current-Mac aggregate 通过后才启动 native execution | 同上 Campaign B-1c §2 |
 | **Wave H · H1** | code-grade landed: `server_routes_openai.py` | 已完成 · OpenAI/Anthropic compat routes 拆出 | 同上 Wave H |
 

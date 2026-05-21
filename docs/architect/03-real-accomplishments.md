@@ -190,7 +190,7 @@
 
 - 模型切换（A→B→A）序列下累计 reclaim 漂移未公开（Campaign B-1c §2 gate）
 
-### 5.3 🔴 主证据 ③ · 长上线稳定（48h+ 两段 soak · 缺）
+### 5.3 🟡 主证据 ③ · 长上线稳定（48h+ 两段 soak · §1 current-Mac passed / §2 缺）
 
 **当前状态**：
 
@@ -202,8 +202,10 @@
 - 2026-05-19 runner 已补 `measurement_wall_clock_gap_free` / `wall_clock_continuity` rollup 字段，后续 24h run 必须同时满足 ledger index 连续与 measurement wall-clock 连续
 - 2026-05-19 用户校准：当前 Mac / laptop 环境**肯定会中断**，因此 B-1c §1 当前路线改为可中断分段累计 ≥24h；continuous 24h 保留为 dedicated host / UPS 的更强证据，不再作为当前机器上的默认期待
 - 2026-05-19 planned-stop native segment (`20260519T014912Z`) 通过 SIGTERM graceful stop 落盘：`measurement_duration_s=28245.605`、`measurement_samples=461`、短/中/长 prompt mix `154/154/153`、`measurement_wall_clock_gap_free=true`、最大 measurement wall-clock gap `66.922s`、`max_drift_bytes=0`、session cache expiration/drop/reject 全 0、FATAL 0、unresolved reclaim barrier 0、cleanup unload OK、settle 后 active memory 28 bytes；aggregate `20260519T094117Z` 因累计 `28245.605s < 86400s` 正确保持 `blocked`
+- 2026-05-20 planned-stop native segment (`20260520T075227Z`) 通过 SIGTERM graceful stop 落盘：`measurement_duration_s=53441.374`、`measurement_samples=862`、短/中/长 prompt mix `288/287/287`、`measurement_wall_clock_gap_free=true`、最大 measurement wall-clock gap `71.846s`、`max_drift_bytes=0`、session cache expiration/drop/reject 全 0、FATAL 0、unresolved reclaim barrier 0、cleanup unload OK、settle 后 active memory 28 bytes；与 2026-05-19 segment 聚合后 `20260520T224544Z` 因累计 `81686.979s < 86400s` 仍正确保持 `blocked`
+- 2026-05-21 top-off native segment (`20260521T044517Z`) 跑满 7200s top-off：`measurement_duration_s=7201.552`、`measurement_samples=119`、短/中/长 prompt mix `40/40/39`、`measurement_wall_clock_gap_free=true`、最大 measurement wall-clock gap `61.832s`、`max_drift_bytes=0`、session cache expiration/drop/reject 全 0、FATAL 0、unresolved reclaim barrier 0、cleanup unload OK、settle 后 active memory 28 bytes；三段聚合 `20260521T064658Z` 记录 `aggregate_measurement_duration_s=88888.531`、`all_segments_ok_for_rehearsal=true`、`interrupted_no_swap_rehearsal=passed`、`current_mac_section_1_prerequisite_met=true`、`section_2_prerequisite_met=true`
 - 2026-05-19 B-1c §2 fake/schema runner 已落：可生成 `b1c2-soak-plus-swap` / `b1c2-interrupted-soak-plus-swap` schema、swap phase 与 prerequisite guard；这只是 code/schema readiness，不是 native §2 evidence
-- 但 **无 24h+ operator-interruptible aggregate 报告**——`active_memory` 漂移、`failed_reclaim`、watermark 跃迁、ledger index 连续性、segment 内 wall-clock 连续性等关键指标尚未聚合通过
+- current-Mac operator-interruptible §1 prerequisite 已通过；但 **无 dedicated/UPS continuous 24h `no_swap_soak_stability=passed`，且 B-1c §2 native soak+swap 仍缺**，因此 session KV cache 仍不得升 `supported`
 
 **晋级 gate · 两段 48h+ 拆分（决策 D3 · 2026-05-16）**：
 
@@ -258,7 +260,7 @@
 - 与 vMLX 在 Gemma 4 上基本持平，不构成差异化
 - README 把它当亮点会**误导外部对 owlmlx 战略价值的判断**——价值不在 raw throughput
 
-### 5.6 Session KV cache `supported` gate 四条状态（明确 · 当前 2/4）
+### 5.6 Session KV cache `supported` gate 四条状态（明确 · 当前 3/4）
 
 > 对应 Campaign B-1a / B-1b / B-1c §1 / B-1c §2
 
@@ -266,10 +268,10 @@
 |---|---|---|
 | **B-1a · 第二模型 / 第二形状** | ✅ | Gemma 4-31B-it 已复现 session KV warm TTFT 改善（2.246×，RuntimeKernel 路径）+ 非 cache 路径 N≥5 prompt 字节等价；§VI 4-gate G1 Cache Parity 已关闭 |
 | **B-1b · `cache=on` × settle barrier 无回归** | ✅ | Gemma 4-31B-it cache-off N=20 / cache-on N=20 passed；20/20 warm hits；`failed_reclaim=0`；cache=off 基线对齐 |
-| **B-1c §1 · 纯 soak（24h+）** | ❌ | runner 已落且 fake/schema smoke 不可毕业；4h + planned-shutdown native interrupted rehearsal 合计 24389.98s 干净但仍为 `blocked`；2026-05-18 continuous-24h attempt 因 host sleep / power gap 出现 `2974.612s` measurement wall-clock gap，只能作为 interrupted segment；2026-05-19 clean planned-stop segment 28245.605s / wall-clock gap free / max drift 0，aggregate 仍 `blocked`；当前 Mac 路线改为可中断分段累计 ≥24h，仍缺 aggregate `interrupted_no_swap_rehearsal = passed` |
+| **B-1c §1 · 纯 soak（24h+）** | ✅ current-Mac interrupted route | 2026-05-19 / 2026-05-20 / 2026-05-21 三段 clean native segment 聚合 `20260521T064658Z`：`aggregate_measurement_duration_s=88888.531`、`all_segments_ok_for_rehearsal=true`、`interrupted_no_swap_rehearsal=passed`、`current_mac_section_1_prerequisite_met=true`；仍不得声称 dedicated continuous `no_swap_soak_stability=passed` |
 | **B-1c §2 · soak + swap（24h+）** | ❌ | fake/schema runner 已落但 native evidence 未启动；§1 通过后；每 4h × 6 次 swap；累积 `failed_reclaim = 0` + 漂移 < §1 阈值；`soak_plus_swap_stability = passed` |
 
-**四条全过** → §1a Promotion Gate → `experimental` 升 `supported`。当前 2/4 达成。
+**四条全过** → §1a Promotion Gate → `experimental` 升 `supported`。当前 3/4 达成。
 
 **晋级越级红线**：
 

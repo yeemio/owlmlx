@@ -1,0 +1,23 @@
+{
+  "backend": "native",
+  "duration_s": 7200,
+  "expected_aggregate_after_segment_s": 88886.979,
+  "gate": "b1c1-no-swap-soak",
+  "interruption_reason": "planned_stop",
+  "launch_timestamp_utc": "2026-05-21T04:44:22Z",
+  "model": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+  "model_gb": 60,
+  "model_label": "gemma-4-31B-it",
+  "notes": [
+    "Top-off segment for the current-Mac operator-interruptible B-1c section 1 route.",
+    "Single segment required_duration_s remains 86400 so this segment cannot claim continuous 24h stability.",
+    "Expected aggregate uses prior clean interrupted rehearsal total 81686.979s plus this 7200s top-off."
+  ],
+  "prior_clean_aggregate_measurement_duration_s": 81686.979,
+  "required_duration_s": 86400,
+  "rehearsal_group_id": "b1c1-current-mac-operator-interruptible",
+  "rehearsal_segment_id": "20260521T044422Z-b1c1-current-mac-topoff-segment",
+  "resumes_prior_segment": true,
+  "sample_interval_s": 60,
+  "session_cache_ttl_s": 90000
+}

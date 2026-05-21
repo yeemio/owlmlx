@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 1 · Session KV cache no-swap soak
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: runner + interrupted rehearsal aggregation landed; 4h + planned-stop interrupted segments clean but blocked; wall-clock gap detection landed after a host sleep / power-gap attempt; current Mac route is operator-interruptible segment aggregation
+> **Status**: runner + interrupted rehearsal aggregation landed; current-Mac operator-interruptible aggregate passed on 2026-05-21; continuous 24h stability remains unclaimed
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
