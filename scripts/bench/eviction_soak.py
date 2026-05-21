@@ -2274,7 +2274,7 @@ def run_b1c2_soak_plus_swap(
             if generation.ok:
                 continuation = generation.text or " ok"
                 session_prompts[prompt_id] = (
-                    f"{prompt}{continuation}\nUser: continue session {sample_index}."
+                    f"{prompt}{continuation} Continue session {sample_index}."
                 )
             next_prompt = session_prompts[prompt_id]
             watermark_after = _watermark(after_bytes, profile=profile)

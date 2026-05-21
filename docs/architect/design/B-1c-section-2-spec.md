@@ -246,7 +246,7 @@ truth, but the rollup correctly concluded `failed`:
 - `max_drift_bytes=343408640` > `drift_budget_bytes=209715200`
 
 The runner was then adjusted so B-1c §2 uses append-only per-session prompts
-instead of reusing a byte-identical prompt. The follow-up smoke:
+instead of reusing a byte-identical prompt. The first follow-up smoke:
 
 ```text
 files/evidence/owlmlx/bench/session-kv-soak/
@@ -255,11 +255,33 @@ files/evidence/owlmlx/bench/session-kv-soak/
 
 also concluded `failed` with the same Qwen3.6-27B-4bit drop/drift signature
 (`session_cache_drops_total=3`, `max_drift_bytes=343408640`). The ledger shows
-the prompt did grow inside each session, so the remaining blocker is not merely
-the fixed-prompt smoke shape.
+the prompt did grow inside each session. Direct tokenizer triage then showed the
+bench continuation separator was the blocker: Qwen generated token `271`
+(`"\n\n"`), while re-tokenizing `"\nUser:"` after that continuation merged into a
+different prefix token and forced a trim; Qwen's cache reported no trimmable
+tokens for that path. The runner now uses a tokenizer-stable space continuation
+for the B-1c §2 bench workload.
 
-Do not start 4h/24h §2 native segments until the Qwen3.6-27B-4bit session-cache
-drop/drift cause is triaged or the rotation is explicitly changed by decision.
+The corrected smoke:
+
+```text
+files/evidence/owlmlx/bench/session-kv-soak/
+  20260521T080541Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap-rollup.jsonl
+```
+
+is clean but intentionally `blocked` because it is only a short smoke:
+
+- `allocator_truth_claimable=true`
+- `measurement_mode=mlx_core_active_memory`
+- `swap_boundaries_clean=true`
+- `session_cache_drops_total=0`
+- `max_drift_bytes=0`
+- `hard_failure=false`
+- `duration_requirement_met=false`
+- `swap_requirement_met=false`
+
+This unblocks the first 4h operator-interruptible §2 segment; it still does not
+claim `soak_plus_swap_stability=passed` or `session_kv_supported=true`.
 
 Do not create new `*_harness.py`, `*_ledger.py`, `*_evidence.py`, or
 `*_contract.py` modules for this work. Keep the bench runner in `scripts/bench/`
@@ -276,12 +298,9 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-Triage the failed native smoke before attempting operator-interruptible §2
-aggregate evidence:
+Start operator-interruptible §2 aggregate evidence:
 
-1. Determine whether the Qwen3.6-27B-4bit drop path is an expected
-   model-specific `trim_prompt_cache` limitation or a fixable generated-token /
-   prompt-cache finalization bug.
-2. Re-run the short native smoke after the fix or explicit rotation decision.
-3. Only then start 4h operator-interruptible §2 segments toward the 24h / 6-swap
-   aggregate.
+1. Run 4h native segments with one planned swap boundary per segment.
+2. Aggregate only gap-free, hard-failure-free segment rollups.
+3. Require cumulative duration >= 24h and aggregate swap count >= 6 before
+   `soak_plus_swap_stability=passed`.
