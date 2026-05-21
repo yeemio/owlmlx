@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec + fake/schema runner landed; native §2 runner pending; native execution must not start before a B-1c §1 prerequisite passes
+> **Status**: design-grade spec + fake/schema runner landed; native §2 runner landed; first native smoke failed on Qwen3.6-27B-4bit session-cache drop/drift and blocks long §2 segments until triaged
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -217,13 +217,36 @@ scripts/bench/eviction_soak.py
   --gate b1c2-interrupted-soak-plus-swap
 ```
 
-The first code-grade slice has landed as a **fake/backend schema runner**. It
+The first code-grade slice landed as a **fake/backend schema runner**. It
 validates the ledger shape, swap phase records, blocked rollup semantics, and
 the §1 prerequisite guard. It does not use native allocator truth and does not
 make §2 native-run evidence.
 
-Do not report B-1c §2 as native-run ready until the native execution slice
-lands and passes smoke validation after the §1 prerequisite is met.
+The native execution slice now admits `--backend native` only when both of
+these are true:
+
+- `--b1c1-prerequisite-satisfied` is explicit
+- all three rotation model paths are explicit (`--model-a`, `--model`,
+  `--model-b`)
+
+The first native smoke after the current-Mac §1 prerequisite was:
+
+```text
+files/evidence/owlmlx/bench/session-kv-soak/
+  20260521T074758Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap-rollup.jsonl
+```
+
+It proved native load/generate/unload/settle/load plumbing reaches allocator
+truth, but the rollup correctly concluded `failed`:
+
+- `allocator_truth_claimable=true`
+- `measurement_mode=mlx_core_active_memory`
+- `swap_boundaries_clean=true`
+- `session_cache_drops_total=3`
+- `max_drift_bytes=343408640` > `drift_budget_bytes=209715200`
+
+Do not start 4h/24h §2 native segments until the Qwen3.6-27B-4bit session-cache
+drop/drift cause is triaged or the rotation is explicitly changed by decision.
 
 Do not create new `*_harness.py`, `*_ledger.py`, `*_evidence.py`, or
 `*_contract.py` modules for this work. Keep the bench runner in `scripts/bench/`
@@ -240,6 +263,12 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-After a B-1c §1 prerequisite is met, implement the native section 2 execution
-slice and run a short native segment before attempting operator-interruptible
-§2 aggregate evidence.
+Triage the failed native smoke before attempting operator-interruptible §2
+aggregate evidence:
+
+1. Determine whether the Qwen3.6-27B-4bit drop path is an expected
+   model-specific `trim_prompt_cache` limitation or a fixable generated-token /
+   prompt-cache finalization bug.
+2. Re-run the short native smoke after the fix or explicit rotation decision.
+3. Only then start 4h operator-interruptible §2 segments toward the 24h / 6-swap
+   aggregate.

@@ -809,3 +809,89 @@ def test_b1c2_missing_b1c1_prerequisite_blocks_promotion(tmp_path):
     assert summary["soak_plus_swap_stability"] == "blocked"
     assert summary["graduates"]["soak_plus_swap_stability"] is False
     assert summary["graduates"]["session_kv_supported"] is False
+
+
+def test_b1c2_duration_loop_waits_before_scheduled_swap(tmp_path):
+    summary = eviction_soak.run_b1c2_soak_plus_swap(
+        runtime="owlmlx",
+        backend="fake",
+        output_dir=tmp_path,
+        swap_count=1,
+        required_swap_count=1,
+        duration_s=0.02,
+        required_duration_s=0.01,
+        sample_interval_s=0.005,
+        b1c1_prerequisite_satisfied=True,
+    )
+
+    assert summary["duration_requirement_met"] is True
+    assert summary["swap_requirement_met"] is True
+    assert summary["measurement_duration_s"] >= 0.01
+    assert summary["soak_plus_swap_stability"] == "blocked"
+
+
+def test_b1c2_native_requires_b1c1_prerequisite(tmp_path):
+    rotation = (
+        eviction_soak.ModelSpec("/models/qwen27", 58.0),
+        eviction_soak.ModelSpec("/models/gemma31", 60.0),
+        eviction_soak.ModelSpec("/models/qwen35", 70.0),
+    )
+
+    with pytest.raises(ValueError, match="requires a satisfied B-1c section 1"):
+        eviction_soak.run_b1c2_soak_plus_swap(
+            runtime="owlmlx",
+            backend="native",
+            output_dir=tmp_path,
+            model_rotation=rotation,
+            swap_count=1,
+            required_swap_count=1,
+            required_duration_s=0.0,
+            sample_interval_s=0.0,
+            b1c1_prerequisite_satisfied=False,
+        )
+
+
+def test_b1c2_native_requires_explicit_three_model_rotation(tmp_path):
+    with pytest.raises(ValueError, match="requires explicit three-model rotation"):
+        eviction_soak.run_b1c2_soak_plus_swap(
+            runtime="owlmlx",
+            backend="native",
+            output_dir=tmp_path,
+            swap_count=1,
+            required_swap_count=1,
+            required_duration_s=0.0,
+            sample_interval_s=0.0,
+            b1c1_prerequisite_satisfied=True,
+        )
+
+
+def test_b1c2_cli_model_rotation_uses_explicit_paths():
+    args = SimpleNamespace(
+        model_a="/models/qwen27",
+        model="/models/gemma31",
+        model_b="/models/qwen35",
+        model_a_gb=58.0,
+        model_gb=60.0,
+        model_b_gb=70.0,
+    )
+
+    rotation = eviction_soak._b1c2_cli_model_rotation(args)
+
+    assert rotation == (
+        eviction_soak.ModelSpec("/models/qwen27", 58.0),
+        eviction_soak.ModelSpec("/models/gemma31", 60.0),
+        eviction_soak.ModelSpec("/models/qwen35", 70.0),
+    )
+
+
+def test_b1c2_cli_model_rotation_keeps_schema_defaults():
+    args = SimpleNamespace(
+        model_a="model-a",
+        model=eviction_soak.B1B_MODEL_PATH,
+        model_b="model-b",
+        model_a_gb=1.0,
+        model_gb=1.0,
+        model_b_gb=1.0,
+    )
+
+    assert eviction_soak._b1c2_cli_model_rotation(args) is None

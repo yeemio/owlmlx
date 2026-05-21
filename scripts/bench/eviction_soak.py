@@ -545,6 +545,46 @@ def _default_b1c2_rotation() -> tuple[ModelSpec, ...]:
     return tuple(ModelSpec(model_id=label, memory_gb=1.0) for label in B1C2_ROTATION_LABELS)
 
 
+def _b1c2_native_rotation_required(
+    *,
+    backend: str,
+    model_rotation: tuple[ModelSpec, ...] | None,
+) -> None:
+    if backend == "native" and model_rotation is None:
+        raise ValueError(
+            "native B-1c section 2 requires explicit three-model rotation "
+            "via --model-a, --model, and --model-b"
+        )
+
+
+def _b1c2_cli_model_rotation(args: argparse.Namespace) -> tuple[ModelSpec, ...] | None:
+    using_parser_defaults = (
+        args.model_a == "model-a"
+        and args.model == B1B_MODEL_PATH
+        and args.model_b == "model-b"
+        and args.model_a_gb == 1.0
+        and args.model_gb == 1.0
+        and args.model_b_gb == 1.0
+    )
+    if using_parser_defaults:
+        return None
+    return (
+        ModelSpec(args.model_a, args.model_a_gb),
+        ModelSpec(args.model, args.model_gb),
+        ModelSpec(args.model_b, args.model_b_gb),
+    )
+
+
+def _b1c2_evidence_strength(*, backend: str) -> str:
+    if backend == "native":
+        return "mlx_allocator_soak_plus_swap"
+    return "smoke_only_no_allocator_claim"
+
+
+def _b1c2_allocator_truth(*, backend: str, sampler: MemorySampler) -> bool:
+    return backend == "native" and sampler.measurement_mode == MlxMemorySampler.measurement_mode
+
+
 def _b1c1_sample_interval_from_records(records: list[dict[str, Any]]) -> float:
     for record in records:
         value = record.get("config", {}).get("sample_interval_s")
@@ -2106,8 +2146,12 @@ def run_b1c2_soak_plus_swap(
 ) -> dict[str, Any]:
     if runtime != "owlmlx":
         raise ValueError("only --runtime owlmlx is implemented in this baseline round")
-    if backend != "fake":
-        raise ValueError("B-1c section 2 schema runner is fake-only in this slice")
+    if backend not in {"fake", "native"}:
+        raise ValueError(f"unsupported backend: {backend}")
+    if backend == "native" and not b1c1_prerequisite_satisfied:
+        raise ValueError(
+            "native B-1c section 2 requires a satisfied B-1c section 1 prerequisite"
+        )
     if swap_count < 1:
         raise ValueError("--swap-count must be >= 1")
     if required_swap_count < 0:
@@ -2119,6 +2163,7 @@ def run_b1c2_soak_plus_swap(
     if sample_interval_s < 0:
         raise ValueError("--sample-interval-s must be >= 0")
 
+    _b1c2_native_rotation_required(backend=backend, model_rotation=model_rotation)
     rotation = model_rotation or _default_b1c2_rotation()
     if len(rotation) != len(B1C2_ROTATION_LABELS):
         raise ValueError("B-1c section 2 requires the canonical three-model rotation")
@@ -2143,6 +2188,8 @@ def run_b1c2_soak_plus_swap(
 
     with _session_cache_env(True, ttl_s=effective_session_cache_ttl_s):
         kernel, sampler = _make_kernel(backend=backend, profile=profile)
+        evidence_strength = _b1c2_evidence_strength(backend=backend)
+        allocator_truth = _b1c2_allocator_truth(backend=backend, sampler=sampler)
         records: list[dict[str, Any]] = []
         started_monotonic_s = time.monotonic()
         measurement_started_monotonic_s: float | None = None
@@ -2245,7 +2292,7 @@ def run_b1c2_soak_plus_swap(
                 "runtime": runtime,
                 "backend": backend,
                 "measurement_mode": sampler.measurement_mode,
-                "evidence_strength": "smoke_only_no_allocator_claim",
+                "evidence_strength": evidence_strength,
                 "model": {
                     "id": current_model.model_id,
                     "path": current_model.model_id,
@@ -2276,8 +2323,8 @@ def run_b1c2_soak_plus_swap(
                     "active_entries_before": cache_before.get("active_entries"),
                     "active_entries_after": cache_after.get("active_entries"),
                     "counter_delta": counter_delta,
-                    "synthetic": True,
-                    "allocator_truth": False,
+                    "synthetic": not allocator_truth,
+                    "allocator_truth": allocator_truth,
                 },
                 "operation": {
                     "load_ok": bool(current_load.ok),
@@ -2318,7 +2365,27 @@ def run_b1c2_soak_plus_swap(
                     )
                     if verdict != "passed":
                         break
-                for swap_index in range(1, swap_count + 1):
+                swaps_completed = 0
+
+                def _measurement_elapsed_s() -> float:
+                    if measurement_started_monotonic_s is None:
+                        return 0.0
+                    return time.monotonic() - measurement_started_monotonic_s
+
+                def _duration_requirement_reached() -> bool:
+                    return duration_s <= 0 or _measurement_elapsed_s() >= duration_s
+
+                def _next_swap_due() -> bool:
+                    if swaps_completed >= swap_count:
+                        return False
+                    if duration_s <= 0:
+                        return True
+                    swap_interval_s = duration_s / max(swap_count, 1)
+                    return _measurement_elapsed_s() >= swap_interval_s * (
+                        swaps_completed + 1
+                    )
+
+                while True:
                     if records and records[-1].get("sample_verdict") == "failed":
                         break
                     for prompt_id, prompt in B1C1_PROMPTS:
@@ -2332,8 +2399,15 @@ def run_b1c2_soak_plus_swap(
                             break
                     if records and records[-1].get("sample_verdict") == "failed":
                         break
+                    if not _next_swap_due():
+                        if _duration_requirement_reached() and swaps_completed >= swap_count:
+                            break
+                        if sample_interval_s > 0:
+                            time.sleep(sample_interval_s)
+                        continue
 
                     sample_index = len(records) + 1
+                    swap_index = swaps_completed + 1
                     from_model = current_model
                     to_index = (current_index + 1) % len(rotation)
                     to_model = rotation[to_index]
@@ -2369,7 +2443,7 @@ def run_b1c2_soak_plus_swap(
                         "runtime": runtime,
                         "backend": backend,
                         "measurement_mode": sampler.measurement_mode,
-                        "evidence_strength": "smoke_only_no_allocator_claim",
+                        "evidence_strength": evidence_strength,
                         "rotation": {
                             "label": rotation_label,
                             "models": [model.model_id for model in rotation],
@@ -2387,8 +2461,8 @@ def run_b1c2_soak_plus_swap(
                         },
                         "session_cache": {
                             "counter_delta": {},
-                            "synthetic": True,
-                            "allocator_truth": False,
+                            "synthetic": not allocator_truth,
+                            "allocator_truth": allocator_truth,
                         },
                         "memory": {
                             "active_memory_before_unload_bytes": active_before_unload,
@@ -2408,6 +2482,7 @@ def run_b1c2_soak_plus_swap(
                     current_index = to_index
                     current_model = to_model
                     current_load = load_next
+                    swaps_completed += 1
                     if not all(
                         [
                             swap["unload_ok"],
@@ -2416,6 +2491,10 @@ def run_b1c2_soak_plus_swap(
                         ]
                     ):
                         break
+                    if _duration_requirement_reached() and swaps_completed >= swap_count:
+                        break
+                    if sample_interval_s > 0:
+                        time.sleep(sample_interval_s)
         finally:
             if current_load.ok:
                 cleanup_unload = kernel.unload_model(current_model.model_id)
@@ -2683,6 +2762,7 @@ def main(argv: list[str] | None = None) -> int:
                 runtime=args.runtime,
                 backend=args.backend,
                 output_dir=args.output or B1C1_OUTPUT_DIR,
+                model_rotation=_b1c2_cli_model_rotation(args),
                 swap_count=args.swap_count,
                 required_swap_count=args.required_swap_count,
                 duration_s=args.duration_s,
