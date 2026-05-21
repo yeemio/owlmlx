@@ -90,6 +90,26 @@ def test_drift_summary_fails_when_settled_memory_exceeds_threshold():
     assert summary["total_drift_gb"] == 0.75
 
 
+def test_result_to_dict_preserves_stream_generation_text_and_token_counts():
+    result = eviction_soak.StreamGenerationResult(
+        ok=True,
+        message="stream generated",
+        error_code=None,
+        model_id="model-a",
+        text="ok",
+        prompt_tokens=12,
+        completion_tokens=1,
+        finish_reason="stop",
+    )
+
+    payload = eviction_soak._result_to_dict(result)
+
+    assert payload["text"] == "ok"
+    assert payload["prompt_tokens"] == 12
+    assert payload["completion_tokens"] == 1
+    assert payload["finish_reason"] == "stop"
+
+
 def test_b1b_gate_both_mode_writes_two_ledgers_and_rollup(tmp_path):
     summary = eviction_soak.run_b1b_cache_on_no_regress(
         runtime="owlmlx",

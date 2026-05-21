@@ -167,6 +167,15 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
         if record.get("memory", {}).get("watermark_after_generation") == "FATAL"
     )
     swap_records = [record for record in records if record.get("phase") == "swap"]
+    drop_records = [
+        record
+        for record in records
+        if _as_int(
+            record.get("session_cache", {}).get("counter_delta", {}).get("drops"),
+            0,
+        )
+        > 0
+    ]
     dirty_swaps = [
         record.get("sample_index")
         for record in swap_records
@@ -196,6 +205,26 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
         "last_prompt_id": last_record.get("prompt_id"),
         "last_elapsed_s": last_record.get("elapsed_s"),
         "swap_count": len(swap_records),
+        "drop_sample_indices": [
+            record.get("sample_index") for record in drop_records
+        ],
+        "drop_samples": [
+            {
+                "sample_index": record.get("sample_index"),
+                "elapsed_s": record.get("elapsed_s"),
+                "phase": record.get("phase"),
+                "prompt_id": record.get("prompt_id"),
+                "model_id": record.get("model", {}).get("id"),
+                "prompt_chars_before_generation": record.get("config", {}).get(
+                    "prompt_chars_before_generation"
+                ),
+                "prompt_chars_after_generation": record.get("config", {}).get(
+                    "prompt_chars_after_generation"
+                ),
+                "counter_delta": record.get("session_cache", {}).get("counter_delta", {}),
+            }
+            for record in drop_records
+        ],
         "dirty_swap_sample_indices": dirty_swaps,
         "session_cache_drops_total": _counter_delta_total(records, "drops"),
         "session_cache_expirations_total": _counter_delta_total(records, "expirations"),
@@ -319,6 +348,8 @@ def _render_text(results: list[dict[str, Any]]) -> str:
                     **result
                 )
             )
+            if result.get("drop_sample_indices"):
+                lines.append(f"  drop_samples={result['drop_sample_indices']}")
         else:
             lines.append(
                 "  conclusion={conclusion} stability={soak_plus_swap_stability} "

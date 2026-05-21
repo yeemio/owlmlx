@@ -102,6 +102,19 @@ def test_b1c2_ledger_audit_reports_live_health(tmp_path):
     assert result["last_sample_index"] == 3
     assert result["last_phase"] == "swap"
     assert result["swap_count"] == 1
+    assert result["drop_sample_indices"] == [2]
+    assert result["drop_samples"] == [
+        {
+            "sample_index": 2,
+            "elapsed_s": 2.0,
+            "phase": "measurement",
+            "prompt_id": "medium",
+            "model_id": None,
+            "prompt_chars_before_generation": None,
+            "prompt_chars_after_generation": None,
+            "counter_delta": {"drops": 1, "rejects": 0},
+        }
+    ]
     assert result["session_cache_drops_total"] == 1
     assert result["max_measurement_drift_bytes"] == 512
     assert result["errors"] == []
