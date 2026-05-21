@@ -245,6 +245,19 @@ truth, but the rollup correctly concluded `failed`:
 - `session_cache_drops_total=3`
 - `max_drift_bytes=343408640` > `drift_budget_bytes=209715200`
 
+The runner was then adjusted so B-1c §2 uses append-only per-session prompts
+instead of reusing a byte-identical prompt. The follow-up smoke:
+
+```text
+files/evidence/owlmlx/bench/session-kv-soak/
+  20260521T075608Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap-rollup.jsonl
+```
+
+also concluded `failed` with the same Qwen3.6-27B-4bit drop/drift signature
+(`session_cache_drops_total=3`, `max_drift_bytes=343408640`). The ledger shows
+the prompt did grow inside each session, so the remaining blocker is not merely
+the fixed-prompt smoke shape.
+
 Do not start 4h/24h §2 native segments until the Qwen3.6-27B-4bit session-cache
 drop/drift cause is triaged or the rotation is explicitly changed by decision.
 

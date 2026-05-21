@@ -2198,6 +2198,7 @@ def run_b1c2_soak_plus_swap(
         first_measurement_bytes: int | None = None
         current_index = 0
         current_model = rotation[current_index]
+        session_prompts = {prompt_id: prompt for prompt_id, prompt in B1C1_PROMPTS}
         initial_load = kernel.load_model(current_model.model_id, memory_gb=current_model.memory_gb)
         current_load = initial_load
         cleanup_unload: Any | None = None
@@ -2208,7 +2209,6 @@ def run_b1c2_soak_plus_swap(
             *,
             phase: str,
             prompt_id: str,
-            prompt: str,
         ) -> str:
             nonlocal first_sample_bytes
             nonlocal first_measurement_bytes
@@ -2218,6 +2218,7 @@ def run_b1c2_soak_plus_swap(
             if phase == "measurement" and measurement_started_monotonic_s is None:
                 measurement_started_monotonic_s = time.monotonic()
             session_id = f"{session_id_prefix}-{prompt_id}"
+            prompt = session_prompts[prompt_id]
             cache_before = _session_cache_status(kernel)
             before_bytes = sampler.active_memory_bytes(kernel)
             try:
@@ -2270,6 +2271,12 @@ def run_b1c2_soak_plus_swap(
                 dict(cache_before.get("counters", {})),
                 dict(cache_after.get("counters", {})),
             )
+            if generation.ok:
+                continuation = generation.text or " ok"
+                session_prompts[prompt_id] = (
+                    f"{prompt}{continuation}\nUser: continue session {sample_index}."
+                )
+            next_prompt = session_prompts[prompt_id]
             watermark_after = _watermark(after_bytes, profile=profile)
             reclaim_stats = _reclaim_stats(kernel)
             settle_snapshot = _compact_settle_barrier(_settle_barrier_snapshot(kernel))
@@ -2308,6 +2315,8 @@ def run_b1c2_soak_plus_swap(
                     "OWLMLX_SESSION_CACHE_ENABLED": "1",
                     "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
                     "session_id": session_id,
+                    "prompt_chars_before_generation": len(prompt),
+                    "prompt_chars_after_generation": len(next_prompt),
                     "temperature": 0.0,
                     "seed": 42,
                     "max_tokens": max_tokens,
@@ -2356,12 +2365,11 @@ def run_b1c2_soak_plus_swap(
 
         try:
             with output_path.open("w", encoding="utf-8") as stream:
-                for prompt_id, prompt in B1C1_PROMPTS:
+                for prompt_id, _prompt in B1C1_PROMPTS:
                     verdict = _write_generation_record(
                         stream,
                         phase="warmup",
                         prompt_id=prompt_id,
-                        prompt=prompt,
                     )
                     if verdict != "passed":
                         break
@@ -2388,12 +2396,11 @@ def run_b1c2_soak_plus_swap(
                 while True:
                     if records and records[-1].get("sample_verdict") == "failed":
                         break
-                    for prompt_id, prompt in B1C1_PROMPTS:
+                    for prompt_id, _prompt in B1C1_PROMPTS:
                         verdict = _write_generation_record(
                             stream,
                             phase="measurement",
                             prompt_id=prompt_id,
-                            prompt=prompt,
                         )
                         if verdict != "passed":
                             break

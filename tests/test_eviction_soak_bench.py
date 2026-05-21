@@ -780,6 +780,20 @@ def test_b1c2_fake_soak_plus_swap_writes_swap_phase_and_blocked_rollup(tmp_path)
         "medium",
         "long",
     }
+    warmup_short = next(
+        record
+        for record in ledger
+        if record["phase"] == "warmup" and record["prompt_id"] == "short"
+    )
+    measurement_short = next(
+        record
+        for record in ledger
+        if record["phase"] == "measurement" and record["prompt_id"] == "short"
+    )
+    assert (
+        measurement_short["config"]["prompt_chars_before_generation"]
+        > warmup_short["config"]["prompt_chars_before_generation"]
+    )
     swap = swap_records[0]["swap"]
     assert swap["index"] == 1
     assert swap["from_model"] == "qwen3.6-27b"

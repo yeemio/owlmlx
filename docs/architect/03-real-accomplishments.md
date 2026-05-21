@@ -206,6 +206,7 @@
 - 2026-05-21 top-off native segment (`20260521T044517Z`) 跑满 7200s top-off：`measurement_duration_s=7201.552`、`measurement_samples=119`、短/中/长 prompt mix `40/40/39`、`measurement_wall_clock_gap_free=true`、最大 measurement wall-clock gap `61.832s`、`max_drift_bytes=0`、session cache expiration/drop/reject 全 0、FATAL 0、unresolved reclaim barrier 0、cleanup unload OK、settle 后 active memory 28 bytes；三段聚合 `20260521T064658Z` 记录 `aggregate_measurement_duration_s=88888.531`、`all_segments_ok_for_rehearsal=true`、`interrupted_no_swap_rehearsal=passed`、`current_mac_section_1_prerequisite_met=true`、`section_2_prerequisite_met=true`
 - 2026-05-19 B-1c §2 fake/schema runner 已落：可生成 `b1c2-soak-plus-swap` / `b1c2-interrupted-soak-plus-swap` schema、swap phase 与 prerequisite guard；这只是 code/schema readiness，不是 native §2 evidence
 - 2026-05-21 B-1c §2 native execution slice 已落，并跑出首条 canonical rotation smoke：`20260521T074758Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap-rollup.jsonl`；该段 `allocator_truth_claimable=true`、`measurement_mode=mlx_core_active_memory`、`swap_boundaries_clean=true`，但因 Qwen3.6-27B-4bit reuse 期间 `session_cache_drops_total=3` 且 `max_drift_bytes=343408640 > drift_budget_bytes=209715200`，rollup 正确为 `failed`
+- 2026-05-21 follow-up native smoke `20260521T075608Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap-rollup.jsonl` 改为 append-only per-session prompt 后仍为 `failed`：ledger 记录 short prompt chars `45 -> 73 -> 101`，但 Qwen3.6-27B-4bit warm hit 仍伴随 `session_cache_drops_total=3` 和同样的 `max_drift_bytes=343408640 > 209715200`，说明 blocker 不只是 fixed-prompt shape
 - current-Mac operator-interruptible §1 prerequisite 已通过；但 **无 dedicated/UPS continuous 24h `no_swap_soak_stability=passed`，且 B-1c §2 native smoke 已失败等待 triage**，因此 session KV cache 仍不得升 `supported`
 
 **晋级 gate · 两段 48h+ 拆分（决策 D3 · 2026-05-16）**：
@@ -270,7 +271,7 @@
 | **B-1a · 第二模型 / 第二形状** | ✅ | Gemma 4-31B-it 已复现 session KV warm TTFT 改善（2.246×，RuntimeKernel 路径）+ 非 cache 路径 N≥5 prompt 字节等价；§VI 4-gate G1 Cache Parity 已关闭 |
 | **B-1b · `cache=on` × settle barrier 无回归** | ✅ | Gemma 4-31B-it cache-off N=20 / cache-on N=20 passed；20/20 warm hits；`failed_reclaim=0`；cache=off 基线对齐 |
 | **B-1c §1 · 纯 soak（24h+）** | ✅ current-Mac interrupted route | 2026-05-19 / 2026-05-20 / 2026-05-21 三段 clean native segment 聚合 `20260521T064658Z`：`aggregate_measurement_duration_s=88888.531`、`all_segments_ok_for_rehearsal=true`、`interrupted_no_swap_rehearsal=passed`、`current_mac_section_1_prerequisite_met=true`；仍不得声称 dedicated continuous `no_swap_soak_stability=passed` |
-| **B-1c §2 · soak + swap（24h+）** | ❌ | native execution slice 已落但首条 smoke `20260521T074758Z` 失败：Qwen3.6-27B-4bit `session_cache_drops_total=3` + `max_drift_bytes=343408640 > 209715200`；长 segment 暂停，先 triage cache drop/drift；目标仍是每 4h × 6 次 swap、累积 `failed_reclaim = 0`、漂移 < §1 阈值、`soak_plus_swap_stability = passed` |
+| **B-1c §2 · soak + swap（24h+）** | ❌ | native execution slice 已落但 `20260521T074758Z` / append-only `20260521T075608Z` 均失败：Qwen3.6-27B-4bit `session_cache_drops_total=3` + `max_drift_bytes=343408640 > 209715200`；长 segment 暂停，先 triage cache drop/drift；目标仍是每 4h × 6 次 swap、累积 `failed_reclaim = 0`、漂移 < §1 阈值、`soak_plus_swap_stability = passed` |
 
 **四条全过** → §1a Promotion Gate → `experimental` 升 `supported`。当前 3/4 达成。
 
