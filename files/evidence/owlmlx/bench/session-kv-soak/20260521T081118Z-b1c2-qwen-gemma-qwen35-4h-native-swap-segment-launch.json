@@ -1,0 +1,21 @@
+{
+  "caffeinate_log": "files/evidence/owlmlx/bench/session-kv-soak/20260521T081118Z-b1c2-qwen-gemma-qwen35-4h-native-swap-segment.caffeinate.log",
+  "caffeinate_pid_file": "files/evidence/owlmlx/bench/session-kv-soak/20260521T081118Z-b1c2-qwen-gemma-qwen35-4h-native-swap-segment.caffeinate.pid",
+  "caffeinate_tmux_session": "owlmlx-b1c2-caffeinate-20260521T081118Z",
+  "claim_boundary": "operator-interruptible segment only; do not claim soak_plus_swap_stability passed from this segment alone",
+  "command_summary": "b1c2-soak-plus-swap native canonical rotation, 4h segment, one planned swap boundary",
+  "exit_file": "files/evidence/owlmlx/bench/session-kv-soak/20260521T081118Z-b1c2-qwen-gemma-qwen35-4h-native-swap-segment.exit",
+  "expected_duration_s": 14400,
+  "gate": "B-1c section 2",
+  "launched_at_utc": "2026-05-21T08:11:19.301856Z",
+  "log": "files/evidence/owlmlx/bench/session-kv-soak/20260521T081118Z-b1c2-qwen-gemma-qwen35-4h-native-swap-segment.log",
+  "monitoring_note": "avoid tmux attach/capture; use pgrep plus files to avoid macOS privacy prompt",
+  "pid_file": "files/evidence/owlmlx/bench/session-kv-soak/20260521T081118Z-b1c2-qwen-gemma-qwen35-4h-native-swap-segment.pid",
+  "required_duration_s": 86400,
+  "required_swap_count": 6,
+  "runner_shell_pid": 18444,
+  "schema_version": "b1c2.segment.launch.v1",
+  "script": "files/evidence/owlmlx/bench/session-kv-soak/20260521T081118Z-b1c2-qwen-gemma-qwen35-4h-native-swap-segment.sh",
+  "swap_count": 1,
+  "tmux_session": "owlmlx-b1c2-4h-20260521T081118Z"
+}
