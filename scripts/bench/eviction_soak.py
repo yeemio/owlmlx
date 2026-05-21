@@ -97,6 +97,7 @@ B1C1_PROMPTS: tuple[tuple[str, str], ...] = (
         "memory watermark discipline, and reclaim-barrier observation. Keep it brief.",
     ),
 )
+B1C2_PROMPT_GROWTH_STRATEGY = "deterministic_append_only_no_generated_text"
 
 
 @dataclass(frozen=True, slots=True)
@@ -2276,10 +2277,7 @@ def run_b1c2_soak_plus_swap(
                 dict(cache_after.get("counters", {})),
             )
             if generation.ok:
-                continuation = generation.text or " ok"
-                session_prompts[prompt_id] = (
-                    f"{prompt}{continuation} Continue session {sample_index}."
-                )
+                session_prompts[prompt_id] = f"{prompt} Continue session {sample_index}."
             next_prompt = session_prompts[prompt_id]
             watermark_after = _watermark(after_bytes, profile=profile)
             reclaim_stats = _reclaim_stats(kernel)
@@ -2330,6 +2328,7 @@ def run_b1c2_soak_plus_swap(
                     "target_swap_count": swap_count,
                     "required_swap_count": required_swap_count,
                     "max_generation_concurrency": 1,
+                    "prompt_growth_strategy": B1C2_PROMPT_GROWTH_STRATEGY,
                 },
                 "prompt_id": prompt_id,
                 "session_cache": {

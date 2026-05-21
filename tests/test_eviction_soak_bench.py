@@ -814,6 +814,22 @@ def test_b1c2_fake_soak_plus_swap_writes_swap_phase_and_blocked_rollup(tmp_path)
         measurement_short["config"]["prompt_chars_before_generation"]
         > warmup_short["config"]["prompt_chars_before_generation"]
     )
+    assert (
+        warmup_short["config"]["prompt_chars_after_generation"]
+        - warmup_short["config"]["prompt_chars_before_generation"]
+        == len(" Continue session 1.")
+    )
+    assert (
+        measurement_short["config"]["prompt_chars_after_generation"]
+        - measurement_short["config"]["prompt_chars_before_generation"]
+        == len(" Continue session 4.")
+    )
+    assert (
+        measurement_short["config"]["prompt_growth_strategy"]
+        == "deterministic_append_only_no_generated_text"
+    )
+    assert measurement_short["generate_result"]["text"]
+    assert "fake completion" in measurement_short["generate_result"]["text"]
     swap = swap_records[0]["swap"]
     assert swap["index"] == 1
     assert swap["from_model"] == "qwen3.6-27b"
