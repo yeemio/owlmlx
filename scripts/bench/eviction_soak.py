@@ -97,7 +97,14 @@ B1C1_PROMPTS: tuple[tuple[str, str], ...] = (
         "memory watermark discipline, and reclaim-barrier observation. Keep it brief.",
     ),
 )
-B1C2_PROMPT_GROWTH_STRATEGY = "generated_text_then_stable_suffix"
+B1C2_PROMPT_GROWTH_STRATEGY = "boundary_safe_generated_text_then_stable_suffix"
+
+
+def _b1c2_prompt_growth_fragment(generated_text: str, *, sample_index: int) -> str:
+    continuation = generated_text or " ok"
+    if continuation and not continuation[0].isspace():
+        continuation = f" {continuation}"
+    return f"{continuation} Continue session {sample_index}."
 
 
 @dataclass(frozen=True, slots=True)
@@ -2295,9 +2302,9 @@ def run_b1c2_soak_plus_swap(
                 counter_delta
             )
             if generation.ok:
-                continuation = generation.text or " ok"
                 session_prompts[prompt_id] = (
-                    f"{prompt}{continuation} Continue session {sample_index}."
+                    f"{prompt}"
+                    f"{_b1c2_prompt_growth_fragment(generation.text, sample_index=sample_index)}"
                 )
             next_prompt = session_prompts[prompt_id]
             watermark_after = _watermark(after_bytes, profile=profile)

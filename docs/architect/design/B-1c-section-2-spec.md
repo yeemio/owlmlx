@@ -297,9 +297,9 @@ failed rollup as soon as any per-sample session cache drop, expiration, or
 reject is observed. The deterministic no-generated-text shape is no longer the
 long-run strategy because the native backend's non-trimmable cache path is only
 valid when the next prompt is an append-only transcript that includes the prior
-generated text. The runner therefore uses `generated_text_then_stable_suffix`.
-Do not run another long §2 segment until a short native canary can complete at
-least one warm reuse cycle with `session_cache_drops_total=0`.
+generated text. The runner moved through two transcript-compatible variants:
+`generated_text_then_stable_suffix`, then
+`boundary_safe_generated_text_then_stable_suffix`.
 
 Do not create new `*_harness.py`, `*_ledger.py`, `*_evidence.py`, or
 `*_contract.py` modules for this work. Keep the bench runner in `scripts/bench/`
@@ -348,6 +348,61 @@ canary was necessary but not sufficient; the next round should isolate Qwen
 long-session token/cache-prefix behavior around the ~900-1000 character prompt
 range instead of launching another 4h segment.
 
+The focused no-sleep reproduction:
+
+```text
+files/evidence/owlmlx/bench/session-kv-soak/
+  20260522T151921Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap-rollup.jsonl
+```
+
+hit the same sample `111` / Qwen long-session drop in `26.528s`, proving the
+4h segment failure is reproducible without wall-clock soak. Token-level triage
+found the unsafe boundary: the previous prompt ended in `"."`, the generated
+text was `"short"`, and re-tokenization merged the next prompt prefix into a
+single `".short"` token. That forces an unsafe trim against the stored prompt
+cache, which Qwen correctly rejects.
+The token comparison is recorded in
+`20260522T153000Z-b1c2-qwen-token-boundary-triage.json`.
+
+A blind "always add one leading space before generated text" attempt:
+
+```text
+files/evidence/owlmlx/bench/session-kv-soak/
+  20260522T152210Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap-rollup.jsonl
+```
+
+failed earlier at sample `4`, because Qwen often generates whitespace
+(`"\n\n"`). Prefixing an additional space before an already whitespace-started
+continuation changes the stored token boundary and again forces an unsafe trim.
+
+The current runner therefore uses
+`boundary_safe_generated_text_then_stable_suffix`: preserve generated text
+unchanged when it already starts with whitespace, and insert a single leading
+space only when the generated text starts with a non-whitespace token. The
+focused canary:
+
+```text
+files/evidence/owlmlx/bench/session-kv-soak/
+  20260522T152537Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap-rollup.jsonl
+```
+
+is clean but intentionally `blocked`:
+
+- `measurement_duration_s=46.425`
+- prompt mix `48/48/48`
+- `session_cache_drops_total=0`
+- `session_cache_expirations_total=0`
+- `session_cache_rejects_total=0`
+- `max_drift_bytes=50331648`
+- `swap_count=1`
+- `swap_boundaries_clean=true`
+- `hard_failure=false`
+- `graduates.session_kv_supported=false`
+
+This closes the token-boundary canary and reopens the 4h fail-fast §2 segment
+route. It still does not claim `soak_plus_swap_stability=passed`; the 24h / six
+swap aggregate remains open.
+
 The landed smoke-only slice covers:
 
 - fake backend schema run
@@ -359,16 +414,12 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-Close the Qwen long-session drop before resuming §2 aggregate evidence:
+Resume §2 evidence from the fail-fast segment lane:
 
-1. Build a focused Qwen long-session canary that reproduces the sample-111
-   cache drop without requiring a 4h wall-clock run.
-2. Capture token-prefix / generated-token details around the first unsafe trim
-   decision.
-3. Adjust bench transcript shape or runtime cache-finalization semantics only
-   after the token-level cause is explicit.
-4. Resume 4h native segments only after the focused canary writes a clean
-   `b1c2.rollup.v1` through the same long-session token range.
-5. Aggregate only gap-free, hard-failure-free segment rollups.
-6. Require cumulative duration >= 24h and aggregate swap count >= 6 before
+1. Run the next 4h native §2 segment with
+   `boundary_safe_generated_text_then_stable_suffix`.
+2. Stop immediately on any session cache drop, expiration, reject, FATAL
+   watermark, unresolved reclaim barrier, or dirty swap boundary.
+3. Aggregate only gap-free, hard-failure-free segment rollups.
+4. Require cumulative duration >= 24h and aggregate swap count >= 6 before
    `soak_plus_swap_stability=passed`.

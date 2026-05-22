@@ -1,0 +1,136 @@
+{
+  "schema_version": "b1c2.token_boundary_triage.v1",
+  "timestamp_utc": "2026-05-22T15:30:00Z",
+  "model": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B-4bit",
+  "tokenizer_class": "Qwen2Tokenizer",
+  "cases": [
+    {
+      "source_ledger": "files/evidence/owlmlx/bench/session-kv-soak/20260522T151921Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap.jsonl",
+      "failing_sample_index": 111,
+      "prompt_id": "long",
+      "strategy": "generated_text_then_stable_suffix",
+      "previous_sample_index": 108,
+      "previous_generated_text": "short",
+      "failing_generated_text": "\n",
+      "previous_prompt_chars": 919,
+      "failing_prompt_chars": 946,
+      "previous_prompt_token_count": 272,
+      "previous_generated_token_ids_retokenized": [
+        8412
+      ],
+      "remembered_prefix_approx_token_count": 273,
+      "failing_prompt_token_count": 279,
+      "common_prefix_prompt_only_token_count": 271,
+      "trim_if_reusing_prompt_only_cache": 1,
+      "prompt_only_previous_first_diff": {
+        "token_ids": [
+          13
+        ],
+        "text": "."
+      },
+      "prompt_only_current_first_diff": {
+        "token_ids": [
+          25814,
+          14569,
+          3669,
+          220,
+          16,
+          15,
+          23,
+          13
+        ],
+        "text": ".short Continue session 108."
+      },
+      "common_prefix_remembered_approx_token_count": 271,
+      "trim_if_reusing_remembered_approx_cache": 2,
+      "remembered_approx_first_diff": {
+        "token_ids": [
+          13,
+          8412
+        ],
+        "text": ".short"
+      },
+      "current_first_diff_against_remembered_approx": {
+        "token_ids": [
+          25814,
+          14569,
+          3669,
+          220,
+          16,
+          15,
+          23,
+          13
+        ],
+        "text": ".short Continue session 108."
+      },
+      "previous_prompt_tail": "84.\n\n Continue session 87.\n Continue session 90.\n Continue session 93.\n Continue session 96.\n Continue session 99.\n Continue session 102.\n Continue session 105.",
+      "failing_prompt_tail": " Continue session 90.\n Continue session 93.\n Continue session 96.\n Continue session 99.\n Continue session 102.\n Continue session 105.short Continue session 108.",
+      "session_cache_failure_reasons": [
+        "session_cache_drops"
+      ],
+      "note": "remembered_prefix_approx uses tokenizer.encode(generated_text) as an approximation because the raw ledger does not store generated token IDs."
+    },
+    {
+      "source_ledger": "files/evidence/owlmlx/bench/session-kv-soak/20260522T152210Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap.jsonl",
+      "failing_sample_index": 4,
+      "prompt_id": "short",
+      "strategy": "space_delimited_generated_text_then_stable_suffix",
+      "previous_sample_index": 1,
+      "previous_generated_text": "\n\n",
+      "failing_generated_text": "\n\n",
+      "previous_prompt_chars": 45,
+      "failing_prompt_chars": 68,
+      "previous_prompt_token_count": 9,
+      "previous_generated_token_ids_retokenized": [
+        271
+      ],
+      "remembered_prefix_approx_token_count": 10,
+      "failing_prompt_token_count": 15,
+      "common_prefix_prompt_only_token_count": 9,
+      "trim_if_reusing_prompt_only_cache": 0,
+      "prompt_only_previous_first_diff": {
+        "token_ids": [],
+        "text": ""
+      },
+      "prompt_only_current_first_diff": {
+        "token_ids": [
+          4558,
+          14569,
+          3669,
+          220,
+          16,
+          13
+        ],
+        "text": " \n\n Continue session 1."
+      },
+      "common_prefix_remembered_approx_token_count": 9,
+      "trim_if_reusing_remembered_approx_cache": 1,
+      "remembered_approx_first_diff": {
+        "token_ids": [
+          271
+        ],
+        "text": "\n\n"
+      },
+      "current_first_diff_against_remembered_approx": {
+        "token_ids": [
+          4558,
+          14569,
+          3669,
+          220,
+          16,
+          13
+        ],
+        "text": " \n\n Continue session 1."
+      },
+      "previous_prompt_tail": "Reply with exactly: owlmlx session cache soak",
+      "failing_prompt_tail": "Reply with exactly: owlmlx session cache soak \n\n Continue session 1.",
+      "session_cache_failure_reasons": [
+        "session_cache_drops"
+      ],
+      "note": "remembered_prefix_approx uses tokenizer.encode(generated_text) as an approximation because the raw ledger does not store generated token IDs."
+    }
+  ],
+  "accepted_strategy": "boundary_safe_generated_text_then_stable_suffix",
+  "accepted_strategy_rule": "Preserve generated text if it starts with whitespace; otherwise prefix one space before appending the stable suffix.",
+  "supported_claim": false
+}

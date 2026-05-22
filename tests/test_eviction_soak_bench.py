@@ -16,6 +16,20 @@ def _records(path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
+def test_b1c2_prompt_growth_preserves_whitespace_started_generation() -> None:
+    assert (
+        eviction_soak._b1c2_prompt_growth_fragment("\n\n", sample_index=4)
+        == "\n\n Continue session 4."
+    )
+
+
+def test_b1c2_prompt_growth_separates_non_whitespace_generation() -> None:
+    assert (
+        eviction_soak._b1c2_prompt_growth_fragment("short", sample_index=111)
+        == " short Continue session 111."
+    )
+
+
 def test_fake_backend_smoke_writes_jsonl_and_no_allocator_claim(tmp_path):
     summary = eviction_soak.run_eviction_soak(
         runtime="owlmlx",
@@ -817,16 +831,18 @@ def test_b1c2_fake_soak_plus_swap_writes_swap_phase_and_blocked_rollup(tmp_path)
     assert (
         warmup_short["config"]["prompt_chars_after_generation"]
         - warmup_short["config"]["prompt_chars_before_generation"]
-        == len(warmup_short["generate_result"]["text"] + " Continue session 1.")
+        == len(" " + warmup_short["generate_result"]["text"] + " Continue session 1.")
     )
     assert (
         measurement_short["config"]["prompt_chars_after_generation"]
         - measurement_short["config"]["prompt_chars_before_generation"]
-        == len(measurement_short["generate_result"]["text"] + " Continue session 4.")
+        == len(
+            " " + measurement_short["generate_result"]["text"] + " Continue session 4."
+        )
     )
     assert (
         measurement_short["config"]["prompt_growth_strategy"]
-        == "generated_text_then_stable_suffix"
+        == "boundary_safe_generated_text_then_stable_suffix"
     )
     assert measurement_short["generate_result"]["text"]
     assert "fake completion" in measurement_short["generate_result"]["text"]
