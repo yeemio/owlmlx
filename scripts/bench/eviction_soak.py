@@ -379,8 +379,23 @@ def _counter_value(counters: dict[str, Any], key: str) -> int:
 
 
 def _counter_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, int]:
-    keys = set(before) | set(after) | {"hits", "misses", "drops", "evictions", "rejects"}
+    keys = set(before) | set(after) | {
+        "hits",
+        "misses",
+        "drops",
+        "evictions",
+        "expirations",
+        "rejects",
+    }
     return {key: _counter_value(after, key) - _counter_value(before, key) for key in sorted(keys)}
+
+
+def _session_cache_delta_failure_reasons(counter_delta: dict[str, int]) -> list[str]:
+    reasons: list[str] = []
+    for key in ("drops", "expirations", "rejects"):
+        if int(counter_delta.get(key, 0) or 0) > 0:
+            reasons.append(f"session_cache_{key}")
+    return reasons
 
 
 def _session_cache_status(kernel: RuntimeKernel) -> dict[str, Any]:
@@ -2276,6 +2291,9 @@ def run_b1c2_soak_plus_swap(
                 dict(cache_before.get("counters", {})),
                 dict(cache_after.get("counters", {})),
             )
+            session_cache_failure_reasons = _session_cache_delta_failure_reasons(
+                counter_delta
+            )
             if generation.ok:
                 session_prompts[prompt_id] = f"{prompt} Continue session {sample_index}."
             next_prompt = session_prompts[prompt_id]
@@ -2289,6 +2307,8 @@ def run_b1c2_soak_plus_swap(
                 reclaim_stats=reclaim_stats,
                 settle_barrier=settle_snapshot,
             )
+            if session_cache_failure_reasons:
+                sample_verdict = "failed"
             record = {
                 "schema_version": "b1c2.v1",
                 "gate": "B-1c section 2",
@@ -2335,6 +2355,8 @@ def run_b1c2_soak_plus_swap(
                     "active_entries_before": cache_before.get("active_entries"),
                     "active_entries_after": cache_after.get("active_entries"),
                     "counter_delta": counter_delta,
+                    "verdict": "failed" if session_cache_failure_reasons else "passed",
+                    "failure_reasons": session_cache_failure_reasons,
                     "synthetic": not allocator_truth,
                     "allocator_truth": allocator_truth,
                 },

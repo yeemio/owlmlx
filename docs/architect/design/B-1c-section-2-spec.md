@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec + fake/schema runner landed; native §2 runner landed; first native smoke failed on Qwen3.6-27B-4bit session-cache drop/drift and blocks long §2 segments until triaged
+> **Status**: design-grade spec + fake/schema runner landed; native §2 runner landed; first native smoke and deterministic canary both exposed Qwen3.6-27B-4bit session-cache drop/drift, so long §2 segments are blocked until transcript/cache-finalization semantics are closed
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -283,6 +283,21 @@ is clean but intentionally `blocked` because it is only a short smoke:
 This unblocks the first 4h operator-interruptible §2 segment; it still does not
 claim `soak_plus_swap_stability=passed` or `session_kv_supported=true`.
 
+The first 4h segment attempt (`20260521T081118Z`) used the old prompt-growth
+strategy and ran to completion, but it failed on cache drops at samples `111`,
+`321`, and `573`. The deterministic follow-up canary (`20260522T114236Z`) then
+failed earlier: after three warmup samples, all three first measurement samples
+(`4/5/6`) recorded cache hit + drop before any swap boundary. It was manually
+stopped with exit code `143`; the audit file
+`20260522T114236Z-b1c2-qwen-gemma-qwen35-deterministic-early-stop-audit.json`
+is failure/triage evidence only and does not contain a segment pass claim.
+
+Implementation rule after this finding: B-1c §2 must fail fast and write a
+failed rollup as soon as any per-sample session cache drop, expiration, or
+reject is observed. Do not run another long §2 segment until a short native
+canary can complete at least one warm reuse cycle with
+`session_cache_drops_total=0`.
+
 Do not create new `*_harness.py`, `*_ledger.py`, `*_evidence.py`, or
 `*_contract.py` modules for this work. Keep the bench runner in `scripts/bench/`
 and put durable claims in markdown or JSONL evidence.
@@ -298,9 +313,14 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-Start operator-interruptible §2 aggregate evidence:
+Close the deterministic canary blocker before resuming operator-interruptible
+§2 aggregate evidence:
 
-1. Run 4h native segments with one planned swap boundary per segment.
-2. Aggregate only gap-free, hard-failure-free segment rollups.
-3. Require cumulative duration >= 24h and aggregate swap count >= 6 before
+1. Fix or explicitly model the Qwen session cache transcript/cache-finalization
+   semantics that cause first warm reuse drops.
+2. Run a short native canary that reaches at least one warm reuse cycle and
+   writes a formal `b1c2.rollup.v1` with `session_cache_drops_total=0`.
+3. Then run 4h native segments with one planned swap boundary per segment.
+4. Aggregate only gap-free, hard-failure-free segment rollups.
+5. Require cumulative duration >= 24h and aggregate swap count >= 6 before
    `soak_plus_swap_stability=passed`.

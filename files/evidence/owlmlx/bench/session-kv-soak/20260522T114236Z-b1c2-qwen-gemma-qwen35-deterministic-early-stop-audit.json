@@ -1,0 +1,153 @@
+{
+  "schema_version": "b1c2.deterministic_early_stop.v1",
+  "generated_at_utc": "2026-05-22T11:47:31Z",
+  "run_id": "20260522T114236Z-owlmlx-native-b1c2-soak-plus-swap",
+  "conclusion": "failed",
+  "reason": "deterministic_canary_dropped_on_first_measurement_cycle",
+  "prompt_growth_strategy": "deterministic_append_only_no_generated_text",
+  "launch_manifest": "files/evidence/owlmlx/bench/session-kv-soak/20260522T114236Z-b1c2-qwen-gemma-qwen35-4h-native-swap-deterministic-launch.json",
+  "script": "files/evidence/owlmlx/bench/session-kv-soak/20260522T114236Z-b1c2-qwen-gemma-qwen35-4h-native-swap-deterministic.sh",
+  "ledger": "files/evidence/owlmlx/bench/session-kv-soak/20260522T114236Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap.jsonl",
+  "runner_log": "files/evidence/owlmlx/bench/session-kv-soak/20260522T114236Z-b1c2-qwen-gemma-qwen35-4h-native-swap-deterministic.log",
+  "exit_file": "files/evidence/owlmlx/bench/session-kv-soak/20260522T114236Z-b1c2-qwen-gemma-qwen35-4h-native-swap-deterministic.exit",
+  "exit_code": 143,
+  "manual_stop": true,
+  "manual_stop_reason": "first measurement cycle already recorded hard session-cache drops; no value in burning the full 4h segment",
+  "formal_segment_rollup_written": false,
+  "records": 6,
+  "warmup_records": 3,
+  "measurement_records": 3,
+  "ledger_gap_free": true,
+  "drop_sample_indices": [
+    4,
+    5,
+    6
+  ],
+  "session_cache_drops_total": 3,
+  "session_cache_expirations_total": 0,
+  "session_cache_rejects_total": 0,
+  "fatal_watermark_count": 0,
+  "failed_sample_count": 0,
+  "swap_count": 0,
+  "max_measurement_drift_bytes": 343408640,
+  "sample_summaries": [
+    {
+      "sample_index": 1,
+      "phase": "warmup",
+      "prompt_id": "short",
+      "prompt_chars_before_generation": 45,
+      "prompt_chars_after_generation": 65,
+      "counter_delta": {
+        "drops": 0,
+        "entries_created": 1,
+        "evictions": 0,
+        "expirations": 0,
+        "hits": 0,
+        "misses": 1,
+        "rejects": 0
+      },
+      "generate_text_repr": "'\\n\\n'",
+      "sample_verdict": "passed"
+    },
+    {
+      "sample_index": 2,
+      "phase": "warmup",
+      "prompt_id": "medium",
+      "prompt_chars_before_generation": 121,
+      "prompt_chars_after_generation": 141,
+      "counter_delta": {
+        "drops": 0,
+        "entries_created": 1,
+        "evictions": 0,
+        "expirations": 0,
+        "hits": 0,
+        "misses": 1,
+        "rejects": 0
+      },
+      "generate_text_repr": "'\\n\\n'",
+      "sample_verdict": "passed"
+    },
+    {
+      "sample_index": 3,
+      "phase": "warmup",
+      "prompt_id": "long",
+      "prompt_chars_before_generation": 148,
+      "prompt_chars_after_generation": 168,
+      "counter_delta": {
+        "drops": 0,
+        "entries_created": 1,
+        "evictions": 0,
+        "expirations": 0,
+        "hits": 0,
+        "misses": 1,
+        "rejects": 0
+      },
+      "generate_text_repr": "'\\n\\n'",
+      "sample_verdict": "passed"
+    },
+    {
+      "sample_index": 4,
+      "phase": "measurement",
+      "prompt_id": "short",
+      "prompt_chars_before_generation": 65,
+      "prompt_chars_after_generation": 85,
+      "counter_delta": {
+        "drops": 1,
+        "entries_created": 0,
+        "evictions": 0,
+        "expirations": 0,
+        "hits": 1,
+        "misses": 0,
+        "rejects": 0
+      },
+      "generate_text_repr": "'\\n\\n'",
+      "sample_verdict": "passed",
+      "measurement_drift_bytes": 0
+    },
+    {
+      "sample_index": 5,
+      "phase": "measurement",
+      "prompt_id": "medium",
+      "prompt_chars_before_generation": 141,
+      "prompt_chars_after_generation": 161,
+      "counter_delta": {
+        "drops": 1,
+        "entries_created": 0,
+        "evictions": 0,
+        "expirations": 0,
+        "hits": 1,
+        "misses": 0,
+        "rejects": 0
+      },
+      "generate_text_repr": "'\\n\\n'",
+      "sample_verdict": "passed",
+      "measurement_drift_bytes": 171704320
+    },
+    {
+      "sample_index": 6,
+      "phase": "measurement",
+      "prompt_id": "long",
+      "prompt_chars_before_generation": 168,
+      "prompt_chars_after_generation": 188,
+      "counter_delta": {
+        "drops": 1,
+        "entries_created": 0,
+        "evictions": 0,
+        "expirations": 0,
+        "hits": 1,
+        "misses": 0,
+        "rejects": 0
+      },
+      "generate_text_repr": "'\\n\\n'",
+      "sample_verdict": "passed",
+      "measurement_drift_bytes": 343408640
+    }
+  ],
+  "no_claims": [
+    "supported",
+    "session_kv_supported=true",
+    "soak_plus_swap_stability=passed",
+    "24h/6swap aggregate"
+  ],
+  "interpretation": "The deterministic B-1c section 2 canary removed generated assistant text from prompt growth, but Qwen3.6-27B-4bit still produced a completion token and then dropped all three warm cache hits on the first measurement cycle. The next blocker is runtime or bench transcript/cache-finalization semantics, not 4h aggregate duration."
+}

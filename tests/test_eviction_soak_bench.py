@@ -840,6 +840,71 @@ def test_b1c2_fake_soak_plus_swap_writes_swap_phase_and_blocked_rollup(tmp_path)
     assert rollup[0]["soak_plus_swap_stability"] == "blocked"
 
 
+def test_b1c2_soak_plus_swap_fails_fast_on_session_cache_drop(
+    monkeypatch, tmp_path
+):
+    statuses = iter(
+        [
+            {"active_entries": 0, "counters": {"misses": 0, "hits": 0, "drops": 0}},
+            {"active_entries": 1, "counters": {"misses": 1, "hits": 0, "drops": 0}},
+            {"active_entries": 1, "counters": {"misses": 1, "hits": 0, "drops": 0}},
+            {"active_entries": 2, "counters": {"misses": 2, "hits": 0, "drops": 0}},
+            {"active_entries": 2, "counters": {"misses": 2, "hits": 0, "drops": 0}},
+            {"active_entries": 3, "counters": {"misses": 3, "hits": 0, "drops": 0}},
+            {"active_entries": 3, "counters": {"misses": 3, "hits": 0, "drops": 0}},
+            {"active_entries": 3, "counters": {"misses": 3, "hits": 1, "drops": 1}},
+        ]
+    )
+
+    def fake_session_cache_status(_kernel):
+        return next(
+            statuses,
+            {
+                "active_entries": 3,
+                "counters": {"misses": 3, "hits": 1, "drops": 1},
+            },
+        )
+
+    monkeypatch.setattr(
+        eviction_soak,
+        "_session_cache_status",
+        fake_session_cache_status,
+    )
+
+    summary = eviction_soak.run_b1c2_soak_plus_swap(
+        runtime="owlmlx",
+        backend="fake",
+        output_dir=tmp_path,
+        swap_count=1,
+        required_swap_count=1,
+        required_duration_s=0.0,
+        sample_interval_s=0.0,
+        b1c1_prerequisite_satisfied=True,
+    )
+
+    assert summary["conclusion"] == "failed"
+    assert summary["soak_plus_swap_stability"] == "failed"
+    assert summary["session_cache_drops_total"] == 1
+    assert summary["swap_count"] == 0
+    assert summary["swap_requirement_met"] is False
+    assert summary["graduates"]["soak_plus_swap_stability"] is False
+    assert summary["graduates"]["session_kv_supported"] is False
+
+    ledger = _records(tmp_path / summary["ledger"].split("/")[-1])
+    assert [record["phase"] for record in ledger] == [
+        "warmup",
+        "warmup",
+        "warmup",
+        "measurement",
+    ]
+    failed_record = ledger[-1]
+    assert failed_record["sample_verdict"] == "failed"
+    assert failed_record["session_cache"]["verdict"] == "failed"
+    assert failed_record["session_cache"]["failure_reasons"] == [
+        "session_cache_drops"
+    ]
+
+
 def test_b1c2_missing_b1c1_prerequisite_blocks_promotion(tmp_path):
     summary = eviction_soak.run_b1c2_soak_plus_swap(
         runtime="owlmlx",
