@@ -403,6 +403,36 @@ This closes the token-boundary canary and reopens the 4h fail-fast §2 segment
 route. It still does not claim `soak_plus_swap_stability=passed`; the 24h / six
 swap aggregate remains open.
 
+The boundary-safe 4h segment:
+
+```text
+files/evidence/owlmlx/bench/session-kv-soak/
+  20260522T164506Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap-rollup.jsonl
+```
+
+ran to the planned swap boundary and closed the token-boundary blocker, but it
+is still failed evidence:
+
+- `measurement_duration_s=14439.346`
+- prompt mix `238/238/238`
+- `measurement_wall_clock_gap_free=true`
+- `session_cache_drops_total=0`
+- `session_cache_expirations_total=0`
+- `session_cache_rejects_total=0`
+- `swap_count=1`
+- `swap_boundaries_clean=true`
+- `fatal_watermark_count=0`
+- `unresolved_reclaim_barrier_events=0`
+- cleanup unload OK
+- `max_drift_bytes=352321536` > `drift_budget_bytes=209715200`
+- `soak_plus_swap_stability=failed`
+- `graduates.session_kv_supported=false`
+
+The max drift appears after sample `685` while cache counters remain clean:
+`drops=0`, `hits=714`, `misses=3`, `entries_created=3`. This separates the next
+blocker from token-boundary reuse: §2 now needs memory-drift triage before any
+additional aggregate segment can be treated as clean input.
+
 The landed smoke-only slice covers:
 
 - fake backend schema run
@@ -414,12 +444,15 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-Resume §2 evidence from the fail-fast segment lane:
+Close the memory-drift blocker before resuming aggregate evidence:
 
-1. Run the next 4h native §2 segment with
-   `boundary_safe_generated_text_then_stable_suffix`.
-2. Stop immediately on any session cache drop, expiration, reject, FATAL
-   watermark, unresolved reclaim barrier, or dirty swap boundary.
-3. Aggregate only gap-free, hard-failure-free segment rollups.
-4. Require cumulative duration >= 24h and aggregate swap count >= 6 before
+1. Reproduce the drift with a shorter boundary-safe Qwen-only probe that keeps
+   the same three-session mix but skips the model swap.
+2. Record active-memory step changes around the first >200MB drift point
+   (sample `685` in `20260522T164506Z`) and whether they correlate with prompt
+   length, generated-token shape, or MLX allocator growth.
+3. Resume 4h native §2 segments only when the focused drift probe stays within
+   budget or the budget/rationale is explicitly revised in the spec.
+4. Aggregate only gap-free, hard-failure-free segment rollups.
+5. Require cumulative duration >= 24h and aggregate swap count >= 6 before
    `soak_plus_swap_stability=passed`.
