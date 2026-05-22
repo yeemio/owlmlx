@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec + fake/schema runner landed; native §2 runner landed; generated-text transcript canary is clean/blocked; resume 4h fail-fast §2 segments before any aggregate claim
+> **Status**: design-grade spec + fake/schema runner landed; native §2 runner landed; 4h fail-fast segment exposed a repeatable Qwen long-session cache drop before swap, so aggregate runs are paused for focused token/debug canaries
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -324,6 +324,30 @@ is clean but intentionally `blocked`:
 - `hard_failure=false`
 - `graduates.session_kv_supported=false`
 
+The follow-up 4h fail-fast segment:
+
+```text
+files/evidence/owlmlx/bench/session-kv-soak/
+  20260522T115939Z-b1c2-qwen3.6-27b-gemma-4-31B-it-qwen3.6-35b-a3b-soak-swap-rollup.jsonl
+```
+
+failed before the first swap:
+
+- `measurement_duration_s=2133.518`
+- prompt mix `36/36/36`
+- `measurement_wall_clock_gap_free=true`
+- `max_drift_bytes=50331648`
+- `session_cache_drops_total=1`
+- drop at sample `111`, prompt `long`, Qwen3.6-27B-4bit
+- `swap_count=0`
+- `soak_plus_swap_stability=failed`
+- `graduates.session_kv_supported=false`
+
+This segment is not clean aggregate input. It shows that the first short clean
+canary was necessary but not sufficient; the next round should isolate Qwen
+long-session token/cache-prefix behavior around the ~900-1000 character prompt
+range instead of launching another 4h segment.
+
 The landed smoke-only slice covers:
 
 - fake backend schema run
@@ -335,11 +359,16 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-Resume operator-interruptible §2 aggregate evidence with fail-fast enabled:
+Close the Qwen long-session drop before resuming §2 aggregate evidence:
 
-1. Run 4h native segments with one planned swap boundary per segment.
-2. Stop immediately on any cache drop / expiration / reject; the runner now
-   writes a failed rollup instead of burning the whole segment.
-3. Aggregate only gap-free, hard-failure-free segment rollups.
-4. Require cumulative duration >= 24h and aggregate swap count >= 6 before
+1. Build a focused Qwen long-session canary that reproduces the sample-111
+   cache drop without requiring a 4h wall-clock run.
+2. Capture token-prefix / generated-token details around the first unsafe trim
+   decision.
+3. Adjust bench transcript shape or runtime cache-finalization semantics only
+   after the token-level cause is explicit.
+4. Resume 4h native segments only after the focused canary writes a clean
+   `b1c2.rollup.v1` through the same long-session token range.
+5. Aggregate only gap-free, hard-failure-free segment rollups.
+6. Require cumulative duration >= 24h and aggregate swap count >= 6 before
    `soak_plus_swap_stability=passed`.
