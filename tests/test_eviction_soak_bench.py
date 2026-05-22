@@ -817,16 +817,16 @@ def test_b1c2_fake_soak_plus_swap_writes_swap_phase_and_blocked_rollup(tmp_path)
     assert (
         warmup_short["config"]["prompt_chars_after_generation"]
         - warmup_short["config"]["prompt_chars_before_generation"]
-        == len(" Continue session 1.")
+        == len(warmup_short["generate_result"]["text"] + " Continue session 1.")
     )
     assert (
         measurement_short["config"]["prompt_chars_after_generation"]
         - measurement_short["config"]["prompt_chars_before_generation"]
-        == len(" Continue session 4.")
+        == len(measurement_short["generate_result"]["text"] + " Continue session 4.")
     )
     assert (
         measurement_short["config"]["prompt_growth_strategy"]
-        == "deterministic_append_only_no_generated_text"
+        == "generated_text_then_stable_suffix"
     )
     assert measurement_short["generate_result"]["text"]
     assert "fake completion" in measurement_short["generate_result"]["text"]
