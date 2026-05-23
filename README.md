@@ -69,7 +69,8 @@ won't.
 | Native MLX backend (in-process, bypassing `mlx_lm`) | experimental |
 | Native session KV cache (`X-Owlmlx-Session-Id`, default off) | experimental |
 | Subprocess backend (`mlx_lm` in a separate process) | supported |
-| Continuous batching / paged KV cache / implicit prefix matching / multimodal / speculative | **not in scope** |
+| Continuous batching / paged KV cache / implicit prefix matching / multimodal | **not in scope** |
+| Speculative decoding (`gemma4_mtp_drafter.py` · `mlx_vlm_mtp_runner.py`) | **probe surface only · not in serving path** — see `docs/architect/01-mainline-roadmap.md §V Campaign F`; D3 inspection + D4 clean pre-load reject已闭合 "MTP weights absent → unsafe_no_attempt" 否定面契约 |
 
 ### Session KV cache (experimental) prefill evidence
 
@@ -139,12 +140,18 @@ emits a loud warning if run outside `.venv/`.
 
 ## Development status
 
-Internal runtime milestone as of 2026-05-17. Public Python surface and HTTP
+Internal runtime milestone as of 2026-05-23. Public Python surface and HTTP
 routes are stable enough for the runtime engineering channel, while OwlCoda
 product readiness remains parked behind the npm local-model learning-loop
-gate. Session KV cache remains experimental: B-1a and B-1b are passed, and
-B-1c no-swap / swap soak gates remain open. Stage 1 refactor (2026-05-11)
-archived 151 spec-as-code modules; Stage 2 aligned landmark vocabulary with
-[PR #649][pr649]. See
-`CHANGELOG.md` (when present) or recent `release(...)` / `refactor(...)`
-commits.
+gate. Session KV cache remains experimental: B-1a passed (Gemma 4-31B-it
+2.246× warm TTFT), B-1b passed (cache-on no-regress N=20), B-1c §1
+current-Mac `interrupted_no_swap_rehearsal=passed` @ ≈24.69h cumulative
+clean native segments, B-1c §2 (soak plus swap) is currently in drift
+triage (2026-05-22 boundary-safe 4h segment recorded `max_drift_bytes=352MB
+> 200MB budget` — cache layer clean, allocator residue归因 open per
+`docs/architect/design/B-1c-section-2-spec.md §10`). Stage 1 refactor
+(2026-05-11) archived 151 spec-as-code modules; Stage 2 aligned landmark
+vocabulary with [PR #649][pr649]; Wave H · H1 (2026-05-17) extracted
+OpenAI/Anthropic compat routes into `server_routes_openai.py`. See
+`CHANGELOG.md` (when present) or recent `release(...)` / `refactor(...)` /
+`docs(...)` commits.
