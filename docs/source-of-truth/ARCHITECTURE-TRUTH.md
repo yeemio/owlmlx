@@ -1,7 +1,7 @@
 # owlmlx 架构真源
 
 > Status: **唯一权威** — 与本文件冲突的其他文档，以本文件为准
-> Updated: 2026-04-12
+> Updated: 2026-05-23（§2.2 / §2.3 代码与文档盘点按工作树重盘点；§1 / §3 / §4 / §5 / §6 / §7 / §8 维持 2026-04-12 历史口径，待后续独立刷新）
 
 ## 1. owlmlx 是什么
 
@@ -38,37 +38,63 @@ memory budget / model inventory / runtime health / GenerationGate。
 
 ### 2.2 代码盘点
 
-Runtime-7 完成交付后，owlmlx 有 19 个 Python 模块，357 tests。
+> 历史口径：Runtime-7 完成交付时为 19 个 Python 模块、357 tests。本节按 2026-05-23 工作树重盘点；下文模块表与历史口径不冲突，是 Stage 1（2026-05-11 archived 151 spec-as-code 模块）+ Stage 2（2026-05-12 PR #649 alignment）+ Stage 3.1 + B-1a/B-1b/B-1c §1 + Wave H · H1 闭合期间的真实演进结果。
 
-| 模块 | LOC | 性质 | 做什么 |
-|---|---|---|---|
-| memory_budget.py | 234 | schema + derivation | 判断模型能不能装进 116GB budget |
-| context_concurrency.py | 166 | schema + lookup | 按 context length 查 gate table |
-| abort_recovery.py | 338 | state machine | clean/probing/contaminated 状态跟踪 |
-| runtime_health.py | 466 | schema + derivation | 6 enum + 7 derivation → readiness |
-| model_inventory.py | ~280 | schema + composition | inventory snapshot → budget/health 组合调用 |
-| model_lineage.py | 322 | schema + validation | lineage 校验 + truth inheritance |
-| cache_truth.py | ~250 | schema + derivation | cache profile / flag / restart 推导 |
-| runtime_status.py | ~200 | schema validation | runtime status payload 校验 |
-| serving_status.py | ~100 | status builder | large-weight path status dict 构建 |
-| serving.py | ~200 | gate (asyncio) | GenerationGate semaphore — **唯一接近 runtime 行为的代码** |
-| training.py | ~480 | artifact management | 训练产物 metadata 注册/发现/校验 |
-| runtime/types.py | ~100 | executable runtime contract | load/generate/unload/status 结果类型 |
-| runtime/backends.py | ~130 | backend adapter + FakeBackend | RuntimeBackend 边界和可测试 fake runtime |
-| runtime/kernel.py | ~230 | **runtime behavior** | RuntimeKernel: load/generate/unload/status |
-| runtime/server.py | ~80 | **HTTP runtime entry** | `/healthz`, `/v1/load`, `/v1/generate`, `/v1/models`, `/v1/unload` |
-| runtime/mlx_lm_backend.py | ~120 | MLX adapter | lazy mlx-lm load/generate 调用路径（in-process，仅 probe 用途） |
-| runtime/mlx_lm_runner.py | ~65 | **child process runner** | 子进程内执行 mlx_lm.load + generate，stdin/stdout JSON 协议 |
-| runtime/mlx_lm_subprocess_backend.py | ~220 | **subprocess backend** | 父进程安全的 mlx-lm 持久 child lifecycle：`load once -> generate many -> unload` |
-| runtime/mlx_environment.py | ~150 | **environment probe** | 安全环境选择 + 结构化诊断，default vs known 分离 |
+**当前规模**：53 个 Python 模块（`owlmlx/` 36 + `owlmlx/runtime/` 17）· 77 test 文件 / 919 test 函数 · `owlmlx/` + `owlmlx/runtime/` 总 LOC 29,730。
 
-**关键事实：Runtime-12 已把 replacement verdict 提升为控制面显式输出：launch readiness、operability、replaceability 不再混在一起。旧平台结论仍是 not yet replaceable。父进程仍永不 import mlx_lm。**
+**Runtime-7 之后新增的主战场**（按出现顺序，非 LOC 顺序）：
+
+- **内存纪律子系统（PR #649 alignment）**：`memory_watermark.py`、`memory_actuator.py`、`settle_barrier_event.py`、`host_pressure.py`、`memory_pressure_classifier.py`、`memory_pressure_eviction_policy.py`、`memory_budget.py`（既有）
+- **Admission & cache 子系统**：`scheduler_admission.py`、`model_load_admission.py`、`nonresident_model_admission_policy.py`、`nonresident_loadability_lineage.py`、`cache_manager.py`、`cache_truth.py`、`cache_residency_tracker.py`、`cache_scheduler_status.py`、`session_kv_cache.py`（experimental · native only）
+- **Multi-model lifecycle 子系统**：`model_inventory.py`、`model_lineage.py`、`model_residency_policy.py`、`model_profile.py`、`quantization_metadata.py`、`model_release_candidate_history.py` / `_record.py` / `_schema.py`
+- **Status & provenance 子系统**：`runtime_health.py`、`orchestration_status.py`、`runtime_model_visibility.py`、`runtime_monitor_test_console.py`、`recovery_supervisor.py`、`comparative_evidence_history.py` / `_record.py` / `_runner.py` / `_schema.py`、`request_context_length_truth.py`、`reasoning_trace_policy.py`、`termination_recovery_policy.py`
+- **Process boundary（experimental side）**：`runtime/mlx_native_backend.py`（in-process · session-scope opt-in only）、`runtime/mlx_vlm_mtp_runner.py`（MTP probe scaffold）、`gemma4_mtp_drafter.py`（drafter probe）
+- **Runtime hardening**：`runtime/serving_hardening.py`、`runtime/specimen_gate.py`、`runtime/first_smoke_decision.py`、`runtime/host_stability.py`、`runtime/technical_preview.py`、`runtime/mlx_environment.py`、`abort_recovery.py`
+- **HTTP routes 拆分（Wave H · H1）**：2026-05-17 拆出 `runtime/server_routes_openai.py`（OpenAI/Anthropic 兼容 5 routes）；`runtime/server.py` 保留 42 routes 待 H2/H3
+
+**Top-15 模块（按 LOC，覆盖 ≥ 75% 总 LOC）**：
+
+| 模块 | LOC | 性质 |
+|---|---:|---|
+| `runtime/mlx_lm_subprocess_backend.py` | 2541 | subprocess backend（生产路径 · persistent child lifecycle） |
+| `runtime/server.py` | 2013 | HTTP entry + 42 routes（Wave H · H1 之后 · H2/H3 待启） |
+| `runtime/kernel.py` | 1694 | RuntimeKernel: load / generate / unload / restart / settle / pin / TTL / eviction history |
+| `runtime_monitor_test_console.py` | 1267 | 内部测试台（OwlOps 消费） |
+| `runtime/mlx_native_backend.py` | 1215 | native backend（experimental · session-scope opt-in） |
+| `comparative_evidence_runner.py` | 1130 | comparative bench 主驱动（OwlOps consumer） |
+| `serving.py` | 1009 | GenerationGate + pre-gate cohort hook + admission seam |
+| `runtime/mlx_lm_runner.py` | 896 | mlx_lm child process runner（stdin/stdout JSON 协议） |
+| `runtime/serving_hardening.py` | 857 | hardening contract（recovery / abort / restart） |
+| `runtime/server_routes_openai.py` | 829 | Wave H · H1 已拆（OpenAI/Anthropic 兼容） |
+| `runtime/mlx_environment.py` | 744 | environment probe + verified baseline registry |
+| `nonresident_model_admission_policy.py` | 709 | non-resident admission verdict |
+| `termination_recovery_policy.py` | 625 | termination 恢复策略 |
+| `memory_actuator.py` | 612 | 内存执行（watermark + actuator） |
+| `scheduler_admission.py` | 599 | scheduler admission contract |
+
+余 38 模块按 LOC 分布在 100–600 之间，覆盖 schema / lineage / policy / training / status surface 等细分职责。
+
+**关键事实**（保持自 Runtime-12 历史结论 · 仍然成立）：launch readiness、operability、replaceability 仍是控制面分离输出；父进程仍永不 import mlx_lm；single worker by design (`MAX_GENERATION_CONCURRENCY = 1`) 是 MLX/Metal 同进程并发不安全的物理结论。
+
+**HTTP 表面**：47 路由（subprocess + native 共用 · OpenAI 兼容 5 + Anthropic 兼容 2 + 核心 lifecycle 8 + `/v1/runtime/*` 状态 27 + admin/monitor 5）。详细路由分类见 `docs/architect/05-alignment-audit.md §2.3`。
 
 ### 2.3 文档盘点
 
-29 个 source-of-truth 文档。
+> 历史口径：2026-04-12 当时为 29 个 source-of-truth 文档。本节按 2026-05-23 工作树重盘点。
 
-其中多数文档描述的是**目标架构**（owlmlx 应该成为什么），不是**当前实现**（owlmlx 现在能做什么）。这不是错——方向文档有存在价值——但不能把方向文档等同于已交付能力。
+**当前规模**：`docs/source-of-truth/` 208 份 .md 文档。
+
+| 范畴 | 数量 | 说明 |
+|---|---:|---|
+| 非 `phase45-*` 文档 | 103 | 顶层契约 + capability matrix + 各 wave 闭合契约（runtime-*、stabilization-*、product-definition、master-outline 等） |
+| `phase45-*` 前缀文档 | 105 | 历史 wave 45 期间的 cache / scheduler / pre-claim / stream-backend 细化契约；其中约 15 份出现 4+ 层 hyphen 嵌套递归命名 |
+| `master-outline.md §5` canonical reading list 编号文件 | 145 | 其中 79 为 `phase45-*` |
+
+**plan-grade architect 文档**（独立目录 `docs/architect/` · **不**入 `master-outline.md` 索引 · 详见 `docs/architect/README.md`）：5 份 plan-grade（含 `01-mainline-roadmap.md` / `02-state-vs-market-gap.md` / `03-real-accomplishments.md` / `04-architecture-canvas.md` / `05-alignment-audit.md`）+ `design/` 子目录 8 份 design-grade gate spec（B-1a / B-1b / B-1c §1 / B-1c §2 / D1 / D2 / D3 / D4）。
+
+**已识别的治理目标**（不在本次盘点范围内）：`phase45-*` 递归命名扩散与 4+ 层 hyphen 嵌套是 Stage 1（2026-05-11）已在源代码层禁止的 spec-as-code 反模式在文档层的重现，作为 Wave G-4 独立 round 处理。本节仅记盘点事实，**不**做归并 / 迁移 / 删除。详细审计与建议见 `docs/architect/05-alignment-audit.md §3.2 / §4.3 / §8`。
+
+历史定性仍然成立：多数 source-of-truth 文档描述的是**目标架构**或**历史 wave 闭合契约**，不是**当前实现**的每行代码——这不是错（方向文档与历史契约都有存在价值），但不能把方向文档等同于已交付能力。
 
 ### 2.4 平台消费关系
 
