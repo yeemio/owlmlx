@@ -6,6 +6,7 @@ This repository is the source-of-truth home for the `owlmlx` runtime line.
 
 If a task does not specify a narrower entry point, read in this order:
 
+0. `docs/architect/README.md` — plan-grade entry（**新成员从这里起**，了解架构师视角的 12+ 月主线、6 子战役、对齐审计；plan-grade 与 source-of-truth grade 分离规则在这里立）
 1. `README.md`
 2. `AGENTS.md`
 3. `docs/source-of-truth/master-outline.md`
@@ -37,6 +38,12 @@ If a task does not specify a narrower entry point, read in this order:
 - `owlmlx` reuses open-source runtime mechanisms freely. Self-owned does not
   mean full rewrite. What is owned is identity, principles, governance, truth
   contracts, and path semantics.
+- owlmlx 的 12+ 月战略身份是 **memory-discipline-first replacement-grade MLX
+  runtime for Apple Silicon 单机企业级 agentic / batch evaluation 场景**——
+  差异化轴是 Reliability + Provenance + Governance，不是 raw throughput。
+  详见 `docs/source-of-truth/product-definition.md §11`（2026-05-23
+  addendum）。OwlCoda 是上层消费者（不是身份组成）；release channel split
+  (`a21a0a2c`) 已确立 owlmlx engineering ≠ OwlCoda consumer readiness。
 
 ## Writing Rules
 
