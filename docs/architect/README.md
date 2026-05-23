@@ -31,6 +31,7 @@
 | 2 | [02-state-vs-market-gap.md](02-state-vs-market-gap.md) | 现状 vs 市场差距清单（12 维框架对照） |
 | 3 | [03-real-accomplishments.md](03-real-accomplishments.md) | 已完成真实情况 + 四主证据 |
 | 4 | [04-architecture-canvas.md](04-architecture-canvas.md) | 架构画布（系统 / 功能 / 业务逻辑 / 路线图，mermaid + 表格 + ASCII） |
+| 5 | [05-alignment-audit.md](05-alignment-audit.md) | 代码 ↔ source-of-truth ↔ plan-grade 对齐审计 + 架构 / 功能 / 方向补充 + Wave G narrow 工作单（2026-05-23） |
 
 ### Design-grade docs（gate 层 · 单 gate 可执行口径）
 
@@ -102,7 +103,7 @@ docs/handoff/                ← 轮次交接
 
 ## 当前状态（2026-05-16 consolidated drop）
 
-- **本目录文件**：4 份 plan-grade 文档（含本 README 为目录说明）
+- **本目录文件**：5 份 plan-grade 文档（含本 README 为目录说明）+ design/ 子目录承载单 gate spec
 - **已 promote 到 source-of-truth/**：0 份
 - **承载迁移来源**：`~/.claude/plans/owlmlx-1-*`（Claude Code plan-mode 临时承载；本目录为 authoritative plan-grade 副本）
 - **维护入口**：[01-mainline-roadmap.md](01-mainline-roadmap.md) 的"顶层维护入口"小节
