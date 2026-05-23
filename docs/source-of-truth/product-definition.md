@@ -1,7 +1,7 @@
 # owlmlx Product Definition
 
 > Status: authoritative
-> Updated: 2026-04-09
+> Updated: 2026-05-23（§5.3 vMLX 边界按 2026-05 现实校正；新增 §11 Internal Replacement-Grade Depth Posture · §1–10 历史定义维持 2026-04-09 口径）
 
 ## 1. Formal Definition
 
@@ -106,11 +106,32 @@ current platform work has historically depended on it. It does not define
 
 ### 5.3 vMLX
 
-`vMLX` is another important reference system.
+`vMLX` 在 2024–2025 早期是开源 MLX serving project；到 2026-05 已演进为
+**Apple 官方背书的 Apple Silicon 单机全栈本地 LLM 方案**（OpenAI / Anthropic
+兼容 API + 20+ tool 整合 + vmlx.net 稳定站点）。这改变了 owlmlx 的边界陈述
+（旧 README 表述"continuous batching / 多 host / 多租户 cluster 看 oMLX / vMLX"
+已经不准；vMLX 在单机端已是 Apple 官方背书的全栈，不需要看向多 host）。
 
-It contributes implementation ideas, operational patterns, and packaging
-examples that may be worth internalizing. It is not the origin story of
-`owlmlx`.
+历史定性仍然成立：vMLX 贡献了 owlmlx 可借鉴的实现想法、运维模式、打包范式，
+且**不是** owlmlx 的 origin story。
+
+**当前边界**（2026-05-23 校正 · 与 §11 互锁）：
+
+owlmlx 与 vMLX 在单机 Apple Silicon 上**场景部分重叠**（OpenAI / Anthropic
+API 端点），但**架构定位不同**：
+
+- owlmlx 强制 **memory-discipline-first**——`MemoryWatermark` + settle
+  barrier 是每条 load 路径的硬契约；`MAX_GENERATION_CONCURRENCY = 1` 是
+  MLX/Metal 同进程并发不安全的物理结论；vMLX 偏向 throughput-first
+- owlmlx 把 **capability honesty + speculative path safety + governance**
+  作为发版门控（§1a Promotion Gate + evidence-language calibration）；
+  vMLX 不以此为闭合标准
+- owlmlx 与 **OwlOps / OwlCoda / OwlMom** 形成内部消费闭环
+  （`/v1/runtime/*` 27+ 路由已 supported · OwlOps 27 行 ledger live）；
+  vMLX 是开源全栈，无对应契约关系
+
+差异化轴明确为 **Reliability + Provenance + Governance**，不是 raw
+throughput。详见 §11。
 
 ### 5.4 Product Shell Layer
 
@@ -247,3 +268,85 @@ Current truth:
 2. Separate runtime ownership from desktop-shell ownership
 3. Provide a stable home for runtime-specific evolution, extraction, and
    productization
+
+## 11. Internal Replacement-Grade Depth Posture（2026-05-23 addendum）
+
+> Status: authoritative addendum to §1–10
+> 来源：`docs/architect/01-mainline-roadmap.md §IV.1 / §IV.5`（plan-grade）
+> 触发：2026-05-10 战略转向 + governance commit `a21a0a2c`（release channel
+> split: owlmlx engineering ≠ OwlCoda consumer readiness）
+
+§1–10 的 formal definition、frozen project statements、runtime principles、
+adoption model 全部维持不变。本节是 2026-05-10 战略转向后必须补充的**身份
+精炼**——把 §1 的 "runtime project for MLX-based model serving and runtime
+management on Apple Silicon" 进一步收口为：
+
+> **owlmlx 的 12+ 月战略身份是**：为 Apple Silicon 单机企业级 agentic /
+> batch evaluation 场景而生的 **memory-discipline-first replacement-grade
+> MLX runtime**。
+
+### 11.1 服务对象收口
+
+- **In**：单机 Apple Silicon (Mac Studio / Mac Pro) · 1–10 simultaneous
+  users behind a request queue · 企业级 agentic / batch evaluation 场景 ·
+  长 uptime · 模型 swap 频繁
+- **Out**：消费级单用户 UI（LM Studio / Ollama / Apple Foundation Models
+  已占位）· 多 host fleet · 多租户 cluster · 持续 batching throughput
+  竞速
+
+### 11.2 差异化三轴（与 §4 Formal Runtime Principles 互锁）
+
+| 轴 | 含义 | 对应 §4 原则 |
+|---|---|---|
+| **Reliability** | speculative path safety + structured-output invariance + repeatability (N≥20) | §4.1 memory governance · §4.2 switch safety |
+| **Provenance** | request lifecycle 事件流 + artifact 来源链 + spec accept/reject ratio + reproduce metadata | §4.3 runtime truth exposure |
+| **Governance** | capability honesty + admission/eviction 公开算法 + OwlOps consumption | §4.5 runtime governance + §6 adoption model |
+
+**不追赶**（明示 · 与 §9 Current Non-Claims 一致 · 扩展）：
+
+- raw throughput（vMLX 已饱和单机端 · 见 §5.3）
+- continuous batching（vllm-mlx 已实装；owlmlx README "not in scope"）
+- 消费级 UI（LM Studio / Ollama / LMM Studio 已占位）
+- Apple Foundation Models 同质化（macOS Tahoe 26 + FM 框架已覆盖消费级
+  本地推理）
+
+### 11.3 边界资产位置（Adjacent Assets · 不入 owlmlx mainline）
+
+| 资产 | 与 owlmlx 的边界关系 |
+|---|---|
+| **OwlRunKit** | owlmlx 之外的 lifecycle / env broker 候选位。owlmlx 暴露 `pre_load_check` / `host_pressure` / `model_visibility` 等 runtime-owned contract 供其调用；owlmlx 不拥有这些能力 |
+| **`llm_router`** | 过渡资产（transitional）。当前承担"几条本地 runtime 之间的路由切换"，待 owlmlx replacement-grade 后逐步由 owlmlx mainline 替代或由 OwlOps 上收。**不**入 owlmlx mainline；任何 `llm_router → owlmlx` 反向依赖出现视为风险事件 |
+| **OwlCoda** | 上层消费者（不是 owlmlx 身份组成）。release channel split (`a21a0a2c`) 已确立 **owlmlx engineering ≠ OwlCoda consumer readiness**——OwlCoda 卡顿**不**延迟 owlmlx 主线 |
+| **OwlMom** | 上层消费者（间接）。5 Vue 页面已 FROZEN · 数据走 OwlOps 聚合 · 不直接消费 `/v1/runtime/*` |
+
+任何 wave 不得把 OwlRunKit / `llm_router` 的能力**下沉到** owlmlx 内部模块。
+协作仅通过 runtime-owned HTTP / contract surface 暴露字段。
+
+### 11.4 Re-Open 发版条件（架构师诚实预测 · 不承诺）
+
+owlmlx 公开发版的再开放门槛冻结为三条 reopen condition，每条对应一个
+Campaign 簇：
+
+| RC | 条件 | 对应 Campaign | 估计达成时点 |
+|---|---|---|---|
+| RC1 | 至少 3 条主线 model family 有 N≥20 重复运行证据 | Campaign A + C + D | 6–9 月 |
+| RC2 | 至少一个 owlmlx native-only 能力（非 wrapping mlx_lm） | Campaign B（session KV）+ Campaign F（spec on native）+ Campaign D（DS4 native MTP） | 9–12 月 |
+| RC3 | OwlOps 稳定消费 live runtime truth 并形成内部 operational 闭环 | Campaign E | 6–9 月 |
+
+具体 Wave / Gate 路线见 `docs/architect/01-mainline-roadmap.md §V`。本节
+**不**承诺时点；任何加速尝试不得通过越级 promotion 实现（promotion 仍走
+§1a Gate）。
+
+### 11.5 本节不做的事
+
+- **不**晋级任何 capability label
+- **不**替代 §1–10 的 formal definition / frozen statements / runtime
+  principles / adoption model
+- **不**重定义 `oMLX` 替代关系（§5.2 仍然有效）
+- **不**改变 §6 adoption model
+- **不**晋级 architect-grade 内容到 source-of-truth 契约（plan-grade /
+  source-of-truth grade 边界保持）
+
+本节是身份**精炼**而不是身份**重写**：与 §1 Formal Definition 互锁，与
+§5.3 vMLX 边界互锁，与 `docs/architect/01-mainline-roadmap.md` plan-grade
+战略互锁；当 plan-grade 路线刷新时本节同步刷新。
