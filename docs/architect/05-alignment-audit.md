@@ -1,8 +1,27 @@
 # 05 · 对齐审计 + 架构 / 功能 / 方向补充
 
 > **Grade**: plan-grade（与本目录其他文件同 grade · 不入 `docs/source-of-truth/master-outline.md`）
-> **Updated**: 2026-05-23
+> **Updated**: 2026-05-23（首次落盘 + Wave G 第一刀 8 commit 后回填 resolved SHAs）
 > **目的**: 对齐 (a) owlmlx 代码现实、(b) `docs/source-of-truth/` 当前文档断言、(c) `docs/architect/` plan-grade 路线，三层之间的差异，并补充架构师视角的现状架构、功能视图、12+ 月方向。
+
+## Wave G 落地进度（2026-05-23 同日批量）
+
+| Commit | 范围 | Resolved 审计项 |
+|---|---|---|
+| `eff8b20d` | 落盘本文 + architect/README.md 索引更新 | （奠基） |
+| `5c98776b` | ARCHITECTURE-TRUTH §2.2 / §2.3 模块/测试/文档盘点 | #1 #2 #3 #12 |
+| `e3b6dfad` | product-definition §5.3 vMLX 边界 + §11 internal-depth posture | #5 #6 #7 |
+| `9601328d` | master-outline §8 dominant question + §5 Wave G-5 banner | #8 #10（partial）#17 #20 |
+| `4ffdb267` | runtime-capability-matrix Wave H · H1 行 + B-1c §1 footnote | #11 #14 |
+| `ca6491d8` | README speculative posture + Development status | #15 #18 |
+| `d98203a1` | AGENTS.md read order + non-negotiable truth | #19 |
+
+**14 项 resolved · 4 项 open · 5 项 healthy 维持**。详见 §4 各小节。
+
+下次批量结算的目标候选：
+- #4（ARCHITECTURE-TRUTH §7.3 truth-substrate identity 框架重写 · 不是简单数字刷新）
+- #9 + #10 full + #13（Wave G-4：phase45 文档归档 / 命名约束 / 迁移路径）
+- #16（session-kv-cache-experimental.md 与 capability matrix 同步审计）
 
 ---
 
@@ -124,84 +143,84 @@ phase45-stream-backend-terminal-notice-leading-discriminator-marker-
 
 ### 4.1 critical — 模块 / 测试规模断言陈旧
 
-| # | 文档位置 | 当前断言 | 代码现实 | 漂移幅度 |
-|---|---|---|---:|---:|
-| 1 | `ARCHITECTURE-TRUTH.md §2.2` (Updated 2026-04-12) | "owlmlx 有 **19** 个 Python 模块，**357** tests" | 53 模块 / 919 tests | **2.6×** 模块 · **2.5×** tests |
-| 2 | `ARCHITECTURE-TRUTH.md §2.2 模块表` | 19 行模块表，最高 `serving.py ~480` LOC、`runtime/server.py ~80` | server.py 2013、subprocess_backend 2541、kernel 1694、native_backend 1215 等 13 个超 500 LOC 模块 | **25× server.py** |
-| 3 | `ARCHITECTURE-TRUTH.md §2.3` | "29 个 source-of-truth 文档" | 208 份（含 105 phase45-*） | **7×** |
-| 4 | `ARCHITECTURE-TRUTH.md §7.3` | "Runtime-7 完成交付后… **11 truth modules / 357 tests / 7 platform consumers ✓**" | runtime 与 truth 已 1:1 拆分但 substrate-truth pillar 早已不占 50%+；现在主体是 runtime/kernel + admission + cache + native | **identity 漂移** |
+| # | 文档位置 | 状态 |
+|---|---|---|
+| 1 | `ARCHITECTURE-TRUTH.md §2.2` "19 个 Python 模块 / 357 tests" → 53 / 919 | **resolved by `5c98776b` · 2026-05-23** |
+| 2 | `ARCHITECTURE-TRUTH.md §2.2 模块表` 最高 `serving.py ~480`、`runtime/server.py ~80` → 2013/2541/1694/1215 等 13 个超 500 LOC 模块 | **resolved by `5c98776b` · 2026-05-23** |
+| 3 | `ARCHITECTURE-TRUTH.md §2.3` "29 个 source-of-truth 文档" → 208 份 | **resolved by `5c98776b` · 2026-05-23** |
+| 4 | `ARCHITECTURE-TRUTH.md §7.3` "11 truth modules / 357 tests / 7 platform consumers ✓" · identity 框架（truth substrate pillar）不再占主体 | **open** · 需要 §3 / §7 框架级重写，不是简单数字刷新；下次架构师 round 处理 |
 
 → 后果：任何外部读者按 `ARCHITECTURE-TRUTH.md` 接 owlmlx，对其规模、复杂度、能力梯度的第一印象与代码现实差 2–25×。
 
 ### 4.2 critical — Identity / 战略定位陈旧
 
-| # | 文档位置 | 当前断言 | 现实（2026-05-10 战略转向后） |
-|---|---|---|---|
-| 5 | `product-definition.md` (Updated 2026-04-09) | §1 "runtime project for MLX-based model serving and runtime management on Apple Silicon" | 已变为 "Apple Silicon 单机企业级 agentic / batch evaluation 场景而生的 memory-discipline-first replacement-grade MLX runtime"（`01-mainline-roadmap.md` §IV.1）但**未写入 product-definition** |
-| 6 | `product-definition.md §5.2` (推测，未读取该节具体文字) | 描述 oMLX 为 borrowable reference | post 2026-05 / vMLX vmlx.net 已 Apple 官方背书全栈，README 旧表述需重写（已在 `01-mainline-roadmap.md §IV.3` 写明，但**未反推 product-definition**） |
-| 7 | `product-definition.md` | 无 release channel split 章节 | governance commit `a21a0a2c` 已确立 owlmlx engineering ≠ OwlCoda consumer readiness（已写入 `public-release-standard.md`，但 product-definition 顶层身份层未声明） |
-| 8 | `master-outline.md §8` (Updated 2026-05-12) | "current dominant gap = `memory_discipline_baseline_missing`" | 经 PR #649 alignment + B-1a/b/c §1 之后，dominant gap 已转移到 `session_kv_drift_under_swap_workload`（B-1c §2 漂 352MB）+ `native_backend_promote_path`（§VI G2 工作面） |
+| # | 文档位置 | 状态 |
+|---|---|---|
+| 5 | `product-definition.md §1` 未含 "internal replacement-grade depth" 战略身份精炼 | **resolved by `e3b6dfad` · 2026-05-23**（新增 §11 addendum） |
+| 6 | `product-definition.md §5.3 vMLX` （审计原写 §5.2 误 · 实际 §5.2 是 oMLX · §5.3 才是 vMLX）边界陈述未含 vMLX 全栈化现实 | **resolved by `e3b6dfad` · 2026-05-23**（§5.3 重写 · 含 2026-05 现实校正） |
+| 7 | `product-definition.md` 无 release channel split 章节（owlmlx engineering ≠ OwlCoda consumer readiness） | **resolved by `e3b6dfad` · 2026-05-23**（§11.3 含 OwlCoda 边界 + commit `a21a0a2c` 引用） |
+| 8 | `master-outline.md §8` "dominant gap = `memory_discipline_baseline_missing`" 已被 PR #649 + B-1a/b/c §1 闭合 | **resolved by `9601328d` · 2026-05-23**（§8 重置为双 dominant gap：`session_kv_drift_under_swap_workload` + `native_backend_promote_path_g2_closure`） |
 
 → 后果：上游契约文档与 architect 战略主线之间存在 5+ 周漂移；外部读者依据 source-of-truth 接 owlmlx 会落到错误的"替代 oMLX"叙事，而非内部 replacement-grade depth 叙事。
 
 ### 4.3 critical — Phase45 递归命名扩散
 
-| # | 文档位置 | 现状 | 风险 |
-|---|---|---|---|
-| 9 | `docs/source-of-truth/phase45-stream-backend-terminal-notice-leading-discriminator-marker-earlier-runtime-owned-boundary-earlier-earlier-boundary-exactness.md` 等 15 份 | 4+ 层 hyphen 嵌套；文档层重现 Stage 1 已禁止的 spec-as-code 反模式 | `R2` 风险 materialization · 与 `AGENTS.md` "Writing Rules" 不一致 · 任何新成员/LLM-assisted PR 会被诱导沿用 |
-| 10 | `master-outline.md §5 #50–#128` | 79 份 `phase45-*` 在 canonical reading list 内编号 | 阅读路径官方化扩散；上手成本剧增 |
+| # | 文档位置 | 状态 |
+|---|---|---|
+| 9 | 105 份 `phase45-*` 文件（含 15 份 4+ 层 hyphen 嵌套递归命名）在 `docs/source-of-truth/` 内驻留 | **open** · Wave G-4 独立 round · 涉及文件归档 / 命名约束 / 迁移路径，需用户参与决策；本次 Wave G-5 仅做 banner 标记不动文件 |
+| 10 | `master-outline.md §5 #50–#85 + #87–#128` 78 份 `phase45-*` 在 canonical reading list 内编号 | **partial · resolved by `9601328d` · 2026-05-23**（Wave G-5 banner 明确"脱离 canonical reading sequence"；canonical 现为 #1–49 + #86 + #129–145 共 67 项 · 全部非 phase45）· 完整归档仍待 Wave G-4 |
 
 → 后果：源代码层已禁的反模式，文档层仍在生长；Stage 1 治理收益部分被反向稀释。
 
 ### 4.4 high — Wave H · H1 已落但未在 source-of-truth 登记
 
-| # | 文档位置 | 现状 |
+| # | 文档位置 | 状态 |
 |---|---|---|
-| 11 | `runtime-capability-matrix.md` | 无 Wave H · H1 (`server_routes_openai.py`) 拆分行；OpenAI/Anthropic 路由仍隐含在 `server.py` 描述下 |
-| 12 | `ARCHITECTURE-TRUTH.md §2.2 模块表` | 无 `server_routes_openai.py` |
-| 13 | `master-outline.md §5` | 无 Wave H 拆分相关条目 |
+| 11 | `runtime-capability-matrix.md` 无 Wave H · H1 行 | **resolved by `4ffdb267` · 2026-05-23**（§4 新增 "HTTP routes modular split (Wave H · H1)" 行 · supported · 含 H2/H3 deferral 说明） |
+| 12 | `ARCHITECTURE-TRUTH.md §2.2 模块表` 无 `server_routes_openai.py` | **resolved by `5c98776b` · 2026-05-23**（Top-15 模块表含 829 LOC · 新增 "HTTP routes 拆分（Wave H · H1）" 主战场段落） |
+| 13 | `master-outline.md §5` 无 Wave H 拆分相关条目 | **open** · Wave H 是 architect 路线条目，按 plan-grade / source-of-truth 边界纪律不入 master-outline §5；如需登记应在 capability matrix（已通过 #11 resolved）或 ARCHITECTURE-TRUTH §2.2（已通过 #12 resolved）；本条作为"已通过其他路径覆盖"标记 |
 
 → 后果：2026-05-17 之后任何对 server.py 行数 / 模块边界的契约引用都过时。
 
 ### 4.5 high — Session KV cache 进度断点不一致
 
-| # | 文档位置 | 当前断言 | 现实 |
-|---|---|---|---|
-| 14 | `runtime-capability-matrix.md` 第 118 行 | B-1a 通过 (Gemma 4 2.246×) + B-1b cache-on no-regress 通过；"24h 无 swap 与 swap soak gates remain open" | B-1c §1 `interrupted_no_swap_rehearsal=passed`（2026-05-21 跨 3 段累积 24.69h）；B-1c §2 boundary-safe 4h 段跑出 352MB 漂 > 200MB budget — **这两条进展尚未 promote 进 source-of-truth** |
-| 15 | `README.md` "Development status" (2026-05-17) | "B-1a and B-1b are passed, B-1c no-swap / swap soak gates remain open" | 同上 — 文字仍然准确但**信息密度落后于实际进展 1 周** |
-| 16 | `session-kv-cache-experimental.md` | 未读取（推测：与 capability matrix 同步） | 同步状态未审计 |
+| # | 文档位置 | 状态 |
+|---|---|---|
+| 14 | `runtime-capability-matrix.md` 第 118 行 session KV cache 行未含 B-1c §1 interrupted prerequisite met + §2 4h 段 drift triage 状态 | **resolved by `4ffdb267` · 2026-05-23**（行内新增 `20260521T064658Z` `interrupted_no_swap_rehearsal=passed` + `20260522T164506Z` `max_drift_bytes=352321536 > 209715200` · 仍 experimental） |
+| 15 | `README.md` "Development status" 信息密度落后实际进展 1 周 | **resolved by `ca6491d8` · 2026-05-23**（B-1c §1 passed + §2 drift triage 句加入 · Wave H · H1 提及） |
+| 16 | `session-kv-cache-experimental.md` 与 capability matrix 同步状态未审计 | **open** · 与 §VI G2 闭合后由 architect 反推刷新一并处理；本轮不在 §8 工作单内 |
 
 → 后果：外部读者无法看到 §1 当前-Mac 路径已达 prerequisite 这一关键事实；§VI 4-gate G2 进度被低估。
 
 ### 4.6 high — `master-outline.md §8` Dominant Question 已过时
 
-| # | 文档位置 | 当前断言 | 现实 |
-|---|---|---|---|
-| 17 | `master-outline.md §8` | "dominant gap = `memory_discipline_baseline_missing`" + "establish memory-discipline baseline evidence before expanding Track B" | PR #649 alignment + B-1a/b/c §1 已闭合 baseline；当前 dominant question 转为 (i) `session_kv_drift_under_swap` 归因 (ii) native backend §VI G2 promote-path 落点 |
+| # | 文档位置 | 状态 |
+|---|---|---|
+| 17 | `master-outline.md §8` "dominant gap = `memory_discipline_baseline_missing`" 已被 PR #649 + B-1a/b/c §1 闭合 | **resolved by `9601328d` · 2026-05-23**（§8 重置为双 dominant gap + 双 Track 并行执行路径 + 历史口径作为 closing evidence 列出） |
 
 → 后果：源代码层正在向"下一刀做归因"的方向走，但顶层 outline 仍指向"先建 baseline"。
 
 ### 4.7 medium — README speculative posture 与代码矛盾
 
-| # | 文档位置 | 当前断言 | 现实 |
-|---|---|---|---|
-| 18 | `README.md` "What ships now" 表 | "Continuous batching / paged KV cache / implicit prefix matching / multimodal / **speculative** : not in scope" | `owlmlx/gemma4_mtp_drafter.py` (510 LOC) + `owlmlx/runtime/mlx_vlm_mtp_runner.py` 已存在；D3 inspection + D4 clean reject 已构成 speculative path 的**否定面**契约（"MTP weights 不在就不上"）；F1 状态契约即将启动 |
+| # | 文档位置 | 状态 |
+|---|---|---|
+| 18 | `README.md` "What ships now" 表把 speculative 与 continuous batching 等并列"not in scope"，与 `gemma4_mtp_drafter.py` + `mlx_vlm_mtp_runner.py` + D3+D4 否定面契约矛盾 | **resolved by `ca6491d8` · 2026-05-23**（拆出独立行 "Speculative decoding (`gemma4_mtp_drafter.py` · `mlx_vlm_mtp_runner.py`): probe surface only · not in serving path" · 引用 Campaign F + D3+D4 negative-face contract） |
 
 → 后果：speculative 在 README 看是"不会做"，在 `01-mainline-roadmap.md §V Campaign F` 是"第 6 子战役"，在代码是"probe 已在"——三层矛盾。
 
 ### 4.8 medium — AGENTS.md Read Order 不含 `docs/architect/`
 
-| # | 文档位置 | 现状 |
+| # | 文档位置 | 状态 |
 |---|---|---|
-| 19 | `AGENTS.md` Read Order 16 条 | 直接从 README → master-outline → source-of-truth 系列；plan-grade `docs/architect/` 不出现在导航 |
+| 19 | `AGENTS.md` Read Order 16 条直接从 README → master-outline → source-of-truth；plan-grade `docs/architect/` 不出现在导航 | **resolved by `d98203a1` · 2026-05-23**（Read Order 顶部新增 item 0 = `docs/architect/README.md` plan-grade 入口 · Non-Negotiable Project Truth 新增 §11 internal-depth posture + OwlCoda 边界引用） |
 
 → 后果：新成员/LLM-assisted PR 无法发现 plan-grade 层；可能将 architect 视角的讨论误送 source-of-truth。
 
 ### 4.9 low — `master-outline.md §5` 索引膨胀
 
-| # | 文档位置 | 现状 |
+| # | 文档位置 | 状态 |
 |---|---|---|
-| 20 | `master-outline.md §5` | 145 个文件编号 · 79 个 phase45-* 编号 · runtime12-* / stabilization*-* 各类 wave-标号文件混杂 |
+| 20 | `master-outline.md §5` 145 个文件编号混杂（79 phase45-* + runtime12-* + stabilization*-* 等） | **resolved by `9601328d` · 2026-05-23**（Wave G-5 banner 明确 canonical reading sequence = #1–49 + #86 + #129–145 共 67 项 · phase45-* 78 项脱离 canonical 但仍在 numbered list 内保持向后兼容；完整归档仍待 Wave G-4） |
 
 → 后果：canonical reading list 已不可阅读；新成员无法按编号 1–145 顺序消化。
 
