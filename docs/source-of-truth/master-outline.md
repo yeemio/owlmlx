@@ -1,7 +1,7 @@
 # owlmlx Master Outline
 
 > Status: authoritative outline
-> Updated: 2026-05-12
+> Updated: 2026-05-23（§5 加 Wave G-5 banner 标记 `phase45-*` 项目脱离 canonical reading sequence；§8 Dominant Question 重置；§1–§4 / §6 / §7 维持 2026-05-12 历史口径）
 
 ## 1. What `owlmlx` Is
 
@@ -55,6 +55,22 @@ Learning artifact v0 decision for the future downstream consumer-readiness gate:
 
 Session-scoped native KV cache experiment:
 `session-kv-cache-experimental.md`.
+
+Plan-grade architect docs（独立目录 `docs/architect/` · 不入本索引 · 详见
+`docs/architect/README.md`）：`01-mainline-roadmap.md`、`02-state-vs-market-gap.md`、
+`03-real-accomplishments.md`、`04-architecture-canvas.md`、`05-alignment-audit.md`
++ `design/` 子目录 8 份 gate spec。
+
+> **2026-05-23 Wave G-5 banner**：下方 numbered list 第 **50–85、87–128** 项
+> 共 78 份 `phase45-*` 前缀文档是 wave-45 cache / scheduler / pre-claim /
+> stream-backend 分解契约。它们**保留在此 numbered list 中以维持向后兼容**，
+> 但已**脱离 canonical reading sequence** —— 阅读优先级是第 **1–49 + 86 +
+> 129–145** 项（共 67 项 · 全部非 `phase45-*`）。
+>
+> `phase45-*` 文档的命名扩散（含 15 份 4+ 层 hyphen 嵌套递归命名）已识别为
+> Wave G-4 治理目标，将在独立 round 中讨论归档 / 命名约束 / 迁移路径
+> （详见 `docs/architect/05-alignment-audit.md §3.2 / §4.3 / §8`）。本次
+> Wave G-5 不做归并 / 迁移 / 删除。
 
 1. `master-outline.md`
 2. `ARCHITECTURE-TRUTH.md`
@@ -224,29 +240,44 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-The current top-level goal is no longer specimen-first and no longer broad
-replacement storytelling.
+> Updated 2026-05-23 · 之前的 dominant gap `memory_discipline_baseline_missing`
+> （2026-04 ~ 2026-05-12 口径）已被以下证据闭合：
+>
+> - **PR #649 alignment**（Stage 2 · 2026-05-12 commit `6141d134`：reclaim
+>   barrier stats surface · `MemoryWatermark` · `SettleBarrierEvent`）
+> - **B-1a**（Gemma 4-31B-it 通过 · warm p50 TTFT 1542.972 ms → 687.102 ms ·
+>   2.246× · `20260516T151100Z`）
+> - **B-1b**（cache-on no-regress N=20 · 20/20 warm hits · `failed_reclaim=0` ·
+>   `20260517T013342Z`）
+> - **B-1c §1**（current-Mac 路径 `interrupted_no_swap_rehearsal=passed` ·
+>   累积 ≈24.69h clean native segments · `20260521T064658Z`）
+>
+> 因此 dominant question 在 2026-05-23 重置。
 
-The next question is:
+### 8.1 Current Top-Level Question
 
-**How does `owlmlx` become a supported-host runtime substrate that upper layers
-can trust without inflating replacement claims?**
+**owlmlx 如何闭合 §VI 4-gate native backend promote-path —— 特别是 G2
+(Reclaim Verified) —— 而不破坏 PR #649 memory discipline，同时让 Campaign F
+(speculative path safety) 具备并行起跑条件？**
 
-The current host-level answer is now frozen:
+### 8.2 Current Dominant Gaps（两条并发）
 
-- this host now has one supported candidate baseline for deeper
-  replacement-grade runtime validation
+- **`session_kv_drift_under_swap_workload`**：B-1c §2 boundary-safe 4h
+  segment（`20260522T164506Z`）跑出 cache 全 clean / swap boundary clean /
+  watermark GREEN / reclaim stats clean，但 `active_memory` 在 sample 685
+  之后漂 **352 MB > 200 MB budget**。drift triage（按
+  `docs/architect/design/B-1c-section-2-spec.md §10 #1` 的 Qwen-only
+  no-swap probe）是下一步决定性证据；归因结果决定 G2 是否需要 runtime
+  code-grade 修复（settle-on-session-boundary / allocator residue policy）
+  还是 drift budget rationale 修订。
 
-The current gating program priority is:
+- **`native_backend_promote_path_g2_closure`**：§VI 4-gate 中 G1（Cache
+  Parity）已通过 B-1a 闭合；G2（Reclaim Verified）通过 B-1b + B-1c §1
+  达到约 60%，§2 漂移是当前活跃工作面；G3（Structured-Output Invariance）
+  + G4（Speculative Path Landing）未启动，但 **G3 不阻塞于 G2**——Campaign
+  F-1（`speculative_execution_status` 状态契约）可独立起跑。
 
-- establish memory-discipline baseline evidence before expanding Track B
-  cache/residency/eviction architecture
-
-The current dominant gap is:
-
-- `memory_discipline_baseline_missing`
-
-The current heavy-weight answer is now frozen:
+### 8.3 Frozen Heavy-Weight Answer（保持自 2026-05-12 口径 · 仍然成立）
 
 - `owlmlx.heavy_weight_runtime_repeatability` exists
 - current result is `supported_host_repeatability_visible` on this host
@@ -257,15 +288,20 @@ The current heavy-weight answer is now frozen:
 - repeated heavy-weight proof is now visible on that selected path via two
   successful repeat runs under default `~/.owlmlx` truth
 
-The next executable closure round is:
+### 8.4 Next Executable Closure Rounds（双轨并行）
 
-- v0 learning artifact shape is frozen in
-  `learning-artifact-v0-decision.md`
-- `scripts/bench/eviction_soak.py` replaces the placeholder with an
-  owlmlx-first soak runner
-- fake backend smoke may prove ledger shape only; native MLX allocator evidence
-  is still required before any memory-stability claim
+- **Track 1 · B-1c §2 drift triage**: short Qwen-only no-swap boundary-safe
+  probe（per `docs/architect/design/B-1c-section-2-spec.md §10 #1`）·
+  30–60min · 不与 architect cycle 强耦合。归因结果决定是否恢复 §2
+  aggregate segment 还是先修 allocator residue
+- **Track 2 · Campaign F-1 state contract**: 建立 runtime-owned
+  `speculative_execution_status` 状态契约（per
+  `docs/architect/01-mainline-roadmap.md §V Campaign F · F1`）· 不依赖
+  G2 closure · 可与 Track 1 并行起跑
 
-Historical Phase45 cache/governance seam details remain in their individual
-`phase45-*` source-of-truth files. They are not the current selector for the
-next runtime round.
+### 8.5 历史 Phase 45 注脚
+
+Historical Phase 45 cache/governance seam details remain in their individual
+`phase45-*` source-of-truth files. They are **not** the current selector for
+the next runtime round; **see §5 Wave G-5 banner** for their脱离 canonical
+reading sequence 状态。
