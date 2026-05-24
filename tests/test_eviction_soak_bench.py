@@ -961,6 +961,72 @@ def test_b1c2_duration_loop_waits_before_scheduled_swap(tmp_path):
     assert summary["soak_plus_swap_stability"] == "blocked"
 
 
+def test_b1c2_zero_swap_drift_probe_keeps_honest_label(tmp_path):
+    summary = eviction_soak.run_b1c2_soak_plus_swap(
+        runtime="owlmlx",
+        backend="fake",
+        output_dir=tmp_path,
+        rotation_label="qwen3.6-27b-only-drift-probe",
+        swap_count=0,
+        required_swap_count=eviction_soak.B1C2_REQUIRED_SWAP_COUNT,
+        duration_s=0.0,
+        required_duration_s=24 * 60 * 60,
+        sample_interval_s=0.0,
+        b1c1_prerequisite_satisfied=True,
+    )
+
+    assert summary["ok"] is False
+    assert summary["soak_plus_swap_stability"] == "blocked"
+    assert summary["rotation_label"] == "qwen3.6-27b-only-drift-probe"
+    assert summary["swap_count"] == 0
+    assert summary["swap_requirement_met"] is False
+    assert summary["graduates"]["soak_plus_swap_stability"] is False
+    assert summary["graduates"]["session_kv_supported"] is False
+    assert "qwen3.6-27b-only-drift-probe" in summary["ledger"]
+
+    ledger = _records(tmp_path / summary["ledger"].split("/")[-1])
+    assert [record["phase"] for record in ledger] == [
+        "warmup",
+        "warmup",
+        "warmup",
+        "measurement",
+        "measurement",
+        "measurement",
+    ]
+    assert not [record for record in ledger if record["phase"] == "swap"]
+
+
+def test_b1c2_max_samples_caps_drift_probe_without_swap(tmp_path):
+    summary = eviction_soak.run_b1c2_soak_plus_swap(
+        runtime="owlmlx",
+        backend="fake",
+        output_dir=tmp_path,
+        rotation_label="qwen3.6-27b-only-drift-probe",
+        swap_count=0,
+        required_swap_count=eviction_soak.B1C2_REQUIRED_SWAP_COUNT,
+        duration_s=3600.0,
+        required_duration_s=24 * 60 * 60,
+        sample_interval_s=0.0,
+        max_samples=5,
+        b1c1_prerequisite_satisfied=True,
+    )
+
+    assert summary["soak_plus_swap_stability"] == "blocked"
+    assert summary["swap_count"] == 0
+    assert summary["swap_requirement_met"] is False
+
+    ledger = _records(tmp_path / summary["ledger"].split("/")[-1])
+    assert len(ledger) == 5
+    assert [record["phase"] for record in ledger] == [
+        "warmup",
+        "warmup",
+        "warmup",
+        "measurement",
+        "measurement",
+    ]
+    assert ledger[-1]["config"]["max_samples"] == 5
+
+
 def test_b1c2_native_requires_b1c1_prerequisite(tmp_path):
     rotation = (
         eviction_soak.ModelSpec("/models/qwen27", 58.0),

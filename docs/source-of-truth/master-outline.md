@@ -240,7 +240,7 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-> Updated 2026-05-23 · 之前的 dominant gap `memory_discipline_baseline_missing`
+> Updated 2026-05-24 · 之前的 dominant gap `memory_discipline_baseline_missing`
 > （2026-04 ~ 2026-05-12 口径）已被以下证据闭合：
 >
 > - **PR #649 alignment**（Stage 2 · 2026-05-12 commit `6141d134`：reclaim
@@ -252,7 +252,9 @@ whether to continue. The discipline is frozen in
 > - **B-1c §1**（current-Mac 路径 `interrupted_no_swap_rehearsal=passed` ·
 >   累积 ≈24.69h clean native segments · `20260521T064658Z`）
 >
-> 因此 dominant question 在 2026-05-23 重置。
+> 因此 dominant question 在 2026-05-23 重置；2026-05-24 的 Qwen-only
+> no-swap probe 把 §2 drift blocker 从 swap-boundary 问题收窄为
+> prompt/session growth allocator policy 问题。
 
 ### 8.1 Current Top-Level Question
 
@@ -265,11 +267,12 @@ whether to continue. The discipline is frozen in
 - **`session_kv_drift_under_swap_workload`**：B-1c §2 boundary-safe 4h
   segment（`20260522T164506Z`）跑出 cache 全 clean / swap boundary clean /
   watermark GREEN / reclaim stats clean，但 `active_memory` 在 sample 685
-  之后漂 **352 MB > 200 MB budget**。drift triage（按
-  `docs/architect/design/B-1c-section-2-spec.md §10 #1` 的 Qwen-only
-  no-swap probe）是下一步决定性证据；归因结果决定 G2 是否需要 runtime
-  code-grade 修复（settle-on-session-boundary / allocator residue policy）
-  还是 drift budget rationale 修订。
+  之后漂 **352 MB > 200 MB budget**。2026-05-24 Qwen-only no-swap probe
+  (`20260524T113306Z`) 在 `swap_count=0`、cache drop/expiration/reject 全 0
+  的情况下复现同一 352 MB drift，说明 blocker 已从 swap boundary 收窄到
+  prompt/session growth allocator policy。下一步决定 G2 是否需要 runtime
+  code-grade 修复（settle-on-session-boundary / bounded prompt-growth window /
+  allocator high-watermark accounting）还是 drift budget rationale 修订。
 
 - **`native_backend_promote_path_g2_closure`**：§VI 4-gate 中 G1（Cache
   Parity）已通过 B-1a 闭合；G2（Reclaim Verified）通过 B-1b + B-1c §1
@@ -290,10 +293,11 @@ whether to continue. The discipline is frozen in
 
 ### 8.4 Next Executable Closure Rounds（双轨并行）
 
-- **Track 1 · B-1c §2 drift triage**: short Qwen-only no-swap boundary-safe
-  probe（per `docs/architect/design/B-1c-section-2-spec.md §10 #1`）·
-  30–60min · 不与 architect cycle 强耦合。归因结果决定是否恢复 §2
-  aggregate segment 还是先修 allocator residue
+- **Track 1 · B-1c §2 allocator-policy closure**: Qwen-only no-swap
+  boundary-safe probe 已完成（`20260524T113306Z`）并复现 drift；下一 round
+  是 runtime/allocator policy 归因：修 settle / prompt-growth window /
+  high-watermark accounting，或明确修订 drift budget rationale。完成前不恢复
+  §2 aggregate segment
 - **Track 2 · Campaign F-1 state contract**: 建立 runtime-owned
   `speculative_execution_status` 状态契约（per
   `docs/architect/01-mainline-roadmap.md §V Campaign F · F1`）· 不依赖

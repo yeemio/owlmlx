@@ -2166,6 +2166,7 @@ def run_b1c2_soak_plus_swap(
     duration_s: float = 0.0,
     required_duration_s: float = float(B1C1_DURATION_S),
     sample_interval_s: float = 0.0,
+    max_samples: int | None = None,
     session_id_prefix: str = B1C2_SESSION_ID_PREFIX,
     max_tokens: int = 2,
     profile_memory_gb: float = 128.0,
@@ -2179,8 +2180,8 @@ def run_b1c2_soak_plus_swap(
         raise ValueError(
             "native B-1c section 2 requires a satisfied B-1c section 1 prerequisite"
         )
-    if swap_count < 1:
-        raise ValueError("--swap-count must be >= 1")
+    if swap_count < 0:
+        raise ValueError("--swap-count must be >= 0")
     if required_swap_count < 0:
         raise ValueError("--required-swap-count must be >= 0")
     if duration_s < 0:
@@ -2189,6 +2190,8 @@ def run_b1c2_soak_plus_swap(
         raise ValueError("--required-duration-s must be >= 0")
     if sample_interval_s < 0:
         raise ValueError("--sample-interval-s must be >= 0")
+    if max_samples is not None and max_samples < 1:
+        raise ValueError("--max-samples must be >= 1")
 
     _b1c2_native_rotation_required(backend=backend, model_rotation=model_rotation)
     rotation = model_rotation or _default_b1c2_rotation()
@@ -2355,6 +2358,7 @@ def run_b1c2_soak_plus_swap(
                     "duration_s": duration_s,
                     "required_duration_s": required_duration_s,
                     "sample_interval_s": sample_interval_s,
+                    "max_samples": max_samples,
                     "target_swap_count": swap_count,
                     "required_swap_count": required_swap_count,
                     "max_generation_concurrency": 1,
@@ -2432,6 +2436,8 @@ def run_b1c2_soak_plus_swap(
                     if records and records[-1].get("sample_verdict") == "failed":
                         break
                     for prompt_id, _prompt in B1C1_PROMPTS:
+                        if max_samples is not None and len(records) >= max_samples:
+                            break
                         verdict = _write_generation_record(
                             stream,
                             phase="measurement",
@@ -2440,6 +2446,8 @@ def run_b1c2_soak_plus_swap(
                         if verdict != "passed":
                             break
                     if records and records[-1].get("sample_verdict") == "failed":
+                        break
+                    if max_samples is not None and len(records) >= max_samples:
                         break
                     if not _next_swap_due():
                         if _duration_requirement_reached() and swaps_completed >= swap_count:
@@ -2498,6 +2506,7 @@ def run_b1c2_soak_plus_swap(
                             "duration_s": duration_s,
                             "required_duration_s": required_duration_s,
                             "sample_interval_s": sample_interval_s,
+                            "max_samples": max_samples,
                             "target_swap_count": swap_count,
                             "required_swap_count": required_swap_count,
                         },
@@ -2755,6 +2764,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--swap-count", type=int, default=1)
     parser.add_argument("--required-swap-count", type=int, default=B1C2_REQUIRED_SWAP_COUNT)
+    parser.add_argument("--rotation-label", default=None)
     parser.add_argument("--b1c1-prerequisite-satisfied", action="store_true")
     return parser.parse_args(argv)
 
@@ -2805,11 +2815,13 @@ def main(argv: list[str] | None = None) -> int:
                 backend=args.backend,
                 output_dir=args.output or B1C1_OUTPUT_DIR,
                 model_rotation=_b1c2_cli_model_rotation(args),
+                rotation_label=args.rotation_label or B1C2_ROTATION_LABEL,
                 swap_count=args.swap_count,
                 required_swap_count=args.required_swap_count,
                 duration_s=args.duration_s,
                 required_duration_s=args.required_duration_s,
                 sample_interval_s=args.sample_interval_s,
+                max_samples=args.max_samples,
                 session_id_prefix=args.session_id_prefix or B1C2_SESSION_ID_PREFIX,
                 max_tokens=args.max_tokens,
                 profile_memory_gb=args.profile_memory_gb,

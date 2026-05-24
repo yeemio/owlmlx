@@ -433,6 +433,32 @@ The max drift appears after sample `685` while cache counters remain clean:
 blocker from token-boundary reuse: §2 now needs memory-drift triage before any
 additional aggregate segment can be treated as clean input.
 
+2026-05-24 Qwen-only no-swap drift probe:
+
+- ledger:
+  `files/evidence/owlmlx/bench/session-kv-soak/20260524T113306Z-b1c2-qwen3.6-27b-only-drift-probe-soak-swap.jsonl`
+- rollup:
+  `files/evidence/owlmlx/bench/session-kv-soak/20260524T113306Z-b1c2-qwen3.6-27b-only-drift-probe-soak-swap-rollup.jsonl`
+- `rotation_label=qwen3.6-27b-only-drift-probe`
+- `swap_count=0`
+- `measurement_duration_s=322.505`
+- timestamped samples: 720 (`warmup=3`, `measurement=717`)
+- prompt mix: `239/239/239`
+- cache drops / expirations / rejects: `0 / 0 / 0`
+- `max_drift_bytes=352321536` > `drift_budget_bytes=209715200`
+- first over-budget step: sample `486`, long prompt, `drift_bytes=218103808`,
+  `prompt_chars_before_generation=3826`
+- final repeated 4h-matching step: sample `685`, short prompt,
+  `drift_bytes=352321536`, `prompt_chars_before_generation=5481`
+- `soak_plus_swap_stability=failed`
+- `graduates.session_kv_supported=false`
+
+This reproduces the 352 MB drift without a model swap. The active-memory growth
+is a regular 16 MiB allocator staircase correlated with prompt/session growth,
+while the session cache remains clean. The next closure round is therefore not
+another aggregate segment; it is a runtime/allocator policy decision for growing
+session prompts.
+
 The landed smoke-only slice covers:
 
 - fake backend schema run
@@ -446,11 +472,12 @@ Only after schema tests pass should native execution be attempted.
 
 Close the memory-drift blocker before resuming aggregate evidence:
 
-1. Reproduce the drift with a shorter boundary-safe Qwen-only probe that keeps
-   the same three-session mix but skips the model swap.
-2. Record active-memory step changes around the first >200MB drift point
-   (sample `685` in `20260522T164506Z`) and whether they correlate with prompt
-   length, generated-token shape, or MLX allocator growth.
+1. Classify the no-swap drift as either expected MLX allocator high-watermark
+   behavior or owlmlx-owned residue that must be settled at session/model
+   boundary.
+2. Decide and document one runtime-owned mitigation or budget rationale:
+   explicit settle-on-session-boundary, bounded prompt-growth window, allocator
+   high-watermark accounting, or a revised drift budget with evidence.
 3. Resume 4h native §2 segments only when the focused drift probe stays within
    budget or the budget/rationale is explicitly revised in the spec.
 4. Aggregate only gap-free, hard-failure-free segment rollups.

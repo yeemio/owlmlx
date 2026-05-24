@@ -354,7 +354,7 @@ README 的能力表是面向用户的"能不能用"，本节是面向架构师�
 
 | 优先级 | 项目 | 节奏纪律 |
 |---|---|---|
-| P0 | B-1c §2 spec §10 第 1 条 — 30–60min Qwen-only no-swap probe 归因 | 与本审计独立 · 不在 architect commit |
+| P0 | B-1c §2 allocator-policy closure — Qwen-only no-swap probe 已复现 drift (`20260524T113306Z`) | 下一刀不跑 aggregate；先定 settle / prompt-growth window / high-watermark accounting / budget rationale |
 | P0 | **Wave G 第一刀 narrow doc edits**（见 §8 工作单） | docs-only · 不动 runtime code · 不抢 §2 资源 |
 | P1 | Campaign F-1 — `speculative_execution_status` runtime-owned 状态契约 | 不必等 G2 完成；可与 §2 归因并行 |
 | P1 | Wave H · H2 计划 spec drafting（不实施） | 等 B-1c §2 settle 后再 implement |
@@ -365,7 +365,7 @@ README 的能力表是面向用户的"能不能用"，本节是面向架构师�
 
 | 优先级 | 项目 | 解锁条件 |
 |---|---|---|
-| P0 | B-1c §2 final aggregate · supported promotion | §2 归因结果 → 修 runtime（G2 工作面）或重订 budget rationale |
+| P0 | B-1c §2 final aggregate · supported promotion | allocator-policy closure 后才恢复；当前不得 claim supported |
 | P1 | Wave H · H2 实施 (`server_routes_runtime.py`) | B-1c §2 settle |
 | P1 | Wave H · H3 实施 (`server_routes_dev.py`) | H2 落后 |
 | P1 | Campaign C-1 — cold-first-response 5-factor instrumentation | session KV supported promote 后 |
