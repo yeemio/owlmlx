@@ -2,7 +2,7 @@
 
 > **文档 grade**：plan-grade · 见 [README.md](README.md)
 > **配套**：[01-mainline-roadmap.md](01-mainline-roadmap.md) / [03-real-accomplishments.md](03-real-accomplishments.md) / [04-architecture-canvas.md](04-architecture-canvas.md)
-> **日期**：2026-05-16
+> **日期**：2026-05-25
 > **视角**：架构师诚实评估，对外参照 2025–2026 Apple Silicon LLM 栈与本地 LLM runtime 业界事实
 
 ---
@@ -24,7 +24,7 @@
 |---|---|---|---|---|---|
 | 1 | Repeatability | 🟡 harness 实装；无 N≥20 硬约束；无 seed-to-token 字节一致测试 | vLLM/SGLang seed 管理 | **L1** | 6–12 月 |
 | 2 | Capability Honesty | ✅ Stage 1 已清 spec-as-code（151 模块/31K LOC）；CI 强制；§1a Gate | Anthropic API 功能矩阵 | **同业界或领先** | — |
-| 3 | Cache Depth | 🟡 session-level append-only 复用（7.409×）；cache_manager 单请求；无跨工作区 | vLLM prefix caching v0.6+；TurboQuant 量化 KV | **L1** | 12–18 月 |
+| 3 | Cache Depth | 🟡 session-level reuse 已有 TTFT 证据（7.409× / Gemma 2.246×）且 B-1a/B-1b/§1 prerequisites 已过；B-1c §2 仍卡在 trim-bypass drift | vLLM prefix caching v0.6+；TurboQuant 量化 KV | **L1** | 12–18 月 |
 | 4 | Scheduler Depth | 🟡 admission contract 完整；prefill warmup 未 default；负载自适应未实装 | vLLM continuous batching；SGLang structured generation | **L1**（但 owlmlx 明确不追 batching） | 单 worker 场景 6 月 |
 | 5 | Admission / Eviction | 🟡 完整决策 + pinned 保护 + TTL；无 background loop（明确约束） | vLLM eviction；AWS SageMaker | **同业界** | — |
 | 6 | Status & Provenance | ✅ request lifecycle 维度 strong；🟡 spec accept/reject 维度缺 | Anthropic usage；OpenTelemetry | **L1（spec 维度）** | spec 路径 6–12 月 |
@@ -152,8 +152,8 @@
 | Prefix caching 跨请求 | ✅ vLLM v0.6+ | 🟠 cache_manager scaffold | Campaign B-2 |
 | Prefix caching workspace 隔离 | ✅ Anthropic 范式 | 🔴 | Campaign B 中期 |
 | 跨模型 prefix 共享 | 🟡 PrefillShare 论文级 | 🔴 | 远期 status surface |
-| Session-level append-only 复用 | 🟡 各 runtime 差异大 | ✅ supported experimental（7.409×） | **owlmlx 走前** |
-| Tail-edit / trimmable cache | 🟡 部分支持 | 🔴 | Campaign B-1 验证 |
+| Session-level append-only 复用 | 🟡 各 runtime 差异大 | 🟠 experimental（TTFT + no-regress prerequisites 强；§2 stability 未过） | **owlmlx 有差异化证据，但未 supported** |
+| Tail-edit / trimmable cache | 🟡 部分支持 | 🟡 reason-code instrumentation + safe trim bypass；频繁 fallback drift 未闭合 | Campaign B-1 §2 当前 blocker |
 | KV 量化（TurboQuant 3-bit / PolarQuant） | ✅ mlx-lm/mlx-vlm 生产 | 🟡 借用上游 | 不追自有 |
 | KV offload to disk | 🔴 业界都未做 | 🔴 | 不追 |
 

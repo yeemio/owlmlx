@@ -2,7 +2,7 @@
 
 > **文档 grade**：plan-grade · 见 [README.md](README.md)
 > **配套**：[01-mainline-roadmap.md](01-mainline-roadmap.md) / [02-state-vs-market-gap.md](02-state-vs-market-gap.md) / [03-real-accomplishments.md](03-real-accomplishments.md)
-> **日期**：2026-05-16
+> **日期**：2026-05-25
 > **形式**：mermaid + 表格 + ASCII（仓内 markdown · G-b2 决策）
 
 ---
@@ -295,10 +295,10 @@ gantt
     扩 DS4 family · RC1                  :a3, after a2, 180d
 
     section B · Cache/Scheduler
-    B-1a Gemma 4 + G1 byte-equiv         :b1a, 2026-05-16, 60d
-    B-1b N=20 cache=on/off               :b1b, after b1a, 30d
-    B-1c §1 24h pure soak                :b1c1, after b1b, 14d
-    B-1c §2 24h soak+swap                :b1c2, after b1c1, 14d
+    B-1a Gemma 4 + G1 byte-equiv         :done, b1a, 2026-05-16, 4d
+    B-1b N=20 cache=on/off               :done, b1b, after b1a, 2d
+    B-1c §1 current-Mac no-swap prereq   :done, b1c1, after b1b, 4d
+    B-1c §2 trim-bypass drift closure    :active, b1c2, after b1c1, 21d
     B2 cache_manager extension           :b2, after b1c2, 30d
     workspace-aware boundary             :b3, 2026-08-15, 90d
     跨模型版本 invalidation                :b4, 2026-11-15, 180d
@@ -344,7 +344,7 @@ gantt
 | 战役 | 0–3 月 | 3–6 月 | 6–12 月 |
 |---|---|---|---|
 | **A · Repeatability** | A1 N→20 · A2 seed-byte · A3 reclaim stats | 扩 Qwen3.6-35B-A3B · dirty recovery | DS4 family · RC1 |
-| **B · Cache/Scheduler** | **B-1a Gemma 4 + G1 byte-equiv** · B-1b N=20 cache=on/off · **B-1c §1 24h pure soak + §2 24h soak+swap** · B2 cache_manager · B3 warmup | workspace-aware boundary · TTL/驱逐契约 | 跨模型版本 invalidation · 量化-cache 共享探针 |
+| **B · Cache/Scheduler** | **B-1a Gemma 4 + G1 byte-equiv passed** · **B-1b N=20 cache=on/off passed** · **B-1c §1 current-Mac interrupted prerequisite passed** · B-1c §2 trim-bypass drift closure active | B2 cache_manager · workspace-aware boundary · TTL/驱逐契约 | 跨模型版本 invalidation · 量化-cache 共享探针 |
 | **C · TTFT Default** | C1 五因素 · C2 warmup default · C3 thinking | Gemma 4 reasoning trace · verdict 解除 | ≥3 主线 verdict 解除 → RC1 |
 | **D · DS4** | D1-D2 passed · D3 `missingReason=mtp_weights_absent_or_stripped` · D4 clean pre-load reject passed | 第二 DS4 variant · upstream tracking | RC2 native-only DS4 lifecycle |
 | **E · OwlOps Loop** | E1 reclaim stats · E2 TTFT · E3 classifier | spec accept/reject + tool-arg metric | RC3 >90d gap-free ledger · classifier partial |
@@ -400,24 +400,25 @@ B-1a · second_model_byte_equiv:
 
 B-1b · cache_on_no_regress:
   required: true
-  current: failed  # awaiting evidence
-  blocker: "N=20 跑后 failed_reclaim=0 + cache=off 基线对齐"
+  current: passed
+  evidence: "Gemma 4-31B-it cache-off N=20 / cache-on N=20; 20/20 warm hits; failed_reclaim=0"
 
 B-1c·§1 · no_swap_soak_stability:
   required: true
-  current: failed  # awaiting evidence
-  blocker: "24h 纯 soak (no swap) + active_memory 漂移 < min(200MB, 0.5% budget)"
+  current: current_mac_section_1_prerequisite_met=passed
+  evidence: "20260521T064658Z interrupted aggregate 88888.531s clean native segments"
+  continuous_no_swap_soak_stability: blocked
   独立结论: 即使 §2 失败也独立成立；但 supported gate 不能 graduate
 
 B-1c·§2 · soak_plus_swap_stability:
   required: true
-  current: failed  # awaiting evidence
-  blocker: "§1 通过后；24h soak + 每 4h × 6 swap + 累积 failed_reclaim=0"
+  current: failed
+  blocker: "trim-unavailable safe bypass 清零 drops，但 173 次 fresh-cache fallback 导致 293MB drift > 200MiB"
   失败语义: §2 失败不撤销 §1，但 supported / release gate 不能 graduate
 
 supported_promotion:
   formula: B-1a AND B-1b AND B-1c·§1 AND B-1c·§2
-  current: 1/4
+  current: 3/4  # §2 open; no supported claim
   越级红线:
     - 不允许合并跑 36h 假装 48h
     - 不允许 §1 失败重启接续 §2
