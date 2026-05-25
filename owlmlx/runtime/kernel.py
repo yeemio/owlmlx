@@ -38,7 +38,11 @@ from owlmlx.serving import (
 
 from .backends import RuntimeBackend
 from .speculative_execution_status import (
+    apply_generate_event as _apply_speculative_generate_event,
+    apply_load_event as _apply_speculative_load_event,
+    apply_unload_event as _apply_speculative_unload_event,
     build_speculative_execution_status_payload,
+    default_state as _default_speculative_state,
 )
 from .types import (
     ChatTurn,
@@ -159,6 +163,66 @@ class RuntimeKernel:
         self._memory_pressure_cooldown_failure_fingerprint: tuple[object, ...] | None = None
         self._cache_residency_tracker = CacheResidencyTracker()
         self._post_load_warmup_log: list[dict[str, Any]] = []
+        # F-1.3: speculative execution status observation state. No
+        # parent-side spawn of MlxVlmMtpChildRunner exists today, so this
+        # only mutates when an external caller (test fixture / future
+        # MlxVlmMtpSubprocessBackend equivalent) feeds the observe_* APIs.
+        # See docs/architect/design/F-1-spec.md §6.2 integration-reality.
+        self._speculative_execution_state: dict[str, Any] = (
+            _default_speculative_state()
+        )
+
+    # ------------------------------------------------------------------
+    # F-1.3: speculative execution observe_* APIs
+    #
+    # Pure observation surface. F-1 explicitly does NOT introduce a
+    # parent-side spawn site for MlxVlmMtpChildRunner (see spec §6.2);
+    # these methods accept the JSONL response shapes the runner already
+    # emits, for a future caller to feed in.
+    # ------------------------------------------------------------------
+
+    def observe_speculative_runner_load(
+        self,
+        load_response: dict[str, Any],
+    ) -> None:
+        """Consume an MlxVlmMtpChildRunner._load response and update
+        the speculative execution state per spec §5.2 + §8 table.
+
+        See docs/architect/design/F-1-spec.md §4.10 for the reason_code
+        vocabulary used on failure.
+        """
+        self._speculative_execution_state = _apply_speculative_load_event(
+            self._speculative_execution_state,
+            load_response,
+        )
+
+    def observe_speculative_runner_generate(
+        self,
+        generate_response: dict[str, Any],
+    ) -> None:
+        """Consume an MlxVlmMtpChildRunner._generate response and update
+        the speculative execution state.
+
+        On returncode=0 + parsable speculative_summary, increments
+        accepted_tokens by floor(mean_accepted_tokens * rounds) and
+        accepted_rounds by rounds. On non-zero returncode, records a
+        runner_crash fallback per spec §5.2.
+
+        rejected_tokens is never derived (spec §4.4 honesty rule).
+        """
+        self._speculative_execution_state = _apply_speculative_generate_event(
+            self._speculative_execution_state,
+            generate_response,
+        )
+
+    def observe_speculative_runner_unload(self) -> None:
+        """Reset the speculative execution state to the §4.11.1
+        spec-disabled default. Clears counters, missing_reason, and the
+        FallbackEntry per §4.8 lifetime rule.
+        """
+        self._speculative_execution_state = _apply_speculative_unload_event(
+            self._speculative_execution_state,
+        )
 
     @property
     def active_model_id(self) -> str | None:
@@ -1686,7 +1750,9 @@ class RuntimeKernel:
             "governance_policy": governance_policy,
             "generation_gate": status.generation_gate,
             "reclaim_barrier": reclaim_barrier_section,
-            "speculative_execution_status": build_speculative_execution_status_payload(),
+            "speculative_execution_status": build_speculative_execution_status_payload(
+                live_state=self._speculative_execution_state,
+            ),
             "load_failure": load_failure_section,
             "memory_pressure_cooldown": memory_pressure_cooldown,
             "host_pressure": dict(self._last_host_pressure_snapshot),
