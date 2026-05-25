@@ -1,7 +1,7 @@
 # 05 · 对齐审计 + 架构 / 功能 / 方向补充
 
 > **Grade**: plan-grade（与本目录其他文件同 grade · 不入 `docs/source-of-truth/master-outline.md`）
-> **Updated**: 2026-05-23（首次落盘 + Wave G 第一刀 8 commit 后回填 resolved SHAs）
+> **Updated**: 2026-05-25（首次落盘 + Wave G 第一刀 8 commit 回填 + 2026-05-24/25 B-1c §2 allocator-policy closure 进度对齐 + 在途 runtime 代码 G2 工作面定性）
 > **目的**: 对齐 (a) owlmlx 代码现实、(b) `docs/source-of-truth/` 当前文档断言、(c) `docs/architect/` plan-grade 路线，三层之间的差异，并补充架构师视角的现状架构、功能视图、12+ 月方向。
 
 ## Wave G 落地进度（2026-05-23 同日批量）
@@ -16,12 +16,46 @@
 | `ca6491d8` | README speculative posture + Development status | #15 #18 |
 | `d98203a1` | AGENTS.md read order + non-negotiable truth | #19 |
 
-**14 项 resolved · 4 项 open · 5 项 healthy 维持**。详见 §4 各小节。
+## Post-Wave-G ops（2026-05-24 / 2026-05-25 · B-1c §2 allocator-policy closure 进度）
+
+| Commit | 范围 | 跨文档对齐效果 |
+|---|---|---|
+| `44afa999`（2026-05-24）| Track 1 probe 落地：Qwen-only no-swap drift probe 复现 352MB drift；同步刷 README + architect/03 + architect/05 + capability matrix + master-outline + B-1c §2 spec | 证明 drift **不是** swap-boundary 问题；blocker 收窄为 prompt/session growth allocator policy。审计 §8.4 Track 1 工作面已闭合（但 §2 整体仍 failed） |
+| `600b884a`（2026-05-25 12:15）| drift accounting v2：`session_kv_drift_accounting.mode=active_memory_minus_session_kv_positive_delta_upper_bound` · `max_unaccounted_session_kv_drift_bytes=0`；首次动 runtime 代码（`mlx_native_backend.py` +22 · `session_kv_cache.py` +8）| 正增量上界**只是诊断 ceiling**，明确 `used_for_promotion_gate=false`；首次 §VI G2 工作面真正进入 runtime code-grade |
+| `f93357f5`（2026-05-25 13:06）| bounded-window 收窄：1024-token cache window 仍漂 293MB；3000-char prompt freeze 把 drift 压到 150MB（**< 200MB budget**）但 sample 371 触发 1 次 session cache drop；新增 closure 文档 `docs/phase-prompts/owlmlx-b1c2-bounded-context-trim-closure-20260525.md` | **blocker 从 "drift 主导" 转为 "drop 主导"**；bounded prompt growth 是当前 memory-budget candidate；下一刀诊断 bounded-context cache-finalization / trim-mismatch 语义 |
+
+**3 个 commit 的对齐纪律值得记**：每个 commit 都同步刷新 README + architect/03 + architect/05 + capability matrix + master-outline + B-1c §2 spec + evidence ledger，**没有产生新的文档漂移**。本审计 §4 中由这些 commit 引出的状态更新已就位（详见 §4.5 #16 注脚与 §4.11 新增项）。
+
+## 在途 runtime 代码（uncommitted · 2026-05-25 同日 G2 工作面延续）
+
+| 文件 | 变更 LOC | 内容 |
+|---|---:|---|
+| `owlmlx/runtime/mlx_native_backend.py` | +147 / -29 | 新增 `_TrimPromptCacheResult` dataclass · `_PreparedPromptCache` 加 `cache_decision / cache_reason_code / exact_prompt_hit / previous_prompt_token_count / common_prefix_token_count / suffix_token_count` · `_trim_prompt_cache_with_reason()` 返回结构化 reason code |
+| `owlmlx/session_kv_cache.py` | +113 / 0 | `SessionKVCacheCounters` 加 `trim_bypasses / trim_evictions` · `SessionKVCacheStore` 加 `_last_drop_event / _last_bypass_event` · `drop_for_session_model` 接收 `reason_code` + `detail` · window-bypass 事件加 reason discriminator |
+| `scripts/bench/eviction_soak.py` | +37 | bench 端消费新 reason codes |
+| `scripts/bench/session_kv_soak_audit.py` | +57 | audit helper 消费新 reason codes |
+| 3 个 test 文件 | +150 | 覆盖新 reason code 路径 |
+| 3 个 untracked evidence（2026-05-25 T051225 / T051719）| — | drop-reason-probe + trim-bypass-fix 试运行结果 |
+
+**架构师定性**：这是 §VI G2 (Reclaim Verified) 工作面的**核心实现动作**——把 cache drop 从"black-box failure"转为"structured reason discriminator"。reason code 模式（`trim_not_requested` / `trim_prompt_cache_unavailable` / `trim_prompt_cache_exception:<exc>` / `prompt_token_window_exceeded` / `unsafe_session_cache_reuse` 等）是正确的可观测性扩展，**不**违反 spec-as-code 反规模化禁令（reason 是值不是模块）。
+
+**等这一刀 commit 后会触发的 Wave G-second-batch 工作面**：
+1. `session-kv-cache-experimental.md`（#16 仍 open）应同步反映新的 `trim_bypasses / trim_evictions` 字段与 reason code 词汇
+2. `runtime-status-schema.md` 应记录 `/v1/runtime/session-kv-cache` endpoint 返回的新字段（如果 endpoint 暴露 last_drop_event / last_bypass_event）
+3. `cache-truth-contract.md` 应考虑是否把 reason code 集合纳入 contract surface（如果作为下游消费契约）
+4. capability matrix session KV cache 行应补 trim observability 子项（不晋级，仍 experimental）
+
+## 状态总览
+
+- **17 项 resolved**（14 Wave G + 3 post-Wave-G ops 间接刷新）· **4 项 open** · **5 项 healthy 维持** · **1 项 new**（§4.11 in-flight runtime instrumentation 待 commit 后正式对齐）
+- **B-1c §2 进度**：阻塞从 swap-boundary → drift 全局 → drift bounded-window → bounded-context cache-finalization drop · 4 步收窄
+- **G2 进度更新**：从 ~60% （B-1b + §1）升至 ~70%（§2 token-boundary 闭合 + bounded prompt-growth 找到）· 仍未闭合（sample-371 drop 待归因）
 
 下次批量结算的目标候选：
 - #4（ARCHITECTURE-TRUTH §7.3 truth-substrate identity 框架重写 · 不是简单数字刷新）
 - #9 + #10 full + #13（Wave G-4：phase45 文档归档 / 命名约束 / 迁移路径）
-- #16（session-kv-cache-experimental.md 与 capability matrix 同步审计）
+- #16（session-kv-cache-experimental.md sync）+ Wave G-second-batch 上述 4 条 · 在 in-flight 代码 commit 后启动
+- §4.11 in-flight runtime instrumentation closeout（待 commit + 一次 architect review）
 
 ---
 
@@ -188,7 +222,7 @@ phase45-stream-backend-terminal-notice-leading-discriminator-marker-
 |---|---|---|
 | 14 | `runtime-capability-matrix.md` 第 118 行 session KV cache 行未含 B-1c §1 interrupted prerequisite met + §2 4h 段 drift triage 状态 | **resolved by `4ffdb267` · 2026-05-23**（行内新增 `20260521T064658Z` `interrupted_no_swap_rehearsal=passed` + `20260522T164506Z` `max_drift_bytes=352321536 > 209715200` · 仍 experimental） |
 | 15 | `README.md` "Development status" 信息密度落后实际进展 1 周 | **resolved by `ca6491d8` · 2026-05-23**（B-1c §1 passed + §2 drift triage 句加入 · Wave H · H1 提及） |
-| 16 | `session-kv-cache-experimental.md` 与 capability matrix 同步状态未审计 | **open** · 与 §VI G2 闭合后由 architect 反推刷新一并处理；本轮不在 §8 工作单内 |
+| 16 | `session-kv-cache-experimental.md` 与 capability matrix 同步状态未审计 | **open** · 范围已扩展（2026-05-25 在途 runtime 代码新增 `trim_bypasses` / `trim_evictions` counters + reason code discriminator 词汇）· 与 §4.11 #26 合流处理 · 与 §VI G2 闭合后一并对齐 |
 
 → 后果：外部读者无法看到 §1 当前-Mac 路径已达 prerequisite 这一关键事实；§VI 4-gate G2 进度被低估。
 
@@ -233,6 +267,20 @@ phase45-stream-backend-terminal-notice-leading-discriminator-marker-
 | 23 | `native-mlx-backend-capability-matrix.md §1a Promotion Gate` | 准确 · 提供四条 promotion 拒绝硬规则 |
 | 24 | `README.md` "What this is" 与 `01-mainline-roadmap.md §IV` 主线声明 | 准确 · 已含 memory-discipline-first + single worker by design + 8066 port |
 | 25 | B-1a/B-1b 验证证据链 → capability matrix → README 反向引用路径 | 端到端一致 |
+| 25a | 44afa999 / 600b884a / f93357f5 三 commit 同步刷新 README + architect/03 + architect/05 + capability matrix + master-outline + B-1c §2 spec 的纪律 | 准确 · 每个 commit 跨 6 文档对齐 · 无新漂移生成 |
+| 25b | `docs/phase-prompts/owlmlx-b1c2-bounded-context-trim-closure-20260525.md` (新增) 作为下一 round 的 goal contract + next round prompt 双用途文件 | 准确 · `docs/phase-prompts/` 已在 `architect/README.md` 边界图中标为"执行 prompt" · 落位正确 |
+
+### 4.11 forward-looking — In-Flight Runtime Instrumentation（待 commit 后启动对齐）
+
+> 本节项目**不**是当前漂移；它们是在途 runtime 代码（uncommitted · 见上方 "在途 runtime 代码"段）一旦 commit 后会触发的对齐工作面。预先登记以避免在 commit 后重新发现。
+
+| # | 触发条件 | 需要对齐的位置 | 性质 |
+|---|---|---|---|
+| 26 | `owlmlx/session_kv_cache.py` 新增 `trim_bypasses` / `trim_evictions` counters + `_last_drop_event` / `_last_bypass_event` 字段 commit 落后 | `session-kv-cache-experimental.md` 需补 counter 词汇与 reason code discriminator（同时也合并 #16 的旧 sync gap）；可能也需要 `cache-truth-contract.md` 评估 reason code 是否进 contract surface | new alignment（与 #16 合流） |
+| 27 | `_TrimPromptCacheResult.reason_code` + `_PreparedPromptCache.cache_decision / cache_reason_code / exact_prompt_hit` commit 落后 | `runtime-status-schema.md` 需评估是否暴露在 `/v1/runtime/session-kv-cache` endpoint；`native-mlx-backend-capability-matrix.md` Notes 列需补 "reuse decision provenance" | new alignment |
+| 28 | 若 in-flight 代码 commit 后 sample-371 cache drop 闭合且 B-1c §2 通过 | session KV cache 行可走 §1a Promotion Gate 升 `supported`；§VI G2 可声明闭合；触发 §11 (next batch of alignment) 全面刷新 | promotion-blocked · 不能预先动 |
+
+**架构师注**：#26 / #27 是必然的对齐工作；#28 是条件性的——只在 B-1c §2 实质通过后才启动。三者**都不能**在 in-flight 代码 commit 之前预先编写文档（会成为目标文档而非现状文档，违反 evidence-language calibration 纪律）。
 
 ---
 
@@ -354,7 +402,7 @@ README 的能力表是面向用户的"能不能用"，本节是面向架构师�
 
 | 优先级 | 项目 | 节奏纪律 |
 |---|---|---|
-| P0 | B-1c §2 allocator-policy closure — Qwen-only no-swap probe 已复现 drift (`20260524T113306Z`) | 下一刀不跑 aggregate；先定 settle / prompt-growth window / high-watermark accounting / budget rationale |
+| P0 | B-1c §2 bounded-context cache-finalization closure — drift 已通过 3000-char prompt freeze 压进预算（150MB < 200MB · `20260525T045707Z`），但 sample 371 触发 1 次 session cache drop · 在途 runtime instrumentation（reason code 化）正在落 | 不跑 aggregate；先 commit instrumentation + 一次 drop 复现 + reason code 归因 + 修复 bounded-context trim/finalization 路径 |
 | P0 | **Wave G 第一刀 narrow doc edits**（见 §8 工作单） | docs-only · 不动 runtime code · 不抢 §2 资源 |
 | P1 | Campaign F-1 — `speculative_execution_status` runtime-owned 状态契约 | 不必等 G2 完成；可与 §2 归因并行 |
 | P1 | Wave H · H2 计划 spec drafting（不实施） | 等 B-1c §2 settle 后再 implement |
