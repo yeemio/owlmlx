@@ -12,6 +12,8 @@ import pytest
 def _build_fake_mlx_lm_with_observable_cache(
     *,
     trim_supported: bool = True,
+    trim_partial: bool = False,
+    stream_token_ids: tuple[int, ...] = (999,),
 ) -> types.ModuleType:
     fake = types.ModuleType("mlx_lm")
     models = types.ModuleType("mlx_lm.models")
@@ -51,6 +53,8 @@ def _build_fake_mlx_lm_with_observable_cache(
         tokens = cache["tokens"]
         assert isinstance(tokens, list)
         trimmed = min(int(token_count), len(tokens))
+        if trim_partial and trimmed > 0:
+            trimmed -= 1
         if trimmed:
             del tokens[-trimmed:]
         trim_calls.append(trimmed)
@@ -85,8 +89,13 @@ def _build_fake_mlx_lm_with_observable_cache(
             tokens = prompt_cache["tokens"]
             assert isinstance(tokens, list)
             tokens.extend(prompt if isinstance(prompt, list) else tokenizer.encode(prompt))
-            tokens.append(999)
-        yield FakeToken(chr(999), finish_reason="stop", token=999)
+        for index, token_id in enumerate(stream_token_ids):
+            if prompt_cache is not None:
+                tokens = prompt_cache["tokens"]
+                assert isinstance(tokens, list)
+                tokens.append(token_id)
+            finish_reason = "stop" if index == len(stream_token_ids) - 1 else None
+            yield FakeToken(chr(token_id), finish_reason=finish_reason, token=token_id)
 
     cache_mod.make_prompt_cache = make_prompt_cache  # type: ignore[attr-defined]
     cache_mod.trim_prompt_cache = trim_prompt_cache  # type: ignore[attr-defined]
@@ -106,8 +115,14 @@ def _reload_native_backend_with_fake_mlx_lm(
     monkeypatch: pytest.MonkeyPatch,
     *,
     trim_supported: bool = True,
+    trim_partial: bool = False,
+    stream_token_ids: tuple[int, ...] = (999,),
 ):
-    fake = _build_fake_mlx_lm_with_observable_cache(trim_supported=trim_supported)
+    fake = _build_fake_mlx_lm_with_observable_cache(
+        trim_supported=trim_supported,
+        trim_partial=trim_partial,
+        stream_token_ids=stream_token_ids,
+    )
     monkeypatch.setitem(sys.modules, "mlx_lm", fake)
     monkeypatch.setitem(sys.modules, "mlx_lm.models", fake.models)
     monkeypatch.setitem(sys.modules, "mlx_lm.models.cache", fake.models.cache)
@@ -168,6 +183,33 @@ def test_native_session_kv_cache_exact_prompt_hit_streams_empty_suffix(
         assert status["active_entries"] == 1
         assert status["counters"]["hits"] == 1
         assert status["counters"]["drops"] == 0
+    finally:
+        importlib.reload(mod)
+
+
+def test_native_session_kv_cache_records_completion_trim_drop_reason(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
+    mod, _fake = _reload_native_backend_with_fake_mlx_lm(
+        monkeypatch,
+        trim_partial=True,
+        stream_token_ids=(999, 1000),
+    )
+    try:
+        backend = mod.MlxNativeBackend()
+        assert backend.load("fake-model").ok is True
+
+        events = list(backend.stream_generate("fake-model", "prefix A", session_id="s1"))
+
+        assert events[-1].event == "done"
+        status = backend.status().detail["session_kv_cache"]
+        assert status["active_entries"] == 0
+        assert status["counters"]["drops"] == 1
+        assert status["last_drop_event"]["reason_code"] == "completion_trim_mismatch"
+        assert status["last_drop_event"]["detail"]["requested_trim_tokens"] == 2
+        assert status["last_drop_event"]["detail"]["trimmed_tokens"] == 1
+        assert status["last_drop_event"]["detail"]["generated_token_count"] == 2
     finally:
         importlib.reload(mod)
 
@@ -265,6 +307,37 @@ def test_native_session_kv_cache_non_trimmable_cache_reuses_append_only_prompt(
         assert status["active_entries"] == 1
         assert status["counters"]["hits"] == 1
         assert status["counters"]["drops"] == 0
+    finally:
+        importlib.reload(mod)
+
+
+def test_native_session_kv_cache_unavailable_reuse_trim_bypasses_without_drop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
+    mod, fake = _reload_native_backend_with_fake_mlx_lm(
+        monkeypatch,
+        trim_supported=False,
+    )
+    try:
+        backend = mod.MlxNativeBackend()
+        assert backend.load("fake-model").ok is True
+
+        first = list(backend.stream_generate("fake-model", "prefix A", session_id="s1"))
+        second = list(backend.stream_generate("fake-model", "prefix B", session_id="s1"))
+
+        assert first[-1].event == "done"
+        assert second[-1].event == "done"
+        assert len(fake._created_caches) == 2
+        status = backend.status().detail["session_kv_cache"]
+        assert status["counters"]["drops"] == 0
+        assert status["counters"]["trim_bypasses"] == 1
+        assert status["counters"]["trim_evictions"] == 1
+        assert status["last_bypass_event"]["reason_code"] == (
+            "reuse_trim_unavailable_fresh_cache"
+        )
+        assert status["last_bypass_event"]["detail"]["requested_trim_tokens"] > 0
+        assert status["last_bypass_event"]["detail"]["trimmed_tokens"] == 0
     finally:
         importlib.reload(mod)
 

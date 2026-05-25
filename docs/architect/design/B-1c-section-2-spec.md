@@ -503,6 +503,18 @@ must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
   `prompt_chars_before_generation=3000`. Conclusion: bounded prompt growth can
   satisfy the memory budget, but bounded-context exact / capped prompt reuse
   still has a cache-finalization or trim-mismatch blocker.
+- drop-reason probe:
+  `20260525T051225Z-b1c2-qwen3.6-27b-only-prompt-freeze-3000-drop-reason-probe-soak-swap-rollup.jsonl`
+  reproduced the same sample `371` failure and recorded
+  `drop_reason_code=reuse_trim_mismatch`: the stored entry had `955` prompt
+  tokens, the requested prompt had `954`, owlmlx requested a trim of `2`, and
+  upstream `trim_prompt_cache` returned `0`.
+- trim-unavailable safe bypass probe:
+  `20260525T051719Z-b1c2-qwen3.6-27b-only-prompt-freeze-3000-trim-bypass-fix-probe-soak-swap-rollup.jsonl`
+  ran 720 samples with drops / expirations / rejects all 0 and recorded
+  `session_cache_trim_bypasses_total=173`. That closes the unknown drop cause,
+  but it fails the memory budget with `max_drift_bytes=293076992` because
+  repeated fresh-cache fallback reintroduces allocator high-watermark drift.
 
 The landed smoke-only slice covers:
 
@@ -517,16 +529,18 @@ Only after schema tests pass should native execution be attempted.
 
 Close the memory-drift blocker before resuming aggregate evidence:
 
-1. Instrument bounded-context cache finalization so a drop records whether the
-   failing operation is reuse-trim, completion-trim, exact-hit empty suffix, or
-   upstream `trim_prompt_cache` refusal.
-2. Keep the 3000-char prompt freeze policy as the current memory-budget
-   candidate because it produced `max_drift_bytes=150994944 < 209715200`.
-3. Do not resume 4h / 24h §2 aggregate evidence until the 3000-char focused
-   probe reaches 720 samples with `session_cache_drops_total=0`.
-4. If cache-finalization cannot be made clean, reclassify bounded prompt growth
-   as blocked and move to precise working-set accounting or explicit budget
-   rationale.
+1. Keep the safe trim-unavailable bypass semantics: pre-generation reuse trim
+   refusal may fall back to a fresh request cache and must be counted as
+   `trim_bypasses`, not as `drops`; partial trim mismatch remains a hard drop.
+2. Do not resume 4h / 24h §2 aggregate evidence while the 720-sample focused
+   probe still exceeds the 200 MiB drift budget.
+3. Next closure options are: reduce trim-bypass frequency with a token-stable
+   prompt/window policy, add a bounded prompt cache reset policy that avoids
+   repeated fresh-prefill high-watermark growth, or replace the active-memory
+   budget with a source-of-truth working-set metric plus explicit rationale.
+4. Any new focused probe must report `session_cache_drops_total=0`,
+   `session_cache_expirations_total=0`, `session_cache_rejects_total=0`, and
+   `max_drift_bytes <= 209715200` before §2 aggregate resumes.
 5. Aggregate only gap-free, hard-failure-free segment rollups.
 6. Require cumulative duration >= 24h and aggregate swap count >= 6 before
    `soak_plus_swap_stability=passed`.

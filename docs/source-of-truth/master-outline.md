@@ -277,8 +277,11 @@ whether to continue. The discipline is frozen in
   set，且明确 `used_for_promotion_gate=false`。同日 bounded-window probes
   进一步证明：cache-only 1024-token window 仍漂 293 MB；3000-char prompt
   freeze 可把 drift 降到 150 MB，但在 sample 371 触发 1 次 session cache
-  drop。因此下一步不是恢复 aggregate segment，而是闭合 bounded-context
-  cache-finalization / trim-mismatch blocker。
+  drop。drop-reason probe (`20260525T051225Z`) 将原因钉为 reuse trim 需要
+  裁 2 tokens 而 upstream 返回 0；safe bypass fix probe (`20260525T051719Z`)
+  清零 drops/expirations/rejects 并跑满 720 samples，但因 173 次 trim bypass
+  / fresh-cache fallback 又漂到 293 MB。因此下一步不是恢复 aggregate
+  segment，而是降低 trim bypass 频率或重定 token/window policy。
 
 - **`native_backend_promote_path_g2_closure`**：§VI 4-gate 中 G1（Cache
   Parity）已通过 B-1a 闭合；G2（Reclaim Verified）通过 B-1b + B-1c §1
@@ -302,10 +305,12 @@ whether to continue. The discipline is frozen in
 - **Track 1 · B-1c §2 allocator-policy closure**: Qwen-only no-swap
   boundary-safe probe 已完成（`20260524T113306Z`）并复现 drift；accounting v2
   probe（`20260525T040839Z`）证明正增量上界可解释 drift 但不能作为 pass
-  gate；bounded-window probes（`20260525T042215Z` / `20260525T045707Z`）
-  显示 memory-budget candidate 是 3000-char prompt freeze，但当前 blocker 是
-  sample 371 cache-finalization drop。下一 round 是给 bounded-context trim/drop
-  加精确原因并修到 720-sample focused probe clean。完成前不恢复 §2 aggregate
+  gate；bounded-window / drop-reason probes（`20260525T042215Z` /
+  `20260525T045707Z` / `20260525T051225Z` / `20260525T051719Z`）显示
+  unknown drop 已关闭，但 3000-char prompt freeze 下的 trim-unavailable
+  bypass 会频繁 fresh-cache fallback 并重新触发 293 MB drift。下一 round 是
+  token-stable window / bounded cache reset / working-set metric 三选一闭合。
+  完成前不恢复 §2 aggregate
   segment
 - **Track 2 · Campaign F-1 state contract**: 建立 runtime-owned
   `speculative_execution_status` 状态契约（per

@@ -75,7 +75,14 @@ def test_b1c2_ledger_audit_reports_live_health(tmp_path):
             "prompt_id": "medium",
             "elapsed_s": 2.0,
             "sample_verdict": "passed",
-            "session_cache": {"counter_delta": {"drops": 1, "rejects": 0}},
+            "session_cache": {
+                "counter_delta": {"drops": 1, "rejects": 0},
+                "drop_reason_code": "completion_trim_mismatch",
+                "last_drop_event_after": {
+                    "reason_code": "completion_trim_mismatch",
+                    "detail": {"trimmed_tokens": 1},
+                },
+            },
             "memory": {
                 "drift_from_measurement_start_bytes": 512,
                 "watermark_after_generation": "GREEN",
@@ -113,6 +120,11 @@ def test_b1c2_ledger_audit_reports_live_health(tmp_path):
             "prompt_chars_before_generation": None,
             "prompt_chars_after_generation": None,
             "counter_delta": {"drops": 1, "rejects": 0},
+            "drop_reason_code": "completion_trim_mismatch",
+            "last_drop_event_after": {
+                "reason_code": "completion_trim_mismatch",
+                "detail": {"trimmed_tokens": 1},
+            },
         }
     ]
     assert result["session_cache_drops_total"] == 1

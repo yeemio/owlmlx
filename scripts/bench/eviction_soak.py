@@ -420,6 +420,8 @@ def _counter_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, i
         "rejects",
         "window_bypasses",
         "window_evictions",
+        "trim_bypasses",
+        "trim_evictions",
     }
     return {key: _counter_value(after, key) - _counter_value(before, key) for key in sorted(keys)}
 
@@ -2058,6 +2060,24 @@ def _b1c2_rollup(
         )
         for record in records
     )
+    trim_bypasses_total = sum(
+        int(
+            record.get("session_cache", {})
+            .get("counter_delta", {})
+            .get("trim_bypasses", 0)
+            or 0
+        )
+        for record in records
+    )
+    trim_evictions_total = sum(
+        int(
+            record.get("session_cache", {})
+            .get("counter_delta", {})
+            .get("trim_evictions", 0)
+            or 0
+        )
+        for record in records
+    )
     resident_estimate_values = [
         int(record["session_cache"]["resident_bytes_estimate_after"])
         for record in sample_records
@@ -2210,6 +2230,8 @@ def _b1c2_rollup(
         "session_cache_rejects_total": rejects_total,
         "session_cache_window_bypasses_total": window_bypasses_total,
         "session_cache_window_evictions_total": window_evictions_total,
+        "session_cache_trim_bypasses_total": trim_bypasses_total,
+        "session_cache_trim_evictions_total": trim_evictions_total,
         "swap_boundaries_clean": all_swaps_clean,
         "load_result": _result_to_dict(initial_load),
         "cleanup_unload_result": (
@@ -2479,6 +2501,21 @@ def run_b1c2_soak_plus_swap(
                     ),
                     "max_prompt_tokens": cache_after.get("max_prompt_tokens"),
                     "prompt_window_policy": cache_after.get("prompt_window_policy"),
+                    "last_drop_event_before": cache_before.get("last_drop_event"),
+                    "last_drop_event_after": cache_after.get("last_drop_event"),
+                    "last_bypass_event_before": cache_before.get("last_bypass_event"),
+                    "last_bypass_event_after": cache_after.get("last_bypass_event"),
+                    "drop_reason_code": (
+                        (cache_after.get("last_drop_event") or {}).get("reason_code")
+                        if int(counter_delta.get("drops", 0) or 0) > 0
+                        else None
+                    ),
+                    "bypass_reason_code": (
+                        (cache_after.get("last_bypass_event") or {}).get("reason_code")
+                        if int(counter_delta.get("trim_bypasses", 0) or 0) > 0
+                        or int(counter_delta.get("window_bypasses", 0) or 0) > 0
+                        else None
+                    ),
                     "counter_delta": counter_delta,
                     "verdict": "failed" if session_cache_failure_reasons else "passed",
                     "failure_reasons": session_cache_failure_reasons,

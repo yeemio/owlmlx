@@ -96,6 +96,19 @@ class _PreparedPromptCache:
     session_id: str | None = None
     prompt_tokens: tuple[int, ...] | None = None
     active_memory_before_generation_bytes: int | None = None
+    cache_decision: str | None = None
+    cache_reason_code: str | None = None
+    exact_prompt_hit: bool = False
+    previous_prompt_token_count: int = 0
+    common_prefix_token_count: int = 0
+    suffix_token_count: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class _TrimPromptCacheResult:
+    requested_tokens: int
+    trimmed_tokens: int
+    reason_code: str
 
 
 class _TicketedAdmission:
@@ -239,20 +252,56 @@ def _trim_prompt_cache(
     prompt_cache: Any,
     token_count: int,
 ) -> int:
+    return _trim_prompt_cache_with_reason(
+        mlx_lm_module,
+        prompt_cache,
+        token_count,
+    ).trimmed_tokens
+
+
+def _trim_prompt_cache_with_reason(
+    mlx_lm_module: Any,
+    prompt_cache: Any,
+    token_count: int,
+) -> _TrimPromptCacheResult:
     if token_count <= 0:
-        return 0
+        return _TrimPromptCacheResult(
+            requested_tokens=max(int(token_count), 0),
+            trimmed_tokens=0,
+            reason_code="trim_not_requested",
+        )
     trim_prompt_cache = _resolve_trim_prompt_cache(mlx_lm_module)
     if trim_prompt_cache is None:
-        return 0
+        return _TrimPromptCacheResult(
+            requested_tokens=int(token_count),
+            trimmed_tokens=0,
+            reason_code="trim_prompt_cache_unavailable",
+        )
     try:
         trimmed = trim_prompt_cache(prompt_cache, token_count)
-    except Exception:
-        return 0
+    except Exception as exc:
+        return _TrimPromptCacheResult(
+            requested_tokens=int(token_count),
+            trimmed_tokens=0,
+            reason_code=f"trim_prompt_cache_exception:{type(exc).__name__}",
+        )
     if isinstance(trimmed, bool):
-        return int(trimmed)
+        return _TrimPromptCacheResult(
+            requested_tokens=int(token_count),
+            trimmed_tokens=int(trimmed),
+            reason_code="trim_prompt_cache_bool_result",
+        )
     if isinstance(trimmed, int):
-        return max(trimmed, 0)
-    return 0
+        return _TrimPromptCacheResult(
+            requested_tokens=int(token_count),
+            trimmed_tokens=max(trimmed, 0),
+            reason_code="trim_prompt_cache_int_result",
+        )
+    return _TrimPromptCacheResult(
+        requested_tokens=int(token_count),
+        trimmed_tokens=0,
+        reason_code=f"trim_prompt_cache_invalid_result:{type(trimmed).__name__}",
+    )
 
 
 def _non_empty_string(value: object) -> str | None:
@@ -447,6 +496,7 @@ class MlxNativeBackend:
 
         cache = decision.cache_object
         prompt_for_call: Any = list(prompt_tokens)
+        exact_prompt_hit = False
         if decision.reused:
             common_prefix_count = min(
                 decision.common_prefix_token_count,
@@ -468,12 +518,38 @@ class MlxNativeBackend:
                 suffix_tokens = prompt_tokens[common_prefix_count:]
             trim_count = max(decision.previous_prompt_token_count - common_prefix_count, 0)
             if trim_count:
-                trimmed = _trim_prompt_cache(mlx_lm_module, cache, trim_count)
-                if trimmed != trim_count:
-                    self._session_kv_cache.drop_for_session_model(
-                        session_id=session_id,
-                        model_id=session.info.model_id,
-                    )
+                trim_result = _trim_prompt_cache_with_reason(
+                    mlx_lm_module,
+                    cache,
+                    trim_count,
+                )
+                if trim_result.trimmed_tokens != trim_count:
+                    detail = {
+                        "trim_reason_code": trim_result.reason_code,
+                        "requested_trim_tokens": trim_count,
+                        "trimmed_tokens": trim_result.trimmed_tokens,
+                        "previous_prompt_token_count": (
+                            decision.previous_prompt_token_count
+                        ),
+                        "requested_prompt_token_count": len(prompt_tokens),
+                        "common_prefix_token_count": common_prefix_count,
+                        "suffix_token_count": len(suffix_tokens),
+                        "exact_prompt_hit": exact_prompt_hit,
+                    }
+                    if trim_result.trimmed_tokens == 0:
+                        self._session_kv_cache.bypass_for_session_model(
+                            session_id=session_id,
+                            model_id=session.info.model_id,
+                            reason_code="reuse_trim_unavailable_fresh_cache",
+                            detail=detail,
+                        )
+                    else:
+                        self._session_kv_cache.drop_for_session_model(
+                            session_id=session_id,
+                            model_id=session.info.model_id,
+                            reason_code="reuse_trim_partial_mismatch",
+                            detail=detail,
+                        )
                     return _PreparedPromptCache(
                         prompt_for_call=prompt,
                         prompt_cache=self._make_fresh_prompt_cache(
@@ -495,6 +571,12 @@ class MlxNativeBackend:
             session_id=_non_empty_string(session_id),
             prompt_tokens=prompt_tokens,
             active_memory_before_generation_bytes=self._read_active_memory_bytes(),
+            cache_decision=decision.decision,
+            cache_reason_code=decision.reason_code,
+            exact_prompt_hit=exact_prompt_hit,
+            previous_prompt_token_count=decision.previous_prompt_token_count,
+            common_prefix_token_count=common_prefix_count if decision.reused else 0,
+            suffix_token_count=len(suffix_tokens) if decision.reused else 0,
         )
 
     def _finalize_session_prompt_cache_after_stream(
@@ -518,12 +600,12 @@ class MlxNativeBackend:
             self._read_active_memory_bytes(),
         )
         if completion_tokens > 0:
-            trimmed = _trim_prompt_cache(
+            trim_result = _trim_prompt_cache_with_reason(
                 mlx_lm_module,
                 prepared.prompt_cache,
                 completion_tokens,
             )
-            if trimmed == completion_tokens:
+            if trim_result.trimmed_tokens == completion_tokens:
                 return self._session_kv_cache.remember_prompt(
                     session_id=prepared.session_id,
                     model_id=session.info.model_id,
@@ -531,7 +613,10 @@ class MlxNativeBackend:
                     token_count=len(prepared.prompt_tokens),
                     byte_estimate_delta=byte_estimate_delta,
                 )
-            if trimmed == 0 and len(generated_token_ids) >= completion_tokens:
+            if (
+                trim_result.trimmed_tokens == 0
+                and len(generated_token_ids) >= completion_tokens
+            ):
                 remembered_tokens = (
                     prepared.prompt_tokens
                     + generated_token_ids[:completion_tokens]
@@ -543,10 +628,29 @@ class MlxNativeBackend:
                     token_count=len(remembered_tokens),
                     byte_estimate_delta=byte_estimate_delta,
                 )
-            if trimmed != completion_tokens:
+            if trim_result.trimmed_tokens != completion_tokens:
                 self._session_kv_cache.drop_for_session_model(
                     session_id=prepared.session_id,
                     model_id=session.info.model_id,
+                    reason_code="completion_trim_mismatch",
+                    detail={
+                        "trim_reason_code": trim_result.reason_code,
+                        "requested_trim_tokens": completion_tokens,
+                        "trimmed_tokens": trim_result.trimmed_tokens,
+                        "generated_token_count": len(generated_token_ids),
+                        "prompt_token_count": len(prepared.prompt_tokens),
+                        "previous_prompt_token_count": (
+                            prepared.previous_prompt_token_count
+                        ),
+                        "common_prefix_token_count": (
+                            prepared.common_prefix_token_count
+                        ),
+                        "suffix_token_count": prepared.suffix_token_count,
+                        "exact_prompt_hit": prepared.exact_prompt_hit,
+                        "cache_decision": prepared.cache_decision,
+                        "cache_reason_code": prepared.cache_reason_code,
+                        "prompt_for_call_empty": prepared.prompt_for_call == [],
+                    },
                 )
                 return False
         return self._session_kv_cache.remember_prompt(
@@ -1141,6 +1245,15 @@ class MlxNativeBackend:
                 self._session_kv_cache.drop_for_session_model(
                     session_id=prepared_cache.session_id,
                     model_id=session.info.model_id,
+                    reason_code="stream_aborted_before_cache_finalize",
+                    detail={
+                        "completion_tokens": completion_tokens,
+                        "generated_token_count": len(generated_token_ids),
+                        "finish_reason": finish_reason,
+                        "cache_decision": prepared_cache.cache_decision,
+                        "cache_reason_code": prepared_cache.cache_reason_code,
+                        "exact_prompt_hit": prepared_cache.exact_prompt_hit,
+                    },
                 )
             self._release_active_cache(session)
 

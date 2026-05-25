@@ -176,6 +176,17 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
         )
         > 0
     ]
+    bypass_records = [
+        record
+        for record in records
+        if _as_int(
+            record.get("session_cache", {})
+            .get("counter_delta", {})
+            .get("trim_bypasses"),
+            0,
+        )
+        > 0
+    ]
     dirty_swaps = [
         record.get("sample_index")
         for record in swap_records
@@ -237,13 +248,53 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
                     "prompt_chars_after_generation"
                 ),
                 "counter_delta": record.get("session_cache", {}).get("counter_delta", {}),
+                "drop_reason_code": record.get("session_cache", {}).get(
+                    "drop_reason_code"
+                ),
+                "last_drop_event_after": record.get("session_cache", {}).get(
+                    "last_drop_event_after"
+                ),
             }
             for record in drop_records
+        ],
+        "trim_bypass_sample_indices": [
+            record.get("sample_index") for record in bypass_records
+        ],
+        "trim_bypass_samples": [
+            {
+                "sample_index": record.get("sample_index"),
+                "elapsed_s": record.get("elapsed_s"),
+                "phase": record.get("phase"),
+                "prompt_id": record.get("prompt_id"),
+                "model_id": record.get("model", {}).get("id"),
+                "prompt_chars_before_generation": record.get("config", {}).get(
+                    "prompt_chars_before_generation"
+                ),
+                "prompt_chars_after_generation": record.get("config", {}).get(
+                    "prompt_chars_after_generation"
+                ),
+                "counter_delta": record.get("session_cache", {}).get("counter_delta", {}),
+                "bypass_reason_code": record.get("session_cache", {}).get(
+                    "bypass_reason_code"
+                ),
+                "last_bypass_event_after": record.get("session_cache", {}).get(
+                    "last_bypass_event_after"
+                ),
+            }
+            for record in bypass_records
         ],
         "dirty_swap_sample_indices": dirty_swaps,
         "session_cache_drops_total": _counter_delta_total(records, "drops"),
         "session_cache_expirations_total": _counter_delta_total(records, "expirations"),
         "session_cache_rejects_total": _counter_delta_total(records, "rejects"),
+        "session_cache_trim_bypasses_total": _counter_delta_total(
+            records,
+            "trim_bypasses",
+        ),
+        "session_cache_trim_evictions_total": _counter_delta_total(
+            records,
+            "trim_evictions",
+        ),
         "session_cache_window_bypasses_total": _counter_delta_total(
             records,
             "window_bypasses",
@@ -305,6 +356,12 @@ def audit_b1c2_segment_rollup(path: Path) -> dict[str, Any]:
         ),
         "session_cache_window_evictions_total": record.get(
             "session_cache_window_evictions_total"
+        ),
+        "session_cache_trim_bypasses_total": record.get(
+            "session_cache_trim_bypasses_total"
+        ),
+        "session_cache_trim_evictions_total": record.get(
+            "session_cache_trim_evictions_total"
         ),
         "max_drift_bytes": record.get("max_drift_bytes"),
         "max_drift_within_budget": record.get("max_drift_within_budget"),

@@ -173,6 +173,63 @@ def test_session_kv_cache_remember_over_prompt_window_evicts_without_drop() -> N
     assert status["counters"]["drops"] == 0
 
 
+def test_session_kv_cache_records_last_drop_reason() -> None:
+    store = SessionKVCacheStore(enabled=True, ttl_s=60.0)
+    store.acquire_for_request(
+        session_id="s1",
+        model_id="m",
+        make_cache=object,
+        prompt_tokens=(1, 2, 3),
+        token_count=3,
+    )
+
+    dropped = store.drop_for_session_model(
+        session_id="s1",
+        model_id="m",
+        reason_code="reuse_trim_mismatch",
+        detail={"requested_trim_tokens": 2, "trimmed_tokens": 1},
+    )
+
+    status = store.status_dict()
+    assert dropped is True
+    assert status["active_entries"] == 0
+    assert status["counters"]["drops"] == 1
+    assert status["last_drop_event"]["reason_code"] == "reuse_trim_mismatch"
+    assert status["last_drop_event"]["entry_token_count"] == 3
+    assert status["last_drop_event"]["detail"] == {
+        "requested_trim_tokens": 2,
+        "trimmed_tokens": 1,
+    }
+
+
+def test_session_kv_cache_records_trim_bypass_without_drop() -> None:
+    store = SessionKVCacheStore(enabled=True, ttl_s=60.0)
+    store.acquire_for_request(
+        session_id="s1",
+        model_id="m",
+        make_cache=object,
+        prompt_tokens=(1, 2, 3),
+        token_count=3,
+    )
+
+    bypassed = store.bypass_for_session_model(
+        session_id="s1",
+        model_id="m",
+        reason_code="reuse_trim_unavailable_fresh_cache",
+        detail={"requested_trim_tokens": 2, "trimmed_tokens": 0},
+    )
+
+    status = store.status_dict()
+    assert bypassed is True
+    assert status["active_entries"] == 0
+    assert status["counters"]["drops"] == 0
+    assert status["counters"]["trim_bypasses"] == 1
+    assert status["counters"]["trim_evictions"] == 1
+    assert status["last_bypass_event"]["reason_code"] == (
+        "reuse_trim_unavailable_fresh_cache"
+    )
+
+
 def test_session_kv_cache_misses_on_model_switch() -> None:
     store = SessionKVCacheStore(enabled=True, ttl_s=60.0)
     created: list[object] = []

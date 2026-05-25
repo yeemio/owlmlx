@@ -93,6 +93,8 @@ class SessionKVCacheCounters:
     expirations: int = 0
     window_bypasses: int = 0
     window_evictions: int = 0
+    trim_bypasses: int = 0
+    trim_evictions: int = 0
 
     def to_dict(self) -> dict[str, int]:
         return {
@@ -105,6 +107,8 @@ class SessionKVCacheCounters:
             "expirations": self.expirations,
             "window_bypasses": self.window_bypasses,
             "window_evictions": self.window_evictions,
+            "trim_bypasses": self.trim_bypasses,
+            "trim_evictions": self.trim_evictions,
         }
 
 
@@ -141,6 +145,8 @@ class SessionKVCacheStore:
         self.max_prompt_tokens = max(int(max_prompt_tokens), 0)
         self._entries: dict[tuple[str, str], _SessionKVCacheEntry] = {}
         self._counters = SessionKVCacheCounters()
+        self._last_drop_event: dict[str, Any] | None = None
+        self._last_bypass_event: dict[str, Any] | None = None
         self._lock = threading.Lock()
         self._next_cache_object_id = 0
 
@@ -214,6 +220,17 @@ class SessionKVCacheStore:
             with self._lock:
                 expired = self._expire_locked(now)
                 removed = self._entries.pop(key, None)
+                if removed is not None:
+                    self._last_bypass_event = _session_cache_event(
+                        reason_code="prompt_token_window_exceeded",
+                        session_id=normalized_session_id,
+                        model_id=model_id,
+                        removed=removed,
+                        detail={
+                            "requested_prompt_token_count": len(requested_prompt_tokens),
+                            "max_prompt_tokens": self.max_prompt_tokens,
+                        },
+                    )
                 self._counters = _replace_counter(
                     self._counters,
                     expirations=self._counters.expirations + expired,
@@ -315,7 +332,20 @@ class SessionKVCacheStore:
             if entry is None:
                 return False
             if self._prompt_exceeds_window(normalized_prompt_tokens):
-                self._entries.pop((normalized_session_id, model_id), None)
+                removed = self._entries.pop((normalized_session_id, model_id), None)
+                if removed is not None:
+                    self._last_bypass_event = _session_cache_event(
+                        reason_code="prompt_token_window_exceeded_after_generation",
+                        session_id=normalized_session_id,
+                        model_id=model_id,
+                        removed=removed,
+                        detail={
+                            "remembered_prompt_token_count": len(
+                                normalized_prompt_tokens
+                            ),
+                            "max_prompt_tokens": self.max_prompt_tokens,
+                        },
+                    )
                 self._counters = _replace_counter(
                     self._counters,
                     window_bypasses=self._counters.window_bypasses + 1,
@@ -334,7 +364,14 @@ class SessionKVCacheStore:
                 )
             return True
 
-    def drop_for_session_model(self, *, session_id: str | None, model_id: str) -> bool:
+    def drop_for_session_model(
+        self,
+        *,
+        session_id: str | None,
+        model_id: str,
+        reason_code: str = "unsafe_session_cache_reuse",
+        detail: dict[str, Any] | None = None,
+    ) -> bool:
         """Drop one session/model cache entry after an aborted or unsafe reuse."""
 
         normalized_session_id = (session_id or "").strip()
@@ -344,9 +381,49 @@ class SessionKVCacheStore:
             removed = self._entries.pop((normalized_session_id, model_id), None)
             if removed is None:
                 return False
+            self._last_drop_event = _session_cache_event(
+                reason_code=reason_code,
+                session_id=normalized_session_id,
+                model_id=model_id,
+                removed=removed,
+                detail=detail,
+            )
             self._counters = _replace_counter(
                 self._counters,
                 drops=self._counters.drops + 1,
+            )
+            return True
+
+    def bypass_for_session_model(
+        self,
+        *,
+        session_id: str | None,
+        model_id: str,
+        reason_code: str,
+        detail: dict[str, Any] | None = None,
+    ) -> bool:
+        """Evict one reusable entry before generation and fall back to fresh cache."""
+
+        normalized_session_id = (session_id or "").strip()
+        if not normalized_session_id or not model_id:
+            return False
+        with self._lock:
+            removed = self._entries.pop((normalized_session_id, model_id), None)
+            self._counters = _replace_counter(
+                self._counters,
+                trim_bypasses=self._counters.trim_bypasses + 1,
+                trim_evictions=(
+                    self._counters.trim_evictions + (1 if removed is not None else 0)
+                ),
+            )
+            if removed is None:
+                return False
+            self._last_bypass_event = _session_cache_event(
+                reason_code=reason_code,
+                session_id=normalized_session_id,
+                model_id=model_id,
+                removed=removed,
+                detail=detail,
             )
             return True
 
@@ -407,6 +484,16 @@ class SessionKVCacheStore:
             entries = [entry.snapshot().to_dict() for entry in self._entries.values()]
             counters = self._counters
             resident_bytes = self._resident_bytes_locked()
+            last_drop_event = (
+                dict(self._last_drop_event)
+                if self._last_drop_event is not None
+                else None
+            )
+            last_bypass_event = (
+                dict(self._last_bypass_event)
+                if self._last_bypass_event is not None
+                else None
+            )
         return {
             "surface": "owlmlx.session_kv_cache",
             "capability_label": "experimental",
@@ -427,6 +514,8 @@ class SessionKVCacheStore:
             "resident_bytes_estimate_mode": "positive_active_memory_delta_upper_bound",
             "resident_bytes_estimate_used_for_promotion_gate": False,
             "counters": counters.to_dict(),
+            "last_drop_event": last_drop_event,
+            "last_bypass_event": last_bypass_event,
             "entries": sorted(
                 entries,
                 key=lambda entry: (entry["model_id"], entry["session_id"]),
@@ -484,6 +573,26 @@ def _common_prefix_len(left: tuple[int, ...], right: tuple[int, ...]) -> int:
             break
         count += 1
     return count
+
+
+def _session_cache_event(
+    *,
+    reason_code: str,
+    session_id: str,
+    model_id: str,
+    removed: _SessionKVCacheEntry,
+    detail: dict[str, Any] | None,
+) -> dict[str, Any]:
+    return {
+        "reason_code": str(reason_code or "session_cache_policy_event"),
+        "session_id": session_id,
+        "model_id": model_id,
+        "cache_object_id": removed.cache_object_id,
+        "entry_token_count": removed.token_count,
+        "entry_prompt_token_count": len(removed.prompt_tokens),
+        "time_s": time.time(),
+        "detail": dict(detail or {}),
+    }
 
 
 def _env_bool(name: str, *, default: bool) -> bool:
