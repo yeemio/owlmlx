@@ -324,10 +324,11 @@ whether to continue. The discipline is frozen in
   `blocked` 且不进入 clean aggregate。下一 round 是 gap-free repeat of
   same prompt-reset swap-bearing policy；完成前不恢复 24h §2 aggregate
   segment
-- **Track 2 · Campaign F-1 state contract**: 建立 runtime-owned
-  `speculative_execution_status` 状态契约（per
-  `docs/architect/01-mainline-roadmap.md §V Campaign F · F1`）· 不依赖
-  G2 closure · 可与 Track 1 并行起跑
+- **Track 2 · Campaign F-1 state contract**: runtime-owned
+  `speculative_execution_status` 状态契约已落地（endpoint +
+  kernel observe APIs + fixture evidence `20260525T142617Z`）· 不依赖
+  G2 closure · endpoint self-promotion 仍需独立 §1a round；任何 spec method
+  capability 仍不得随 endpoint 晋级
 
 ### 8.5 历史 Phase 45 注脚
 

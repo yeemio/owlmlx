@@ -167,6 +167,9 @@ swap-bearing §2 policy, not promotion per
 `docs/architect/design/B-1c-section-2-spec.md §10`). Stage 1 refactor
 (2026-05-11) archived 151 spec-as-code modules; Stage 2 aligned landmark
 vocabulary with [PR #649][pr649]; Wave H · H1 (2026-05-17) extracted
-OpenAI/Anthropic compat routes into `server_routes_openai.py`. See
+OpenAI/Anthropic compat routes into `server_routes_openai.py`. Campaign F-1
+has landed the diagnostic `/v1/runtime/speculative-execution-status` surface
+with kernel observe APIs and F-1.3 fixture evidence, but the endpoint is not
+promoted to `supported` and no speculative method is promoted. See
 `CHANGELOG.md` (when present) or recent `release(...)` / `refactor(...)` /
 `docs(...)` commits.

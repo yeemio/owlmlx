@@ -3,7 +3,7 @@
 > **Gate**: Campaign F · F-1 — runtime-owned `speculative_execution_status` contract surface
 > **Layer**: design-grade, downstream of [`../06-campaign-F1-plan.md`](../06-campaign-F1-plan.md), upstream of code-grade (F-1.2 endpoint stub + F-1.3 wired-to-runner)
 > **Plan-grade source**: [`../06-campaign-F1-plan.md`](../06-campaign-F1-plan.md) (which derives from [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Part V · Campaign F · F1)
-> **Status**: design-grade draft pending review
+> **Status**: code-grade F-1.2/F-1.3 landed; fixture evidence captured; no method promotion
 > **Prerequisite**: F-1 plan-grade reviewed; B-1c §2 closure is **not** a prerequisite for F-1.1/F-1.2/F-1.3 (per plan §2)
 > **Non-goal**: this spec does not promote `assistant_drafter` / `native_mtp` / any spec method to `supported`. It only specifies the endpoint contract by which their honest capability is surfaced.
 
@@ -428,12 +428,23 @@ To prevent scope creep into adjacent gates during F-1.2 / F-1.3 implementation:
 
 ## 10. Status / Next Step
 
-- **Current state**: design-grade draft pending user review
-- **On approval**:
-  - **F-1.2** code-grade session: implement the new module + kernel diagnostic registration + endpoint + contract test suite for the spec-disabled fixture set (§4.11.1 + §5.1 + §6.1). Ledger first fixture pass to `files/evidence/owlmlx/runtime/f1-speculative-execution-status/`.
-  - **F-1.3** code-grade session (after F-1.2 review): land kernel `observe_*` methods, wire to runner return paths, extend the contract test suite to cover §5.2 fixtures (`assistant_drafter_loaded`, `assistant_drafter_crashed`, `runner_unloaded`, `re_loaded_after_crash`).
-  - **§1a Gate** for endpoint self-promotion: only after F-1.3 evidence shows `endpoint_self_promotion_eligible=true` for ≥20 fresh runs.
-- **Hand-off discipline** (per [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Part VIII.3 layered handoff): design-grade → user review → revisions → code-grade. F-1.2 PR does not start until this spec is signed off.
+- **Current state**: F-1.2 endpoint stub + F-1.3 kernel observe APIs landed. The
+  captured evidence ledger
+  `files/evidence/owlmlx/runtime/f1-speculative-execution-status/20260525T142617Z-f1-contract-fixtures.jsonl`
+  records 5/5 contract fixtures passed; the rollup
+  `20260525T142617Z-f1-contract-fixtures-rollup.jsonl` records
+  `fresh_round_trips=20`, `fresh_round_trips_passed=true`,
+  `endpoint_self_promotion_eligible=true`, and
+  `graduates.endpoint_supported=false` / `graduates.any_method_supported=false`.
+- **Next step**:
+  - **Endpoint §1a promotion round**: decide whether to promote the endpoint
+    surface itself to `supported` using the captured eligibility evidence. This
+    still does **not** promote `assistant_drafter`, `native_mtp`, or any other
+    speculative method.
+  - **F-2**: start n-gram / suffix probe as the first additive method-status
+    expansion.
+  - **F-3**: parent-side spawn / supervision site for MTP runner remains out of
+    F-1 and belongs to a future resident/spawned MTP gate.
 
 ## 11. References
 
@@ -469,3 +480,4 @@ To prevent scope creep into adjacent gates during F-1.2 / F-1.3 implementation:
 | Date | Change | By |
 |---|---|---|
 | 2026-05-25 | design-grade draft (fresh-context derivation from plan-grade) | architect session (this round) |
+| 2026-05-25 | F-1.2 endpoint + F-1.3 observe APIs landed; fixture evidence captured in `files/evidence/owlmlx/runtime/f1-speculative-execution-status/20260525T142617Z-*` | code-grade sessions |

@@ -327,16 +327,13 @@ PR 描述纪律：F-1.2 endpoint 实装 PR 必须显式声明 "将被 Wave H2 �
 
 ## 11. Status / Next Step
 
-- **当前状态**：plan-grade draft pending 用户复核
-- **下一步**：用户复核通过后，next session derive **design-grade `docs/architect/design/F-1-spec.md`**，包含：
-  - 精确 endpoint URL / 方法名
-  - 字段 JSON serialization 形式（camelCase / snake_case 决定）
-  - test harness 加点（候选：`tests/test_runtime_status_surfaces.py` extension）
-  - failure handling（runner crash / partial load / Gemma4 toolchain missing）
-  - Evidence path（contract test fixture）
-  - `FallbackEntry` / `CacheSharingEntry` 完整 shape 定义
-  - 与现有 `/v1/runtime/status` integration 测试
-- **再下一步**：design-grade 复核通过后，code-grade session 实装 endpoint stub（F-1.2）+ 接到真实 runner 状态（F-1.3）
+- **当前状态**：plan-grade → design-grade → code-grade F-1.2/F-1.3 已落地；
+  evidence `20260525T142617Z` 记录 5/5 contract fixtures + 20 fresh
+  round trips passed
+- **下一步**：二选一但不冲突：
+  - endpoint §1a Promotion Gate：只晋级 F-1 status surface 本身，不晋级任何
+    speculative method
+  - F-2：n-gram / suffix probe 作为第一个 additive method-status 扩展
 - **晋级路径**：F-1 endpoint **本身**经 §1a Promotion Gate 后可晋 `supported`；endpoint 暴露的 method capability **不**因此晋级
 
 ### 11.1 Hand-off 纪律

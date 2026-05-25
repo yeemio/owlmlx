@@ -30,7 +30,7 @@
 | 6 | Status & Provenance | ✅ request lifecycle 维度 strong；🟡 spec accept/reject 维度缺 | Anthropic usage；OpenTelemetry | **L1（spec 维度）** | spec 路径 6–12 月 |
 | 7 | Failure Cleanliness | 🟡 recovery_supervisor / settle_barrier / child probe / restart supported | K8s phase；vLLM 稳定边界 | **同业界** | — |
 | 8 | Multi-Model Lifecycle | 🟡 pin/TTL/eviction supported；model_lineage supported；缺 hot-swap | mlx-knife 2.0.5；vLLM 多端点 | **L1** | 6 月 |
-| 9 | Speculative Path Safety | 🟠 gemma4_mtp_drafter probe；spec_method status 缺；正交矩阵无 | 业界普遍未解决（vLLM #41967；ToolSpec arXiv 2604.13519 2026 才出） | **L2** | 与业界同处探索 |
+| 9 | Speculative Path Safety | 🟡 gemma4_mtp_drafter probe + F-1 runtime-owned status surface landed；method 仍 experimental；正交矩阵无 | 业界普遍未解决（vLLM #41967；ToolSpec arXiv 2604.13519 2026 才出） | **L2** | 与业界同处探索 |
 | 10 | Structured-Output Invariance | 🔴 runtime 不主动验证 JSON/tool schema 不变性 | Claude API guaranteed | **L2** | 业界仅 Anthropic 真正 hardened |
 | 11 | OwlOps Consumption | ✅ 27 行 ledger live；test-runs / model-rc / evidence history live | vLLM Prom；Ray Serve | **同业界领先** | — |
 | 12 | Heterogeneous Compute (GPU/CPU/ANE) | 🔴 not in scope | 业界整体未解决 | **L3** | 与业界同处空白 |
@@ -141,7 +141,7 @@
 | P-EAGLE | 🟡 早期实装 | 🔴 | schema 预留字段 |
 | Medusa | ✅ 平台化 | 🔴 | 不追 |
 | n-gram / suffix decoding | 🟡 主流低优先 | 🔴 | **Campaign F Round 0 第一站** |
-| `speculative_execution_status` runtime-owned | 🔴 业界普遍无 | 🔴 | **Campaign F-1 立即建** |
+| `speculative_execution_status` runtime-owned | 🔴 业界普遍无 | 🟡 F-1.2/F-1.3 diagnostic surface + fixture evidence landed; endpoint not promoted | **F-1 evidence landed · next §1a endpoint promotion / F-2** |
 | Spec × tool calling reliability | 🔴 (vLLM #41967) | 🔴 | **Campaign F-4/F-5** |
 | Spec × structured output bit-for-bit | 🔴（Claude API 之外业界普遍无） | 🔴 | **Campaign F 核心差异化** |
 

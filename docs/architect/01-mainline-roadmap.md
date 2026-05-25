@@ -328,7 +328,7 @@
 ### Campaign F — Speculative Path Safety + Structured-Output Invariance（第 6 子战役）
 
 - **目标**：在不破坏 capability honesty 前提下建立 runtime-owned `speculative_execution_status` surface 与正交测试矩阵；证明 spec 路径下 tool calling / structured output / thinking-tag 闭合 bit-for-bit 不变
-- **当前**：gemma4_mtp_drafter probe scaffold；spec_method status 缺；正交矩阵无
+- **当前**：F1 `speculative_execution_status` diagnostic surface 已落地（F-1.2 endpoint + F-1.3 kernel observe APIs + fixture evidence `20260525T142617Z`），endpoint self-promotion 仍未执行；`assistant_drafter` 仍为 experimental，正交矩阵无
 - **近期闭环（0–3 月）**：F1 `speculative_execution_status` runtime-owned contract + F2 n-gram/suffix probe (Round 0) + F3 Gemma 4 resident MTP A/B
 - **中期（3–6 月）**：F4 正交矩阵 ≥20 case + F5 draft constraint checker + F6 MTP+session KV combo
 - **远期（6–12 月）**：F7 DS4 native MTP path + F8 主 serving 受控启用 + F9 RC2 强支撑

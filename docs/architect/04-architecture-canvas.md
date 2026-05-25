@@ -178,7 +178,7 @@ flowchart TB
 | **C** TTFT Default | `mlx_lm_subprocess_backend.py` (child cold-start) · `scheduler_admission.py` (warmup decision) |
 | **D** DeepSeek V4 | `.runtime-deepseek-v4-mlx` venv · D1/D2 passed · D3 MTP checkpoint absent/stripped · D4 clean pre-load reject |
 | **E** OwlOps Consumption | `comparative_evidence_history.py` · `runtime_monitor_test_console.py` · 27-row ledger |
-| **F** Spec Path Safety | `gemma4_mtp_drafter.py` · `runtime/mlx_vlm_mtp_runner.py` · `speculative_execution_status` (待建) |
+| **F** Spec Path Safety | `gemma4_mtp_drafter.py` · `runtime/mlx_vlm_mtp_runner.py` · `runtime/speculative_execution_status.py` · `/v1/runtime/speculative-execution-status` |
 | **Wave G** Governance | `docs/source-of-truth/ARCHITECTURE-TRUTH.md` · `product-definition.md` · `README.md` · phase45 命名治理 |
 | **Wave H** Server 拆分 | H1 done: `server_routes_openai.py`; next: routes_runtime / routes_dev |
 

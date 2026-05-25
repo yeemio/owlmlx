@@ -1,0 +1,1 @@
+{"all_fixtures_passed": true, "endpoint_self_promotion_eligible": true, "fixture_count": 5, "fresh_round_trips": 20, "fresh_round_trips_passed": true, "gate": "F-1", "graduates": {"any_method_supported": false, "endpoint_supported": false}, "schema_version": "f1.contract_rollup.v1", "slice": "F1.3", "timestamp_utc": "20260525T142617Z"}

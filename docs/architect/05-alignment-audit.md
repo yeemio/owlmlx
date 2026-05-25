@@ -362,9 +362,9 @@ phase45-stream-backend-terminal-notice-leading-discriminator-marker-
 | G1 · Cache Parity | session KV cache 语义 + 非 cache 路径字节等价 | **B-1a 通过** = G1 done |
 | G2 · Reclaim Verified | settle barrier 在 native 路径上 hardened | B-1b cache-on no-regress 通过 + B-1c §1 interrupted 通过 → 约 60% · §2 漂 352MB 是 G2 真正的工作面 |
 | G3 · Structured-Output Invariance | tool / JSON / thinking-tag 在 native 上字节等价 + 正交矩阵 ≥20 case | 未启动（Campaign F-4/5） |
-| G4 · Speculative Path Landing | spec 在 native 上稳定 + F4 矩阵未破坏 + DS4 native MTP | 未启动；**D3+D4 已闭合"unsafe 否定面"**，是 G4 的输入而非达成 |
+| G4 · Speculative Path Landing | spec 在 native 上稳定 + F4 矩阵未破坏 + DS4 native MTP | F-1 diagnostic surface 已落地（endpoint + observe APIs + fixture evidence）；**D3+D4 已闭合"unsafe 否定面"**，但 spec serving / F4 矩阵 / DS4 native MTP 仍未达成 |
 
-**架构师注**：G3 不依赖 G2 完成；可以在 §2 解决过程中并行起 Campaign F-1（runtime-owned `speculative_execution_status` 状态契约）。当前 sequence 把 F 整体推到 G2 之后是节奏选择，不是依赖。
+**架构师注**：G3 不依赖 G2 完成；Campaign F-1 已在 §2 解决过程中并行落地 runtime-owned `speculative_execution_status` 状态契约。它降低了后续 F-2/F-3/F-4 的状态面风险，但不等于 G4 达成。
 
 ---
 
@@ -388,7 +388,7 @@ README 的能力表是面向用户的"能不能用"，本节是面向架构师�
 | Runtime monitor 内部测试台 | `/v1/runtime/monitor/{snapshot,history,events}` · `/v1/runtime/test-runs*` | Status & provenance → HTTP | supported | OwlOps 27 行 ledger live |
 | Session KV cache（实验） | `OWLMLX_SESSION_CACHE_ENABLED=1` + `X-Owlmlx-Session-Id` | Admission & cache + Native backend | experimental | 默认 off · native only · append-only reuse · §VI G2 在归因 |
 | Native backend（实验） | `OWLMLX_SESSION_CACHE_ENABLED=1` 触发 | Process boundary | experimental | 仅在 session-scope 显式 opt-in 时启用；session KV cache 的物理承载 |
-| MTP 探针（实验） | `gemma4_mtp_drafter.py` · `mlx_vlm_mtp_runner.py` | Process boundary | scaffold-only | F-1 未起 · D3 已闭合 "weights absent → reject" 否定面 |
+| MTP 探针（实验） | `gemma4_mtp_drafter.py` · `mlx_vlm_mtp_runner.py` · `/v1/runtime/speculative-execution-status` | Process boundary + diagnostic status | scaffold-only method · diagnostic surface experimental | F-1 endpoint / observe APIs landed; no parent-side MTP spawn site; D3 已闭合 "weights absent → reject" 否定面 |
 | Test runs admin | `/v1/runtime/test-runs/{run_id}[/abort]` | Status & provenance | supported | OwlOps consumption · 内部 |
 
 **新增视角**：把 README "what ships now" 的 11 行升级为 25+ 行的功能 / 子系统 / 状态三维矩阵。本表可在 Wave G-5 编入 `runtime-contracts.md` 作为 contract surface 的统一索引。
@@ -407,7 +407,7 @@ README 的能力表是面向用户的"能不能用"，本节是面向架构师�
 |---|---|---|
 | P0 | B-1c §2 prompt-reset swap-bearing proof — `20260525T061019Z` 已在 one-swap segment 内清零 drop/expiration/reject、trim bypass=3、drift within budget、swap boundary clean，但 wall-clock continuity gap-blocked | 不跑 24h aggregate；先 gap-free repeat 同一 prompt-reset policy 的 swap-bearing 4h fail-fast segment |
 | P0 | **Wave G 第一刀 narrow doc edits**（见 §8 工作单） | docs-only · 不动 runtime code · 不抢 §2 资源 |
-| P1 | Campaign F-1 — `speculative_execution_status` runtime-owned 状态契约 | 不必等 G2 完成；可与 §2 归因并行 |
+| P1 | Campaign F-1 — `speculative_execution_status` runtime-owned 状态契约 | 已落地 endpoint + observe APIs + fixture evidence；下一步是 endpoint §1a promotion 或 F-2 |
 | P1 | Wave H · H2 计划 spec drafting（不实施） | 等 B-1c §2 settle 后再 implement |
 
 ### 7.2 中期（3–6 月）
@@ -420,7 +420,7 @@ README 的能力表是面向用户的"能不能用"，本节是面向架构师�
 | P1 | Wave H · H2 实施 (`server_routes_runtime.py`) | B-1c §2 settle |
 | P1 | Wave H · H3 实施 (`server_routes_dev.py`) | H2 落后 |
 | P1 | Campaign C-1 — cold-first-response 5-factor instrumentation | session KV supported promote 后 |
-| P2 | Campaign F-2/F-3 — n-gram/suffix probe + Gemma 4 resident MTP wrapper | F-1 落后 |
+| P2 | Campaign F-2/F-3 — n-gram/suffix probe + Gemma 4 resident MTP wrapper | F-1 surface 已就绪；F-3 仍需 parent-side spawn/supervision site |
 | P2 | D-recurring — DS4 在 D-style isolated ledger 的 steady-state 重跑（脱离一次性 closeout） | D2 ladder 闭合后 |
 
 ### 7.3 远期（6–12 月）
