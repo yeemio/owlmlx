@@ -114,6 +114,9 @@ from owlmlx.runtime_monitor_test_console import (
 
 from .backends import FakeBackend, RuntimeBackend
 from .kernel import RuntimeKernel
+from .speculative_execution_status import (
+    build_speculative_execution_status_payload,
+)
 from .serving_hardening import (
     ErrorEnvelopeBuilder,
     GracefulShutdown,
@@ -1294,6 +1297,17 @@ def create_app(
             "scope": "native_backend_explicit_session_id_only",
             "reason_code": "backend_does_not_expose_session_kv_cache",
         }
+
+    @app.get("/v1/runtime/speculative-execution-status")
+    def runtime_speculative_execution_status() -> dict[str, Any]:
+        # F-1.2: read from the kernel's top-level diagnostic section.
+        # Defensive fallback constructs the §4.11.1 payload directly if a
+        # custom kernel ever omits the section. Wave H2 will sweep this
+        # route to server_routes_runtime.py.
+        section = runtime.status_dict().get("speculative_execution_status")
+        if isinstance(section, dict):
+            return section
+        return build_speculative_execution_status_payload()
 
     @app.get("/v1/runtime/monitor/snapshot")
     def runtime_monitor_snapshot(request: Request) -> dict[str, Any]:

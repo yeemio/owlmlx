@@ -633,6 +633,7 @@ def test_status_dict_exposes_governance_observations() -> None:
         "load_failure",
         "memory_pressure_cooldown",
         "host_pressure",
+        "speculative_execution_status",
     ]
     assert status["governance_observations"] == {
         "transition_count": 4,

@@ -37,6 +37,9 @@ from owlmlx.serving import (
 )
 
 from .backends import RuntimeBackend
+from .speculative_execution_status import (
+    build_speculative_execution_status_payload,
+)
 from .types import (
     ChatTurn,
     GenerateResult,
@@ -1655,6 +1658,7 @@ class RuntimeKernel:
                     "load_failure",
                     "memory_pressure_cooldown",
                     "host_pressure",
+                    "speculative_execution_status",
                 ],
             },
             "summary": summary,
@@ -1682,6 +1686,7 @@ class RuntimeKernel:
             "governance_policy": governance_policy,
             "generation_gate": status.generation_gate,
             "reclaim_barrier": reclaim_barrier_section,
+            "speculative_execution_status": build_speculative_execution_status_payload(),
             "load_failure": load_failure_section,
             "memory_pressure_cooldown": memory_pressure_cooldown,
             "host_pressure": dict(self._last_host_pressure_snapshot),
