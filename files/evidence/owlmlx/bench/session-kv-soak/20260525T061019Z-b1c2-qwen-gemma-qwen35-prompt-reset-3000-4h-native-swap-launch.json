@@ -1,0 +1,21 @@
+{
+  "schema_version": "b1c2.launch.v1",
+  "timestamp_utc": "20260525T061019Z",
+  "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+  "run_label": "20260525T061019Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-native-swap",
+  "purpose": "B-1c section 2 4h native fail-fast swap-bearing segment after prompt-reset focused probe",
+  "script": "files/evidence/owlmlx/bench/session-kv-soak/20260525T061019Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-native-swap.sh",
+  "log": "files/evidence/owlmlx/bench/session-kv-soak/20260525T061019Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-native-swap.log",
+  "exit_file": "files/evidence/owlmlx/bench/session-kv-soak/20260525T061019Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-native-swap.exit",
+  "pid_file": "files/evidence/owlmlx/bench/session-kv-soak/20260525T061019Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-native-swap.pid",
+  "caffeinate_pid_file": "files/evidence/owlmlx/bench/session-kv-soak/20260525T061019Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-native-swap.caffeinate.pid",
+  "caffeinate_log": "files/evidence/owlmlx/bench/session-kv-soak/20260525T061019Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-native-swap.caffeinate.log",
+  "tmux_session": "owlmlx-b1c2-pr-20260525T061019Z",
+  "caffeinate_tmux_session": "owlmlx-b1c2-pr-caf-20260525T061019Z",
+  "expected_result": "blocked_if_clean_because_required_duration_86400_and_required_swaps_6; failed_if_drop_drift_or_other_hard_failure",
+  "no_claims": ["supported", "session_kv_supported=true", "soak_plus_swap_stability=passed"],
+  "prompt_growth_strategy_expected": "boundary_safe_generated_text_then_stable_suffix",
+  "prompt_window_strategy_expected": "reset_to_base_prompt_when_max_chars_exceeded",
+  "prompt_growth_max_chars": 3000,
+  "focused_prerequisite": "20260525T055831Z prompt-reset Qwen-only probe clean for drop/expiration/reject and drift budget"
+}

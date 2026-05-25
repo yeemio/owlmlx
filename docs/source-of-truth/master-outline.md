@@ -283,9 +283,13 @@ whether to continue. The discipline is frozen in
   / fresh-cache fallback 又漂到 293 MB。prompt-reset window probe
   (`20260525T055831Z`) 跑满 720 Qwen-only samples，drop/expiration/reject
   全 0，trim bypass 降到 3，`max_drift_bytes=171704320 < 209715200`。
-  因此 Track 1 的 focused drift/drop closure 已得到候选策略，但它仍是
-  no-swap focused evidence；下一步是用同一 prompt-reset policy 跑
-  swap-bearing §2 segment，而不是恢复 24h aggregate 或 promotion claim。
+  首条 prompt-reset swap-bearing segment (`20260525T061019Z`) 进一步证明
+  同一策略在真实 §2 swap 边界下保持 drop/expiration/reject 全 0、trim
+  bypass=3、drift 171,704,320 bytes 且 `swap_boundaries_clean=true`；但该段
+  `measurement_wall_clock_gap_free=false`（6 个 measurement gap，最大
+  7064.873s），所以 `clean_for_interrupted_aggregate=false`，不得计入
+  aggregate 或 promotion claim。下一步是 gap-free repeat of same policy，
+  而不是恢复 24h aggregate。
 
 - **`native_backend_promote_path_g2_closure`**：§VI 4-gate 中 G1（Cache
   Parity）已通过 B-1a 闭合；G2（Reclaim Verified）通过 B-1b + B-1c §1
@@ -314,9 +318,11 @@ whether to continue. The discipline is frozen in
   unknown drop 已关闭，但 3000-char prompt freeze 下的 trim-unavailable
   bypass 会频繁 fresh-cache fallback 并重新触发 293 MB drift；prompt-reset
   probe（`20260525T055831Z`）把 trim bypass 降到 3 且 `max_drift_bytes`
-  压到 171,704,320 bytes。下一 round 是用 prompt-reset policy 跑
-  swap-bearing 4h fail-fast segment，验证该候选在真实 §2 swap 边界下仍
-  clean。完成前不恢复 24h §2 aggregate
+  压到 171,704,320 bytes；swap-bearing 4h segment
+  (`20260525T061019Z`) 也保持 drop/expiration/reject=0、drift within budget
+  与 clean swap boundary，但因 wall-clock continuity gap 正确保持
+  `blocked` 且不进入 clean aggregate。下一 round 是 gap-free repeat of
+  same prompt-reset swap-bearing policy；完成前不恢复 24h §2 aggregate
   segment
 - **Track 2 · Campaign F-1 state contract**: 建立 runtime-owned
   `speculative_execution_status` 状态契约（per

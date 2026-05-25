@@ -25,8 +25,9 @@ current_truth:
   - 20260525T051719Z changed that path to safe trim bypass and ran 720 samples with drops/expirations/rejects all 0
   - the same run recorded 173 trim bypasses and max_drift_bytes=293076992, so it still failed the memory budget
   - 20260525T055831Z changed the 3000-char window from freeze to reset-to-base and ran 720 Qwen-only samples with drops/expirations/rejects all 0, trim_bypasses=3, max_drift_bytes=171704320
+  - 20260525T061019Z ran the same prompt-reset policy through a one-swap §2 segment with drops/expirations/rejects all 0, trim_bypasses=3, max_drift_bytes=171704320, and clean swap boundary; the rollup is blocked because measurement_wall_clock_gap_free=false, so it is not aggregate-clean
 dominant_next_gap:
-  - validate the prompt-reset policy under a swap-bearing B-1c section 2 fail-fast segment
+  - repeat the prompt-reset policy under a gap-free swap-bearing B-1c section 2 fail-fast segment
 ```
 
 ## Next Round Prompt
@@ -44,8 +45,9 @@ Continue from `/Users/yeemio/AI/gitrep/owlmlx` on `main`.
 5. Re-run the focused native probe only after a code or policy change:
    `--gate b1c2-soak-plus-swap`, Qwen3.6-27B-only, `--max-samples 720`,
    `--b1c2-prompt-growth-max-chars 3000`, `--swap-count 0`.
-6. Next executable round is a swap-bearing fail-fast §2 segment using the same
-   prompt-reset policy; it may remain `blocked` if duration / swap count are
-   short, but must keep drop/expiration/reject at 0 and drift within budget.
+6. Next executable round is a gap-free swap-bearing fail-fast §2 segment using
+   the same prompt-reset policy; it may remain `blocked` if duration / swap
+   count are short, but must keep drop/expiration/reject at 0, drift within
+   budget, and `measurement_wall_clock_gap_free=true`.
 7. Update B-1c docs and evidence honestly. No `supported` claim until all
    promotion gates pass together.

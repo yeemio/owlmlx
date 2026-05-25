@@ -525,6 +525,19 @@ must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
   that require upstream trims. The rollup correctly remains `blocked` because
   it is Qwen-only focused evidence with `swap_count=0`, not a 24h / 6-swap §2
   segment.
+- prompt-reset swap-bearing segment:
+  `20260525T061019Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-soak-swap-rollup.jsonl`
+  ran warmup 3 + measurement 714 + swap 1 with drops / expirations / rejects
+  all 0, `session_cache_trim_bypasses_total=3`,
+  `session_cache_trim_evictions_total=3`,
+  `max_drift_bytes=171704320 <= 209715200`,
+  `swap_boundaries_clean=true`, FATAL 0, unresolved reclaim barrier 0, cleanup
+  unload OK, and cleanup settle active memory 18 bytes. This validates the
+  prompt-reset candidate across one real §2 swap boundary, but the rollup
+  remains `blocked` and `clean_for_interrupted_aggregate=false` because
+  `measurement_wall_clock_gap_free=false` with 6 measurement wall-clock gap
+  violations (max `7064.873s`). It must not be counted toward interrupted
+  aggregate duration or used for promotion.
 
 The landed smoke-only slice covers:
 
@@ -537,7 +550,7 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-Close the swap-bearing proof gap before resuming aggregate evidence:
+Close the gap-free swap-bearing proof gap before resuming aggregate evidence:
 
 1. Keep the safe trim-unavailable bypass semantics: pre-generation reuse trim
    refusal may fall back to a fresh request cache and must be counted as
@@ -545,8 +558,8 @@ Close the swap-bearing proof gap before resuming aggregate evidence:
 2. Use `reset_to_base_prompt_when_max_chars_exceeded` as the current
    prompt-window candidate; it passes the focused Qwen-only 720-sample
    drift/drop criteria but does not yet prove swap-boundary stability.
-3. Run one swap-bearing §2 fail-fast segment with the same prompt-reset policy
-   before resuming 24h aggregate evidence.
+3. Repeat one gap-free swap-bearing §2 fail-fast segment with the same
+   prompt-reset policy before resuming 24h aggregate evidence.
 4. Any new focused or swap-bearing probe must report `session_cache_drops_total=0`,
    `session_cache_expirations_total=0`, `session_cache_rejects_total=0`, and
    `max_drift_bytes <= 209715200` before §2 aggregate resumes.

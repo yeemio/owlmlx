@@ -298,7 +298,7 @@ gantt
     B-1a Gemma 4 + G1 byte-equiv         :done, b1a, 2026-05-16, 4d
     B-1b N=20 cache=on/off               :done, b1b, after b1a, 2d
     B-1c §1 current-Mac no-swap prereq   :done, b1c1, after b1b, 4d
-    B-1c §2 trim-bypass drift closure    :active, b1c2, after b1c1, 21d
+    B-1c §2 prompt-reset gap-free repeat :active, b1c2, after b1c1, 21d
     B2 cache_manager extension           :b2, after b1c2, 30d
     workspace-aware boundary             :b3, 2026-08-15, 90d
     跨模型版本 invalidation                :b4, 2026-11-15, 180d
@@ -344,7 +344,7 @@ gantt
 | 战役 | 0–3 月 | 3–6 月 | 6–12 月 |
 |---|---|---|---|
 | **A · Repeatability** | A1 N→20 · A2 seed-byte · A3 reclaim stats | 扩 Qwen3.6-35B-A3B · dirty recovery | DS4 family · RC1 |
-| **B · Cache/Scheduler** | **B-1a Gemma 4 + G1 byte-equiv passed** · **B-1b N=20 cache=on/off passed** · **B-1c §1 current-Mac interrupted prerequisite passed** · B-1c §2 trim-bypass drift closure active | B2 cache_manager · workspace-aware boundary · TTL/驱逐契约 | 跨模型版本 invalidation · 量化-cache 共享探针 |
+| **B · Cache/Scheduler** | **B-1a Gemma 4 + G1 byte-equiv passed** · **B-1b N=20 cache=on/off passed** · **B-1c §1 current-Mac interrupted prerequisite passed** · B-1c §2 prompt-reset functional subcriteria clean but wall-clock gap-blocked | B2 cache_manager · workspace-aware boundary · TTL/驱逐契约 | 跨模型版本 invalidation · 量化-cache 共享探针 |
 | **C · TTFT Default** | C1 五因素 · C2 warmup default · C3 thinking | Gemma 4 reasoning trace · verdict 解除 | ≥3 主线 verdict 解除 → RC1 |
 | **D · DS4** | D1-D2 passed · D3 `missingReason=mtp_weights_absent_or_stripped` · D4 clean pre-load reject passed | 第二 DS4 variant · upstream tracking | RC2 native-only DS4 lifecycle |
 | **E · OwlOps Loop** | E1 reclaim stats · E2 TTFT · E3 classifier | spec accept/reject + tool-arg metric | RC3 >90d gap-free ledger · classifier partial |

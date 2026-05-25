@@ -156,9 +156,14 @@ unknown cache-drop cause as `reuse_trim_unavailable_fresh_cache`, but the safe
 fresh-cache bypass path still drifts 293MB under the 3000-char prompt freeze;
 the prompt-reset window policy probe (`20260525T055831Z`) then ran 720
 Qwen-only samples with drops / expirations / rejects all 0, trim bypasses down
-to 3, and `max_drift_bytes=171704320 < 209715200`; it is still only focused
-no-swap evidence, so the next step is a swap-bearing §2 segment, not promotion
-per
+to 3, and `max_drift_bytes=171704320 < 209715200`; the first swap-bearing
+prompt-reset segment (`20260525T061019Z`) kept drops / expirations / rejects at
+0, trim bypasses at 3, drift within budget (`171704320 < 209715200`), and the
+swap boundary clean, but its rollup is still `blocked` and
+`clean_for_interrupted_aggregate=false` because measurement wall-clock
+continuity failed (`measurement_wall_clock_gap_free=false`, 6 gap violations,
+max gap `7064.873s`). The next step is a gap-free repeat of the same
+swap-bearing §2 policy, not promotion per
 `docs/architect/design/B-1c-section-2-spec.md §10`). Stage 1 refactor
 (2026-05-11) archived 151 spec-as-code modules; Stage 2 aligned landmark
 vocabulary with [PR #649][pr649]; Wave H · H1 (2026-05-17) extracted

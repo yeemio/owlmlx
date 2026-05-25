@@ -24,7 +24,7 @@
 |---|---|---|---|---|---|
 | 1 | Repeatability | 🟡 harness 实装；无 N≥20 硬约束；无 seed-to-token 字节一致测试 | vLLM/SGLang seed 管理 | **L1** | 6–12 月 |
 | 2 | Capability Honesty | ✅ Stage 1 已清 spec-as-code（151 模块/31K LOC）；CI 强制；§1a Gate | Anthropic API 功能矩阵 | **同业界或领先** | — |
-| 3 | Cache Depth | 🟡 session-level reuse 已有 TTFT 证据（7.409× / Gemma 2.246×）且 B-1a/B-1b/§1 prerequisites 已过；B-1c §2 仍卡在 trim-bypass drift | vLLM prefix caching v0.6+；TurboQuant 量化 KV | **L1** | 12–18 月 |
+| 3 | Cache Depth | 🟡 session-level reuse 已有 TTFT 证据（7.409× / Gemma 2.246×）且 B-1a/B-1b/§1 prerequisites 已过；B-1c §2 prompt-reset policy 已清 drop/drift/swap-boundary 子指标，但首条 one-swap segment wall-clock continuity gap-blocked | vLLM prefix caching v0.6+；TurboQuant 量化 KV | **L1** | 12–18 月 |
 | 4 | Scheduler Depth | 🟡 admission contract 完整；prefill warmup 未 default；负载自适应未实装 | vLLM continuous batching；SGLang structured generation | **L1**（但 owlmlx 明确不追 batching） | 单 worker 场景 6 月 |
 | 5 | Admission / Eviction | 🟡 完整决策 + pinned 保护 + TTL；无 background loop（明确约束） | vLLM eviction；AWS SageMaker | **同业界** | — |
 | 6 | Status & Provenance | ✅ request lifecycle 维度 strong；🟡 spec accept/reject 维度缺 | Anthropic usage；OpenTelemetry | **L1（spec 维度）** | spec 路径 6–12 月 |

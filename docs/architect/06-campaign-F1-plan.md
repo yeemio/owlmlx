@@ -29,7 +29,7 @@ F-1 plan-grade 现在落地的理由：
 
 1. F-1.1 是 contract design，不动 runtime code，也不进 cache / memory 修改面 → 与 Track 1 在 git 路径上零碰撞
 2. F-1.1 plan-grade 完成后，design-grade `F-1-spec.md`（下条 session）和 code-grade endpoint stub（再下条 session）都可以与 Track 1 持续并行
-3. Track 1 §2 active triage 当下不能被打断（prompt-reset window probe `20260525T055831Z` → swap-bearing 4h `20260525T061019Z` 正在跑），让 F-1 contract 工作由 fresh-context session 同期推进更高效
+3. Track 1 §2 active triage 当下不能被打断（prompt-reset window probe `20260525T055831Z` → swap-bearing 4h `20260525T061019Z` 已产出 gap-blocked evidence），让 F-1 contract 工作由 fresh-context session 同期推进更高效
 
 ---
 
@@ -302,7 +302,7 @@ PR 描述纪律：F-1.2 endpoint 实装 PR 必须显式声明 "将被 Wave H2 �
 | 下游 gate | 与 F-1 的关系 |
 |---|---|
 | **F-2** n-gram / suffix probe | F-2 实装时在 `available_methods` 中把 `ngram.status` 从 `not_implemented` 升 `experimental`；不需改 F-1 schema |
-| **F-3** Gemma 4 resident MTP A/B | F-3 完成后把 `assistant_drafter.status` 的 `notes` 从 `deferred_cli_per_request` 改为 `resident`；F-3 前置等 session-kv soak `20260525T061019Z-...-native-swap` 完成 |
+| **F-3** Gemma 4 resident MTP A/B | F-3 完成后把 `assistant_drafter.status` 的 `notes` 从 `deferred_cli_per_request` 改为 `resident`；F-3 前置等 session-kv B-1c §2 closure，`20260525T061019Z-...-native-swap` 只能算 gap-blocked one-swap evidence |
 | **F-4** 正交矩阵 ≥20 case | F-4 直接 consume `speculative_execution_status` 的 `method` / `accepted_tokens` / `rejected_tokens` / `fallback`；F-1 是 F-4 的接口前置 |
 | **F-5** draft constraint checker | F-5 可在 F-1 surface 中新增 `constraint_check_status` optional field（schema-additive） |
 | **F-6** MTP + session KV combo | F-6 用 F-1 的 `cache_sharing` 字段表达；F-6 前置等 B-1c §2 closure |

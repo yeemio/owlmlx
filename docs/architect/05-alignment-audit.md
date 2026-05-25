@@ -24,9 +24,10 @@
 | `600b884a`（2026-05-25 12:15）| drift accounting v2：`session_kv_drift_accounting.mode=active_memory_minus_session_kv_positive_delta_upper_bound` · `max_unaccounted_session_kv_drift_bytes=0`；首次动 runtime 代码（`mlx_native_backend.py` +22 · `session_kv_cache.py` +8）| 正增量上界**只是诊断 ceiling**，明确 `used_for_promotion_gate=false`；首次 §VI G2 工作面真正进入 runtime code-grade |
 | `f93357f5`（2026-05-25 13:06）| bounded-window 收窄：1024-token cache window 仍漂 293MB；3000-char prompt freeze 把 drift 压到 150MB（**< 200MB budget**）但 sample 371 触发 1 次 session cache drop；新增 closure 文档 `docs/phase-prompts/owlmlx-b1c2-bounded-context-trim-closure-20260525.md` | **blocker 从 "drift 主导" 转为 "drop 主导"**；bounded prompt growth 是当前 memory-budget candidate；下一刀诊断 bounded-context cache-finalization / trim-mismatch 语义 |
 | `3b81762b`（2026-05-25）| reason-code + trim-bypass instrumentation 落地：drop reason probe 将 sample 371 钉为 `reuse_trim_mismatch`；safe trim-bypass probe 清零 drops/expirations/rejects，但 173 次 fresh-cache fallback 重新触发 293MB drift | unknown drop 已关闭；blocker 从 black-box drop 转为 trim-unavailable fallback 频率 / prompt-window policy |
-| 当前待提交 prompt-reset probe（2026-05-25）| `reset_to_base_prompt_when_max_chars_exceeded`：720 Qwen-only samples，drop/expiration/reject 全 0，trim bypass=3，`max_drift_bytes=171704320 < 209715200` | focused drift/drop closure 有候选策略；仍是 no-swap focused evidence，下一步必须跑 swap-bearing §2 fail-fast segment，不得 promotion |
+| `5400733d`（2026-05-25）| `reset_to_base_prompt_when_max_chars_exceeded`：720 Qwen-only samples，drop/expiration/reject 全 0，trim bypass=3，`max_drift_bytes=171704320 < 209715200` | focused drift/drop closure 有候选策略；仍是 no-swap focused evidence，不得 promotion |
+| 本轮 swap-bearing evidence（2026-05-25）| `20260525T061019Z` prompt-reset 4h segment：warmup 3 + measurement 714 + swap 1，drop/expiration/reject 全 0，trim bypass=3，drift 171,704,320 bytes，swap boundary clean | 功能子指标已在真实 §2 swap boundary 下保持 clean；但 `measurement_wall_clock_gap_free=false`（6 gaps，max 7064.873s），所以 `clean_for_interrupted_aggregate=false`，只能作为 gap-blocked proof，不能计入 aggregate |
 
-**4 个 committed ops + 当前 prompt-reset probe 的对齐纪律值得记**：每轮都同步刷新 README + architect/03 + architect/05 + capability matrix + master-outline + B-1c §2 spec + evidence ledger，**没有产生新的文档漂移**。本审计 §4 中由这些事实引出的状态更新已就位（详见 §4.5 #16 注脚与 §4.11 新增项）。
+**5 个 committed ops + 当前 swap-bearing evidence 的对齐纪律值得记**：每轮都同步刷新 README + architect/03 + architect/05 + capability matrix + master-outline + B-1c §2 spec + evidence ledger，**没有产生新的文档漂移**。本审计 §4 中由这些事实引出的状态更新已就位（详见 §4.5 #16 注脚与 §4.11 新增项）。
 
 ## Runtime instrumentation + prompt-window candidate（2026-05-25 · G2 工作面延续）
 
@@ -34,14 +35,14 @@
 |---|---:|---|
 | `owlmlx/runtime/mlx_native_backend.py` | +147 / -29 | 新增 `_TrimPromptCacheResult` dataclass · `_PreparedPromptCache` 加 `cache_decision / cache_reason_code / exact_prompt_hit / previous_prompt_token_count / common_prefix_token_count / suffix_token_count` · `_trim_prompt_cache_with_reason()` 返回结构化 reason code |
 | `owlmlx/session_kv_cache.py` | +113 / 0 | `SessionKVCacheCounters` 加 `trim_bypasses / trim_evictions` · `SessionKVCacheStore` 加 `_last_drop_event / _last_bypass_event` · `drop_for_session_model` 接收 `reason_code` + `detail` · window-bypass 事件加 reason discriminator |
-| `scripts/bench/eviction_soak.py` | +37 + 当前 prompt-reset strategy | bench 端消费新 reason codes；当前待提交改动将 B-1c §2 3000-char window 从 freeze 改为超限后 reset 到 base prompt |
+| `scripts/bench/eviction_soak.py` | +37 + prompt-reset strategy | bench 端消费新 reason codes；B-1c §2 3000-char window 从 freeze 改为超限后 reset 到 base prompt |
 | `scripts/bench/session_kv_soak_audit.py` | +57 | audit helper 消费新 reason codes |
 | 3 个 test 文件 | +150 | 覆盖新 reason code 路径 |
 | evidence（2026-05-25 T051225 / T051719 / T055831）| — | drop-reason-probe + trim-bypass-fix + prompt-reset focused probe |
 
 **架构师定性**：这是 §VI G2 (Reclaim Verified) 工作面的**核心实现动作**——把 cache drop 从"black-box failure"转为"structured reason discriminator"。reason code 模式（`trim_not_requested` / `trim_prompt_cache_unavailable` / `trim_prompt_cache_exception:<exc>` / `prompt_token_window_exceeded` / `unsafe_session_cache_reuse` 等）是正确的可观测性扩展，**不**违反 spec-as-code 反规模化禁令（reason 是值不是模块）。
 
-**等 prompt-reset 这一刀 commit 后会触发的 Wave G-second-batch 工作面**：
+**prompt-reset + swap-bearing gap-blocked evidence 后触发的 Wave G-second-batch 工作面**：
 1. `session-kv-cache-experimental.md`（#16 仍 open）应同步反映新的 `trim_bypasses / trim_evictions` 字段与 reason code 词汇
 2. `runtime-status-schema.md` 应记录 `/v1/runtime/session-kv-cache` endpoint 返回的新字段（如果 endpoint 暴露 last_drop_event / last_bypass_event）
 3. `cache-truth-contract.md` 应考虑是否把 reason code 集合纳入 contract surface（如果作为下游消费契约）
@@ -49,14 +50,14 @@
 
 ## 状态总览
 
-- **17 项 resolved**（14 Wave G + 3 post-Wave-G ops 间接刷新）· **4 项 open** · **5 项 healthy 维持** · **1 项 new**（§4.11 prompt-window candidate 待 swap-bearing proof 后正式对齐）
-- **B-1c §2 进度**：阻塞从 swap-boundary → drift 全局 → bounded-window drop → trim-bypass drift → prompt-reset focused clean · 5 步收窄
-- **G2 进度更新**：从 ~60% （B-1b + §1）升至 ~75%（§2 token-boundary/drop 关闭 + focused drift/drop candidate 通过）· 仍未闭合（swap-bearing §2 segment 待验证）
+- **17 项 resolved**（14 Wave G + 3 post-Wave-G ops 间接刷新）· **4 项 open** · **5 项 healthy 维持** · **1 项 new**（§4.11 prompt-window candidate 已有 one-swap functional proof，但 gap-free aggregate proof 未到）
+- **B-1c §2 进度**：阻塞从 swap-boundary → drift 全局 → bounded-window drop → trim-bypass drift → prompt-reset focused clean → swap-bearing functional clean but wall-clock-gap blocked · 6 步收窄
+- **G2 进度更新**：从 ~60% （B-1b + §1）升至 ~78%（§2 token-boundary/drop 关闭 + focused drift/drop candidate 通过 + one-swap functional subcriteria clean）· 仍未闭合（gap-free swap-bearing §2 segment / aggregate 待验证）
 
 下次批量结算的目标候选：
 - #4（ARCHITECTURE-TRUTH §7.3 truth-substrate identity 框架重写 · 不是简单数字刷新）
 - #9 + #10 full + #13（Wave G-4：phase45 文档归档 / 命名约束 / 迁移路径）
-- #16（session-kv-cache-experimental.md sync）+ Wave G-second-batch 上述 4 条 · 在 prompt-reset swap-bearing proof 后启动
+- #16（session-kv-cache-experimental.md sync）+ Wave G-second-batch 上述 4 条 · 在 prompt-reset gap-blocked evidence 落账后启动
 - §4.11 prompt-window candidate closeout（待 commit + swap-bearing segment review）
 
 ---
@@ -282,7 +283,7 @@ phase45-stream-backend-terminal-notice-leading-discriminator-marker-
 | 27 | `_TrimPromptCacheResult.reason_code` + `_PreparedPromptCache.cache_decision / cache_reason_code / exact_prompt_hit` commit 落后 | `runtime-status-schema.md` 需评估是否暴露在 `/v1/runtime/session-kv-cache` endpoint；`native-mlx-backend-capability-matrix.md` Notes 列需补 "reuse decision provenance" | new alignment |
 | 28 | 若 prompt-reset policy 在 swap-bearing §2 segment 与后续 aggregate 中通过 | session KV cache 行可走 §1a Promotion Gate 升 `supported`；§VI G2 可声明闭合；触发 §11 (next batch of alignment) 全面刷新 | promotion-blocked · 不能预先动 |
 
-**架构师注**：#26 / #27 是必然的对齐工作；#28 是条件性的——只在 B-1c §2 实质通过后才启动。三者**都不能**在 swap-bearing proof 之前预先编写 promotion 文档（会成为目标文档而非现状文档，违反 evidence-language calibration 纪律）。
+**架构师注**：#26 / #27 是必然的对齐工作；#28 是条件性的——只在 B-1c §2 实质通过后才启动。三者**都不能**在 gap-free aggregate proof 之前预先编写 promotion 文档（会成为目标文档而非现状文档，违反 evidence-language calibration 纪律）。
 
 ---
 
@@ -404,7 +405,7 @@ README 的能力表是面向用户的"能不能用"，本节是面向架构师�
 
 | 优先级 | 项目 | 节奏纪律 |
 |---|---|---|
-| P0 | B-1c §2 prompt-reset swap-bearing proof — focused Qwen-only probe `20260525T055831Z` 已清零 drop/expiration/reject、trim bypass 降到 3、`max_drift_bytes=171704320 < 209715200` | 不跑 24h aggregate；先用同一 prompt-reset policy 跑 swap-bearing 4h fail-fast segment，验证真实 §2 boundary 下仍 clean |
+| P0 | B-1c §2 prompt-reset swap-bearing proof — `20260525T061019Z` 已在 one-swap segment 内清零 drop/expiration/reject、trim bypass=3、drift within budget、swap boundary clean，但 wall-clock continuity gap-blocked | 不跑 24h aggregate；先 gap-free repeat 同一 prompt-reset policy 的 swap-bearing 4h fail-fast segment |
 | P0 | **Wave G 第一刀 narrow doc edits**（见 §8 工作单） | docs-only · 不动 runtime code · 不抢 §2 资源 |
 | P1 | Campaign F-1 — `speculative_execution_status` runtime-owned 状态契约 | 不必等 G2 完成；可与 §2 归因并行 |
 | P1 | Wave H · H2 计划 spec drafting（不实施） | 等 B-1c §2 settle 后再 implement |
