@@ -98,6 +98,7 @@ B1C1_PROMPTS: tuple[tuple[str, str], ...] = (
     ),
 )
 B1C2_PROMPT_GROWTH_STRATEGY = "boundary_safe_generated_text_then_stable_suffix"
+B1C2_PROMPT_WINDOW_STRATEGY = "append_until_max_chars_then_freeze"
 
 
 def _b1c2_prompt_growth_fragment(generated_text: str, *, sample_index: int) -> str:
@@ -105,6 +106,18 @@ def _b1c2_prompt_growth_fragment(generated_text: str, *, sample_index: int) -> s
     if continuation and not continuation[0].isspace():
         continuation = f" {continuation}"
     return f"{continuation} Continue session {sample_index}."
+
+
+def _b1c2_apply_prompt_growth_window(
+    *,
+    prompt_id: str,
+    prompt: str,
+    max_chars: int | None,
+) -> str:
+    if max_chars is None or max_chars <= 0 or len(prompt) <= max_chars:
+        return prompt
+    _ = prompt_id
+    return prompt[: int(max_chars)]
 
 
 @dataclass(frozen=True, slots=True)
@@ -339,15 +352,21 @@ def _session_cache_env(
     *,
     ttl_s: float | None = None,
     max_entries: int | None = None,
+    max_prompt_tokens: int | None = None,
 ) -> Iterator[None]:
     previous_enabled = os.environ.get("OWLMLX_SESSION_CACHE_ENABLED")
     previous_ttl = os.environ.get("OWLMLX_SESSION_CACHE_TTL_S")
     previous_max_entries = os.environ.get("OWLMLX_SESSION_CACHE_MAX_ENTRIES")
+    previous_max_prompt_tokens = os.environ.get("OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS")
     os.environ["OWLMLX_SESSION_CACHE_ENABLED"] = "1" if enabled else "0"
     if ttl_s is not None:
         os.environ["OWLMLX_SESSION_CACHE_TTL_S"] = str(float(ttl_s))
     if max_entries is not None:
         os.environ["OWLMLX_SESSION_CACHE_MAX_ENTRIES"] = str(int(max_entries))
+    if max_prompt_tokens is not None:
+        os.environ["OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS"] = str(
+            int(max_prompt_tokens)
+        )
     try:
         yield
     finally:
@@ -363,6 +382,12 @@ def _session_cache_env(
             os.environ.pop("OWLMLX_SESSION_CACHE_MAX_ENTRIES", None)
         else:
             os.environ["OWLMLX_SESSION_CACHE_MAX_ENTRIES"] = previous_max_entries
+        if previous_max_prompt_tokens is None:
+            os.environ.pop("OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS", None)
+        else:
+            os.environ["OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS"] = (
+                previous_max_prompt_tokens
+            )
 
 
 def _percentile(values: list[float | int], percentile: float) -> float | None:
@@ -393,6 +418,8 @@ def _counter_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, i
         "evictions",
         "expirations",
         "rejects",
+        "window_bypasses",
+        "window_evictions",
     }
     return {key: _counter_value(after, key) - _counter_value(before, key) for key in sorted(keys)}
 
@@ -2013,6 +2040,24 @@ def _b1c2_rollup(
         int(record.get("session_cache", {}).get("counter_delta", {}).get("rejects", 0) or 0)
         for record in records
     )
+    window_bypasses_total = sum(
+        int(
+            record.get("session_cache", {})
+            .get("counter_delta", {})
+            .get("window_bypasses", 0)
+            or 0
+        )
+        for record in records
+    )
+    window_evictions_total = sum(
+        int(
+            record.get("session_cache", {})
+            .get("counter_delta", {})
+            .get("window_evictions", 0)
+            or 0
+        )
+        for record in records
+    )
     resident_estimate_values = [
         int(record["session_cache"]["resident_bytes_estimate_after"])
         for record in sample_records
@@ -2163,6 +2208,8 @@ def _b1c2_rollup(
         "session_cache_drops_total": drops_total,
         "session_cache_expirations_total": expirations_total,
         "session_cache_rejects_total": rejects_total,
+        "session_cache_window_bypasses_total": window_bypasses_total,
+        "session_cache_window_evictions_total": window_evictions_total,
         "swap_boundaries_clean": all_swaps_clean,
         "load_result": _result_to_dict(initial_load),
         "cleanup_unload_result": (
@@ -2204,6 +2251,8 @@ def run_b1c2_soak_plus_swap(
     max_tokens: int = 2,
     profile_memory_gb: float = 128.0,
     b1c1_prerequisite_satisfied: bool = False,
+    session_cache_max_prompt_tokens: int | None = None,
+    prompt_growth_max_chars: int | None = None,
 ) -> dict[str, Any]:
     if runtime != "owlmlx":
         raise ValueError("only --runtime owlmlx is implemented in this baseline round")
@@ -2249,7 +2298,11 @@ def run_b1c2_soak_plus_swap(
         sample_interval_s=sample_interval_s,
     )
 
-    with _session_cache_env(True, ttl_s=effective_session_cache_ttl_s):
+    with _session_cache_env(
+        True,
+        ttl_s=effective_session_cache_ttl_s,
+        max_prompt_tokens=session_cache_max_prompt_tokens,
+    ):
         kernel, sampler = _make_kernel(backend=backend, profile=profile)
         evidence_strength = _b1c2_evidence_strength(backend=backend)
         allocator_truth = _b1c2_allocator_truth(backend=backend, sampler=sampler)
@@ -2338,9 +2391,14 @@ def run_b1c2_soak_plus_swap(
                 counter_delta
             )
             if generation.ok:
-                session_prompts[prompt_id] = (
+                grown_prompt = (
                     f"{prompt}"
                     f"{_b1c2_prompt_growth_fragment(generation.text, sample_index=sample_index)}"
+                )
+                session_prompts[prompt_id] = _b1c2_apply_prompt_growth_window(
+                    prompt_id=prompt_id,
+                    prompt=grown_prompt,
+                    max_chars=prompt_growth_max_chars,
                 )
             next_prompt = session_prompts[prompt_id]
             watermark_after = _watermark(after_bytes, profile=profile)
@@ -2382,6 +2440,9 @@ def run_b1c2_soak_plus_swap(
                 "config": {
                     "OWLMLX_SESSION_CACHE_ENABLED": "1",
                     "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
+                    "OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS": (
+                        session_cache_max_prompt_tokens
+                    ),
                     "session_id": session_id,
                     "prompt_chars_before_generation": len(prompt),
                     "prompt_chars_after_generation": len(next_prompt),
@@ -2396,6 +2457,12 @@ def run_b1c2_soak_plus_swap(
                     "required_swap_count": required_swap_count,
                     "max_generation_concurrency": 1,
                     "prompt_growth_strategy": B1C2_PROMPT_GROWTH_STRATEGY,
+                    "prompt_growth_max_chars": prompt_growth_max_chars,
+                    "prompt_window_strategy": (
+                        B1C2_PROMPT_WINDOW_STRATEGY
+                        if prompt_growth_max_chars
+                        else "unbounded"
+                    ),
                 },
                 "prompt_id": prompt_id,
                 "session_cache": {
@@ -2410,6 +2477,8 @@ def run_b1c2_soak_plus_swap(
                     "resident_bytes_estimate_mode": cache_after.get(
                         "resident_bytes_estimate_mode"
                     ),
+                    "max_prompt_tokens": cache_after.get("max_prompt_tokens"),
+                    "prompt_window_policy": cache_after.get("prompt_window_policy"),
                     "counter_delta": counter_delta,
                     "verdict": "failed" if session_cache_failure_reasons else "passed",
                     "failure_reasons": session_cache_failure_reasons,
@@ -2544,6 +2613,9 @@ def run_b1c2_soak_plus_swap(
                         "config": {
                             "OWLMLX_SESSION_CACHE_ENABLED": "1",
                             "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
+                            "OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS": (
+                                session_cache_max_prompt_tokens
+                            ),
                             "session_id": None,
                             "duration_s": duration_s,
                             "required_duration_s": required_duration_s,
@@ -2551,6 +2623,12 @@ def run_b1c2_soak_plus_swap(
                             "max_samples": max_samples,
                             "target_swap_count": swap_count,
                             "required_swap_count": required_swap_count,
+                            "prompt_growth_max_chars": prompt_growth_max_chars,
+                            "prompt_window_strategy": (
+                                B1C2_PROMPT_WINDOW_STRATEGY
+                                if prompt_growth_max_chars
+                                else "unbounded"
+                            ),
                         },
                         "session_cache": {
                             "counter_delta": {},
@@ -2790,6 +2868,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--warmup-cycles", type=int, default=B1C1_WARMUP_CYCLES)
     parser.add_argument("--session-cache-ttl-s", type=float, default=None)
+    parser.add_argument("--session-cache-max-prompt-tokens", type=int, default=None)
     parser.add_argument("--rehearsal-group-id", default=None)
     parser.add_argument("--rehearsal-segment-id", default=None)
     parser.add_argument("--resumes-prior-segment", action="store_true")
@@ -2808,6 +2887,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--required-swap-count", type=int, default=B1C2_REQUIRED_SWAP_COUNT)
     parser.add_argument("--rotation-label", default=None)
     parser.add_argument("--b1c1-prerequisite-satisfied", action="store_true")
+    parser.add_argument("--b1c2-prompt-growth-max-chars", type=int, default=None)
     return parser.parse_args(argv)
 
 
@@ -2868,6 +2948,8 @@ def main(argv: list[str] | None = None) -> int:
                 max_tokens=args.max_tokens,
                 profile_memory_gb=args.profile_memory_gb,
                 b1c1_prerequisite_satisfied=args.b1c1_prerequisite_satisfied,
+                session_cache_max_prompt_tokens=args.session_cache_max_prompt_tokens,
+                prompt_growth_max_chars=args.b1c2_prompt_growth_max_chars,
             )
         elif args.gate == B1C1_REHEARSAL_GATE:
             summary = run_b1c1_interrupted_rehearsal(

@@ -25,6 +25,7 @@ _TRUE_VALUES = {"1", "true", "yes", "on"}
 _PRESSURE_WATERMARKS = {"yellow", "red", "fatal"}
 _DEFAULT_TTL_S = 60.0
 _DEFAULT_MAX_ENTRIES = 64
+_DEFAULT_MAX_PROMPT_TOKENS = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,6 +91,8 @@ class SessionKVCacheCounters:
     rejects: int = 0
     drops: int = 0
     expirations: int = 0
+    window_bypasses: int = 0
+    window_evictions: int = 0
 
     def to_dict(self) -> dict[str, int]:
         return {
@@ -100,6 +103,8 @@ class SessionKVCacheCounters:
             "rejects": self.rejects,
             "drops": self.drops,
             "expirations": self.expirations,
+            "window_bypasses": self.window_bypasses,
+            "window_evictions": self.window_evictions,
         }
 
 
@@ -128,10 +133,12 @@ class SessionKVCacheStore:
         enabled: bool = False,
         ttl_s: float = _DEFAULT_TTL_S,
         max_entries: int = _DEFAULT_MAX_ENTRIES,
+        max_prompt_tokens: int = _DEFAULT_MAX_PROMPT_TOKENS,
     ) -> None:
         self.enabled = bool(enabled)
         self.ttl_s = max(float(ttl_s), 0.0)
         self.max_entries = max(int(max_entries), 1)
+        self.max_prompt_tokens = max(int(max_prompt_tokens), 0)
         self._entries: dict[tuple[str, str], _SessionKVCacheEntry] = {}
         self._counters = SessionKVCacheCounters()
         self._lock = threading.Lock()
@@ -143,6 +150,10 @@ class SessionKVCacheStore:
             enabled=_env_bool("OWLMLX_SESSION_CACHE_ENABLED", default=False),
             ttl_s=_env_float("OWLMLX_SESSION_CACHE_TTL_S", _DEFAULT_TTL_S),
             max_entries=_env_int("OWLMLX_SESSION_CACHE_MAX_ENTRIES", _DEFAULT_MAX_ENTRIES),
+            max_prompt_tokens=_env_int(
+                "OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS",
+                _DEFAULT_MAX_PROMPT_TOKENS,
+            ),
         )
 
     def acquire_for_request(
@@ -199,6 +210,24 @@ class SessionKVCacheStore:
             )
 
         key = (normalized_session_id, model_id)
+        if self._prompt_exceeds_window(requested_prompt_tokens):
+            with self._lock:
+                expired = self._expire_locked(now)
+                removed = self._entries.pop(key, None)
+                self._counters = _replace_counter(
+                    self._counters,
+                    expirations=self._counters.expirations + expired,
+                    window_bypasses=self._counters.window_bypasses + 1,
+                    window_evictions=(
+                        self._counters.window_evictions + (1 if removed is not None else 0)
+                    ),
+                )
+            return SessionKVCacheDecision(
+                decision="bypassed",
+                reason_code="prompt_token_window_exceeded",
+                evicted_count=1 if removed is not None else 0,
+            )
+
         with self._lock:
             expired = self._expire_locked(now)
             entry = self._entries.get(key)
@@ -280,11 +309,20 @@ class SessionKVCacheStore:
         normalized_session_id = (session_id or "").strip()
         if not normalized_session_id or not model_id:
             return False
+        normalized_prompt_tokens = tuple(prompt_tokens)
         with self._lock:
             entry = self._entries.get((normalized_session_id, model_id))
             if entry is None:
                 return False
-            entry.prompt_tokens = tuple(prompt_tokens)
+            if self._prompt_exceeds_window(normalized_prompt_tokens):
+                self._entries.pop((normalized_session_id, model_id), None)
+                self._counters = _replace_counter(
+                    self._counters,
+                    window_bypasses=self._counters.window_bypasses + 1,
+                    window_evictions=self._counters.window_evictions + 1,
+                )
+                return True
+            entry.prompt_tokens = normalized_prompt_tokens
             if token_count is not None:
                 entry.token_count = max(int(token_count), 0)
             if byte_estimate is not None:
@@ -377,6 +415,12 @@ class SessionKVCacheStore:
             "default_enabled": False,
             "ttl_s": self.ttl_s,
             "max_entries": self.max_entries,
+            "max_prompt_tokens": self.max_prompt_tokens,
+            "prompt_window_policy": (
+                "bypass_and_evict_over_limit"
+                if self.max_prompt_tokens > 0
+                else "unbounded"
+            ),
             "active_entries": len(entries),
             "active_sessions": len({entry["session_id"] for entry in entries}),
             "resident_bytes_estimate": resident_bytes,
@@ -421,6 +465,9 @@ class SessionKVCacheStore:
 
     def _resident_bytes_locked(self) -> int:
         return sum(entry.byte_estimate for entry in self._entries.values())
+
+    def _prompt_exceeds_window(self, prompt_tokens: tuple[int, ...]) -> bool:
+        return self.max_prompt_tokens > 0 and len(prompt_tokens) > self.max_prompt_tokens
 
 
 def _normalize_watermark(watermark: str | None) -> str | None:

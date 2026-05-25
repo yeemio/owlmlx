@@ -145,6 +145,33 @@ def test_native_session_kv_cache_stream_reuses_prompt_cache_with_suffix_tokens(
         importlib.reload(mod)
 
 
+def test_native_session_kv_cache_exact_prompt_hit_streams_empty_suffix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
+    mod, fake = _reload_native_backend_with_fake_mlx_lm(monkeypatch)
+    try:
+        backend = mod.MlxNativeBackend()
+        assert backend.load("fake-model").ok is True
+
+        first = list(backend.stream_generate("fake-model", "prefix A", session_id="s1"))
+        second = list(backend.stream_generate("fake-model", "prefix A", session_id="s1"))
+
+        assert first[-1].event == "done"
+        assert second[-1].event == "done"
+        assert len(fake._created_caches) == 1
+        assert fake._seen_prompt_caches[0] is fake._seen_prompt_caches[1]
+        assert fake._seen_stream_prompts[0] == [ord(ch) for ch in "prefix A"]
+        assert fake._seen_stream_prompts[1] == []
+        assert fake._trim_calls == [1, 1]
+        status = backend.status().detail["session_kv_cache"]
+        assert status["active_entries"] == 1
+        assert status["counters"]["hits"] == 1
+        assert status["counters"]["drops"] == 0
+    finally:
+        importlib.reload(mod)
+
+
 def test_native_session_kv_cache_accounts_positive_active_memory_growth(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -179,6 +206,36 @@ def test_native_session_kv_cache_accounts_positive_active_memory_growth(
         )
         assert status["resident_bytes_estimate_used_for_promotion_gate"] is False
         assert status["entries"][0]["byte_estimate"] == 40
+    finally:
+        importlib.reload(mod)
+
+
+def test_native_session_kv_cache_prompt_window_bypasses_persistent_reuse(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS", "3")
+    mod, fake = _reload_native_backend_with_fake_mlx_lm(monkeypatch)
+    try:
+        backend = mod.MlxNativeBackend()
+        assert backend.load("fake-model").ok is True
+
+        first = list(backend.stream_generate("fake-model", "abcd", session_id="s1"))
+        second = list(backend.stream_generate("fake-model", "abcde", session_id="s1"))
+
+        assert first[-1].event == "done"
+        assert second[-1].event == "done"
+        assert len(fake._created_caches) == 2
+        assert fake._seen_prompt_caches[0] is not fake._seen_prompt_caches[1]
+        assert backend._cache_manager.status_dict()["handles_count_by_model"] == {}
+        status = backend.status().detail["session_kv_cache"]
+        assert status["active_entries"] == 0
+        assert status["max_prompt_tokens"] == 3
+        assert status["prompt_window_policy"] == "bypass_and_evict_over_limit"
+        assert status["counters"]["window_bypasses"] == 2
+        assert status["counters"]["window_evictions"] == 0
+        assert status["counters"]["drops"] == 0
+        assert status["counters"]["rejects"] == 0
     finally:
         importlib.reload(mod)
 

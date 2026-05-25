@@ -274,9 +274,11 @@ whether to continue. The discipline is frozen in
   prompt/session growth allocator policy。2026-05-25 accounting probe
   (`20260525T040839Z`) 用正 `active_memory` delta upper bound 得到
   `max_unaccounted_session_kv_drift_bytes=0`，但该估计会高估 resident working
-  set，且明确 `used_for_promotion_gate=false`。下一步决定 G2 是否需要精确
-  working-set accounting、bounded prompt-growth/session-window、runtime
-  code-grade settle 修复，还是 drift budget rationale 修订。
+  set，且明确 `used_for_promotion_gate=false`。同日 bounded-window probes
+  进一步证明：cache-only 1024-token window 仍漂 293 MB；3000-char prompt
+  freeze 可把 drift 降到 150 MB，但在 sample 371 触发 1 次 session cache
+  drop。因此下一步不是恢复 aggregate segment，而是闭合 bounded-context
+  cache-finalization / trim-mismatch blocker。
 
 - **`native_backend_promote_path_g2_closure`**：§VI 4-gate 中 G1（Cache
   Parity）已通过 B-1a 闭合；G2（Reclaim Verified）通过 B-1b + B-1c §1
@@ -300,9 +302,10 @@ whether to continue. The discipline is frozen in
 - **Track 1 · B-1c §2 allocator-policy closure**: Qwen-only no-swap
   boundary-safe probe 已完成（`20260524T113306Z`）并复现 drift；accounting v2
   probe（`20260525T040839Z`）证明正增量上界可解释 drift 但不能作为 pass
-  gate。下一 round 是 runtime/allocator policy 归因：精确 working-set
-  accounting / bounded prompt-growth window / settle 修复 / high-watermark
-  rationale，或明确修订 drift budget rationale。完成前不恢复 §2 aggregate
+  gate；bounded-window probes（`20260525T042215Z` / `20260525T045707Z`）
+  显示 memory-budget candidate 是 3000-char prompt freeze，但当前 blocker 是
+  sample 371 cache-finalization drop。下一 round 是给 bounded-context trim/drop
+  加精确原因并修到 720-sample focused probe clean。完成前不恢复 §2 aggregate
   segment
 - **Track 2 · Campaign F-1 state contract**: 建立 runtime-owned
   `speculative_execution_status` 状态契约（per

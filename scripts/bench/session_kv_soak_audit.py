@@ -244,6 +244,14 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
         "session_cache_drops_total": _counter_delta_total(records, "drops"),
         "session_cache_expirations_total": _counter_delta_total(records, "expirations"),
         "session_cache_rejects_total": _counter_delta_total(records, "rejects"),
+        "session_cache_window_bypasses_total": _counter_delta_total(
+            records,
+            "window_bypasses",
+        ),
+        "session_cache_window_evictions_total": _counter_delta_total(
+            records,
+            "window_evictions",
+        ),
         "fatal_watermark_count": fatal_watermarks,
         "failed_sample_count": failed_samples,
         "max_measurement_drift_bytes": (
@@ -292,6 +300,12 @@ def audit_b1c2_segment_rollup(path: Path) -> dict[str, Any]:
             record
         ),
         "session_cache_drops_total": record.get("session_cache_drops_total"),
+        "session_cache_window_bypasses_total": record.get(
+            "session_cache_window_bypasses_total"
+        ),
+        "session_cache_window_evictions_total": record.get(
+            "session_cache_window_evictions_total"
+        ),
         "max_drift_bytes": record.get("max_drift_bytes"),
         "max_drift_within_budget": record.get("max_drift_within_budget"),
         "session_kv_drift_accounting": record.get("session_kv_drift_accounting"),

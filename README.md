@@ -151,7 +151,9 @@ triage (2026-05-22 boundary-safe 4h segment recorded `max_drift_bytes=352MB
 > 200MB budget`; 2026-05-24 Qwen-only no-swap probe reproduced the same
 352MB drift with cache drops/expirations/rejects all 0; 2026-05-25 accounting
 probe showed positive-delta upper-bound accounting can explain the drift but is
-diagnostic-only, not a promotion gate — allocator policy 归因 open per
+diagnostic-only, not a promotion gate; bounded-window probes narrowed the next
+blocker to cache-finalization drop under a 3000-char prompt freeze — allocator
+policy 归因 open per
 `docs/architect/design/B-1c-section-2-spec.md §10`). Stage 1 refactor
 (2026-05-11) archived 151 spec-as-code modules; Stage 2 aligned landmark
 vocabulary with [PR #649][pr649]; Wave H · H1 (2026-05-17) extracted

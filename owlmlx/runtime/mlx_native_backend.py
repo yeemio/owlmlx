@@ -454,7 +454,16 @@ class MlxNativeBackend:
                 decision.previous_prompt_token_count,
             )
             suffix_tokens = tuple(decision.suffix_tokens or ())
-            if not suffix_tokens and common_prefix_count > 0:
+            exact_prompt_hit = (
+                not suffix_tokens
+                and common_prefix_count == len(prompt_tokens)
+                and common_prefix_count == decision.previous_prompt_token_count
+            )
+            if (
+                not suffix_tokens
+                and common_prefix_count > 0
+                and common_prefix_count < decision.previous_prompt_token_count
+            ):
                 common_prefix_count -= 1
                 suffix_tokens = prompt_tokens[common_prefix_count:]
             trim_count = max(decision.previous_prompt_token_count - common_prefix_count, 0)
@@ -472,7 +481,7 @@ class MlxNativeBackend:
                             session,
                         ),
                     )
-            prompt_for_call = list(suffix_tokens or prompt_tokens)
+            prompt_for_call = [] if exact_prompt_hit else list(suffix_tokens or prompt_tokens)
 
         session.last_prompt_cache = cache
         session.last_prompt_cache_id = id(cache)

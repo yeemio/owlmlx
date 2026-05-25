@@ -114,6 +114,65 @@ def test_session_kv_cache_accumulates_byte_estimate_delta() -> None:
     assert status["entries"][0]["byte_estimate"] == 40
 
 
+def test_session_kv_cache_bypasses_and_evicts_over_prompt_window() -> None:
+    store = SessionKVCacheStore(enabled=True, ttl_s=60.0, max_prompt_tokens=3)
+    first = store.acquire_for_request(
+        session_id="s1",
+        model_id="m",
+        make_cache=object,
+        prompt_tokens=(1, 2, 3),
+    )
+    remembered = store.remember_prompt(
+        session_id="s1",
+        model_id="m",
+        prompt_tokens=(1, 2, 3),
+    )
+    second = store.acquire_for_request(
+        session_id="s1",
+        model_id="m",
+        make_cache=object,
+        prompt_tokens=(1, 2, 3, 4),
+    )
+
+    status = store.status_dict()
+    assert first.decision == "new"
+    assert remembered is True
+    assert second.decision == "bypassed"
+    assert second.reason_code == "prompt_token_window_exceeded"
+    assert second.cache_object is None
+    assert second.evicted_count == 1
+    assert status["active_entries"] == 0
+    assert status["max_prompt_tokens"] == 3
+    assert status["prompt_window_policy"] == "bypass_and_evict_over_limit"
+    assert status["counters"]["window_bypasses"] == 1
+    assert status["counters"]["window_evictions"] == 1
+    assert status["counters"]["drops"] == 0
+    assert status["counters"]["rejects"] == 0
+
+
+def test_session_kv_cache_remember_over_prompt_window_evicts_without_drop() -> None:
+    store = SessionKVCacheStore(enabled=True, ttl_s=60.0, max_prompt_tokens=3)
+    store.acquire_for_request(
+        session_id="s1",
+        model_id="m",
+        make_cache=object,
+        prompt_tokens=(1, 2, 3),
+    )
+
+    remembered = store.remember_prompt(
+        session_id="s1",
+        model_id="m",
+        prompt_tokens=(1, 2, 3, 4),
+    )
+
+    status = store.status_dict()
+    assert remembered is True
+    assert status["active_entries"] == 0
+    assert status["counters"]["window_bypasses"] == 1
+    assert status["counters"]["window_evictions"] == 1
+    assert status["counters"]["drops"] == 0
+
+
 def test_session_kv_cache_misses_on_model_switch() -> None:
     store = SessionKVCacheStore(enabled=True, ttl_s=60.0)
     created: list[object] = []

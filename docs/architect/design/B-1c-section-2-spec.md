@@ -487,6 +487,23 @@ estimate is an upper bound and may double-count allocator high-watermark
 stair-steps across generations. Therefore this field is diagnostic only and
 must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
 
+2026-05-25 bounded-window policy probes:
+
+- cache-only 1024-token window:
+  `20260525T042215Z-b1c2-qwen3.6-27b-only-bounded-window-1024-probe-soak-swap-rollup.jsonl`
+  ran 720 samples with cache drops / expirations / rejects all 0 and
+  `session_cache_window_bypasses_total=329`, but `max_drift_bytes=293076992`
+  still exceeded the 200 MiB budget. Conclusion: persistent-cache bypass alone
+  reduces resident cache pressure but repeated long fresh-prefill requests still
+  grow MLX active-memory high-watermark.
+- prompt freeze 3000-char window after exact-hit empty-suffix runtime fix:
+  `20260525T045707Z-b1c2-qwen3.6-27b-only-prompt-freeze-3000-exact-hit-probe-soak-swap-rollup.jsonl`
+  kept `max_drift_bytes=150994944` within budget, but failed at sample `371`
+  with `session_cache_drops_total=1` on the medium session at
+  `prompt_chars_before_generation=3000`. Conclusion: bounded prompt growth can
+  satisfy the memory budget, but bounded-context exact / capped prompt reuse
+  still has a cache-finalization or trim-mismatch blocker.
+
 The landed smoke-only slice covers:
 
 - fake backend schema run
@@ -500,18 +517,16 @@ Only after schema tests pass should native execution be attempted.
 
 Close the memory-drift blocker before resuming aggregate evidence:
 
-1. Replace the diagnostic positive-delta upper bound with precise working-set
-   accounting, or explicitly choose a bounded prompt-growth/session-window
-   policy that keeps `max_drift_bytes` under budget.
-2. Classify the no-swap drift as either expected MLX allocator high-watermark
-   behavior, expected growing KV working set, or owlmlx-owned residue that must
-   be settled at session/model boundary.
-3. Decide and document one runtime-owned mitigation or budget rationale:
-   precise working-set accounting, explicit settle-on-session-boundary, bounded
-   prompt-growth window, allocator high-watermark accounting, or a revised drift
-   budget with evidence.
-4. Resume 4h native §2 segments only when the focused drift probe stays within
-   budget or the budget/rationale is explicitly revised in the spec.
+1. Instrument bounded-context cache finalization so a drop records whether the
+   failing operation is reuse-trim, completion-trim, exact-hit empty suffix, or
+   upstream `trim_prompt_cache` refusal.
+2. Keep the 3000-char prompt freeze policy as the current memory-budget
+   candidate because it produced `max_drift_bytes=150994944 < 209715200`.
+3. Do not resume 4h / 24h §2 aggregate evidence until the 3000-char focused
+   probe reaches 720 samples with `session_cache_drops_total=0`.
+4. If cache-finalization cannot be made clean, reclassify bounded prompt growth
+   as blocked and move to precise working-set accounting or explicit budget
+   rationale.
 5. Aggregate only gap-free, hard-failure-free segment rollups.
 6. Require cumulative duration >= 24h and aggregate swap count >= 6 before
    `soak_plus_swap_stability=passed`.
