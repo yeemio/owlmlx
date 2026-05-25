@@ -140,7 +140,7 @@ emits a loud warning if run outside `.venv/`.
 
 ## Development status
 
-Internal runtime milestone as of 2026-05-24. Public Python surface and HTTP
+Internal runtime milestone as of 2026-05-25. Public Python surface and HTTP
 routes are stable enough for the runtime engineering channel, while OwlCoda
 product readiness remains parked behind the npm local-model learning-loop
 gate. Session KV cache remains experimental: B-1a passed (Gemma 4-31B-it
@@ -149,8 +149,9 @@ current-Mac `interrupted_no_swap_rehearsal=passed` @ ≈24.69h cumulative
 clean native segments, B-1c §2 (soak plus swap) is currently in drift
 triage (2026-05-22 boundary-safe 4h segment recorded `max_drift_bytes=352MB
 > 200MB budget`; 2026-05-24 Qwen-only no-swap probe reproduced the same
-352MB drift with cache drops/expirations/rejects all 0 — allocator policy
-归因 open per
+352MB drift with cache drops/expirations/rejects all 0; 2026-05-25 accounting
+probe showed positive-delta upper-bound accounting can explain the drift but is
+diagnostic-only, not a promotion gate — allocator policy 归因 open per
 `docs/architect/design/B-1c-section-2-spec.md §10`). Stage 1 refactor
 (2026-05-11) archived 151 spec-as-code modules; Stage 2 aligned landmark
 vocabulary with [PR #649][pr649]; Wave H · H1 (2026-05-17) extracted

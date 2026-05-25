@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec + fake/schema runner landed; native §2 runner landed; 4h fail-fast segment exposed a repeatable Qwen long-session cache drop before swap, so aggregate runs are paused for focused token/debug canaries
+> **Status**: design-grade spec + fake/schema runner landed; native §2 runner landed; token-boundary cache drops are closed, but Qwen-only accounting probes show 352 MB active-memory drift is explained only by a diagnostic positive-delta upper bound, so aggregate runs remain paused pending precise working-set accounting or bounded prompt-growth policy
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -459,6 +459,34 @@ while the session cache remains clean. The next closure round is therefore not
 another aggregate segment; it is a runtime/allocator policy decision for growing
 session prompts.
 
+2026-05-25 Qwen-only no-swap drift accounting probe:
+
+- ledger:
+  `files/evidence/owlmlx/bench/session-kv-soak/20260525T040839Z-b1c2-qwen3.6-27b-only-drift-accounting-v2-probe-soak-swap.jsonl`
+- rollup:
+  `files/evidence/owlmlx/bench/session-kv-soak/20260525T040839Z-b1c2-qwen3.6-27b-only-drift-accounting-v2-probe-soak-swap-rollup.jsonl`
+- `rotation_label=qwen3.6-27b-only-drift-accounting-v2-probe`
+- `swap_count=0`
+- `measurement_duration_s=178.325`
+- timestamped samples: 720 (`warmup=3`, `measurement=717`)
+- prompt mix: `239/239/239`
+- cache drops / expirations / rejects: `0 / 0 / 0`
+- `max_drift_bytes=352321536` > `drift_budget_bytes=209715200`
+- diagnostic `session_kv_drift_accounting.mode =
+  active_memory_minus_session_kv_positive_delta_upper_bound`
+- `max_session_cache_resident_bytes=1233125378`
+- `max_unaccounted_session_kv_drift_bytes=0`
+- `session_kv_drift_accounting.used_for_promotion_gate=false`
+- `soak_plus_swap_stability=failed`
+- `graduates.session_kv_supported=false`
+
+This accounting slice proves the 352 MB drift can be covered by a deliberately
+conservative positive `active_memory` delta estimate attached to session cache
+entries. It does **not** prove the real resident KV working set is 1.23 GB: the
+estimate is an upper bound and may double-count allocator high-watermark
+stair-steps across generations. Therefore this field is diagnostic only and
+must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
+
 The landed smoke-only slice covers:
 
 - fake backend schema run
@@ -472,14 +500,18 @@ Only after schema tests pass should native execution be attempted.
 
 Close the memory-drift blocker before resuming aggregate evidence:
 
-1. Classify the no-swap drift as either expected MLX allocator high-watermark
-   behavior or owlmlx-owned residue that must be settled at session/model
-   boundary.
-2. Decide and document one runtime-owned mitigation or budget rationale:
-   explicit settle-on-session-boundary, bounded prompt-growth window, allocator
-   high-watermark accounting, or a revised drift budget with evidence.
-3. Resume 4h native §2 segments only when the focused drift probe stays within
+1. Replace the diagnostic positive-delta upper bound with precise working-set
+   accounting, or explicitly choose a bounded prompt-growth/session-window
+   policy that keeps `max_drift_bytes` under budget.
+2. Classify the no-swap drift as either expected MLX allocator high-watermark
+   behavior, expected growing KV working set, or owlmlx-owned residue that must
+   be settled at session/model boundary.
+3. Decide and document one runtime-owned mitigation or budget rationale:
+   precise working-set accounting, explicit settle-on-session-boundary, bounded
+   prompt-growth window, allocator high-watermark accounting, or a revised drift
+   budget with evidence.
+4. Resume 4h native §2 segments only when the focused drift probe stays within
    budget or the budget/rationale is explicitly revised in the spec.
-4. Aggregate only gap-free, hard-failure-free segment rollups.
-5. Require cumulative duration >= 24h and aggregate swap count >= 6 before
+5. Aggregate only gap-free, hard-failure-free segment rollups.
+6. Require cumulative duration >= 24h and aggregate swap count >= 6 before
    `soak_plus_swap_stability=passed`.

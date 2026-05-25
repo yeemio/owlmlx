@@ -145,6 +145,44 @@ def test_native_session_kv_cache_stream_reuses_prompt_cache_with_suffix_tokens(
         importlib.reload(mod)
 
 
+def test_native_session_kv_cache_accounts_positive_active_memory_growth(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
+    mod, _fake = _reload_native_backend_with_fake_mlx_lm(monkeypatch)
+
+    class FakeMxCore:
+        def __init__(self) -> None:
+            self._readings = iter([100, 116, 116, 140])
+
+        def get_active_memory(self) -> int:
+            return next(self._readings)
+
+        def get_cache_memory(self) -> int:
+            return 0
+
+    try:
+        backend = mod.MlxNativeBackend()
+        fake_mx = FakeMxCore()
+        monkeypatch.setattr(backend, "_try_import_mlx_core", lambda: fake_mx)
+        assert backend.load("fake-model").ok is True
+
+        first = list(backend.stream_generate("fake-model", "prefix A", session_id="s1"))
+        second = list(backend.stream_generate("fake-model", "prefix B", session_id="s1"))
+
+        assert first[-1].event == "done"
+        assert second[-1].event == "done"
+        status = backend.status().detail["session_kv_cache"]
+        assert status["resident_bytes_estimate"] == 40
+        assert status["resident_bytes_estimate_mode"] == (
+            "positive_active_memory_delta_upper_bound"
+        )
+        assert status["resident_bytes_estimate_used_for_promotion_gate"] is False
+        assert status["entries"][0]["byte_estimate"] == 40
+    finally:
+        importlib.reload(mod)
+
+
 def test_native_session_kv_cache_non_trimmable_cache_reuses_append_only_prompt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

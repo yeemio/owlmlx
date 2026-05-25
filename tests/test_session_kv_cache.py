@@ -86,6 +86,34 @@ def test_session_kv_cache_reports_common_prefix_suffix_for_reuse() -> None:
     assert second.suffix_tokens == (4, 5)
 
 
+def test_session_kv_cache_accumulates_byte_estimate_delta() -> None:
+    store = SessionKVCacheStore(enabled=True, ttl_s=60.0)
+    store.acquire_for_request(session_id="s1", model_id="m", make_cache=object)
+
+    first = store.remember_prompt(
+        session_id="s1",
+        model_id="m",
+        prompt_tokens=(1, 2, 3),
+        byte_estimate_delta=16,
+    )
+    second = store.remember_prompt(
+        session_id="s1",
+        model_id="m",
+        prompt_tokens=(1, 2, 3, 4),
+        byte_estimate_delta=24,
+    )
+
+    status = store.status_dict()
+    assert first is True
+    assert second is True
+    assert status["resident_bytes_estimate"] == 40
+    assert status["resident_bytes_estimate_mode"] == (
+        "positive_active_memory_delta_upper_bound"
+    )
+    assert status["resident_bytes_estimate_used_for_promotion_gate"] is False
+    assert status["entries"][0]["byte_estimate"] == 40
+
+
 def test_session_kv_cache_misses_on_model_switch() -> None:
     store = SessionKVCacheStore(enabled=True, ttl_s=60.0)
     created: list[object] = []

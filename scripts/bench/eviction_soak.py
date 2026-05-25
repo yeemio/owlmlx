@@ -2013,6 +2013,26 @@ def _b1c2_rollup(
         int(record.get("session_cache", {}).get("counter_delta", {}).get("rejects", 0) or 0)
         for record in records
     )
+    resident_estimate_values = [
+        int(record["session_cache"]["resident_bytes_estimate_after"])
+        for record in sample_records
+        if record.get("session_cache", {}).get("resident_bytes_estimate_after") is not None
+    ]
+    max_session_cache_resident_bytes = (
+        max(resident_estimate_values) if resident_estimate_values else None
+    )
+    unaccounted_drift_values = []
+    for record in measurement_records:
+        drift = record.get("memory", {}).get("drift_from_measurement_start_bytes")
+        resident_estimate = record.get("session_cache", {}).get(
+            "resident_bytes_estimate_after"
+        )
+        if drift is None or resident_estimate is None:
+            continue
+        unaccounted_drift_values.append(max(int(drift) - int(resident_estimate), 0))
+    max_unaccounted_session_kv_drift_bytes = (
+        max(unaccounted_drift_values) if unaccounted_drift_values else None
+    )
     final_reclaim_stats = {}
     for record in reversed(records):
         stats = record.get("reclaim_barrier_stats_after_sample") or record.get(
@@ -2124,6 +2144,19 @@ def _b1c2_rollup(
         "max_drift_bytes": max_drift_bytes,
         "drift_budget_bytes": drift_budget_bytes,
         "max_drift_within_budget": drift_ok,
+        "session_kv_drift_accounting": {
+            "mode": "active_memory_minus_session_kv_positive_delta_upper_bound",
+            "estimate_kind": "positive_active_memory_delta_upper_bound",
+            "max_session_cache_resident_bytes": max_session_cache_resident_bytes,
+            "max_unaccounted_session_kv_drift_bytes": (
+                max_unaccounted_session_kv_drift_bytes
+            ),
+            "unaccounted_drift_within_budget": (
+                max_unaccounted_session_kv_drift_bytes is not None
+                and max_unaccounted_session_kv_drift_bytes <= drift_budget_bytes
+            ),
+            "used_for_promotion_gate": False,
+        },
         "fatal_watermark_count": fatal_watermark_count,
         "failure_measurement_count": failure_measurement_count,
         "unresolved_reclaim_barrier_events": unresolved_reclaim_barrier_events,
@@ -2368,6 +2401,15 @@ def run_b1c2_soak_plus_swap(
                 "session_cache": {
                     "active_entries_before": cache_before.get("active_entries"),
                     "active_entries_after": cache_after.get("active_entries"),
+                    "resident_bytes_estimate_before": cache_before.get(
+                        "resident_bytes_estimate"
+                    ),
+                    "resident_bytes_estimate_after": cache_after.get(
+                        "resident_bytes_estimate"
+                    ),
+                    "resident_bytes_estimate_mode": cache_after.get(
+                        "resident_bytes_estimate_mode"
+                    ),
                     "counter_delta": counter_delta,
                     "verdict": "failed" if session_cache_failure_reasons else "passed",
                     "failure_reasons": session_cache_failure_reasons,

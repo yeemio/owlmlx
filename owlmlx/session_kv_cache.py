@@ -273,6 +273,7 @@ class SessionKVCacheStore:
         prompt_tokens: tuple[int, ...],
         token_count: int | None = None,
         byte_estimate: int | None = None,
+        byte_estimate_delta: int | None = None,
     ) -> bool:
         """Persist the prompt-token prefix represented by a session entry."""
 
@@ -288,6 +289,11 @@ class SessionKVCacheStore:
                 entry.token_count = max(int(token_count), 0)
             if byte_estimate is not None:
                 entry.byte_estimate = max(int(byte_estimate), 0)
+            if byte_estimate_delta is not None:
+                entry.byte_estimate = max(
+                    entry.byte_estimate + int(byte_estimate_delta),
+                    0,
+                )
             return True
 
     def drop_for_session_model(self, *, session_id: str | None, model_id: str) -> bool:
@@ -374,6 +380,8 @@ class SessionKVCacheStore:
             "active_entries": len(entries),
             "active_sessions": len({entry["session_id"] for entry in entries}),
             "resident_bytes_estimate": resident_bytes,
+            "resident_bytes_estimate_mode": "positive_active_memory_delta_upper_bound",
+            "resident_bytes_estimate_used_for_promotion_gate": False,
             "counters": counters.to_dict(),
             "entries": sorted(
                 entries,

@@ -240,7 +240,7 @@ whether to continue. The discipline is frozen in
 
 ## 8. Current Dominant Question
 
-> Updated 2026-05-24 · 之前的 dominant gap `memory_discipline_baseline_missing`
+> Updated 2026-05-25 · 之前的 dominant gap `memory_discipline_baseline_missing`
 > （2026-04 ~ 2026-05-12 口径）已被以下证据闭合：
 >
 > - **PR #649 alignment**（Stage 2 · 2026-05-12 commit `6141d134`：reclaim
@@ -254,7 +254,8 @@ whether to continue. The discipline is frozen in
 >
 > 因此 dominant question 在 2026-05-23 重置；2026-05-24 的 Qwen-only
 > no-swap probe 把 §2 drift blocker 从 swap-boundary 问题收窄为
-> prompt/session growth allocator policy 问题。
+> prompt/session growth allocator policy 问题；2026-05-25 accounting probe
+> 进一步证明正增量上界可解释漂移但不能作为晋级依据。
 
 ### 8.1 Current Top-Level Question
 
@@ -270,9 +271,12 @@ whether to continue. The discipline is frozen in
   之后漂 **352 MB > 200 MB budget**。2026-05-24 Qwen-only no-swap probe
   (`20260524T113306Z`) 在 `swap_count=0`、cache drop/expiration/reject 全 0
   的情况下复现同一 352 MB drift，说明 blocker 已从 swap boundary 收窄到
-  prompt/session growth allocator policy。下一步决定 G2 是否需要 runtime
-  code-grade 修复（settle-on-session-boundary / bounded prompt-growth window /
-  allocator high-watermark accounting）还是 drift budget rationale 修订。
+  prompt/session growth allocator policy。2026-05-25 accounting probe
+  (`20260525T040839Z`) 用正 `active_memory` delta upper bound 得到
+  `max_unaccounted_session_kv_drift_bytes=0`，但该估计会高估 resident working
+  set，且明确 `used_for_promotion_gate=false`。下一步决定 G2 是否需要精确
+  working-set accounting、bounded prompt-growth/session-window、runtime
+  code-grade settle 修复，还是 drift budget rationale 修订。
 
 - **`native_backend_promote_path_g2_closure`**：§VI 4-gate 中 G1（Cache
   Parity）已通过 B-1a 闭合；G2（Reclaim Verified）通过 B-1b + B-1c §1
@@ -294,10 +298,12 @@ whether to continue. The discipline is frozen in
 ### 8.4 Next Executable Closure Rounds（双轨并行）
 
 - **Track 1 · B-1c §2 allocator-policy closure**: Qwen-only no-swap
-  boundary-safe probe 已完成（`20260524T113306Z`）并复现 drift；下一 round
-  是 runtime/allocator policy 归因：修 settle / prompt-growth window /
-  high-watermark accounting，或明确修订 drift budget rationale。完成前不恢复
-  §2 aggregate segment
+  boundary-safe probe 已完成（`20260524T113306Z`）并复现 drift；accounting v2
+  probe（`20260525T040839Z`）证明正增量上界可解释 drift 但不能作为 pass
+  gate。下一 round 是 runtime/allocator policy 归因：精确 working-set
+  accounting / bounded prompt-growth window / settle 修复 / high-watermark
+  rationale，或明确修订 drift budget rationale。完成前不恢复 §2 aggregate
+  segment
 - **Track 2 · Campaign F-1 state contract**: 建立 runtime-owned
   `speculative_execution_status` 状态契约（per
   `docs/architect/01-mainline-roadmap.md §V Campaign F · F1`）· 不依赖

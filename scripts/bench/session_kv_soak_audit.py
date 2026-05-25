@@ -190,6 +190,21 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
         for record in records
         if record.get("memory", {}).get("drift_from_measurement_start_bytes") is not None
     ]
+    resident_estimate_values = [
+        _as_int(record.get("session_cache", {}).get("resident_bytes_estimate_after"))
+        for record in records
+        if record.get("session_cache", {}).get("resident_bytes_estimate_after")
+        is not None
+    ]
+    unaccounted_drift_values = []
+    for record in records:
+        drift = record.get("memory", {}).get("drift_from_measurement_start_bytes")
+        resident_estimate = record.get("session_cache", {}).get(
+            "resident_bytes_estimate_after"
+        )
+        if drift is None or resident_estimate is None:
+            continue
+        unaccounted_drift_values.append(max(_as_int(drift) - _as_int(resident_estimate), 0))
 
     return {
         "kind": "b1c2_ledger",
@@ -234,6 +249,12 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
         "max_measurement_drift_bytes": (
             max(max_drift_values) if max_drift_values else None
         ),
+        "max_session_cache_resident_bytes": (
+            max(resident_estimate_values) if resident_estimate_values else None
+        ),
+        "max_unaccounted_session_kv_drift_bytes": (
+            max(unaccounted_drift_values) if unaccounted_drift_values else None
+        ),
         "errors": errors,
     }
 
@@ -273,6 +294,7 @@ def audit_b1c2_segment_rollup(path: Path) -> dict[str, Any]:
         "session_cache_drops_total": record.get("session_cache_drops_total"),
         "max_drift_bytes": record.get("max_drift_bytes"),
         "max_drift_within_budget": record.get("max_drift_within_budget"),
+        "session_kv_drift_accounting": record.get("session_kv_drift_accounting"),
         "swap_boundaries_clean": record.get("swap_boundaries_clean"),
         "graduates": record.get("graduates", {}),
         "blockers": blockers,

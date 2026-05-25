@@ -95,6 +95,7 @@ class _PreparedPromptCache:
     session_cache_active: bool = False
     session_id: str | None = None
     prompt_tokens: tuple[int, ...] | None = None
+    active_memory_before_generation_bytes: int | None = None
 
 
 class _TicketedAdmission:
@@ -484,6 +485,7 @@ class MlxNativeBackend:
             session_cache_active=True,
             session_id=_non_empty_string(session_id),
             prompt_tokens=prompt_tokens,
+            active_memory_before_generation_bytes=self._read_active_memory_bytes(),
         )
 
     def _finalize_session_prompt_cache_after_stream(
@@ -502,6 +504,10 @@ class MlxNativeBackend:
             or prepared.prompt_tokens is None
         ):
             return True
+        byte_estimate_delta = self._positive_active_memory_delta(
+            prepared.active_memory_before_generation_bytes,
+            self._read_active_memory_bytes(),
+        )
         if completion_tokens > 0:
             trimmed = _trim_prompt_cache(
                 mlx_lm_module,
@@ -514,6 +520,7 @@ class MlxNativeBackend:
                     model_id=session.info.model_id,
                     prompt_tokens=prepared.prompt_tokens,
                     token_count=len(prepared.prompt_tokens),
+                    byte_estimate_delta=byte_estimate_delta,
                 )
             if trimmed == 0 and len(generated_token_ids) >= completion_tokens:
                 remembered_tokens = (
@@ -525,6 +532,7 @@ class MlxNativeBackend:
                     model_id=session.info.model_id,
                     prompt_tokens=remembered_tokens,
                     token_count=len(remembered_tokens),
+                    byte_estimate_delta=byte_estimate_delta,
                 )
             if trimmed != completion_tokens:
                 self._session_kv_cache.drop_for_session_model(
@@ -537,6 +545,7 @@ class MlxNativeBackend:
             model_id=session.info.model_id,
             prompt_tokens=prepared.prompt_tokens,
             token_count=len(prepared.prompt_tokens),
+            byte_estimate_delta=byte_estimate_delta,
         )
 
     def _release_active_cache(self, session: _NativeSession) -> None:
@@ -779,6 +788,19 @@ class MlxNativeBackend:
         except ImportError:
             return None
         return mx_core
+
+    def _read_active_memory_bytes(self) -> int | None:
+        actuator = MemoryActuator(mlx_module=self._try_import_mlx_core())
+        return actuator.read_active_memory_bytes()
+
+    @staticmethod
+    def _positive_active_memory_delta(
+        before: int | None,
+        after: int | None,
+    ) -> int | None:
+        if before is None or after is None:
+            return None
+        return max(0, int(after) - int(before))
 
     # ------------------------------------------------------------------ #
     # Generation
