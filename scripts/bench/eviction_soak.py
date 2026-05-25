@@ -98,7 +98,7 @@ B1C1_PROMPTS: tuple[tuple[str, str], ...] = (
     ),
 )
 B1C2_PROMPT_GROWTH_STRATEGY = "boundary_safe_generated_text_then_stable_suffix"
-B1C2_PROMPT_WINDOW_STRATEGY = "append_until_max_chars_then_freeze"
+B1C2_PROMPT_WINDOW_STRATEGY = "reset_to_base_prompt_when_max_chars_exceeded"
 
 
 def _b1c2_prompt_growth_fragment(generated_text: str, *, sample_index: int) -> str:
@@ -116,8 +116,7 @@ def _b1c2_apply_prompt_growth_window(
 ) -> str:
     if max_chars is None or max_chars <= 0 or len(prompt) <= max_chars:
         return prompt
-    _ = prompt_id
-    return prompt[: int(max_chars)]
+    return dict(B1C1_PROMPTS)[prompt_id]
 
 
 @dataclass(frozen=True, slots=True)

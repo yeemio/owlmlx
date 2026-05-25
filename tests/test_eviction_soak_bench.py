@@ -856,7 +856,7 @@ def test_b1c2_fake_soak_plus_swap_writes_swap_phase_and_blocked_rollup(tmp_path)
     assert rollup[0]["soak_plus_swap_stability"] == "blocked"
 
 
-def test_b1c2_prompt_growth_window_freezes_at_max_chars() -> None:
+def test_b1c2_prompt_growth_window_resets_at_max_chars() -> None:
     original = dict(eviction_soak.B1C1_PROMPTS)["short"]
     grown = original + " " + ("x" * 200)
 
@@ -866,16 +866,14 @@ def test_b1c2_prompt_growth_window_freezes_at_max_chars() -> None:
         max_chars=len(original) + 20,
     )
 
-    assert len(bounded) == len(original) + 20
-    assert bounded.startswith(original)
-    assert bounded.endswith("x" * 19)
+    assert bounded == original
 
     second = eviction_soak._b1c2_apply_prompt_growth_window(
         prompt_id="short",
         prompt=bounded + " extra turn",
-        max_chars=len(bounded),
+        max_chars=len(bounded) + 100,
     )
-    assert second == bounded
+    assert second == bounded + " extra turn"
 
 
 def test_b1c2_soak_plus_swap_fails_fast_on_session_cache_drop(

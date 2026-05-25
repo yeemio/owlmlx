@@ -280,8 +280,12 @@ whether to continue. The discipline is frozen in
   drop。drop-reason probe (`20260525T051225Z`) 将原因钉为 reuse trim 需要
   裁 2 tokens 而 upstream 返回 0；safe bypass fix probe (`20260525T051719Z`)
   清零 drops/expirations/rejects 并跑满 720 samples，但因 173 次 trim bypass
-  / fresh-cache fallback 又漂到 293 MB。因此下一步不是恢复 aggregate
-  segment，而是降低 trim bypass 频率或重定 token/window policy。
+  / fresh-cache fallback 又漂到 293 MB。prompt-reset window probe
+  (`20260525T055831Z`) 跑满 720 Qwen-only samples，drop/expiration/reject
+  全 0，trim bypass 降到 3，`max_drift_bytes=171704320 < 209715200`。
+  因此 Track 1 的 focused drift/drop closure 已得到候选策略，但它仍是
+  no-swap focused evidence；下一步是用同一 prompt-reset policy 跑
+  swap-bearing §2 segment，而不是恢复 24h aggregate 或 promotion claim。
 
 - **`native_backend_promote_path_g2_closure`**：§VI 4-gate 中 G1（Cache
   Parity）已通过 B-1a 闭合；G2（Reclaim Verified）通过 B-1b + B-1c §1
@@ -308,9 +312,11 @@ whether to continue. The discipline is frozen in
   gate；bounded-window / drop-reason probes（`20260525T042215Z` /
   `20260525T045707Z` / `20260525T051225Z` / `20260525T051719Z`）显示
   unknown drop 已关闭，但 3000-char prompt freeze 下的 trim-unavailable
-  bypass 会频繁 fresh-cache fallback 并重新触发 293 MB drift。下一 round 是
-  token-stable window / bounded cache reset / working-set metric 三选一闭合。
-  完成前不恢复 §2 aggregate
+  bypass 会频繁 fresh-cache fallback 并重新触发 293 MB drift；prompt-reset
+  probe（`20260525T055831Z`）把 trim bypass 降到 3 且 `max_drift_bytes`
+  压到 171,704,320 bytes。下一 round 是用 prompt-reset policy 跑
+  swap-bearing 4h fail-fast segment，验证该候选在真实 §2 swap 边界下仍
+  clean。完成前不恢复 24h §2 aggregate
   segment
 - **Track 2 · Campaign F-1 state contract**: 建立 runtime-owned
   `speculative_execution_status` 状态契约（per

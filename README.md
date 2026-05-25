@@ -153,8 +153,12 @@ triage (2026-05-22 boundary-safe 4h segment recorded `max_drift_bytes=352MB
 probe showed positive-delta upper-bound accounting can explain the drift but is
 diagnostic-only, not a promotion gate; bounded-window probes then closed the
 unknown cache-drop cause as `reuse_trim_unavailable_fresh_cache`, but the safe
-fresh-cache bypass path still drifts 293MB under the 3000-char prompt freeze —
-allocator/prompt-window policy 归因 open per
+fresh-cache bypass path still drifts 293MB under the 3000-char prompt freeze;
+the prompt-reset window policy probe (`20260525T055831Z`) then ran 720
+Qwen-only samples with drops / expirations / rejects all 0, trim bypasses down
+to 3, and `max_drift_bytes=171704320 < 209715200`; it is still only focused
+no-swap evidence, so the next step is a swap-bearing §2 segment, not promotion
+per
 `docs/architect/design/B-1c-section-2-spec.md §10`). Stage 1 refactor
 (2026-05-11) archived 151 spec-as-code modules; Stage 2 aligned landmark
 vocabulary with [PR #649][pr649]; Wave H · H1 (2026-05-17) extracted

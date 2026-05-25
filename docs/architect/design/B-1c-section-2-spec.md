@@ -515,6 +515,16 @@ must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
   `session_cache_trim_bypasses_total=173`. That closes the unknown drop cause,
   but it fails the memory budget with `max_drift_bytes=293076992` because
   repeated fresh-cache fallback reintroduces allocator high-watermark drift.
+- prompt-reset 3000-char window probe:
+  `20260525T055831Z-b1c2-qwen3.6-27b-only-prompt-reset-3000-probe-soak-swap-rollup.jsonl`
+  ran 720 samples with drops / expirations / rejects all 0,
+  `session_cache_trim_bypasses_total=3`, `session_cache_trim_evictions_total=3`,
+  and `max_drift_bytes=171704320 <= 209715200`. This is the current
+  bounded-window candidate: reset a session back to its base prompt when the
+  prompt-growth cap is exceeded instead of repeatedly issuing capped prompts
+  that require upstream trims. The rollup correctly remains `blocked` because
+  it is Qwen-only focused evidence with `swap_count=0`, not a 24h / 6-swap §2
+  segment.
 
 The landed smoke-only slice covers:
 
@@ -527,18 +537,17 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-Close the memory-drift blocker before resuming aggregate evidence:
+Close the swap-bearing proof gap before resuming aggregate evidence:
 
 1. Keep the safe trim-unavailable bypass semantics: pre-generation reuse trim
    refusal may fall back to a fresh request cache and must be counted as
    `trim_bypasses`, not as `drops`; partial trim mismatch remains a hard drop.
-2. Do not resume 4h / 24h §2 aggregate evidence while the 720-sample focused
-   probe still exceeds the 200 MiB drift budget.
-3. Next closure options are: reduce trim-bypass frequency with a token-stable
-   prompt/window policy, add a bounded prompt cache reset policy that avoids
-   repeated fresh-prefill high-watermark growth, or replace the active-memory
-   budget with a source-of-truth working-set metric plus explicit rationale.
-4. Any new focused probe must report `session_cache_drops_total=0`,
+2. Use `reset_to_base_prompt_when_max_chars_exceeded` as the current
+   prompt-window candidate; it passes the focused Qwen-only 720-sample
+   drift/drop criteria but does not yet prove swap-boundary stability.
+3. Run one swap-bearing §2 fail-fast segment with the same prompt-reset policy
+   before resuming 24h aggregate evidence.
+4. Any new focused or swap-bearing probe must report `session_cache_drops_total=0`,
    `session_cache_expirations_total=0`, `session_cache_rejects_total=0`, and
    `max_drift_bytes <= 209715200` before §2 aggregate resumes.
 5. Aggregate only gap-free, hard-failure-free segment rollups.
