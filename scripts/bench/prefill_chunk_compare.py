@@ -296,6 +296,10 @@ def _write_rollup(
     path: Path,
     run_id: str,
     rows: list[dict[str, Any]],
+    run_complete: bool = True,
+    stop_reason: str | None = None,
+    time_limit_s: float | None = None,
+    elapsed_s: float | None = None,
 ) -> None:
     within_chunk_determinism = _within_chunk_determinism_summary(rows)
     cross_chunk_consistency = _cross_chunk_consistency_summary(rows)
@@ -322,6 +326,10 @@ def _write_rollup(
         "cell_count": len(rows),
         "ok_cells": ok_cells,
         "failed_cells": failed_cells,
+        "run_complete": run_complete,
+        "stop_reason": stop_reason,
+        "time_limit_s": time_limit_s,
+        "elapsed_s": round(elapsed_s, 3) if elapsed_s is not None else None,
         "within_chunk_determinism": within_chunk_determinism,
         "cross_chunk_consistency": cross_chunk_consistency,
         "baseline_regression_long_context_ladder": {
@@ -359,6 +367,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--timeout-s", type=float, default=1800.0)
+    parser.add_argument(
+        "--time-limit-s",
+        type=float,
+        default=None,
+        help="Stop at the next cell boundary after this many seconds and write a partial rollup.",
+    )
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args(argv)
 
@@ -375,8 +389,19 @@ def main(argv: list[str] | None = None) -> int:
     rollup_path = output_dir / f"{run_id}-rollup.jsonl"
     host = _host_label()
     rows: list[dict[str, Any]] = []
+    started_monotonic = time.perf_counter()
+    stop_reason: str | None = None
+
+    def time_limit_reached() -> bool:
+        return (
+            args.time_limit_s is not None
+            and time.perf_counter() - started_monotonic >= args.time_limit_s
+        )
 
     for model_name in args.models:
+        if time_limit_reached():
+            stop_reason = f"time_limit_before_model:{model_name}"
+            break
         tokenizer = _load_tokenizer(model_name)
         backend = MlxLmSubprocessBackend(
             model_path_resolver=_model_path_resolver,
@@ -405,12 +430,25 @@ def main(argv: list[str] | None = None) -> int:
             continue
         try:
             for target_tokens in args.lengths:
+                if stop_reason:
+                    break
+                if time_limit_reached():
+                    stop_reason = f"time_limit_before_length:{model_name}:{target_tokens}"
+                    break
                 prompt, actual_tokens = _build_prompt_to_token_count(
                     tokenizer,
                     target_tokens,
                 )
                 for run_idx in range(1, args.runs + 1):
+                    if stop_reason:
+                        break
                     for chunk_size in args.chunk_sizes:
+                        if time_limit_reached():
+                            stop_reason = (
+                                "time_limit_before_cell:"
+                                f"{model_name}:{target_tokens}:run{run_idx}:chunk{chunk_size}"
+                            )
+                            break
                         metrics, text = _run_cell(
                             backend=backend,
                             model_name=model_name,
@@ -443,7 +481,16 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             backend.unload(model_name)
 
-    _write_rollup(path=rollup_path, run_id=run_id, rows=rows)
+    elapsed_s = time.perf_counter() - started_monotonic
+    _write_rollup(
+        path=rollup_path,
+        run_id=run_id,
+        rows=rows,
+        run_complete=stop_reason is None,
+        stop_reason=stop_reason,
+        time_limit_s=args.time_limit_s,
+        elapsed_s=elapsed_s,
+    )
     print(json.dumps({"ledger": str(ledger_path), "rollup": str(rollup_path)}))
     return 0
 

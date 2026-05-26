@@ -226,11 +226,12 @@ graduates:
 
 ## 10. Status / Next Step
 
-- **Current**：code-grade implementation + smoke evidence landed; B partial gate passed for configuration surface and streaming progress visibility; full workload still pending
+- **Current**：code-grade implementation + smoke + half workload evidence landed; B partial gate passed for configuration surface, streaming progress visibility, and within-chunk determinism across 3 models / 3 lengths / 3 chunks / 2 runs
 - **On approval**：
   - code-grade session 已实装 §6.1 / §6.2 改动 + 写 §5 workload runner，已落 smoke evidence
   - smoke 已证明 chunk 参数和 progress event 可工作；determinism smoke `20260526T084239Z-prefill-chunk-determinism-smoke` 证明同一 chunk size 重复运行 hash 一致，不同 chunk size 之间是 deterministic numeric-path 差异
-  - 下一步是跑 §5 full workload，并以 within-chunk determinism + progress + baseline no-regression 判定 B 是否可升到更强 capability label；cross-chunk consistency 继续记录但不作为 pass/fail
+  - half workload `20260526T090253Z-prefill-chunk-half-50m` completed 54/54 cells in 1720.072s with `within_chunk_determinism.status=passed`, `progress_events_observable=true`, and no failed cells
+  - 下一步是补 64k / full workload，并以 within-chunk determinism + progress + baseline no-regression 判定 B 是否可升到更强 capability label；cross-chunk consistency 继续记录但不作为 pass/fail
 - **Re-open of A / C**：等 mlx-lm 修 issue #980 (hybrid cache trim) 后重新评估
 
 ### 10.1 Hand-off 纪律
@@ -250,6 +251,7 @@ graduates:
 - 现有 long-context bench script：`scripts/bench/long_context_ladder.py`（被复用 prompt 构造逻辑）
 - C1 canary 发现的 mlx-lm batched-vs-split 数值漂移：`docs/architect/design/F-2-ngram-suffix-spec.md` §4.2 change log
 - B determinism smoke：`files/evidence/owlmlx/bench/prefill-chunking/20260526T084239Z-prefill-chunk-determinism-smoke-rollup.jsonl`
+- B half workload：`files/evidence/owlmlx/bench/prefill-chunking/20260526T090253Z-prefill-chunk-half-50m-rollup.jsonl`
 - F-1 surface（B 不消费）：[`F-1-spec.md`](F-1-spec.md)
 
 ## 12. Change Log
@@ -260,3 +262,4 @@ graduates:
 | 2026-05-26 | review amend：progress event scope 收紧到显式启用的 streaming 路径，避免污染 subprocess 非 stream 单 payload `_exchange` 和默认 stream 消费者；移除 "100% 兼容" 预设结论 | codex quality gate |
 | 2026-05-26 | code-grade smoke：Qwen 27B 4bit / 4k prompt / chunks 512 vs 2048 均 pass generation + progress events，但 cross-chunk consistency match_rate=0.0；进入 numeric-path triage | codex code-grade |
 | 2026-05-26 | gate 修订：determinism smoke 证明同一 chunk size 重复运行 byte-for-byte deterministic（repeat_match_rate=1.0），跨 chunk divergence 是 mlx-lm 不同 `prefill_step_size` 的 deterministic numeric-path 行为；B gate 改为 within-chunk determinism required，cross-chunk consistency diagnostic-only | codex quality gate |
+| 2026-05-26 | half workload：3 models × 3 lengths (4k/16k/32k) × 3 chunks × 2 runs = 54 cells；54/54 pass，elapsed=1720.072s，within_chunk_determinism passed (27/27 repeated groups)，progress_events_observable=true，cross_chunk_consistency match_rate=0.666667 informational-only | codex half workload |

@@ -82,3 +82,23 @@ def test_write_rollup_marks_progress_not_measured_without_long_prompt(tmp_path) 
 
     [rollup] = rollup_path.read_text(encoding="utf-8").splitlines()
     assert '"progress_events_observable": null' in rollup
+
+
+def test_write_rollup_records_partial_timebox_metadata(tmp_path) -> None:
+    rollup_path = tmp_path / "rollup.jsonl"
+
+    prefill_chunk_compare._write_rollup(
+        path=rollup_path,
+        run_id="test-run",
+        rows=[],
+        run_complete=False,
+        stop_reason="time_limit_before_model:qwen3.6-27b-4bit",
+        time_limit_s=2850,
+        elapsed_s=2850.1234,
+    )
+
+    [rollup] = rollup_path.read_text(encoding="utf-8").splitlines()
+    assert '"run_complete": false' in rollup
+    assert '"stop_reason": "time_limit_before_model:qwen3.6-27b-4bit"' in rollup
+    assert '"time_limit_s": 2850' in rollup
+    assert '"elapsed_s": 2850.123' in rollup
