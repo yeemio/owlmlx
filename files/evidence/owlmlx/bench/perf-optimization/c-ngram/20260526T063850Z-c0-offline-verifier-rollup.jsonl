@@ -1,0 +1,33 @@
+{
+  "coverage_per_module": {
+    "owlmlx/speculative/suffix_decoding/__init__.py": 100.0,
+    "owlmlx/speculative/suffix_decoding/proposer.py": 100.0,
+    "owlmlx/speculative/suffix_decoding/suffix_tree.py": 100.0,
+    "owlmlx/speculative/suffix_decoding/verifier.py": 100.0
+  },
+  "coverage_percent_total": 100.0,
+  "ended_at": "2026-05-26T06:38:50Z",
+  "f1_ngram_status_after_c0": "not_implemented",
+  "gate": "F-2",
+  "host": "Mac17,6",
+  "next_phase": "C1 \u2014 mlx-lm verifier canary (separate code-grade session)",
+  "phase": "c0",
+  "run_id": "20260526T063850Z-c0-offline-verifier",
+  "schema_version": "f2.c0.rollup.v1",
+  "spec_gate_criteria_satisfied": {
+    "coverage_at_least_90_percent": true,
+    "f1_surface_ngram_remains_not_implemented": true,
+    "no_runtime_or_track1_files_modified": true,
+    "proposer_shape_contract_no_cycle": true,
+    "pytest_all_green": true,
+    "suffix_tree_invariants_n1000_brute_force": true,
+    "verifier_correctness_hand_crafted_samples": true
+  },
+  "spec_source": "docs/architect/design/F-2-ngram-suffix-spec.md \u00a74.1",
+  "started_at": "2026-05-26T06:38:50Z",
+  "tests_failed": 0,
+  "tests_ledger_rows": 26,
+  "tests_passed": 26,
+  "tests_total": 26,
+  "verdict": "passed"
+}
