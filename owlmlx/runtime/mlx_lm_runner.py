@@ -13,6 +13,7 @@ import gc
 import os
 import sys
 import time
+from collections.abc import Callable
 from contextlib import redirect_stdout
 from typing import Any
 
@@ -27,6 +28,22 @@ _SAMPLER_PARAM_NAMES = (
     "xtc_threshold",
     "xtc_special_tokens",
 )
+
+_PREFILL_CHUNK_TOKENS_PARAM = "prefill_chunk_tokens"
+_PREFILL_CHUNK_TOKENS_ENV = "OWLMLX_PREFILL_CHUNK_TOKENS"
+_PREFILL_PROGRESS_EVENTS_PARAM = "prefill_progress_events"
+
+
+def _positive_int_or_none(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed <= 0:
+        return None
+    return parsed
 
 
 def _stop_strings_from_params(params: dict[str, Any]) -> tuple[str, ...]:
@@ -116,6 +133,14 @@ def _prepare_generation_params(params: dict[str, Any]) -> dict[str, Any]:
     prepared = dict(params)
     prepared.pop("stop", None)
     prepared.pop("chat_template_kwargs", None)
+    prepared.pop(_PREFILL_PROGRESS_EVENTS_PARAM, None)
+    raw_prefill_chunk_tokens = prepared.pop(_PREFILL_CHUNK_TOKENS_PARAM, None)
+    if raw_prefill_chunk_tokens is None and "prefill_step_size" not in prepared:
+        raw_prefill_chunk_tokens = os.environ.get(_PREFILL_CHUNK_TOKENS_ENV)
+    if raw_prefill_chunk_tokens is not None:
+        prefill_step_size = _positive_int_or_none(raw_prefill_chunk_tokens)
+        if prefill_step_size is not None:
+            prepared["prefill_step_size"] = prefill_step_size
     sampler_kwargs: dict[str, Any] = {}
 
     if "temperature" in prepared:
@@ -133,6 +158,62 @@ def _prepare_generation_params(params: dict[str, Any]) -> dict[str, Any]:
         prepared["sampler"] = make_sampler(**sampler_kwargs)
 
     return prepared
+
+
+def _bool_param(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
+def _prefill_progress_requested(params: dict[str, Any]) -> bool:
+    if _PREFILL_PROGRESS_EVENTS_PARAM in params:
+        return _bool_param(params.get(_PREFILL_PROGRESS_EVENTS_PARAM))
+    if _PREFILL_CHUNK_TOKENS_PARAM in params:
+        return True
+    return bool(os.environ.get(_PREFILL_CHUNK_TOKENS_ENV))
+
+
+def _make_prefill_progress_callback(
+    *,
+    action: str,
+    model_id: str,
+    request_start: float,
+    prompt_character_count: int,
+    message_count: int | None = None,
+    prefill_step_size: int | None = None,
+) -> tuple[Callable[[Any, Any], None], dict[str, Any]]:
+    state: dict[str, Any] = {"count": 0, "last": None}
+
+    def callback(processed: Any, total: Any) -> None:
+        processed_int = _positive_int_or_none(processed) or 0
+        total_int = _positive_int_or_none(total) or 0
+        state["count"] = int(state["count"]) + 1
+        payload: dict[str, Any] = {
+            "ok": True,
+            "action": action,
+            "event": "prefill_progress",
+            "model_id": model_id,
+            "pid": os.getpid(),
+            "processed": processed_int,
+            "total": total_int,
+            "ratio": round(processed_int / total_int, 6) if total_int else None,
+            "prefill_sequence": state["count"],
+            "prompt_character_count": prompt_character_count,
+            "timing": {
+                "prefill_progress_elapsed_ms": _elapsed_ms(request_start),
+            },
+        }
+        if message_count is not None:
+            payload["message_count"] = message_count
+        if prefill_step_size is not None:
+            payload["prefill_step_size"] = prefill_step_size
+        state["last"] = payload
+        _emit(payload)
+
+    return callback, state
 
 
 def _prepare_tokenizer_config(config: dict[str, Any]) -> dict[str, Any]:
@@ -434,13 +515,31 @@ def main() -> int:
                 stop_filter = _StopStringStreamFilter(stop_strings)
                 first_response_ms = None
                 first_visible_token_ms = None
+                generation_params = _prepare_generation_params(params)
+                prefill_progress_state: dict[str, Any] = {"count": 0, "last": None}
+                if _prefill_progress_requested(params):
+                    prefill_progress_callback, prefill_progress_state = (
+                        _make_prefill_progress_callback(
+                            action="stream_event",
+                            model_id=current_model_id,
+                            request_start=request_start,
+                            prompt_character_count=len(rendered_prompt),
+                            prefill_step_size=generation_params.get("prefill_step_size")
+                            if isinstance(
+                                generation_params.get("prefill_step_size"),
+                                int,
+                            )
+                            else None,
+                        )
+                    )
+                    generation_params["prompt_progress_callback"] = prefill_progress_callback
                 with redirect_stdout(sys.stderr):
                     stream_call_start = time.perf_counter()
                     for response in mlx_lm.stream_generate(
                         model,
                         tokenizer,
                         prompt=rendered_prompt,
-                        **_prepare_generation_params(params),
+                        **generation_params,
                     ):
                         if first_response_ms is None:
                             first_response_ms = _elapsed_ms(request_start)
@@ -519,6 +618,8 @@ def main() -> int:
                     "first_response_ms": first_response_ms,
                     "first_visible_token_ms": first_visible_token_ms,
                     "stream_wall_ms": _elapsed_ms(request_start),
+                    "prefill_progress_event_count": prefill_progress_state["count"],
+                    "prefill_step_size": generation_params.get("prefill_step_size"),
                 }
                 _emit(
                     {
@@ -649,13 +750,32 @@ def main() -> int:
                 stop_filter = _StopStringStreamFilter(stop_strings)
                 first_response_ms = None
                 first_visible_token_ms = None
+                generation_params = _prepare_generation_params(params)
+                prefill_progress_state: dict[str, Any] = {"count": 0, "last": None}
+                if _prefill_progress_requested(params):
+                    prefill_progress_callback, prefill_progress_state = (
+                        _make_prefill_progress_callback(
+                            action="stream_message_event",
+                            model_id=current_model_id,
+                            request_start=request_start,
+                            prompt_character_count=len(rendered_prompt),
+                            message_count=len(messages),
+                            prefill_step_size=generation_params.get("prefill_step_size")
+                            if isinstance(
+                                generation_params.get("prefill_step_size"),
+                                int,
+                            )
+                            else None,
+                        )
+                    )
+                    generation_params["prompt_progress_callback"] = prefill_progress_callback
                 with redirect_stdout(sys.stderr):
                     stream_call_start = time.perf_counter()
                     for response in mlx_lm.stream_generate(
                         model,
                         tokenizer,
                         prompt=rendered_prompt,
-                        **_prepare_generation_params(params),
+                        **generation_params,
                     ):
                         if first_response_ms is None:
                             first_response_ms = _elapsed_ms(request_start)
@@ -737,6 +857,8 @@ def main() -> int:
                     "first_response_ms": first_response_ms,
                     "first_visible_token_ms": first_visible_token_ms,
                     "stream_wall_ms": _elapsed_ms(request_start),
+                    "prefill_progress_event_count": prefill_progress_state["count"],
+                    "prefill_step_size": generation_params.get("prefill_step_size"),
                 }
                 _emit(
                     {

@@ -105,6 +105,47 @@ def _write_runner(
     return module.stem
 
 
+def _write_prefill_progress_runner(tmp_path: Path) -> str:
+    module = tmp_path / "prefill_progress_runner.py"
+    module.write_text(
+        "\n".join(
+            [
+                "import json, os, sys",
+                "loaded = None",
+                "count = 0",
+                "for line in sys.stdin:",
+                "    req = json.loads(line)",
+                "    action = req.get('action')",
+                "    if action == 'load':",
+                "        loaded = req['model_id']",
+                "        print(json.dumps({'ok': True, 'action': 'load', 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                "    elif action == 'stream_generate':",
+                "        count += 1",
+                "        chunk = req.get('params', {}).get('prefill_chunk_tokens')",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'prefill_progress', 'model_id': loaded, 'pid': os.getpid(), 'processed': 1024, 'total': 4096, 'ratio': 0.25, 'prefill_sequence': 1, 'received_prefill_chunk_tokens': chunk}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_event', 'event': 'token', 'text': req['prompt'], 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 4, 'completion_tokens': 1, 'finish_reason': 'streaming'}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 4, 'completion_tokens': 1, 'finish_reason': 'stop'}), flush=True)",
+                "    elif action == 'stream_generate_messages':",
+                "        count += 1",
+                "        chunk = req.get('params', {}).get('prefill_chunk_tokens')",
+                "        text = ' | '.join(f\"{m['role']}:{m['content']}\" for m in req.get('messages', []))",
+                "        print(json.dumps({'ok': True, 'action': 'stream_message_event', 'event': 'prefill_progress', 'model_id': loaded, 'pid': os.getpid(), 'processed': 2048, 'total': 4096, 'ratio': 0.5, 'prefill_sequence': 1, 'message_count': len(req.get('messages', [])), 'received_prefill_chunk_tokens': chunk}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_message_event', 'event': 'token', 'text': text, 'pid': os.getpid(), 'sequence': 1, 'prompt_tokens': 4, 'completion_tokens': 1, 'finish_reason': 'streaming', 'message_count': len(req.get('messages', []))}), flush=True)",
+                "        print(json.dumps({'ok': True, 'action': 'stream_message_done', 'event': 'done', 'pid': os.getpid(), 'generation_count': count, 'sequence': 1, 'prompt_tokens': 4, 'completion_tokens': 1, 'finish_reason': 'stop', 'message_count': len(req.get('messages', []))}), flush=True)",
+                "    elif action in ('shutdown', 'unload'):",
+                "        print(json.dumps({'ok': True, 'action': action, 'model_id': loaded, 'pid': os.getpid()}), flush=True)",
+                "        break",
+                "    elif action == 'ping':",
+                "        print(json.dumps({'ok': True, 'action': 'ping', 'model_id': loaded, 'pid': os.getpid(), 'generation_count': count}), flush=True)",
+                "    else:",
+                "        print(json.dumps({'ok': False, 'error': 'unsupported action'}), flush=True)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return module.stem
+
+
 def _write_fake_mlx_lm_package(
     tmp_path: Path,
     *,
@@ -251,6 +292,34 @@ def test_subprocess_backend_stream_generate_reuses_same_child(tmp_path: Path) ->
     assert events[0].detail["timing"]["first_visible_token_ms"] == 12.0
     assert events[1].detail["timing"]["surface"] == "owlmlx.child_stream_timing"
     assert backend.status().detail["children"]["model-a"]["generation_count"] == 1
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_stream_generate_yields_prefill_progress(
+    tmp_path: Path,
+) -> None:
+    runner = _write_prefill_progress_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    events = list(
+        backend.stream_generate(
+            "model-a",
+            "hello",
+            max_tokens=4,
+            prefill_chunk_tokens=1024,
+        )
+    )
+
+    assert [event.event for event in events] == ["prefill_progress", "token", "done"]
+    assert events[0].detail["processed"] == 1024
+    assert events[0].detail["total"] == 4096
+    assert events[0].detail["ratio"] == 0.25
+    assert events[0].detail["prefill_sequence"] == 1
+    assert events[0].detail["received_prefill_chunk_tokens"] == 1024
     backend.unload("model-a")
 
 
@@ -3894,6 +3963,34 @@ def test_subprocess_backend_stream_generate_messages_reuses_same_child(tmp_path:
     assert events[0].detail["message_count"] == 2
     assert events[0].detail["timing"]["prompt_render_ms"] == 2.0
     assert events[1].detail["timing"]["stream_wall_ms"] == 13.0
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_stream_generate_messages_yields_prefill_progress(
+    tmp_path: Path,
+) -> None:
+    runner = _write_prefill_progress_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+
+    events = list(
+        backend.stream_generate_messages(
+            "model-a",
+            [ChatTurn(role="user", content="hello")],
+            max_tokens=4,
+            prefill_chunk_tokens=512,
+        )
+    )
+
+    assert [event.event for event in events] == ["prefill_progress", "token", "done"]
+    assert events[0].detail["processed"] == 2048
+    assert events[0].detail["total"] == 4096
+    assert events[0].detail["ratio"] == 0.5
+    assert events[0].detail["message_count"] == 1
+    assert events[0].detail["received_prefill_chunk_tokens"] == 512
     backend.unload("model-a")
 
 

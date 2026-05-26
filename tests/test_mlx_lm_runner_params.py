@@ -6,8 +6,10 @@ import types
 from owlmlx.runtime.mlx_lm_runner import (
     _StopStringStreamFilter,
     _chat_template_kwargs_from_params,
+    _make_prefill_progress_callback,
     _prepare_generation_params,
     _prepare_tokenizer_config,
+    _prefill_progress_requested,
     _prompt_from_messages,
     _stop_strings_from_params,
     _truncate_at_stop_strings,
@@ -89,6 +91,75 @@ def test_prepare_generation_params_removes_chat_template_kwargs() -> None:
     )
 
     assert prepared == {"max_tokens": 4}
+
+
+def test_prepare_generation_params_maps_prefill_chunk_tokens() -> None:
+    prepared = _prepare_generation_params(
+        {"max_tokens": 4, "prefill_chunk_tokens": "1024"}
+    )
+
+    assert prepared == {"max_tokens": 4, "prefill_step_size": 1024}
+
+
+def test_prepare_generation_params_uses_prefill_env_fallback(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setenv("OWLMLX_PREFILL_CHUNK_TOKENS", "4096")
+
+    prepared = _prepare_generation_params({"max_tokens": 4})
+    overridden = _prepare_generation_params(
+        {"max_tokens": 4, "prefill_chunk_tokens": 1024}
+    )
+
+    assert prepared == {"max_tokens": 4, "prefill_step_size": 4096}
+    assert overridden == {"max_tokens": 4, "prefill_step_size": 1024}
+
+
+def test_prepare_generation_params_removes_prefill_progress_flag() -> None:
+    prepared = _prepare_generation_params(
+        {"max_tokens": 4, "prefill_progress_events": True}
+    )
+
+    assert prepared == {"max_tokens": 4}
+
+
+def test_prefill_progress_is_explicitly_requested(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.delenv("OWLMLX_PREFILL_CHUNK_TOKENS", raising=False)
+
+    assert _prefill_progress_requested({"max_tokens": 4}) is False
+    assert _prefill_progress_requested({"prefill_chunk_tokens": 2048}) is True
+    assert _prefill_progress_requested({"prefill_progress_events": True}) is True
+    assert _prefill_progress_requested({"prefill_progress_events": False}) is False
+
+    monkeypatch.setenv("OWLMLX_PREFILL_CHUNK_TOKENS", "4096")
+    assert _prefill_progress_requested({"max_tokens": 4}) is True
+
+
+def test_prefill_progress_callback_emits_stream_payload(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    emitted: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        "owlmlx.runtime.mlx_lm_runner._emit",
+        lambda payload: emitted.append(payload),
+    )
+    monkeypatch.setattr("owlmlx.runtime.mlx_lm_runner.time.perf_counter", lambda: 10.0)
+
+    callback, state = _make_prefill_progress_callback(
+        action="stream_event",
+        model_id="model-a",
+        request_start=10.0,
+        prompt_character_count=123,
+    )
+    callback(512, 2048)
+
+    assert state["count"] == 1
+    assert emitted[0]["ok"] is True
+    assert emitted[0]["action"] == "stream_event"
+    assert emitted[0]["event"] == "prefill_progress"
+    assert emitted[0]["model_id"] == "model-a"
+    assert emitted[0]["processed"] == 512
+    assert emitted[0]["total"] == 2048
+    assert emitted[0]["ratio"] == 0.25
+    assert emitted[0]["prefill_sequence"] == 1
+    assert emitted[0]["prompt_character_count"] == 123
+    assert emitted[0]["timing"] == {"prefill_progress_elapsed_ms": 0.0}
 
 
 def test_prepare_tokenizer_config_builds_pretrained_config(monkeypatch) -> None:  # type: ignore[no-untyped-def]

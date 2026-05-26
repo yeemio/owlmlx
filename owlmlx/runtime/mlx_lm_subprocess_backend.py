@@ -94,6 +94,17 @@ def _drain_stderr(pipe: Any, buffer: deque[str]) -> None:
         return
 
 
+_PREFILL_PROGRESS_DETAIL_KEYS = (
+    "processed",
+    "total",
+    "ratio",
+    "prefill_sequence",
+    "prefill_step_size",
+    "prompt_character_count",
+    "received_prefill_chunk_tokens",
+)
+
+
 def _stream_payload_detail(
     payload: dict[str, Any],
     *,
@@ -105,6 +116,9 @@ def _stream_payload_detail(
         detail["generation_count"] = payload.get("generation_count")
     if include_message_count:
         detail["message_count"] = payload.get("message_count")
+    for key in _PREFILL_PROGRESS_DETAIL_KEYS:
+        if key in payload:
+            detail[key] = payload.get(key)
     timing = payload.get("timing")
     if isinstance(timing, dict):
         detail["timing"] = timing
@@ -2193,6 +2207,14 @@ class MlxLmSubprocessBackend:
                     )
                     return
                 event = str(payload.get("event") or "token")
+                if event == "prefill_progress":
+                    yield StreamEvent(
+                        event="prefill_progress",
+                        model_id=model_id,
+                        sequence=payload.get("prefill_sequence"),
+                        detail=_stream_payload_detail(payload),
+                    )
+                    continue
                 if event == "token":
                     yield StreamEvent(
                         event="token",
@@ -2288,6 +2310,17 @@ class MlxLmSubprocessBackend:
                     )
                     return
                 event = str(payload.get("event") or "token")
+                if event == "prefill_progress":
+                    yield StreamEvent(
+                        event="prefill_progress",
+                        model_id=model_id,
+                        sequence=payload.get("prefill_sequence"),
+                        detail=_stream_payload_detail(
+                            payload,
+                            include_message_count=True,
+                        ),
+                    )
+                    continue
                 if event == "token":
                     yield StreamEvent(
                         event="token",

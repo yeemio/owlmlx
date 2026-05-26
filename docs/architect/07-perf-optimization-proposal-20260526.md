@@ -5,7 +5,9 @@
 > **下游 design-grade**：未起，每个方向通过后另开 `docs/architect/design/<feature>-spec.md`
 > **触发**：2026-05-26 长上下文阶梯 bench 结果 + Rapid-MLX / vLLM / SuffixDecoding 等先进引擎调研
 > **语言纪律**：plan-grade 允许 `plausible` / `candidate` / `pending`；不写 `supported`
-> **Architect review note**：2026-05-26 复核后，本方案顺序仍批准为 C → A → B；但 C 在 F-1 v1 contract 内必须以 `method=ngram` 暴露，SuffixDecoding 是该 method 的实现策略之一，不新增 `method=suffix_decoding`。
+> **Architect review note**：2026-05-26 复核后，本方案顺序原批准为 C → A → B；但 C 在 F-1 v1 contract 内必须以 `method=ngram` 暴露，SuffixDecoding 是该 method 的实现策略之一，不新增 `method=suffix_decoding`。
+>
+> **Order revision 2026-05-26 (C2 execution finding)**：C2 在 owlmlx 当前三主力 bench 模型（Qwen 3.6 27B 4bit / Gemma 4 31B 4bit / Qwen 3.6 35B-A3B 4bit）上撞结构性阻塞 —— 这些模型都走 mlx-lm hybrid cache（含 `ArraysCache` 不可 trim 层），speculative decoding 需要的 partial-accept rollback 物理上不可达，是 mlx-lm 上游 issue #980 的范围。**方向 A（prompt cache）大概率受同一上游 bug 影响**（部分前缀匹配同样需要 trim）。**方向 B（prefill chunking）只调 mlx-lm 已有的 `prefill_step_size` / `prompt_progress_callback`，不依赖 partial cache trim**。因此修正推进顺序为：**B 优先 → 等 mlx-lm 修 hybrid trim → 再做 A/C**。C0/C1 算法工作已 commit，对 trimmable 模型（Qwen 2.5 / Llama 3 等）有效，保留不浪费；B 的 hybrid 兼容性仍由 workload gate 判定，不预先写成 supported fact。
 
 ---
 
@@ -35,15 +37,15 @@
 
 | 方向 | 改什么 | 用户可见效果 | 工程量 | 推荐顺序 |
 |---|---|---|---|---|
-| **C** n-gram / SuffixDecoding probe | 加一层"基于历史输出做投机预测"的解码包装 | 同 prompt 重复模式下 decode **候选快 2-5×**；agent / code-edit 场景特别明显 | 中（3-4 周） | **1** |
-| **A** Prompt cache 在 MoE serving 路径落地 | 让 owlmlx 真正消费 mlx-lm 已有的 prompt cache 原语，让相同前缀第二次请求**跳过 prefill** | 多轮对话第 2+ 轮 TTFT 从几十秒掉到亚秒 | 中-高（3-4 周） | **2** |
-| **B** Prefill chunking | 长 prompt 分块处理，实现 TTFT 渐进可见 + 给 spec / cache 工作让出调度空间 | 长 prompt 不再"卡 6 分钟"，能流式上报进度 | 中（2-3 周） | **3** |
+| **B** Prefill chunking | 暴露 mlx-lm 已有 `prefill_step_size`，把 `prompt_progress_callback` 转成 owlmlx 内部 stream event | 长 prompt 不再"卡 6 分钟无信号"，能上报 prefill 进度；同时量化 chunk size 对 TTFT / 峰值内存 / byte-equivalence 的影响 | 低-中（1-2 周） | **1（当前）** |
+| **C** n-gram / SuffixDecoding probe | 加一层"基于历史输出做投机预测"的解码包装 | 同 prompt 重复模式下 decode **候选快 2-5×**；agent / code-edit 场景特别明显 | 中（3-4 周） | paused on mlx-lm #980 |
+| **A** Prompt cache 在 MoE serving 路径落地 | 让 owlmlx 真正消费 mlx-lm 已有的 prompt cache 原语，让相同前缀第二次请求**跳过 prefill** | 多轮对话第 2+ 轮 TTFT 从几十秒掉到亚秒 | 中-高（3-4 周） | paused on trim risk |
 
-**为什么这个顺序**：
+**为什么现在改顺序**：
 
-- **C 排第一**：用户可见效果最直观（agent / OwlCoda 工作流立刻受益）、外部参考实现成熟（Arctic Inference 在 vLLM 已 production）、算法本身简单（后缀树 + 单次验证 forward）、不依赖前两个
-- **A 排第二**：mlx-lm 已经提供 cache 原语（`make_prompt_cache` / 各种 KVCache 类），我们的工作量主要是"把现有 session_kv_cache 思路扩到 subprocess 路径 + MoE 模型"，对长上下文复用场景效果巨大
-- **B 排第三**：在我们 `MAX_GENERATION_CONCURRENCY=1` 的单 worker 设计下，chunked prefill 的最大收益（多请求 prefill / decode 交错）拿不到，剩下的价值主要是进度可见性。优先级低
+- **B 先做**：它不需要 rollback / trim hybrid cache，只暴露 mlx-lm 已有参数和 callback；风险小，能立刻补上长上下文进度可见和 chunk-size 量化证据。
+- **C 暂停**：C0/C1 已证明算法和 batch verify 可行，但 C2 serving integration 在 hybrid cache 上需要 partial-accept rollback，当前被 mlx-lm issue #980 卡住。
+- **A 暂停**：A 的 prefix / prompt cache 复用很有价值，但部分前缀匹配也可能碰到同类 trim 语义；在 B 不动 cache 的窗口里先把可执行项收口。
 
 ---
 
@@ -202,23 +204,27 @@ owlmlx 的设计前提是 `MAX_GENERATION_CONCURRENCY=1`（单 worker by design�
 
 ### 5.3 How
 
-mlx-lm 已经有 `ChunkedKVCache` 类。我们的实现：
+mlx-lm 已经提供 B 所需的直接 building blocks：
 
-- 在 subprocess backend 的 stream_generate 调用之前，把 prompt 按 `max_chunk_tokens`（候选默认 2048）切片
-- 每块 model.__call__ 一次，累积 cache state
-- 期间上报 SSE 进度事件 `prefill_chunk_progress`
-- 最后一块跑完进入正常 decode loop
+- `stream_generate(..., prefill_step_size=N, ...)`
+- `prompt_progress_callback(processed, total)`
 
-**Effort**：2-3 周（主要是 stream_generate 调用结构的改造 + SSE 进度协议扩展）
+我们的实现不手动切 prompt、不 fork mlx-lm prefill loop，也不扩 OpenAI / Anthropic SSE 协议。owlmlx 侧只做三件事：
+
+- 在 child runner 中把 per-request `prefill_chunk_tokens` 和 env fallback `OWLMLX_PREFILL_CHUNK_TOKENS` 映射到 mlx-lm `prefill_step_size`
+- 仅在显式请求 chunk/progress 的 internal streaming path 注册 `prompt_progress_callback`，把 callback 转成 child JSONL `event="prefill_progress"`，parent 再 yield 为内部 `StreamEvent`
+- 新增 workload runner 测 3 模型 × 4 context × 3 chunk size 的 TTFT / 峰值 RSS / byte-equivalence
+
+**Effort**：1-2 周（主要是参数透传、stream event plumbing、workload/evidence）
 
 ### 5.4 Risk / Unknown
 
-- 把 prompt 拆开 prefill 跟一次性 prefill 的**数值等价性**需要验证。理论上 attention 是 causal 的，分块不应该改变结果，但 mlx-lm 的 prefill 路径可能有"全 prompt 一起的优化"，分块后慢一点不奇怪
-- SSE 协议扩展会触动 `server_routes_openai.py` 的兼容层，需要小心不破 OpenAI / Anthropic 协议
+- 不同 `prefill_step_size` 的**数值等价性**需要验证。理论上 attention 是 causal 的，分块不应该改变结果，但 C1 canary 已经证明 mlx-lm 不同 prefill execution path 可能出现数值漂移，B 必须用 byte-equivalence gate 卡住
+- progress event 先只走 owlmlx 内部 stream channel；非 stream subprocess `_exchange` 仍是单 payload 协议，B 不得让非 stream path 先吐 progress
 
-### 5.5 为什么排第 3
+### 5.5 为什么现在排第 1
 
-对 owlmlx 单 worker 设计，**真实价值主要是用户体验**（进度可见），不是物理加速。**优先级低于 C 和 A**。但完整对外讲故事时需要有，所以最终要做。
+原计划里，B 的真实价值主要是用户体验（进度可见），不是物理加速，所以排在 C/A 之后。C2 后发现 C/A 都被 hybrid trim blocker 牵住，B 反而成为唯一当前可执行、且不会触动 Track 1 cache 模块的性能方向。它不升 supported，不写加速结论，只补配置面、进度面和测量面。
 
 ---
 
@@ -226,19 +232,15 @@ mlx-lm 已经有 `ChunkedKVCache` 类。我们的实现：
 
 | 周次 | 方向 | 阶段 | 关键交付 |
 |---|---|---|---|
-| W1 | **C ngram/suffix** | C0 算法 + 数据结构 | suffix tree / proposer / fake verifier 单元测试 |
-| W2 | **C** | C1 mlx-lm verifier canary | 明确 `stream_generate` 外如何做 candidate-token verification |
-| W3 | **C** | C2 decode loop 集成 | wrapper 实装，能跑通"speculate → verify"循环 |
-| W4 | **C** | F-1 `ngram` wire + 真实 workload 测 | OwlCoda-class 代码场景实测；≥2× 作为候选目标，不作为预设事实 |
-| W5-W6 | **A1 MoE prompt cache** | 扩 session_kv_cache 到 MoE | native backend 上 N≥20 字节等价 + 第二轮 TTFT 实测 |
-| W7-W8 | **A2 subprocess resident worker** | 改 subprocess backend | 默认 serving 路径上 cache 命中实测 |
-| W9 | **A** | F-1 `cache_sharing` 字段联调 + 多轮 workload 验证 | 第二轮 TTFT 落到亚秒 |
-| W10-W11 | **B Prefill chunking** | 长 prompt 分块 + SSE 进度 | 128k 输入有进度反馈 |
-| W12 | **整体** | 综合 bench + 对外可对照的速度故事整理 | 三个改造叠加后的 long-context-ladder 重跑 + 对照 mainstream |
+| W1 | **B Prefill chunking** | B contract + stream event plumbing | `prefill_chunk_tokens` → `prefill_step_size`；explicit stream-only `prefill_progress` event；非 stream `_exchange` 不变 |
+| W1-W2 | **B** | workload + evidence | 3 模型 × 4 context × 3 chunk size；TTFT / peak RSS / byte-equivalence rollup |
+| blocked | **C ngram/suffix** | C2 serving integration | 等 mlx-lm issue #980 支持 hybrid cache trim / rollback 后重开 |
+| blocked | **A prompt cache** | MoE / subprocess cache reuse | 等 Track 1 与 hybrid trim 风险收口后重开 |
+| later | **整体** | 综合 bench + 对外可对照的速度故事整理 | 只有 B/A/C 各自 evidence clean 后再重跑 long-context-ladder 对照 |
 
-**关键依赖**：W4 完成 C 之后才动 A —— 避免两个改造同时改 decode loop 互相干扰。
+**关键依赖**：当前不再要求 C 先完成。B 的优势是独立、不动 cache trim、不动 `session_kv_cache.py`，因此先把可执行的配置面 / 进度面 / measurement 面补齐。
 
-**关键里程碑**：W4 末出"ngram/SuffixDecoding 在 OwlCoda-class workload 的实测加速"数字。这是第一个可整理成速度故事的候选材料；是否对外讲，取决于 N≥20 evidence 和 capability honesty。
+**关键里程碑**：B 末尾不产出"物理加速"故事，只产出长上下文 prefill 可观测性和 chunk-size 风险画像；C/A 的速度故事等上游 blocker 清掉后再恢复。
 
 ---
 
@@ -260,9 +262,9 @@ mlx-lm 已经有 `ChunkedKVCache` 类。我们的实现：
 |---|---|---|
 | **C** ngram/SuffixDecoding | OwlCoda-class workload 上的 wall-clock decode 时间、accepted_tokens、accepted_rounds、fallback rate | 同 workload 关 `method=ngram` 的实测；目标 ≥2× |
 | **A** Prompt cache | 第二轮同 prefix 请求的 TTFT | 第一轮 prefill 时间；目标 cache 命中时 < 5% |
-| **B** Prefill chunking | 长输入 TTFT 不变（验证等价性）+ SSE 进度事件可见 | 128k 一次性 prefill 时间；目标 ±10% 内 |
+| **B** Prefill chunking | 长输入 TTFT / 峰值 RSS 可测 + 内部 stream `prefill_progress` 事件可见 + byte-equivalence | 2026-05-26 long-context baseline；默认路径目标 ±5% 内，非默认 chunk size 不预设提速 |
 
-**统一 evidence 落点**：`files/evidence/owlmlx/bench/perf-optimization/<方向>/<时间戳>-*.jsonl`
+**统一 evidence 落点**：每个 design-grade spec 自定子目录；B 使用 `files/evidence/owlmlx/bench/prefill-chunking/<时间戳>-*.jsonl`。
 
 **晋级路径**：每个方向都要有 N≥20 重复 + clean health 才上 `partial`；`supported` 要走 §1a Promotion Gate（不在本方案范围）。
 
@@ -276,7 +278,7 @@ mlx-lm 已经有 `ChunkedKVCache` 类。我们的实现：
 | **B-1c §2 drift triage**（Track 1，仍在进行）| 方向 A 在 MoE 上验证时会触动 session_kv_cache，跟 §2 是同一份模块。**必须等 §2 收口后才动 A1**（路径冲突） |
 | **F-2 ngram probe**（Campaign F · F2，原 roadmap）| 本方案 **方向 C 就是 F-2 的具体实装**。可以把 F-2 retitle 为"ngram / SuffixDecoding probe"，但不改 F-1 v1 vocabulary |
 | **F-3 Gemma resident MTP A/B**（Campaign F · F3）| 不在本方案，独立路线。条件：等真有用的 Gemma drafter |
-| **Wave H2 server_routes 拆分** | 方向 B 的 SSE 进度协议改动会动 server.py，要和 H2 协调，不能同 round |
+| **Wave H2 server_routes 拆分** | B 第一版不扩 OpenAI / Anthropic SSE，不要求动 server.py；若后续把 progress 暴露到 HTTP streaming，再与 H2 协调 |
 
 **主线对齐声明**：本方案不修改 [01-mainline-roadmap.md](01-mainline-roadmap.md) 的 12+ 月战略路线，只是把 Campaign F 的 F-2 具体化、把 Campaign B 的 prompt cache 工作扩到 MoE。**身份与边界（单 worker / memory-discipline-first）不变**。
 
@@ -307,11 +309,11 @@ mlx-lm 已经有 `ChunkedKVCache` 类。我们的实现：
 
 ## 11. 状态 / 下一步
 
-- **当前状态**：plan-grade 已按 architect review 收紧；方向 C 的 F-2 design-grade 已起，C0/C1 code-grade 已完成并通过；C2 serving integration 未开始
+- **当前状态**：plan-grade 已按 C2 blocker 重新排序；方向 C 的 F-2 C0/C1 已完成并通过，但 C2 serving integration blocked on mlx-lm hybrid trim；B code-grade 已实现参数 / progress plumbing，smoke blocked on byte-equivalence
 - **下一步**：
-  - 方向 C 进入 C2 design/code closeout：serving integration + OwlCoda-class workload runner；C2 passed 前 `method=ngram` 不升 `experimental`
-  - 方向 A 起 design-grade spec：`docs/architect/design/moe-prompt-cache-spec.md`（A1 + A2 两段；A1 仍等 B-1c §2 收口后再动 `session_kv_cache.py`）
-  - 方向 B 起 design-grade spec：`docs/architect/design/prefill-chunking-spec.md`
+  - 方向 B 进入 byte-equivalence triage：smoke 中 512 vs 2048 chunk 输出 hash 不一致；先确认是 mlx-lm prefill path 数值差异还是 workload/harness 问题
+  - 方向 C 保留 C0/C1 与当前 C2 attempt，不继续 serving integration，等 mlx-lm issue #980
+  - 方向 A 暂停，不动 `session_kv_cache.py` / Track 1 文件
 - **每个 design-grade spec 评审通过后**才进 code-grade（依 [01-mainline-roadmap.md Part VIII.3](01-mainline-roadmap.md) 层级 handoff 纪律）
 
 ---
@@ -323,3 +325,5 @@ mlx-lm 已经有 `ChunkedKVCache` 类。我们的实现：
 | 2026-05-26 | 初稿，基于当日长上下文 bench + 外部最佳实践调研 | architect session |
 | 2026-05-26 | 复核修订：锁 C→A→B 顺序；将 C 的 surface 收敛到 F-1 v1 `method=ngram`；收窄 prompt-cache 现状措辞；把 C 拆成 C0/C1/C2；补 evidence 纪律 | Codex architect review |
 | 2026-05-26 | 状态更新：F-2 C0/C1 已完成并通过；C2 serving integration 成为方向 C 下一步 | C1 closeout |
+| 2026-05-26 | C2 blocker 后重排：B 优先；C/A 暂停；B 使用 mlx-lm `prefill_step_size` / `prompt_progress_callback`，不扩 HTTP SSE，不预设 hybrid supported 结论 | B kickoff review |
+| 2026-05-26 | B code-grade smoke：参数 / progress plumbing 工作，但 Qwen 27B 4bit 4k prompt 的 chunk 512 vs 2048 byte-equivalence 失败；B 不收口，下一步转数值稳定性 triage | B smoke closeout |
