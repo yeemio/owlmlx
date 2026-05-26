@@ -232,6 +232,7 @@ graduates:
   - smoke 已证明 chunk 参数和 progress event 可工作；determinism smoke `20260526T084239Z-prefill-chunk-determinism-smoke` 证明同一 chunk size 重复运行 hash 一致，不同 chunk size 之间是 deterministic numeric-path 差异
   - half workload `20260526T090253Z-prefill-chunk-half-50m` completed 54/54 cells in 1720.072s with `within_chunk_determinism.status=passed`, `progress_events_observable=true`, and no failed cells
   - 64k supplement `20260526T133018Z-prefill-chunk-64k-supplement` recorded Qwen 27B run-1 across chunks 512/2048/8192: 3/3 pass, progress observable, cross-chunk consistency 1.0, TTFT 563-605s. It was stopped after run-1 because Qwen 27B 64k is a 9-10 minute-per-cell workload on this host; N=2 determinism is not measured in that partial
+  - Qwen 35B-A3B targeted 64k `20260526T140719Z-prefill-chunk-qwen35-64k-targeted` completed 6/6 cells in 938.612s; within-chunk determinism and cross-chunk consistency both passed, with median TTFT 173.63s / 144.21s / 147.08s for chunks 512 / 2048 / 8192
   - 下一步是补 64k 的剩余模型/重复或改成 per-model targeted schedule，并以 within-chunk determinism + progress + baseline no-regression 判定 B 是否可升到更强 capability label；cross-chunk consistency 继续记录但不作为 pass/fail
 - **Re-open of A / C**：等 mlx-lm 修 issue #980 (hybrid cache trim) 后重新评估
 
@@ -254,6 +255,7 @@ graduates:
 - B determinism smoke：`files/evidence/owlmlx/bench/prefill-chunking/20260526T084239Z-prefill-chunk-determinism-smoke-rollup.jsonl`
 - B half workload：`files/evidence/owlmlx/bench/prefill-chunking/20260526T090253Z-prefill-chunk-half-50m-rollup.jsonl`
 - B 64k partial：`files/evidence/owlmlx/bench/prefill-chunking/20260526T133018Z-prefill-chunk-64k-supplement-rollup.jsonl`
+- B Qwen35 64k targeted：`files/evidence/owlmlx/bench/prefill-chunking/20260526T140719Z-prefill-chunk-qwen35-64k-targeted-rollup.jsonl`
 - F-1 surface（B 不消费）：[`F-1-spec.md`](F-1-spec.md)
 
 ## 12. Change Log
@@ -266,3 +268,4 @@ graduates:
 | 2026-05-26 | gate 修订：determinism smoke 证明同一 chunk size 重复运行 byte-for-byte deterministic（repeat_match_rate=1.0），跨 chunk divergence 是 mlx-lm 不同 `prefill_step_size` 的 deterministic numeric-path 行为；B gate 改为 within-chunk determinism required，cross-chunk consistency diagnostic-only | codex quality gate |
 | 2026-05-26 | half workload：3 models × 3 lengths (4k/16k/32k) × 3 chunks × 2 runs = 54 cells；54/54 pass，elapsed=1720.072s，within_chunk_determinism passed (27/27 repeated groups)，progress_events_observable=true，cross_chunk_consistency match_rate=0.666667 informational-only | codex half workload |
 | 2026-05-26 | 64k supplement partial：Qwen 27B 64k run-1 chunks 512/2048/8192 all pass，TTFT 591.8s / 563.7s / 605.4s，progress events 130 / 34 / 10，cross-chunk consistency 1.0；stopped after run-1 because the cell cost is 9-10 min and N=2 determinism was not measured | codex 64k triage |
+| 2026-05-26 | Qwen 35B-A3B 64k targeted：6/6 cells pass，elapsed=938.612s，within-chunk determinism passed，cross-chunk consistency 1.0，median TTFT 173.63s / 144.21s / 147.08s for chunks 512 / 2048 / 8192 | codex 64k targeted |
