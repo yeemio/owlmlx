@@ -70,18 +70,19 @@ Q4 同一 `prefill_step_size` 在重复运行中是否 byte-for-byte determinist
 
 B 比 F-2 简单，**单一阶段，命名 `B_prefill_chunking_contract`**。
 
-**Pass criteria**：
+**Pass criteria / capability wording**：
 
-| 检查项 | 要求 |
-|---|---|
-| 参数透传 | 给 child 请求里加 `prefill_chunk_tokens: 1024`，child 应该用 1024 调 stream_generate；observable via debug log 或 progress event 间隔 |
-| 进度事件 emission | streaming 长 prompt（≥ 8k tokens）触发 ≥ 2 个 `prefill_progress` 事件；事件的 `processed` 应递增、`total` 一致 |
-| Within-chunk determinism | 同一 prompt / 同 sampler（temp=0）/ 同 chunk size 下重复运行，生成的 token 序列必须 byte-for-byte 一致（**100% 通过**） |
-| Cross-chunk consistency | 同一 prompt / 同 sampler 在 chunk size [512, 2048, 8192] 之间的输出一致率必须记录；该字段为 diagnostic-only，不阻塞 B，因为 mlx-lm 不同 `prefill_step_size` 会走不同 deterministic numeric path |
-| 默认行为不变 | 不传 `prefill_chunk_tokens` 时，行为与改造前一致（baseline 无回归，long_context_ladder.py 数字落在 ±5% 内） |
-| 环境变量 fallback | `OWLMLX_PREFILL_CHUNK_TOKENS=4096` 不传 per-request 时生效；per-request 传入时覆盖 env |
-| 峰值内存差异可测 | workload runner 能记录 `resource.getrusage` peak RSS per cell；小 chunk 对长上下文应表现出更低峰值（**不预设阈值**，记数据为主） |
-| Hybrid 模型兼容 | 三个主力模型（Qwen 27B / Qwen 35B-A3B / Gemma 4 31B）都能在不同 chunk size 下成功生成；B 不依赖 partial cache trim，但兼容性必须由 workload 证明 |
+| 检查项 | 档位 | 要求 / 判定 |
+|---|---|---|
+| `prefill_chunk_tokens` 参数透传 | supported | 给 child 请求里加 `prefill_chunk_tokens: 1024`，child 应该用 1024 调 stream_generate；observable via debug log 或 progress event 间隔 |
+| `prefill_progress` 进度事件 emission | supported | streaming 长 prompt（≥ 8k tokens）触发 ≥ 2 个 `prefill_progress` 事件；事件的 `processed` 应递增、`total` 一致；非 stream `_exchange` 不被 progress payload 污染 |
+| 环境变量 fallback | supported | `OWLMLX_PREFILL_CHUNK_TOKENS=4096` 不传 per-request 时生效；per-request 传入时覆盖 env |
+| Within-chunk determinism | supported gate | 同一 prompt / 同 sampler（temp=0）/ 同 chunk size 下重复运行，生成的 token 序列必须 byte-for-byte 一致（**100% 通过**） |
+| Hybrid 模型兼容 | supported for B surface | 三个主力模型（Qwen 27B / Qwen 35B-A3B / Gemma 4 31B）都能在不同 chunk size 下成功生成；B 不依赖 partial cache trim，但兼容性必须由 workload 证明 |
+| Cross-chunk consistency | diagnostic-only | 同一 prompt / 同 sampler 在 chunk size [512, 2048, 8192] 之间的输出一致率必须记录；该字段不阻塞 B，因为 mlx-lm 不同 `prefill_step_size` 会走不同 deterministic numeric path。该现象是 prompt/context-length dependent：4k smoke 可出现 0% 一致，64k targeted/combined 可出现 1.0 一致，不能把任一方向写成普遍保证 |
+| 默认 wall-clock 无回归 | not promoted by wall-clock sample | 不传 `prefill_chunk_tokens` 时默认语义应保持；unit tests 覆盖参数缺省 / env fallback / protocol 边界。2026-05-26 9-cell `long_context_ladder` sample 9/9 ok，但相对早上 baseline 多数 cell 超出 ±5%，且该脚本直接调 mlx-lm、不走 B plumbing；因此只记为 host-state-sensitive wall-clock evidence，不作为 B promotion gate |
+| Wall-clock 加速 | not promised | 单 worker 设计下不承诺物理降 TTFT；chunk 2048 可作为当前 Qwen35/Gemma 64k 默认候选，但不是加速 SLA |
+| 峰值内存差异可测 | partial | workload runner 能记录 `resource.getrusage` peak RSS per cell；更长 context 才可能显著，不预设阈值，记数据为主 |
 
 **Evidence**：`files/evidence/owlmlx/bench/prefill-chunking/<ts>-prefill-chunk-compare.jsonl` + rollup
 
@@ -226,16 +227,18 @@ graduates:
 
 ## 10. Status / Next Step
 
-- **Current**：code-grade implementation + smoke + half workload evidence landed; B partial gate passed for configuration surface, streaming progress visibility, and within-chunk determinism across 3 models / 3 lengths / 3 chunks / 2 runs
+- **Current**：diagnostic-ready partial closeout. `prefill_chunk_tokens` configuration surface and `prefill_progress` streaming event are supported; within-chunk determinism and three-main-model hybrid compatibility are clean; cross-chunk byte-equivalence remains diagnostic-only; wall-clock acceleration is not promised; peak-memory delta remains partial
 - **On approval**：
   - code-grade session 已实装 §6.1 / §6.2 改动 + 写 §5 workload runner，已落 smoke evidence
   - smoke 已证明 chunk 参数和 progress event 可工作；determinism smoke `20260526T084239Z-prefill-chunk-determinism-smoke` 证明同一 chunk size 重复运行 hash 一致，不同 chunk size 之间是 deterministic numeric-path 差异
   - half workload `20260526T090253Z-prefill-chunk-half-50m` completed 54/54 cells in 1720.072s with `within_chunk_determinism.status=passed`, `progress_events_observable=true`, and no failed cells
+  - cross-chunk nuance: the 4k smoke exposed chunk-size-dependent divergence, while all 64k targeted/combined evidence recorded cross-chunk consistency 1.0. Treat cross-chunk behavior as prompt/context-length dependent diagnostic signal, not a required invariant
   - 64k supplement `20260526T133018Z-prefill-chunk-64k-supplement` recorded Qwen 27B run-1 across chunks 512/2048/8192: 3/3 pass, progress observable, cross-chunk consistency 1.0, TTFT 563-605s. It was stopped after run-1 because Qwen 27B 64k is a 9-10 minute-per-cell workload on this host; N=2 determinism is not measured in that partial
   - Qwen 35B-A3B targeted 64k `20260526T140719Z-prefill-chunk-qwen35-64k-targeted` completed 6/6 cells in 938.612s; within-chunk determinism and cross-chunk consistency both passed, with median TTFT 173.63s / 144.21s / 147.08s for chunks 512 / 2048 / 8192
   - Gemma 4 31B targeted 64k `20260526T142420Z-prefill-chunk-gemma31-64k-targeted` completed 6/6 cells in 1277.599s; within-chunk determinism and cross-chunk consistency both passed, with median TTFT 228.54s / 185.47s / 219.58s for chunks 512 / 2048 / 8192
   - Qwen 27B 64k combined rollup `20260526T145527Z-prefill-chunk-qwen27-64k-combined` combines run-1 and repeat2 into 6 cells: 6/6 pass, within-chunk determinism passed, cross-chunk consistency 1.0
-  - 下一步不是继续补同类 cells，而是做 baseline regression check / capability wording closeout；cross-chunk consistency 继续记录但不作为 pass/fail
+  - default-path regression sample `20260526T150351Z-long-context-ladder` completed 9/9 cells, but `20260526T150351Z-long-context-ladder-regression-compare` is `inconclusive_host_state_sensitive`: wall-clock deltas vs the earlier same-day baseline exceed ±5% in most cells, and this direct mlx-lm ladder does not exercise B plumbing. Do not promote wall-clock no-regression from this sample
+  - 下一步不是继续补同类 cells；B 收口到 capability wording / downstream consumption handoff，主线转入下一个 replacement-grade gap 选择
 - **Re-open of A / C**：等 mlx-lm 修 issue #980 (hybrid cache trim) 后重新评估
 
 ### 10.1 Hand-off 纪律
@@ -260,6 +263,7 @@ graduates:
 - B Qwen35 64k targeted：`files/evidence/owlmlx/bench/prefill-chunking/20260526T140719Z-prefill-chunk-qwen35-64k-targeted-rollup.jsonl`
 - B Gemma 64k targeted：`files/evidence/owlmlx/bench/prefill-chunking/20260526T142420Z-prefill-chunk-gemma31-64k-targeted-rollup.jsonl`
 - B Qwen27 64k combined：`files/evidence/owlmlx/bench/prefill-chunking/20260526T145527Z-prefill-chunk-qwen27-64k-combined-rollup.jsonl`
+- B default-path regression sample：`files/evidence/owlmlx/bench/long-context-ladder/20260526T150351Z-long-context-ladder-regression-compare.jsonl`
 - F-1 surface（B 不消费）：[`F-1-spec.md`](F-1-spec.md)
 
 ## 12. Change Log
@@ -275,3 +279,4 @@ graduates:
 | 2026-05-26 | Qwen 35B-A3B 64k targeted：6/6 cells pass，elapsed=938.612s，within-chunk determinism passed，cross-chunk consistency 1.0，median TTFT 173.63s / 144.21s / 147.08s for chunks 512 / 2048 / 8192 | codex 64k targeted |
 | 2026-05-26 | Gemma 4 31B 64k targeted：6/6 cells pass，elapsed=1277.599s，within-chunk determinism passed，cross-chunk consistency 1.0，median TTFT 228.54s / 185.47s / 219.58s for chunks 512 / 2048 / 8192 | codex 64k targeted |
 | 2026-05-26 | Qwen 27B 64k combined：run-1 + repeat2 combined into 6 cells；6/6 pass，within-chunk determinism passed (3/3 repeated groups)，cross-chunk consistency 1.0，all chunk hashes stable; repeat2 was much faster than run-1, so TTFT should be treated as host-state-sensitive | codex 64k combined |
+| 2026-05-26 | Capability wording closeout：配置面 / streaming 进度面 supported；cross-chunk byte-equivalence diagnostic-only and context-length dependent；wall-clock acceleration not promised；baseline regression sample 9/9 ok but wall-clock compare is host-state-sensitive / inconclusive, not promotion evidence | codex capability closeout |

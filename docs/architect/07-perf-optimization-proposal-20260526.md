@@ -37,7 +37,7 @@
 
 | 方向 | 改什么 | 用户可见效果 | 工程量 | 推荐顺序 |
 |---|---|---|---|---|
-| **B** Prefill chunking | 暴露 mlx-lm 已有 `prefill_step_size`，把 `prompt_progress_callback` 转成 owlmlx 内部 stream event | 长 prompt 不再"卡 6 分钟无信号"，能上报 prefill 进度；同时量化 chunk size 对 TTFT / 峰值内存 / within-chunk determinism / cross-chunk consistency 的影响 | 低-中（1-2 周） | **1（当前）** |
+| **B** Prefill chunking | 暴露 mlx-lm 已有 `prefill_step_size`，把 `prompt_progress_callback` 转成 owlmlx 内部 stream event | 配置面 / streaming 进度面 supported；长 prompt 不再"卡 6 分钟无信号"；同时量化 chunk size 对 TTFT / 峰值内存 / within-chunk determinism / cross-chunk consistency 的影响。**不承诺 wall-clock 加速** | 低-中（1-2 周） | **1（当前）** |
 | **C** n-gram / SuffixDecoding probe | 加一层"基于历史输出做投机预测"的解码包装 | 同 prompt 重复模式下 decode **候选快 2-5×**；agent / code-edit 场景特别明显 | 中（3-4 周） | paused on mlx-lm #980 |
 | **A** Prompt cache 在 MoE serving 路径落地 | 让 owlmlx 真正消费 mlx-lm 已有的 prompt cache 原语，让相同前缀第二次请求**跳过 prefill** | 多轮对话第 2+ 轮 TTFT 从几十秒掉到亚秒 | 中-高（3-4 周） | paused on trim risk |
 
@@ -262,7 +262,7 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 |---|---|---|
 | **C** ngram/SuffixDecoding | OwlCoda-class workload 上的 wall-clock decode 时间、accepted_tokens、accepted_rounds、fallback rate | 同 workload 关 `method=ngram` 的实测；目标 ≥2× |
 | **A** Prompt cache | 第二轮同 prefix 请求的 TTFT | 第一轮 prefill 时间；目标 cache 命中时 < 5% |
-| **B** Prefill chunking | 长输入 TTFT / 峰值 RSS 可测 + 内部 stream `prefill_progress` 事件可见 + within-chunk determinism；cross-chunk consistency 仅诊断 | 2026-05-26 long-context baseline；默认路径目标 ±5% 内，非默认 chunk size 不预设提速 |
+| **B** Prefill chunking | 长输入 TTFT / 峰值 RSS 可测 + 内部 stream `prefill_progress` 事件可见 + within-chunk determinism；cross-chunk consistency 仅诊断 | 2026-05-26 long-context baseline；默认路径 9-cell sample 9/9 ok 但 wall-clock compare host-state-sensitive / inconclusive，非默认 chunk size 不预设提速 |
 
 **统一 evidence 落点**：每个 design-grade spec 自定子目录；B 使用 `files/evidence/owlmlx/bench/prefill-chunking/<时间戳>-*.jsonl`。
 
@@ -309,9 +309,9 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 
 ## 11. 状态 / 下一步
 
-- **当前状态**：plan-grade 已按 C2 blocker 重新排序；方向 C 的 F-2 C0/C1 已完成并通过，但 C2 serving integration blocked on mlx-lm hybrid trim；B code-grade 已实现参数 / progress plumbing，smoke + half workload 支持 partial 收口：同一 chunk size deterministic，progress event observable，跨 chunk divergence 作为 diagnostic-only；64k targeted 已补齐三主力模型，Qwen 27B combined / Qwen 35B-A3B / Gemma 31B 都有 6/6 pass + within-chunk determinism evidence。Qwen 27B 64k TTFT host-state-sensitive；Qwen 35B-A3B / Gemma 31B 的当前默认候选仍是 chunk 2048
+- **当前状态**：plan-grade 已按 C2 blocker 重新排序；方向 C 的 F-2 C0/C1 已完成并通过，但 C2 serving integration blocked on mlx-lm hybrid trim；B code-grade 已实现参数 / progress plumbing，smoke + half workload 支持 diagnostic-ready partial 收口：`prefill_chunk_tokens` 配置面和 `prefill_progress` streaming 进度面 supported；同一 chunk size deterministic；跨 chunk byte-equivalence diagnostic-only 且 context-length dependent；64k targeted 已补齐三主力模型，Qwen 27B combined / Qwen 35B-A3B / Gemma 31B 都有 6/6 pass + within-chunk determinism evidence。Qwen 27B 64k TTFT host-state-sensitive；Qwen 35B-A3B / Gemma 31B 的当前默认候选仍是 chunk 2048；wall-clock 加速不承诺
 - **下一步**：
-  - 方向 B 补 full workload：已完成 half workload `20260526T090253Z`（3 模型 × 4k/16k/32k × 3 chunks × N=2，54/54 pass，elapsed=1720.072s）；Qwen27 combined `20260526T145527Z` 完成 6/6（within determinism 3/3，cross-chunk consistency 1.0，run-1 TTFT 563-605s，repeat2 TTFT 132-200s，说明 TTFT 受 host state 影响）；Qwen35 targeted `20260526T140719Z` 完成 6/6（median TTFT 173.63s / 144.21s / 147.08s）；Gemma targeted `20260526T142420Z` 完成 6/6（median TTFT 228.54s / 185.47s / 219.58s）。下一步不再补同类 cells，转 baseline regression check / capability wording closeout；cross-chunk consistency 只记录不 gate
+  - 方向 B workload/capability closeout：已完成 half workload `20260526T090253Z`（3 模型 × 4k/16k/32k × 3 chunks × N=2，54/54 pass，elapsed=1720.072s）；Qwen27 combined `20260526T145527Z` 完成 6/6（within determinism 3/3，cross-chunk consistency 1.0，run-1 TTFT 563-605s，repeat2 TTFT 132-200s，说明 TTFT 受 host state 影响）；Qwen35 targeted `20260526T140719Z` 完成 6/6（median TTFT 173.63s / 144.21s / 147.08s）；Gemma targeted `20260526T142420Z` 完成 6/6（median TTFT 228.54s / 185.47s / 219.58s）；default-path sample `20260526T150351Z` 9/9 ok，但 regression compare 是 `inconclusive_host_state_sensitive`，不作为 wall-clock no-regression 晋级证据。B 不再补同类 cells，转 downstream consumption handoff / 下个主线 gap 选择
   - 方向 C 保留 C0/C1 与当前 C2 attempt，不继续 serving integration，等 mlx-lm issue #980
   - 方向 A 暂停，不动 `session_kv_cache.py` / Track 1 文件
 - **每个 design-grade spec 评审通过后**才进 code-grade（依 [01-mainline-roadmap.md Part VIII.3](01-mainline-roadmap.md) 层级 handoff 纪律）
@@ -333,3 +333,4 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 | 2026-05-26 | B Qwen35 64k targeted `20260526T140719Z`：6/6 pass，elapsed=938.612s，within-chunk determinism passed，cross-chunk consistency 1.0，median TTFT 173.63s / 144.21s / 147.08s for chunks 512 / 2048 / 8192 | B 64k targeted |
 | 2026-05-26 | B Gemma 64k targeted `20260526T142420Z`：6/6 pass，elapsed=1277.599s，within-chunk determinism passed，cross-chunk consistency 1.0，median TTFT 228.54s / 185.47s / 219.58s for chunks 512 / 2048 / 8192 | B 64k targeted |
 | 2026-05-26 | B Qwen27 64k combined `20260526T145527Z`：run-1 + repeat2 combined into 6 cells；6/6 pass，within-chunk determinism 3/3 repeated groups passed，cross-chunk consistency 1.0；repeat2 TTFT much faster than run-1, so Qwen27 TTFT is host-state-sensitive rather than a stable speed claim | B 64k combined |
+| 2026-05-26 | B capability closeout：`prefill_chunk_tokens` / `prefill_progress` supported；cross-chunk byte-equivalence diagnostic-only and context-length dependent（4k smoke diverged, 64k targeted/combined matched）；default-path 9-cell sample 9/9 ok but wall-clock compare is host-state-sensitive / inconclusive, so no acceleration or no-regression speed claim | B capability closeout |
