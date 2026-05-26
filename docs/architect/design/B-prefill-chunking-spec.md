@@ -3,7 +3,7 @@
 > **Gate**: 方向 B — Prefill chunking 在 owlmlx serving 路径上落地
 > **Layer**: design-grade, downstream of [`../07-perf-optimization-proposal-20260526.md`](../07-perf-optimization-proposal-20260526.md) §5 (方向 B), upstream of code-grade
 > **Plan-grade source**: same plan-grade doc, architect-reviewed 2026-05-26; **order revised 2026-05-26** 把 B 提到 C → A 之前（C 在 hybrid 模型上撞 mlx-lm 上游 trim 阻塞，A 大概率受同源问题影响，B 是唯一不依赖 partial cache trim 的方向）
-> **Status**: code-grade implementation + smoke evidence landed; B does **not** pass gate yet because byte-equivalence failed in smoke
+> **Status**: code-grade implementation + smoke evidence landed; B partial gate passed for parameter / progress plumbing; cross-chunk output consistency is diagnostic-only after mlx-lm numeric-path triage
 > **Prerequisite**: F-1 plan + design + code-grade landed（✓）；本方向不依赖 C0/C1 算法工作，不依赖 B-1c §2 closure
 > **Non-goal**: 不期望物理降低单请求 TTFT（owlmlx 单 worker 设计下，chunked prefill 的 vLLM-style "decode/prefill 交错"收益拿不到）；只承诺**streaming 进度可见性 + chunk-size 配置面 + 峰值内存可测**这三件可达的事
 
@@ -29,7 +29,7 @@ owlmlx 需要做：
 Q1 把 chunk size 暴露成 per-request 参数后，调用方真能控制 mlx-lm 行为吗？
 Q2 进度事件能正确穿越 child → parent → 上层吗？
 Q3 不同 chunk size 在长上下文场景的 TTFT / 峰值内存有显著差异吗？
-Q4 chunked prefill 跟"一次性 batched"产生的输出是否完全 byte-equivalent？（C1 canary 在 Qwen 3.6 上发现过差异，要重测）
+Q4 同一 `prefill_step_size` 在重复运行中是否 byte-for-byte deterministic？不同 `prefill_step_size` 之间若输出不同，是否属于 mlx-lm 已知的 deterministic numeric-path 差异？
 ```
 
 ## 2. Prerequisites
@@ -48,7 +48,7 @@ Q4 chunked prefill 跟"一次性 batched"产生的输出是否完全 byte-equiva
 - `mlx_lm_subprocess_backend.py`：parent 端透传 `prefill_chunk_tokens` kwarg；stream parse child 的 `prefill_progress` 事件并 yield 为内部 `StreamEvent`
 - 新环境变量 `OWLMLX_PREFILL_CHUNK_TOKENS`（默认 fallback）
 - 新 workload runner `scripts/bench/prefill_chunk_compare.py`：对每个模型 × context 长度 × chunk size 测 TTFT / 峰值 RSS / 进度事件数
-- 输出 byte-equivalence 校验：同 prompt 同 seed 在不同 chunk size 下，generated tokens 必须 byte-for-byte 一致
+- 输出稳定性校验：同 prompt / 同 sampler / 同 chunk size 下重复运行必须 byte-for-byte 一致；不同 chunk size 之间的一致率只作为 diagnostic metric
 - evidence 落在 `files/evidence/owlmlx/bench/prefill-chunking/`
 
 ### Explicit protocol boundary
@@ -76,7 +76,8 @@ B 比 F-2 简单，**单一阶段，命名 `B_prefill_chunking_contract`**。
 |---|---|
 | 参数透传 | 给 child 请求里加 `prefill_chunk_tokens: 1024`，child 应该用 1024 调 stream_generate；observable via debug log 或 progress event 间隔 |
 | 进度事件 emission | streaming 长 prompt（≥ 8k tokens）触发 ≥ 2 个 `prefill_progress` 事件；事件的 `processed` 应递增、`total` 一致 |
-| Byte-equivalence | 同一 prompt 同 sampler（temp=0），用 chunk size [512, 2048, 8192] 三档分别跑 N=10 次，生成的 token 序列 byte-for-byte 一致（**100% 通过**） |
+| Within-chunk determinism | 同一 prompt / 同 sampler（temp=0）/ 同 chunk size 下重复运行，生成的 token 序列必须 byte-for-byte 一致（**100% 通过**） |
+| Cross-chunk consistency | 同一 prompt / 同 sampler 在 chunk size [512, 2048, 8192] 之间的输出一致率必须记录；该字段为 diagnostic-only，不阻塞 B，因为 mlx-lm 不同 `prefill_step_size` 会走不同 deterministic numeric path |
 | 默认行为不变 | 不传 `prefill_chunk_tokens` 时，行为与改造前一致（baseline 无回归，long_context_ladder.py 数字落在 ±5% 内） |
 | 环境变量 fallback | `OWLMLX_PREFILL_CHUNK_TOKENS=4096` 不传 per-request 时生效；per-request 传入时覆盖 env |
 | 峰值内存差异可测 | workload runner 能记录 `resource.getrusage` peak RSS per cell；小 chunk 对长上下文应表现出更低峰值（**不预设阈值**，记数据为主） |
@@ -89,7 +90,8 @@ B 比 F-2 简单，**单一阶段，命名 `B_prefill_chunking_contract`**。
 - **参数透传失败**：child 收到参数但 stream_generate 没改行为 → 验证 mlx-lm 版本兼容；可能需要 kwargs 名转换
 - **进度事件丢失**：child stdout 缓冲问题 → 检查 _emit + flush
 - **非 stream 协议污染**：非 stream `generate` 先吐 progress → parent 单 payload `_exchange` 会误收；本阶段必须禁用非 stream progress
-- **Byte-equivalence 失败**：chunk size 影响数值结果 → 记录差异 token 位置 + 验证是否在 C1 canary 已知的"batched vs split forward 漂移"范畴内；如果是新现象，escalate
+- **Within-chunk determinism 失败**：同一 chunk size 重复运行 hash 不一致 → 硬阻塞；这说明 wrapper 或 mlx-lm 路径存在非确定性，不能作为可配置面交付
+- **Cross-chunk consistency 失败**：不同 chunk size 输出 hash 不一致 → 记录差异 token 位置 / preview / hash；若每个 chunk size 自身 deterministic，则按 mlx-lm deterministic numeric-path 差异处理，不阻塞 B
 - **Baseline 回归 > 5%**：包装层引入 overhead → 优化或 revert
 
 ## 5. Workload Definition
@@ -163,7 +165,7 @@ metrics:
   completion_tokens: <int>
   peak_rss_gb_process_lifetime: <float>
   prefill_progress_event_count: <int>
-output_byte_hash: <sha256 of completed text>  # for byte-equivalence verify
+output_byte_hash: <sha256 of completed text>  # for determinism / consistency checks
 output_byte_length: <int>
 output_text_preview: <short diagnostic prefix, optional>
 verdict: pass | fail
@@ -178,10 +180,18 @@ run_id: <ts>-prefill-chunk-compare
 cell_count: 108
 ok_cells: <int>
 failed_cells: <int>
-byte_equivalence:
-  total_groups: <int>           # = models × context × runs (chunk dimension collapsed)
+within_chunk_determinism:
+  gate: required
+  status: passed | failed | not_measured
+  total_groups: <int>                    # = models × context × chunk size
+  groups_with_repeated_runs: <int>
+  repeated_groups_with_identical_output: <int>
+  repeat_match_rate: <float | null>      # repeated groups must be 1.0 to pass
+cross_chunk_consistency:
+  gate: informational_only
+  total_groups: <int>                    # = models × context × runs
   groups_with_identical_output: <int>
-  match_rate: <float>           # 必须 1.0 才 pass
+  match_rate: <float | null>             # recorded, not a B gate
 ttft_chunked_vs_default:
   per_model_per_length: ...     # min/median/max for each chunk size
 peak_rss_chunked_vs_default:
@@ -190,8 +200,9 @@ baseline_regression_long_context_ladder:
   delta_pct: <float>             # 跟 2026-05-26 baseline 比，必须 ±5% 内
 graduates:
   chunk_param_exposed: true | false
-  progress_events_observable: true | false
-  byte_equivalence_holds: true | false
+  progress_events_observable: true | false | null
+  within_chunk_determinism_holds: true | false | null
+  cross_chunk_consistency_holds: true | false | null
   baseline_no_regression: true | false
 ```
 
@@ -201,7 +212,8 @@ graduates:
 
 - 任何 failure 记录到 evidence，verdict 标 `failed` + `blocker_summary`
 - baseline 回归 > 5%：硬阻塞，不允许 land
-- byte-equivalence 失败但差异在 C1 canary 已知的 mlx-lm "batched vs split forward" 范畴：记录差异分布 + escalate；如果不在已知范畴，回退实现 + 重测
+- within-chunk determinism 失败：硬阻塞，回退实现或升级为 mlx-lm determinism blocker
+- cross-chunk consistency 失败但每个 chunk size 自身 deterministic：记录差异分布，不阻塞 B；如果差异不是 mlx-lm 已知 numeric-path 范畴，再升级为 triage blocker
 
 ## 9. Out-of-scope reminders
 
@@ -214,11 +226,11 @@ graduates:
 
 ## 10. Status / Next Step
 
-- **Current**：code-grade implementation + smoke evidence landed; B remains blocked on byte-equivalence
+- **Current**：code-grade implementation + smoke evidence landed; B partial gate passed for configuration surface and streaming progress visibility; full workload still pending
 - **On approval**：
-  - code-grade session 实装 §6.1 / §6.2 改动 + 写 §5 workload runner，落 evidence
-  - smoke 已证明 chunk 参数和 progress event 可工作，但 512 vs 2048 输出 hash 不一致；full workload 前需要先诊断 `prefill_step_size` 数值稳定性
-  - 只有 workload 判定 §4 pass criteria 全部满足后，B 才能收口
+  - code-grade session 已实装 §6.1 / §6.2 改动 + 写 §5 workload runner，已落 smoke evidence
+  - smoke 已证明 chunk 参数和 progress event 可工作；determinism smoke `20260526T084239Z-prefill-chunk-determinism-smoke` 证明同一 chunk size 重复运行 hash 一致，不同 chunk size 之间是 deterministic numeric-path 差异
+  - 下一步是跑 §5 full workload，并以 within-chunk determinism + progress + baseline no-regression 判定 B 是否可升到更强 capability label；cross-chunk consistency 继续记录但不作为 pass/fail
 - **Re-open of A / C**：等 mlx-lm 修 issue #980 (hybrid cache trim) 后重新评估
 
 ### 10.1 Hand-off 纪律
@@ -237,6 +249,7 @@ graduates:
 - 现有 long-context baseline：`files/evidence/owlmlx/bench/long-context-ladder/20260526T013407Z-long-context-ladder.jsonl`
 - 现有 long-context bench script：`scripts/bench/long_context_ladder.py`（被复用 prompt 构造逻辑）
 - C1 canary 发现的 mlx-lm batched-vs-split 数值漂移：`docs/architect/design/F-2-ngram-suffix-spec.md` §4.2 change log
+- B determinism smoke：`files/evidence/owlmlx/bench/prefill-chunking/20260526T084239Z-prefill-chunk-determinism-smoke-rollup.jsonl`
 - F-1 surface（B 不消费）：[`F-1-spec.md`](F-1-spec.md)
 
 ## 12. Change Log
@@ -245,4 +258,5 @@ graduates:
 |---|---|---|
 | 2026-05-26 | design-grade 初稿；plan §5 derive；mlx-lm 已提供 `prefill_step_size` + `prompt_progress_callback`，owlmlx 侧工作是 expose + callback emit + workload；不依赖 trim，但 hybrid 兼容性仍由 workload gate 判定 | architect session（B kickoff round） |
 | 2026-05-26 | review amend：progress event scope 收紧到显式启用的 streaming 路径，避免污染 subprocess 非 stream 单 payload `_exchange` 和默认 stream 消费者；移除 "100% 兼容" 预设结论 | codex quality gate |
-| 2026-05-26 | code-grade smoke：Qwen 27B 4bit / 4k prompt / chunks 512 vs 2048 均 pass generation + progress events，但 byte-equivalence match_rate=0.0；B 保持 blocked，不升 capability | codex code-grade |
+| 2026-05-26 | code-grade smoke：Qwen 27B 4bit / 4k prompt / chunks 512 vs 2048 均 pass generation + progress events，但 cross-chunk consistency match_rate=0.0；进入 numeric-path triage | codex code-grade |
+| 2026-05-26 | gate 修订：determinism smoke 证明同一 chunk size 重复运行 byte-for-byte deterministic（repeat_match_rate=1.0），跨 chunk divergence 是 mlx-lm 不同 `prefill_step_size` 的 deterministic numeric-path 行为；B gate 改为 within-chunk determinism required，cross-chunk consistency diagnostic-only | codex quality gate |

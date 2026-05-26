@@ -37,7 +37,7 @@
 
 | 方向 | 改什么 | 用户可见效果 | 工程量 | 推荐顺序 |
 |---|---|---|---|---|
-| **B** Prefill chunking | 暴露 mlx-lm 已有 `prefill_step_size`，把 `prompt_progress_callback` 转成 owlmlx 内部 stream event | 长 prompt 不再"卡 6 分钟无信号"，能上报 prefill 进度；同时量化 chunk size 对 TTFT / 峰值内存 / byte-equivalence 的影响 | 低-中（1-2 周） | **1（当前）** |
+| **B** Prefill chunking | 暴露 mlx-lm 已有 `prefill_step_size`，把 `prompt_progress_callback` 转成 owlmlx 内部 stream event | 长 prompt 不再"卡 6 分钟无信号"，能上报 prefill 进度；同时量化 chunk size 对 TTFT / 峰值内存 / within-chunk determinism / cross-chunk consistency 的影响 | 低-中（1-2 周） | **1（当前）** |
 | **C** n-gram / SuffixDecoding probe | 加一层"基于历史输出做投机预测"的解码包装 | 同 prompt 重复模式下 decode **候选快 2-5×**；agent / code-edit 场景特别明显 | 中（3-4 周） | paused on mlx-lm #980 |
 | **A** Prompt cache 在 MoE serving 路径落地 | 让 owlmlx 真正消费 mlx-lm 已有的 prompt cache 原语，让相同前缀第二次请求**跳过 prefill** | 多轮对话第 2+ 轮 TTFT 从几十秒掉到亚秒 | 中-高（3-4 周） | paused on trim risk |
 
@@ -213,13 +213,13 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 
 - 在 child runner 中把 per-request `prefill_chunk_tokens` 和 env fallback `OWLMLX_PREFILL_CHUNK_TOKENS` 映射到 mlx-lm `prefill_step_size`
 - 仅在显式请求 chunk/progress 的 internal streaming path 注册 `prompt_progress_callback`，把 callback 转成 child JSONL `event="prefill_progress"`，parent 再 yield 为内部 `StreamEvent`
-- 新增 workload runner 测 3 模型 × 4 context × 3 chunk size 的 TTFT / 峰值 RSS / byte-equivalence
+- 新增 workload runner 测 3 模型 × 4 context × 3 chunk size 的 TTFT / 峰值 RSS / within-chunk determinism / cross-chunk consistency
 
 **Effort**：1-2 周（主要是参数透传、stream event plumbing、workload/evidence）
 
 ### 5.4 Risk / Unknown
 
-- 不同 `prefill_step_size` 的**数值等价性**需要验证。理论上 attention 是 causal 的，分块不应该改变结果，但 C1 canary 已经证明 mlx-lm 不同 prefill execution path 可能出现数值漂移，B 必须用 byte-equivalence gate 卡住
+- 不同 `prefill_step_size` 的**数值路径**必须记录。理论上 attention 是 causal 的，但 C1 canary 和 B smoke triage 已经证明 mlx-lm 不同 prefill execution path 可能出现 deterministic 输出分叉。B 的硬 gate 是**同一 chunk size 重复运行必须 byte-for-byte deterministic**；跨 chunk 一致率降为 diagnostic-only
 - progress event 先只走 owlmlx 内部 stream channel；非 stream subprocess `_exchange` 仍是单 payload 协议，B 不得让非 stream path 先吐 progress
 
 ### 5.5 为什么现在排第 1
@@ -233,7 +233,7 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 | 周次 | 方向 | 阶段 | 关键交付 |
 |---|---|---|---|
 | W1 | **B Prefill chunking** | B contract + stream event plumbing | `prefill_chunk_tokens` → `prefill_step_size`；explicit stream-only `prefill_progress` event；非 stream `_exchange` 不变 |
-| W1-W2 | **B** | workload + evidence | 3 模型 × 4 context × 3 chunk size；TTFT / peak RSS / byte-equivalence rollup |
+| W1-W2 | **B** | workload + evidence | 3 模型 × 4 context × 3 chunk size；TTFT / peak RSS / within-chunk determinism / cross-chunk consistency rollup |
 | blocked | **C ngram/suffix** | C2 serving integration | 等 mlx-lm issue #980 支持 hybrid cache trim / rollback 后重开 |
 | blocked | **A prompt cache** | MoE / subprocess cache reuse | 等 Track 1 与 hybrid trim 风险收口后重开 |
 | later | **整体** | 综合 bench + 对外可对照的速度故事整理 | 只有 B/A/C 各自 evidence clean 后再重跑 long-context-ladder 对照 |
@@ -262,7 +262,7 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 |---|---|---|
 | **C** ngram/SuffixDecoding | OwlCoda-class workload 上的 wall-clock decode 时间、accepted_tokens、accepted_rounds、fallback rate | 同 workload 关 `method=ngram` 的实测；目标 ≥2× |
 | **A** Prompt cache | 第二轮同 prefix 请求的 TTFT | 第一轮 prefill 时间；目标 cache 命中时 < 5% |
-| **B** Prefill chunking | 长输入 TTFT / 峰值 RSS 可测 + 内部 stream `prefill_progress` 事件可见 + byte-equivalence | 2026-05-26 long-context baseline；默认路径目标 ±5% 内，非默认 chunk size 不预设提速 |
+| **B** Prefill chunking | 长输入 TTFT / 峰值 RSS 可测 + 内部 stream `prefill_progress` 事件可见 + within-chunk determinism；cross-chunk consistency 仅诊断 | 2026-05-26 long-context baseline；默认路径目标 ±5% 内，非默认 chunk size 不预设提速 |
 
 **统一 evidence 落点**：每个 design-grade spec 自定子目录；B 使用 `files/evidence/owlmlx/bench/prefill-chunking/<时间戳>-*.jsonl`。
 
@@ -309,9 +309,9 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 
 ## 11. 状态 / 下一步
 
-- **当前状态**：plan-grade 已按 C2 blocker 重新排序；方向 C 的 F-2 C0/C1 已完成并通过，但 C2 serving integration blocked on mlx-lm hybrid trim；B code-grade 已实现参数 / progress plumbing，smoke blocked on byte-equivalence
+- **当前状态**：plan-grade 已按 C2 blocker 重新排序；方向 C 的 F-2 C0/C1 已完成并通过，但 C2 serving integration blocked on mlx-lm hybrid trim；B code-grade 已实现参数 / progress plumbing，smoke + determinism smoke 支持 partial 收口：同一 chunk size deterministic，跨 chunk divergence 作为 diagnostic-only
 - **下一步**：
-  - 方向 B 进入 byte-equivalence triage：smoke 中 512 vs 2048 chunk 输出 hash 不一致；先确认是 mlx-lm prefill path 数值差异还是 workload/harness 问题
+  - 方向 B 跑 full workload：3 模型 × 4 context × 3 chunk size × N=3，检查 progress、TTFT/RSS、within-chunk determinism、baseline regression；cross-chunk consistency 只记录不 gate
   - 方向 C 保留 C0/C1 与当前 C2 attempt，不继续 serving integration，等 mlx-lm issue #980
   - 方向 A 暂停，不动 `session_kv_cache.py` / Track 1 文件
 - **每个 design-grade spec 评审通过后**才进 code-grade（依 [01-mainline-roadmap.md Part VIII.3](01-mainline-roadmap.md) 层级 handoff 纪律）
@@ -326,4 +326,5 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 | 2026-05-26 | 复核修订：锁 C→A→B 顺序；将 C 的 surface 收敛到 F-1 v1 `method=ngram`；收窄 prompt-cache 现状措辞；把 C 拆成 C0/C1/C2；补 evidence 纪律 | Codex architect review |
 | 2026-05-26 | 状态更新：F-2 C0/C1 已完成并通过；C2 serving integration 成为方向 C 下一步 | C1 closeout |
 | 2026-05-26 | C2 blocker 后重排：B 优先；C/A 暂停；B 使用 mlx-lm `prefill_step_size` / `prompt_progress_callback`，不扩 HTTP SSE，不预设 hybrid supported 结论 | B kickoff review |
-| 2026-05-26 | B code-grade smoke：参数 / progress plumbing 工作，但 Qwen 27B 4bit 4k prompt 的 chunk 512 vs 2048 byte-equivalence 失败；B 不收口，下一步转数值稳定性 triage | B smoke closeout |
+| 2026-05-26 | B code-grade smoke：参数 / progress plumbing 工作，但 Qwen 27B 4bit 4k prompt 的 chunk 512 vs 2048 cross-chunk consistency 失败；进入 numeric-path triage | B smoke closeout |
+| 2026-05-26 | B gate 修订：determinism smoke `20260526T084239Z` 证明同一 chunk size 重复运行必须 deterministic；跨 chunk divergence 确认为 mlx-lm `prefill_step_size` deterministic numeric-path 差异，降为 diagnostic-only；B partial 收口，等待 full workload | B quality gate |

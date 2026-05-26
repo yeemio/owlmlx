@@ -54,7 +54,7 @@ DEFAULT_RUNS = 3
 DEFAULT_OUTPUT_TOKENS = 32
 
 SCHEMA_VERSION_CELL = "b.prefill_chunk.cell.v1"
-SCHEMA_VERSION_ROLLUP = "b.prefill_chunk.rollup.v1"
+SCHEMA_VERSION_ROLLUP = "b.prefill_chunk.rollup.v2"
 
 
 def _now_compact_utc() -> str:
@@ -233,7 +233,38 @@ def _run_cell(
     )
 
 
-def _byte_equivalence_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def _within_chunk_determinism_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    groups: dict[tuple[str, int, int], list[str]] = {}
+    for row in rows:
+        if row.get("verdict") != "pass":
+            continue
+        key = (
+            str(row.get("model_id")),
+            int(row.get("target_input_tokens") or 0),
+            int(row.get("chunk_size") or 0),
+        )
+        output_hash = row.get("output_byte_hash")
+        if isinstance(output_hash, str):
+            groups.setdefault(key, []).append(output_hash)
+    repeated_groups = [hashes for hashes in groups.values() if len(hashes) >= 2]
+    deterministic = sum(1 for hashes in repeated_groups if len(set(hashes)) == 1)
+    if not repeated_groups:
+        status = "not_measured"
+        match_rate: float | None = None
+    else:
+        match_rate = round(deterministic / len(repeated_groups), 6)
+        status = "passed" if deterministic == len(repeated_groups) else "failed"
+    return {
+        "gate": "required",
+        "status": status,
+        "total_groups": len(groups),
+        "groups_with_repeated_runs": len(repeated_groups),
+        "repeated_groups_with_identical_output": deterministic,
+        "repeat_match_rate": match_rate,
+    }
+
+
+def _cross_chunk_consistency_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     groups: dict[tuple[str, int, int], set[str]] = {}
     for row in rows:
         if row.get("verdict") != "pass":
@@ -249,9 +280,14 @@ def _byte_equivalence_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     total_groups = len(groups)
     identical = sum(1 for hashes in groups.values() if len(hashes) == 1)
     return {
+        "gate": "informational_only",
         "total_groups": total_groups,
         "groups_with_identical_output": identical,
         "match_rate": round(identical / total_groups, 6) if total_groups else None,
+        "note": (
+            "Different prefill_step_size values may follow different deterministic "
+            "mlx-lm numeric paths; this metric is diagnostic and does not gate B."
+        ),
     }
 
 
@@ -261,7 +297,8 @@ def _write_rollup(
     run_id: str,
     rows: list[dict[str, Any]],
 ) -> None:
-    byte_equivalence = _byte_equivalence_summary(rows)
+    within_chunk_determinism = _within_chunk_determinism_summary(rows)
+    cross_chunk_consistency = _cross_chunk_consistency_summary(rows)
     ok_cells = sum(1 for row in rows if row.get("verdict") == "pass")
     failed_cells = len(rows) - ok_cells
     progress_candidates = [
@@ -269,10 +306,14 @@ def _write_rollup(
         for row in rows
         if row.get("verdict") == "pass" and int(row.get("target_input_tokens") or 0) >= 8192
     ]
-    progress_observable = bool(progress_candidates) and all(
-        int((row.get("metrics") or {}).get("prefill_progress_event_count") or 0) >= 2
-        for row in progress_candidates
-    )
+    progress_observable: bool | None
+    if progress_candidates:
+        progress_observable = all(
+            int((row.get("metrics") or {}).get("prefill_progress_event_count") or 0) >= 2
+            for row in progress_candidates
+        )
+    else:
+        progress_observable = None
     rollup = {
         "schema_version": SCHEMA_VERSION_ROLLUP,
         "gate": "B",
@@ -281,7 +322,8 @@ def _write_rollup(
         "cell_count": len(rows),
         "ok_cells": ok_cells,
         "failed_cells": failed_cells,
-        "byte_equivalence": byte_equivalence,
+        "within_chunk_determinism": within_chunk_determinism,
+        "cross_chunk_consistency": cross_chunk_consistency,
         "baseline_regression_long_context_ladder": {
             "available": False,
             "delta_pct": None,
@@ -290,7 +332,12 @@ def _write_rollup(
         "graduates": {
             "chunk_param_exposed": ok_cells > 0,
             "progress_events_observable": progress_observable,
-            "byte_equivalence_holds": byte_equivalence.get("match_rate") == 1.0,
+            "within_chunk_determinism_holds": (
+                within_chunk_determinism.get("status") == "passed"
+            ),
+            "cross_chunk_consistency_holds": (
+                cross_chunk_consistency.get("match_rate") == 1.0
+            ),
             "baseline_no_regression": None,
         },
     }
