@@ -309,9 +309,9 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 
 ## 11. 状态 / 下一步
 
-- **当前状态**：plan-grade 已按 C2 blocker 重新排序；方向 C 的 F-2 C0/C1 已完成并通过，但 C2 serving integration blocked on mlx-lm hybrid trim；B code-grade 已实现参数 / progress plumbing，smoke + half workload 支持 partial 收口：同一 chunk size deterministic，progress event observable，跨 chunk divergence 作为 diagnostic-only；64k targeted 已证明 Qwen 27B 可跑但单 cell 9-10 分钟级，Qwen 35B-A3B / Gemma 31B 64k targeted 都 6/6 pass 且 chunk 2048 是当前最佳默认候选
+- **当前状态**：plan-grade 已按 C2 blocker 重新排序；方向 C 的 F-2 C0/C1 已完成并通过，但 C2 serving integration blocked on mlx-lm hybrid trim；B code-grade 已实现参数 / progress plumbing，smoke + half workload 支持 partial 收口：同一 chunk size deterministic，progress event observable，跨 chunk divergence 作为 diagnostic-only；64k targeted 已补齐三主力模型，Qwen 27B combined / Qwen 35B-A3B / Gemma 31B 都有 6/6 pass + within-chunk determinism evidence。Qwen 27B 64k TTFT host-state-sensitive；Qwen 35B-A3B / Gemma 31B 的当前默认候选仍是 chunk 2048
 - **下一步**：
-  - 方向 B 补 full workload：已完成 half workload `20260526T090253Z`（3 模型 × 4k/16k/32k × 3 chunks × N=2，54/54 pass，elapsed=1720.072s）；64k supplement `20260526T133018Z` 已完成 Qwen27 run-1 三档 chunk（3/3 pass，TTFT 563-605s）；Qwen35 targeted `20260526T140719Z` 完成 6/6（median TTFT 173.63s / 144.21s / 147.08s）；Gemma targeted `20260526T142420Z` 完成 6/6（median TTFT 228.54s / 185.47s / 219.58s）。下一步只剩 Qwen27 64k N=2 repeat 或 B partial 定性收口；cross-chunk consistency 只记录不 gate
+  - 方向 B 补 full workload：已完成 half workload `20260526T090253Z`（3 模型 × 4k/16k/32k × 3 chunks × N=2，54/54 pass，elapsed=1720.072s）；Qwen27 combined `20260526T145527Z` 完成 6/6（within determinism 3/3，cross-chunk consistency 1.0，run-1 TTFT 563-605s，repeat2 TTFT 132-200s，说明 TTFT 受 host state 影响）；Qwen35 targeted `20260526T140719Z` 完成 6/6（median TTFT 173.63s / 144.21s / 147.08s）；Gemma targeted `20260526T142420Z` 完成 6/6（median TTFT 228.54s / 185.47s / 219.58s）。下一步不再补同类 cells，转 baseline regression check / capability wording closeout；cross-chunk consistency 只记录不 gate
   - 方向 C 保留 C0/C1 与当前 C2 attempt，不继续 serving integration，等 mlx-lm issue #980
   - 方向 A 暂停，不动 `session_kv_cache.py` / Track 1 文件
 - **每个 design-grade spec 评审通过后**才进 code-grade（依 [01-mainline-roadmap.md Part VIII.3](01-mainline-roadmap.md) 层级 handoff 纪律）
@@ -332,3 +332,4 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 | 2026-05-26 | B 64k partial `20260526T133018Z`：Qwen27 64k run-1 chunks 512/2048/8192 all pass，TTFT 591.8s / 563.7s / 605.4s，progress observable；stopped after run-1 because default order makes Qwen27 64k a 30+ minute front-loaded blocker | B 64k triage |
 | 2026-05-26 | B Qwen35 64k targeted `20260526T140719Z`：6/6 pass，elapsed=938.612s，within-chunk determinism passed，cross-chunk consistency 1.0，median TTFT 173.63s / 144.21s / 147.08s for chunks 512 / 2048 / 8192 | B 64k targeted |
 | 2026-05-26 | B Gemma 64k targeted `20260526T142420Z`：6/6 pass，elapsed=1277.599s，within-chunk determinism passed，cross-chunk consistency 1.0，median TTFT 228.54s / 185.47s / 219.58s for chunks 512 / 2048 / 8192 | B 64k targeted |
+| 2026-05-26 | B Qwen27 64k combined `20260526T145527Z`：run-1 + repeat2 combined into 6 cells；6/6 pass，within-chunk determinism 3/3 repeated groups passed，cross-chunk consistency 1.0；repeat2 TTFT much faster than run-1, so Qwen27 TTFT is host-state-sensitive rather than a stable speed claim | B 64k combined |
