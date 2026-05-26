@@ -102,3 +102,18 @@ def test_write_rollup_records_partial_timebox_metadata(tmp_path) -> None:
     assert '"stop_reason": "time_limit_before_model:qwen3.6-27b-4bit"' in rollup
     assert '"time_limit_s": 2850' in rollup
     assert '"elapsed_s": 2850.123' in rollup
+
+
+def test_write_rollup_marks_unmeasured_determinism_as_null(tmp_path) -> None:
+    rollup_path = tmp_path / "rollup.jsonl"
+    rows = [_row(chunk_size=512, run_idx=1, output_hash="a")]
+
+    prefill_chunk_compare._write_rollup(
+        path=rollup_path,
+        run_id="test-run",
+        rows=rows,
+    )
+
+    [rollup] = rollup_path.read_text(encoding="utf-8").splitlines()
+    assert '"status": "not_measured"' in rollup
+    assert '"within_chunk_determinism_holds": null' in rollup

@@ -309,9 +309,9 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 
 ## 11. 状态 / 下一步
 
-- **当前状态**：plan-grade 已按 C2 blocker 重新排序；方向 C 的 F-2 C0/C1 已完成并通过，但 C2 serving integration blocked on mlx-lm hybrid trim；B code-grade 已实现参数 / progress plumbing，smoke + half workload 支持 partial 收口：同一 chunk size deterministic，progress event observable，跨 chunk divergence 作为 diagnostic-only
+- **当前状态**：plan-grade 已按 C2 blocker 重新排序；方向 C 的 F-2 C0/C1 已完成并通过，但 C2 serving integration blocked on mlx-lm hybrid trim；B code-grade 已实现参数 / progress plumbing，smoke + half workload 支持 partial 收口：同一 chunk size deterministic，progress event observable，跨 chunk divergence 作为 diagnostic-only；64k partial 已证明 Qwen 27B 可跑但单 cell 9-10 分钟级
 - **下一步**：
-  - 方向 B 补 full workload：已完成 half workload `20260526T090253Z`（3 模型 × 4k/16k/32k × 3 chunks × N=2，54/54 pass，elapsed=1720.072s）；下一步补 64k / N=3 与 baseline regression 检查；cross-chunk consistency 只记录不 gate
+  - 方向 B 补 full workload：已完成 half workload `20260526T090253Z`（3 模型 × 4k/16k/32k × 3 chunks × N=2，54/54 pass，elapsed=1720.072s）；64k supplement `20260526T133018Z` 已完成 Qwen27 run-1 三档 chunk（3/3 pass，TTFT 563-605s）。下一步应改成 per-model targeted 64k schedule，而不是按默认模型顺序硬跑 18 cells；cross-chunk consistency 只记录不 gate
   - 方向 C 保留 C0/C1 与当前 C2 attempt，不继续 serving integration，等 mlx-lm issue #980
   - 方向 A 暂停，不动 `session_kv_cache.py` / Track 1 文件
 - **每个 design-grade spec 评审通过后**才进 code-grade（依 [01-mainline-roadmap.md Part VIII.3](01-mainline-roadmap.md) 层级 handoff 纪律）
@@ -329,3 +329,4 @@ mlx-lm 已经提供 B 所需的直接 building blocks：
 | 2026-05-26 | B code-grade smoke：参数 / progress plumbing 工作，但 Qwen 27B 4bit 4k prompt 的 chunk 512 vs 2048 cross-chunk consistency 失败；进入 numeric-path triage | B smoke closeout |
 | 2026-05-26 | B gate 修订：determinism smoke `20260526T084239Z` 证明同一 chunk size 重复运行必须 deterministic；跨 chunk divergence 确认为 mlx-lm `prefill_step_size` deterministic numeric-path 差异，降为 diagnostic-only；B partial 收口，等待 full workload | B quality gate |
 | 2026-05-26 | B half workload `20260526T090253Z`：54/54 cells pass，elapsed=1720.072s，within-chunk determinism 27/27 repeated groups passed，progress observable，cross-chunk consistency 12/18 groups identical (diagnostic-only) | B half workload |
+| 2026-05-26 | B 64k partial `20260526T133018Z`：Qwen27 64k run-1 chunks 512/2048/8192 all pass，TTFT 591.8s / 563.7s / 605.4s，progress observable；stopped after run-1 because default order makes Qwen27 64k a 30+ minute front-loaded blocker | B 64k triage |

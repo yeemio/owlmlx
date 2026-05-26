@@ -318,6 +318,11 @@ def _write_rollup(
         )
     else:
         progress_observable = None
+    determinism_status = within_chunk_determinism.get("status")
+    if determinism_status == "not_measured":
+        determinism_holds: bool | None = None
+    else:
+        determinism_holds = determinism_status == "passed"
     rollup = {
         "schema_version": SCHEMA_VERSION_ROLLUP,
         "gate": "B",
@@ -340,9 +345,7 @@ def _write_rollup(
         "graduates": {
             "chunk_param_exposed": ok_cells > 0,
             "progress_events_observable": progress_observable,
-            "within_chunk_determinism_holds": (
-                within_chunk_determinism.get("status") == "passed"
-            ),
+            "within_chunk_determinism_holds": determinism_holds,
             "cross_chunk_consistency_holds": (
                 cross_chunk_consistency.get("match_rate") == 1.0
             ),
