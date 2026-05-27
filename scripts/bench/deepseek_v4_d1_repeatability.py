@@ -104,6 +104,11 @@ D6_TTFT_DRIFT_REL_THRESHOLD = 0.20
 D6_DECODE_TPS_DRIFT_REL_THRESHOLD = 0.15
 D6_CHILD_RSS_DRIFT_ABS_THRESHOLD = 1.0
 D6_FREED_GB_LOWER_BOUND = 80.0
+# §6.5 / §7.1 item 7 amendment (2026-05-27 D6.1 calibration): cross-validation
+# vs D2 is recorded as advisory diagnostic only. The gate is intra-run
+# child_rss_gb stability across the 6-row matrix.
+D6_INTRA_RUN_RSS_RANGE_THRESHOLD_GB = 0.5
+D6_INTRA_RUN_RSS_CEILING_GB = 30.0
 D6_DEFAULT_PROMPT_IDS: tuple[str, ...] = (
     "p1_short_cn",
     "p2_short_en",
@@ -2942,13 +2947,13 @@ def run_mainline(
 
             verdict = "passed"
             verdict_reason: str | None = None
-            if not cross["drift_within_threshold"]:
-                verdict = "failed"
-                verdict_reason = "cross_validation_drift"
-                overall_failed = True
+            # §6.5 / §7.1 item 7 amendment: cross-validation drift vs D2 is
+            # recorded as advisory diagnostic; it does NOT fail the row or
+            # the overall conclusion. The intra-run RSS stability gate is
+            # evaluated post-loop on the summary.
             if done_event is None:
                 verdict = "failed"
-                verdict_reason = verdict_reason or "no_done_event"
+                verdict_reason = "no_done_event"
                 overall_failed = True
 
             rows.append(
@@ -3047,6 +3052,28 @@ def run_mainline(
     if len(rows) != expected_rows:
         overall_failed = True
 
+    # §6.5 / §7.1 item 7 amendment: intra-run child_rss_gb stability gate.
+    row_rss_values = [
+        _as_float(row.get("metrics", {}).get("child_rss_gb"))
+        for row in rows
+        if isinstance(row.get("metrics"), dict)
+    ]
+    row_rss_values = [v for v in row_rss_values if v is not None]
+    if row_rss_values:
+        rss_range = round(max(row_rss_values) - min(row_rss_values), 6)
+        rss_max = round(max(row_rss_values), 6)
+    else:
+        rss_range = None
+        rss_max = None
+    intra_run_stability_ok = (
+        rss_range is not None
+        and rss_max is not None
+        and rss_range <= D6_INTRA_RUN_RSS_RANGE_THRESHOLD_GB
+        and rss_max <= D6_INTRA_RUN_RSS_CEILING_GB
+    )
+    if not intra_run_stability_ok:
+        overall_failed = True
+
     overall = "failed" if overall_failed or passed_rows != len(rows) else "passed"
 
     summary = {
@@ -3070,9 +3097,17 @@ def run_mainline(
             "child_rss_gb": _metric_distribution(rows, "child_rss_gb"),
         },
         "cross_validation_summary": {
+            "advisory": True,  # §6.5 amendment: not a gate
             "ttft_ms_diff_rel_max": max(ttft_diffs) if ttft_diffs else None,
             "decode_tps_diff_rel_max": max(decode_diffs) if decode_diffs else None,
             "child_rss_gb_diff_abs_max": max(rss_diffs) if rss_diffs else None,
+        },
+        "intra_run_stability": {
+            "child_rss_gb_range": rss_range,
+            "child_rss_gb_max": rss_max,
+            "child_rss_gb_range_threshold": D6_INTRA_RUN_RSS_RANGE_THRESHOLD_GB,
+            "child_rss_gb_ceiling": D6_INTRA_RUN_RSS_CEILING_GB,
+            "within_threshold": intra_run_stability_ok,
         },
         "backend_health_summary": {
             "child_restart_observed": False,

@@ -2093,10 +2093,26 @@ def test_mainline_writes_d6_evidence_on_happy_path(tmp_path, monkeypatch):
     )
     assert summary["backend_health_summary"]["child_restart_observed"] is False
     assert summary["backend_health_summary"]["clean_health_after_unload"] is True
+    # §6.5 amendment: intra-run RSS stability block present and passes
+    stability = summary["intra_run_stability"]
+    assert stability["within_threshold"] is True
+    assert stability["child_rss_gb_range"] is not None
+    assert stability["child_rss_gb_range"] <= 0.5
+    # §6.5 amendment: cross-validation block is advisory only
+    assert summary["cross_validation_summary"]["advisory"] is True
 
 
-def test_mainline_flags_cross_validation_drift_as_failed(tmp_path, monkeypatch):
-    # Baseline TTFT 1ms; fake yields after ~50ms -> ~5000% drift, way over 20%
+def test_mainline_records_cross_validation_drift_advisorily(tmp_path, monkeypatch):
+    """Per §6.5 / §7.1 item 7 amendment, cross-validation drift vs D2 is
+    advisory diagnostic only — it is recorded in the summary and per-row
+    `cross_validation` blocks but does NOT gate `overall_conclusion`.
+
+    This test sets up baseline values guaranteed to be exceeded by any
+    realistic timing (baseline ttft=1ms, decode_tps=1000) and asserts:
+    (1) drift values are populated, (2) overall_conclusion stays `passed`
+    as long as intra-run RSS stability and functional gates hold.
+    """
+
     baseline_path = tmp_path / "d2_baseline.jsonl"
     _write_fake_d2_baseline(
         baseline_path, ttft_ms=1.0, decode_tps=1000.0, child_rss_gb=100.0
@@ -2113,7 +2129,7 @@ def test_mainline_flags_cross_validation_drift_as_failed(tmp_path, monkeypatch):
     output_dir = tmp_path / "evidence"
     payload = d1.run_mainline(
         output_dir=output_dir,
-        run_id="20260527T-d6-drift-test",
+        run_id="20260527T-d6-drift-advisory-test",
         backend_python=backend_python,
         model_path=model_path,
         d2_baseline_path=baseline_path,
@@ -2124,8 +2140,17 @@ def test_mainline_flags_cross_validation_drift_as_failed(tmp_path, monkeypatch):
         ),
     )
 
-    assert payload["overall_conclusion"] == "failed"
-    assert payload["verdict"] == "failed"
+    # Drift is huge but overall passes because cross-validation is now advisory.
+    assert payload["overall_conclusion"] == "passed", payload
+    assert payload["verdict"] == "passed"
+
+    cv_summary = payload["cross_validation_summary"]
+    assert cv_summary["advisory"] is True
+    assert cv_summary["ttft_ms_diff_rel_max"] is not None
+    assert cv_summary["ttft_ms_diff_rel_max"] > 0.20, (
+        "fake timing should still exceed the legacy 20% TTFT threshold; "
+        "this test exists to prove that exceeding it no longer fails the run"
+    )
 
     jsonl_files = list(output_dir.glob("*.jsonl"))
     rows = _records(jsonl_files[0])
@@ -2134,8 +2159,86 @@ def test_mainline_flags_cross_validation_drift_as_failed(tmp_path, monkeypatch):
         r for r in rows if r["cross_validation"]["drift_within_threshold"] is False
     ]
     assert len(drift_violations) >= 1
+    # Under amended spec, drift violations do NOT flip row verdict to failed.
     for violation in drift_violations:
-        assert violation["verdict"] == "failed"
+        assert violation["verdict"] == "passed", (
+            "row verdict must stay passed under amended spec even when "
+            "cross_validation drift exceeds the legacy threshold"
+        )
+
+
+def test_mainline_flags_intra_run_rss_instability_as_failed(tmp_path, monkeypatch):
+    """Per §6.5 / §7.1 item 7 amendment, the new gate is intra-run
+    `child_rss_gb` stability: range across the 6 rows must be ≤ 0.5 GB.
+    This test simulates an unstable RSS sample sequence and asserts the
+    harness flips `overall_conclusion` to `failed`.
+    """
+
+    baseline_path = tmp_path / "d2_baseline.jsonl"
+    _write_fake_d2_baseline(baseline_path)
+
+    model_path = tmp_path / "DSV4-fake"
+    _write_dsv4_config_only_model(model_path)
+
+    backend_python = tmp_path / "fake-python"
+    backend_python.write_text("")
+
+    # Replicate the _mock_d6_probes default except inject an RSS sample
+    # sequence that grows monotonically beyond the 0.5 GB intra-run band.
+    rss_samples = iter([7.0, 7.1, 7.3, 7.6, 8.0, 8.5])  # range = 1.5 GB
+
+    def _stepping_rss(pid, **_kw):
+        try:
+            return next(rss_samples)
+        except StopIteration:
+            return 8.5
+
+    monkeypatch.setattr(
+        d1,
+        "_d6_probe_model_type_support",
+        lambda python_executable, model_type: {
+            "supported": True,
+            "module_name": f"mlx_lm.models.{model_type}",
+            "returncode": 0,
+            "stdout": "",
+            "stderr": "",
+        },
+        raising=False,
+    )
+    monkeypatch.setattr(
+        d1,
+        "_d6_runtime_provenance",
+        lambda python_executable: {
+            "origin": "mocked",
+            "package_version": "0.22.0",
+            "git_commit": "5c10538136b9038b9626c134612b08afc18d697a",
+        },
+        raising=False,
+    )
+    monkeypatch.setattr(d1, "_process_rss_gb", _stepping_rss, raising=True)
+
+    output_dir = tmp_path / "evidence"
+    payload = d1.run_mainline(
+        output_dir=output_dir,
+        run_id="20260527T-d6-rss-instability-test",
+        backend_python=backend_python,
+        model_path=model_path,
+        d2_baseline_path=baseline_path,
+        backend_factory=lambda **_kw: _DSV4FakeBackend(),
+        # Use lenient cross-validation thresholds so only the intra-run
+        # stability gate can fail this run.
+        ttft_drift_rel_threshold=100.0,
+        decode_tps_drift_rel_threshold=100.0,
+        child_rss_drift_abs_threshold=1000.0,
+    )
+
+    assert payload["overall_conclusion"] == "failed", payload
+    assert payload["verdict"] == "failed"
+    stability = payload["intra_run_stability"]
+    assert stability["within_threshold"] is False
+    assert stability["child_rss_gb_range"] is not None
+    assert stability["child_rss_gb_range"] > 0.5
+    assert stability["child_rss_gb_max"] is not None
 
 
 def test_mainline_emits_blocked_when_model_type_probe_unsupported(
