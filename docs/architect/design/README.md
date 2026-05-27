@@ -47,6 +47,9 @@
 | **D3** | [`D3-spec.md`](D3-spec.md) | inspection passed; `missingReason=mtp_weights_absent_or_stripped` | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
 | **D4** | [`D4-spec.md`](D4-spec.md) | clean pre-load reject passed; consumes D3 missing reason; no load attempted | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign D |
 | **F-1** | [`F-1-spec.md`](F-1-spec.md) | code-grade F-1.2 + F-1.3 landed; endpoint + kernel observe APIs + fixture evidence `20260525T142617Z`; no method promotion | [`../06-campaign-F1-plan.md`](../06-campaign-F1-plan.md) (in turn from [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign F · F1) |
+| **F-2** | [`F-2-ngram-suffix-spec.md`](F-2-ngram-suffix-spec.md) | C0/C1 passed; C2 serving integration paused on mlx-lm hybrid trim | [`../07-perf-optimization-proposal-20260526.md`](../07-perf-optimization-proposal-20260526.md) direction C |
+| **B prefill chunking** | [`B-prefill-chunking-spec.md`](B-prefill-chunking-spec.md) | configuration/progress surfaces supported; wall-clock acceleration not promised; cross-chunk consistency diagnostic-only | [`../07-perf-optimization-proposal-20260526.md`](../07-perf-optimization-proposal-20260526.md) direction B |
+| **F-4** | [`F-4-structured-output-invariance-spec.md`](F-4-structured-output-invariance-spec.md) | design-grade draft; validator + smoke matrix next; no code-grade implementation yet | [`../08-campaign-F4-structured-output-invariance-plan.md`](../08-campaign-F4-structured-output-invariance-plan.md) |
 
 **节奏纪律**：design spec **一次一个**，per round 落盘 + review；不允许批量预先撰写未启动的 gate。
 
