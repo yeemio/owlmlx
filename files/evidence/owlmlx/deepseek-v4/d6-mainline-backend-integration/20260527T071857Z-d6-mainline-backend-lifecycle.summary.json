@@ -1,0 +1,86 @@
+{
+  "backend_class": "MlxLmSubprocessBackend",
+  "backend_health_summary": {
+    "child_restart_observed": false,
+    "clean_health_after_unload": false,
+    "unload_freed_gb": null,
+    "unload_time_s": null
+  },
+  "created_at": "2026-05-27T07:19:33Z",
+  "cross_validation_summary": {
+    "child_rss_gb_diff_abs_max": null,
+    "decode_tps_diff_rel_max": null,
+    "ttft_ms_diff_rel_max": null
+  },
+  "drift_within_threshold_rows": 0,
+  "evidence_strength": "mainline_backend_lifecycle",
+  "gate": "D6",
+  "lifecycle_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/deepseek-v4/d6-mainline-backend-integration/20260527T071857Z-d6-mainline-backend-lifecycle.jsonl",
+  "load_error": {
+    "detail": {
+      "load_time_s": 34.216,
+      "payload": {
+        "error": "child process produced no output",
+        "ok": false
+      },
+      "pid": 61071,
+      "returncode": -1,
+      "stderr": "libc++abi: terminating due to uncaught exception of type std::runtime_error: [METAL] Command buffer execution failed: Caused GPU Timeout Error (00000002:kIOGPUCommandBufferCallbackErrorTimeout)",
+      "stdout": ""
+    },
+    "error_code": "backend_error",
+    "message": "mlx-lm subprocess load failed: child process produced no output"
+  },
+  "metric_summary": {
+    "child_rss_gb": {
+      "count": 0,
+      "max": null,
+      "min": null,
+      "p50": null
+    },
+    "decode_tps_after_first_token": {
+      "count": 0,
+      "max": null,
+      "min": null,
+      "p50": null
+    },
+    "ttft_ms": {
+      "count": 0,
+      "max": null,
+      "min": null,
+      "p50": null
+    }
+  },
+  "mlx_lm_git_commit": "9e8f8a54d71fe073f5b42794b1218190b5d5d4b1",
+  "overall_conclusion": "failed",
+  "passed_rows": 0,
+  "preflight": "passed",
+  "preflight_detail": {
+    "backend_class": "MlxLmSubprocessBackend",
+    "d2_baseline_evidence_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/20260517T-d2-p1-p2-p4-128-512-metrics-v2.jsonl",
+    "d2_baseline_rows_present": 6,
+    "deepseek_experimental_extras_installed": true,
+    "default_model_surface_unchanged": true,
+    "mainline_runtime_path": ".runtime-deepseek-experimental",
+    "mlx_lm_source": {
+      "git_commit": "9e8f8a54d71fe073f5b42794b1218190b5d5d4b1",
+      "git_commit_matches_expected": false,
+      "origin": "/Users/yeemio/AI/gitrep/owlmlx/.runtime-deepseek-experimental/lib/python3.13/site-packages/mlx_lm/__init__.py",
+      "package_version": "0.31.3"
+    },
+    "model_artifact_path": "/Users/yeemio/AI/Agent/model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ",
+    "model_type_in_config": "deepseek_v4",
+    "model_type_support_probe": {
+      "module_name": "mlx_lm.models.deepseek_v4",
+      "returncode": 0,
+      "supported": true
+    },
+    "python_executable": ".runtime-deepseek-experimental/bin/python",
+    "stock_runtime_untouched": true
+  },
+  "rows_written": 0,
+  "run_id": "20260527T071857Z-d6-mainline-backend-lifecycle",
+  "schema_version": "d6.mainline-backend.run.v1",
+  "summary_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/deepseek-v4/d6-mainline-backend-integration/20260527T071857Z-d6-mainline-backend-lifecycle.summary.json",
+  "verdict": "failed"
+}

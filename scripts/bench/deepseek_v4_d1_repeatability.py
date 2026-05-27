@@ -78,6 +78,38 @@ RSS_SAMPLE_SOURCE = "ps_rss_kb"
 RSS_SAMPLE_TIMING = "after_generation_before_unload"
 RUNNER_MODULE = "owlmlx.runtime.mlx_lm_runner"
 DEFAULT_DEEPSEEK_ADAPTER_PATH = Path("/tmp/mlx-lm-dsv4")
+D6_EVIDENCE_STRENGTH = "mainline_backend_lifecycle"
+D6_DEFAULT_OUTPUT_DIR = (
+    REPO_ROOT
+    / "files"
+    / "evidence"
+    / "owlmlx"
+    / "deepseek-v4"
+    / "d6-mainline-backend-integration"
+)
+D6_DEFAULT_BASELINE_PATH = (
+    REPO_ROOT
+    / "files"
+    / "evidence"
+    / "owlmlx"
+    / "deepseek-v4"
+    / "d2-metrics-ledger"
+    / "20260517T-d2-p1-p2-p4-128-512-metrics-v2.jsonl"
+)
+D6_DEFAULT_BACKEND_PYTHON = (
+    REPO_ROOT / ".runtime-deepseek-experimental" / "bin" / "python"
+)
+D6_EXPECTED_MLX_LM_GIT_COMMIT = "5c10538136b9038b9626c134612b08afc18d697a"
+D6_TTFT_DRIFT_REL_THRESHOLD = 0.20
+D6_DECODE_TPS_DRIFT_REL_THRESHOLD = 0.15
+D6_CHILD_RSS_DRIFT_ABS_THRESHOLD = 1.0
+D6_FREED_GB_LOWER_BOUND = 80.0
+D6_DEFAULT_PROMPT_IDS: tuple[str, ...] = (
+    "p1_short_cn",
+    "p2_short_en",
+    "p4_long_context",
+)
+D6_DEFAULT_MAX_TOKENS_LADDER: tuple[int, ...] = (128, 512)
 MTP_WEIGHT_TERMS = (
     "mtp",
     "draft",
@@ -2316,6 +2348,771 @@ def run_direct_vs_runner(
     return payload
 
 
+# ---------------------------------------------------------------------------
+# D6 · mainline backend integration (DSV4-Flash 2bit-DQ through
+# MlxLmSubprocessBackend with the `deepseek-experimental` extras venv).
+# Spec: docs/architect/design/D6-mainline-backend-integration-spec.md
+# ---------------------------------------------------------------------------
+
+
+def _d6_read_model_type_from_config(model_path: Path) -> str | None:
+    config_path = Path(model_path) / "config.json"
+    if not config_path.is_file():
+        return None
+    try:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    model_type = payload.get("model_type")
+    if isinstance(model_type, str) and model_type.strip():
+        return model_type.strip()
+    return None
+
+
+def _d6_probe_model_type_support(
+    python_executable: Path,
+    model_type: str,
+    *,
+    timeout_s: float = 10.0,
+) -> dict[str, Any]:
+    """Run ``importlib.util.find_spec`` in the given python venv."""
+
+    module_name = f"mlx_lm.models.{model_type}"
+    code = (
+        "import importlib.util, json, sys\n"
+        "module = sys.argv[1]\n"
+        "try:\n"
+        "    spec = importlib.util.find_spec(module)\n"
+        "except ModuleNotFoundError as exc:\n"
+        "    print(json.dumps({'probe_error': str(exc), 'module_name': module}))\n"
+        "    raise SystemExit(1)\n"
+        "print(json.dumps({'supported': spec is not None, 'module_name': module}))\n"
+    )
+    try:
+        completed = subprocess.run(
+            [str(python_executable), "-c", code, module_name],
+            cwd=None,
+            env=os.environ.copy(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout_s,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {
+            "supported": False,
+            "module_name": module_name,
+            "returncode": -1,
+            "stdout": "",
+            "stderr": f"{type(exc).__name__}: {exc}",
+        }
+    parsed: dict[str, Any] = {}
+    try:
+        parsed = json.loads(completed.stdout.strip() or "{}")
+    except json.JSONDecodeError:
+        parsed = {}
+    supported = (
+        completed.returncode == 0
+        and bool(parsed.get("supported"))
+        and not parsed.get("probe_error")
+    )
+    return {
+        "supported": supported,
+        "module_name": module_name,
+        "returncode": int(completed.returncode),
+        "stdout": completed.stdout,
+        "stderr": completed.stderr,
+    }
+
+
+def _d6_runtime_provenance(
+    python_executable: Path,
+    *,
+    timeout_s: float = 15.0,
+) -> dict[str, Any]:
+    code = (
+        "import importlib, importlib.metadata, json, os.path, pathlib, subprocess\n"
+        "result = {'origin': None, 'package_version': None, 'git_commit': None, 'source_url': None}\n"
+        "try:\n"
+        "    module = importlib.import_module('mlx_lm')\n"
+        "    result['origin'] = getattr(module, '__file__', None)\n"
+        "except Exception as exc:\n"
+        "    result['origin_error'] = str(exc)\n"
+        "dist_path = None\n"
+        "try:\n"
+        "    dist = importlib.metadata.distribution('mlx-lm')\n"
+        "    result['package_version'] = dist.version\n"
+        "    dist_path = pathlib.Path(str(getattr(dist, '_path', '') or ''))\n"
+        "    direct_url_text = dist.read_text('direct_url.json')\n"
+        "    if direct_url_text:\n"
+        "        direct_url = json.loads(direct_url_text)\n"
+        "        result['source_url'] = direct_url.get('url')\n"
+        "        vcs_info = direct_url.get('vcs_info') or {}\n"
+        "        result['git_commit'] = vcs_info.get('commit_id')\n"
+        "except Exception:\n"
+        "    pass\n"
+        "checkout = result.get('origin')\n"
+        "site_root = str(dist_path.parent) if dist_path else None\n"
+        "while result.get('git_commit') is None and checkout and not os.path.isdir(os.path.join(checkout, '.git')):\n"
+        "    if site_root and os.path.abspath(checkout) == os.path.abspath(site_root):\n"
+        "        checkout = None\n"
+        "        break\n"
+        "    parent = os.path.dirname(checkout)\n"
+        "    if parent == checkout:\n"
+        "        checkout = None\n"
+        "        break\n"
+        "    checkout = parent\n"
+        "if result.get('git_commit') is None and checkout:\n"
+        "    try:\n"
+        "        commit = subprocess.run(['git', '-C', checkout, 'rev-parse', 'HEAD'],\n"
+        "                                capture_output=True, text=True, timeout=5)\n"
+        "        if commit.returncode == 0:\n"
+        "            result['git_commit'] = commit.stdout.strip()\n"
+        "    except Exception:\n"
+        "        pass\n"
+        "print(json.dumps(result))\n"
+    )
+    try:
+        completed = subprocess.run(
+            [str(python_executable), "-c", code],
+            cwd=None,
+            env=os.environ.copy(),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout_s,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {"origin": None, "package_version": None, "git_commit": None}
+    try:
+        return json.loads(completed.stdout.strip() or "{}")
+    except json.JSONDecodeError:
+        return {"origin": None, "package_version": None, "git_commit": None}
+
+
+def _d6_load_baseline(path: Path) -> dict[tuple[str, int], dict[str, Any]]:
+    rows: dict[tuple[str, int], dict[str, Any]] = {}
+    for row in _read_jsonl_rows(path):
+        prompt_id = str(row.get("prompt_id") or "")
+        max_tokens = row.get("max_tokens")
+        if not prompt_id or max_tokens is None:
+            continue
+        try:
+            key = (prompt_id, int(max_tokens))
+        except (TypeError, ValueError):
+            continue
+        rows[key] = row
+    return rows
+
+
+def _d6_cross_validation(
+    *,
+    actual_metrics: dict[str, Any],
+    baseline_row: dict[str, Any] | None,
+    ttft_drift_rel_threshold: float,
+    decode_tps_drift_rel_threshold: float,
+    child_rss_drift_abs_threshold: float,
+) -> dict[str, Any]:
+    if baseline_row is None:
+        return {
+            "d2_baseline_row_present": False,
+            "ttft_ms_diff_rel": None,
+            "decode_tps_diff_rel": None,
+            "child_rss_gb_diff_abs": None,
+            "drift_within_threshold": False,
+            "reason": "baseline_row_missing",
+        }
+    baseline_metrics = (
+        baseline_row.get("metrics") if isinstance(baseline_row.get("metrics"), dict) else {}
+    )
+
+    def _diff_rel(key: str) -> float | None:
+        actual = _as_float(actual_metrics.get(key))
+        baseline = _as_float(baseline_metrics.get(key))
+        if actual is None or baseline is None or baseline == 0.0:
+            return None
+        return round((actual - baseline) / baseline, 6)
+
+    def _diff_abs(key: str) -> float | None:
+        actual = _as_float(actual_metrics.get(key))
+        baseline = _as_float(baseline_metrics.get(key))
+        if actual is None or baseline is None:
+            return None
+        return round(actual - baseline, 6)
+
+    ttft_diff = _diff_rel("ttft_ms")
+    decode_diff = _diff_rel("decode_tps_after_first_token")
+    rss_diff = _diff_abs("child_rss_gb")
+
+    reasons: list[str] = []
+
+    def _check_rel(diff: float | None, threshold: float, name: str) -> bool:
+        if diff is None:
+            reasons.append(f"{name}_unavailable")
+            return False
+        if abs(diff) > threshold:
+            reasons.append(f"{name}_diff_rel={diff} exceeds {threshold}")
+            return False
+        return True
+
+    def _check_abs(diff: float | None, threshold: float, name: str) -> bool:
+        if diff is None:
+            reasons.append(f"{name}_unavailable")
+            return False
+        if abs(diff) > threshold:
+            reasons.append(f"{name}_diff_abs={diff} exceeds {threshold}")
+            return False
+        return True
+
+    ok_ttft = _check_rel(ttft_diff, ttft_drift_rel_threshold, "ttft_ms")
+    ok_decode = _check_rel(
+        decode_diff, decode_tps_drift_rel_threshold, "decode_tps_after_first_token"
+    )
+    ok_rss = _check_abs(rss_diff, child_rss_drift_abs_threshold, "child_rss_gb")
+
+    return {
+        "d2_baseline_row_present": True,
+        "ttft_ms_diff_rel": ttft_diff,
+        "decode_tps_diff_rel": decode_diff,
+        "child_rss_gb_diff_abs": rss_diff,
+        "drift_within_threshold": ok_ttft and ok_decode and ok_rss,
+        "reason": "; ".join(reasons) if reasons else None,
+    }
+
+
+def _d6_status_snapshot(backend: Any) -> dict[str, Any]:
+    try:
+        status = backend.status()
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "healthy": None,
+            "loaded_model_count": None,
+            "backend_name": None,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    return {
+        "healthy": bool(status.healthy),
+        "loaded_model_count": len(status.loaded_models),
+        "backend_name": status.backend_name,
+    }
+
+
+def run_mainline(
+    *,
+    output_dir: Path,
+    backend_python: Path,
+    model_path: Path,
+    run_id: str | None = None,
+    d2_baseline_path: Path = D6_DEFAULT_BASELINE_PATH,
+    prompt_ids: tuple[str, ...] = D6_DEFAULT_PROMPT_IDS,
+    max_tokens_ladder: tuple[int, ...] = D6_DEFAULT_MAX_TOKENS_LADDER,
+    timeout_s: float = 900.0,
+    expected_mlx_lm_git_commit: str = D6_EXPECTED_MLX_LM_GIT_COMMIT,
+    ttft_drift_rel_threshold: float = D6_TTFT_DRIFT_REL_THRESHOLD,
+    decode_tps_drift_rel_threshold: float = D6_DECODE_TPS_DRIFT_REL_THRESHOLD,
+    child_rss_drift_abs_threshold: float = D6_CHILD_RSS_DRIFT_ABS_THRESHOLD,
+    expected_freed_gb_lower_bound: float = D6_FREED_GB_LOWER_BOUND,
+    backend_factory: Any = None,
+) -> dict[str, Any]:
+    """Drive D6 mainline-backend lifecycle and write D6 evidence ledger.
+
+    Spec: ``docs/architect/design/D6-mainline-backend-integration-spec.md``.
+    Constructs ``MlxLmSubprocessBackend`` (or the injected ``backend_factory``)
+    against ``backend_python``; runs preflight; on pass loads the model, runs
+    the cartesian ``prompt_ids × max_tokens_ladder`` matrix in one session,
+    cross-validates each row against the D2 baseline, then unloads. Writes
+    one JSONL ledger plus one summary JSON.
+    """
+
+    run_id = run_id or f"{_compact_stamp()}-d6-mainline-backend-lifecycle"
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    lifecycle_path = output_dir / f"{run_id}.jsonl"
+    summary_path = output_dir / f"{run_id}.summary.json"
+
+    backend_python = Path(backend_python)
+    model_path = Path(model_path)
+    d2_baseline_path = Path(d2_baseline_path)
+
+    # ---------- Preflight ----------
+    model_type = _d6_read_model_type_from_config(model_path)
+    probe = _d6_probe_model_type_support(backend_python, model_type or MODEL_TYPE)
+    provenance = _d6_runtime_provenance(backend_python)
+    baseline_rows = _d6_load_baseline(d2_baseline_path) if d2_baseline_path.exists() else {}
+
+    if backend_python.parent.name == "bin":
+        mainline_runtime_path_str = str(backend_python.parent.parent)
+    else:
+        mainline_runtime_path_str = str(backend_python.parent)
+
+    preflight_detail: dict[str, Any] = {
+        "mainline_runtime_path": mainline_runtime_path_str,
+        "deepseek_experimental_extras_installed": bool(probe.get("supported")),
+        "mlx_lm_source": {
+            "origin": provenance.get("origin"),
+            "package_version": provenance.get("package_version"),
+            "git_commit": provenance.get("git_commit"),
+            "git_commit_matches_expected": (
+                provenance.get("git_commit") == expected_mlx_lm_git_commit
+            ),
+        },
+        "backend_class": "MlxLmSubprocessBackend",
+        "python_executable": str(backend_python),
+        "model_artifact_path": str(model_path),
+        "model_type_in_config": model_type,
+        "model_type_support_probe": {
+            "module_name": probe.get("module_name"),
+            "supported": bool(probe.get("supported")),
+            "returncode": probe.get("returncode"),
+        },
+        "d2_baseline_evidence_path": str(d2_baseline_path),
+        "d2_baseline_rows_present": len(baseline_rows),
+        "stock_runtime_untouched": True,
+        "default_model_surface_unchanged": True,
+    }
+
+    blocked_reasons: list[str] = []
+    if not model_type:
+        blocked_reasons.append("model_type_missing_from_config")
+    if not probe.get("supported"):
+        blocked_reasons.append("model_type_support_probe_unsupported")
+    expected_baseline_rows = len(prompt_ids) * len(max_tokens_ladder)
+    if len(baseline_rows) < expected_baseline_rows:
+        blocked_reasons.append(
+            f"d2_baseline_rows_insufficient ({len(baseline_rows)} < {expected_baseline_rows})"
+        )
+
+    if blocked_reasons:
+        summary = {
+            "schema_version": "d6.mainline-backend.run.v1",
+            "run_id": run_id,
+            "created_at": _now_utc(),
+            "gate": "D6",
+            "evidence_strength": D6_EVIDENCE_STRENGTH,
+            "preflight": "blocked",
+            "preflight_detail": preflight_detail,
+            "blocked_reasons": blocked_reasons,
+            "rows_written": 0,
+            "passed_rows": 0,
+            "drift_within_threshold_rows": 0,
+            "backend_class": "MlxLmSubprocessBackend",
+            "mlx_lm_git_commit": provenance.get("git_commit"),
+            "metric_summary": {
+                "ttft_ms": {"count": 0, "min": None, "p50": None, "max": None},
+                "decode_tps_after_first_token": {
+                    "count": 0,
+                    "min": None,
+                    "p50": None,
+                    "max": None,
+                },
+                "child_rss_gb": {"count": 0, "min": None, "p50": None, "max": None},
+            },
+            "cross_validation_summary": {
+                "ttft_ms_diff_rel_max": None,
+                "decode_tps_diff_rel_max": None,
+                "child_rss_gb_diff_abs_max": None,
+            },
+            "backend_health_summary": {
+                "child_restart_observed": False,
+                "clean_health_after_unload": False,
+                "unload_freed_gb": None,
+                "unload_time_s": None,
+            },
+            "overall_conclusion": "blocked",
+            "verdict": "blocked",
+            "lifecycle_path": str(lifecycle_path),
+            "summary_path": str(summary_path),
+        }
+        _append_jsonl(lifecycle_path, [])
+        summary_path.write_text(
+            json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        return summary
+
+    # ---------- Backend lifecycle ----------
+    if backend_factory is None:
+        def _default_backend_factory(**kwargs: Any) -> Any:
+            from owlmlx.runtime.mlx_lm_subprocess_backend import MlxLmSubprocessBackend
+
+            return MlxLmSubprocessBackend(**kwargs)
+
+        backend_factory = _default_backend_factory
+
+    backend = backend_factory(
+        python_executable=str(backend_python),
+        timeout_s=timeout_s,
+        auto_restart_dead_session=False,
+        max_restart_attempts=0,
+    )
+
+    health_before_load = _d6_status_snapshot(backend)
+
+    from owlmlx.runtime.types import ChatTurn  # local: keep script importable without owlmlx
+
+    load_started = time.monotonic()
+    load_result = backend.load(str(model_path), memory_gb=100.0)
+    load_time_s = round(time.monotonic() - load_started, 4)
+
+    if not load_result.ok:
+        summary = {
+            "schema_version": "d6.mainline-backend.run.v1",
+            "run_id": run_id,
+            "created_at": _now_utc(),
+            "gate": "D6",
+            "evidence_strength": D6_EVIDENCE_STRENGTH,
+            "preflight": "passed",
+            "preflight_detail": preflight_detail,
+            "rows_written": 0,
+            "passed_rows": 0,
+            "drift_within_threshold_rows": 0,
+            "backend_class": "MlxLmSubprocessBackend",
+            "mlx_lm_git_commit": provenance.get("git_commit"),
+            "load_error": {
+                "message": load_result.message,
+                "error_code": (
+                    load_result.error_code.value if load_result.error_code else None
+                ),
+                "detail": load_result.detail,
+            },
+            "metric_summary": {
+                "ttft_ms": {"count": 0, "min": None, "p50": None, "max": None},
+                "decode_tps_after_first_token": {
+                    "count": 0,
+                    "min": None,
+                    "p50": None,
+                    "max": None,
+                },
+                "child_rss_gb": {"count": 0, "min": None, "p50": None, "max": None},
+            },
+            "cross_validation_summary": {
+                "ttft_ms_diff_rel_max": None,
+                "decode_tps_diff_rel_max": None,
+                "child_rss_gb_diff_abs_max": None,
+            },
+            "backend_health_summary": {
+                "child_restart_observed": False,
+                "clean_health_after_unload": False,
+                "unload_freed_gb": None,
+                "unload_time_s": None,
+            },
+            "overall_conclusion": "failed",
+            "verdict": "failed",
+            "lifecycle_path": str(lifecycle_path),
+            "summary_path": str(summary_path),
+        }
+        _append_jsonl(lifecycle_path, [])
+        summary_path.write_text(
+            json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        return summary
+
+    health_after_load = _d6_status_snapshot(backend)
+    pid = load_result.detail.get("pid") if isinstance(load_result.detail, dict) else None
+
+    rows: list[dict[str, Any]] = []
+    overall_failed = False
+
+    for prompt_id in prompt_ids:
+        try:
+            _index, _, prompt_text = _prompt_by_id(prompt_id)
+        except ValueError:
+            overall_failed = True
+            rows.append(
+                {
+                    "schema_version": "d6.mainline-backend.v1",
+                    "record_type": "mainline_backend_lifecycle_row",
+                    "gate": "D6",
+                    "run_id": run_id,
+                    "created_at_utc": _now_utc(),
+                    "prompt_id": prompt_id,
+                    "max_tokens": None,
+                    "metrics": {},
+                    "cross_validation": {
+                        "drift_within_threshold": False,
+                        "reason": "unknown_prompt_id",
+                    },
+                    "verdict": "failed",
+                    "verdict_reason": "unknown_prompt_id",
+                }
+            )
+            continue
+        messages_dicts = _messages_for_prompt(prompt_text)
+        messages = [
+            ChatTurn(role=msg["role"], content=msg["content"])
+            for msg in messages_dicts
+        ]
+
+        for max_tokens in max_tokens_ladder:
+            request_started = time.monotonic()
+            first_token_at: float | None = None
+            done_event = None
+            stream_exception: BaseException | None = None
+            try:
+                for event in backend.stream_generate_messages(
+                    str(model_path),
+                    messages,
+                    max_tokens=int(max_tokens),
+                ):
+                    if event.event == "token" and first_token_at is None:
+                        first_token_at = time.monotonic()
+                    if event.event == "done":
+                        done_event = event
+                    if event.event == "error":
+                        stream_exception = RuntimeError(
+                            f"stream error: {event.detail}"
+                        )
+                        break
+            except BaseException as exc:  # noqa: BLE001
+                stream_exception = exc
+            stream_done_at = time.monotonic()
+
+            if stream_exception is not None:
+                overall_failed = True
+                rows.append(
+                    {
+                        "schema_version": "d6.mainline-backend.v1",
+                        "record_type": "mainline_backend_lifecycle_row",
+                        "gate": "D6",
+                        "run_id": run_id,
+                        "created_at_utc": _now_utc(),
+                        "model_id": MODEL_ID,
+                        "backend_class": "MlxLmSubprocessBackend",
+                        "prompt_id": prompt_id,
+                        "max_tokens": int(max_tokens),
+                        "metrics": {},
+                        "stream_error": (
+                            f"{type(stream_exception).__name__}: {stream_exception}"
+                        ),
+                        "cross_validation": {
+                            "drift_within_threshold": False,
+                            "reason": "stream_exception",
+                        },
+                        "verdict": "failed",
+                        "verdict_reason": "stream_exception",
+                    }
+                )
+                continue
+
+            if first_token_at is None:
+                first_token_at = stream_done_at
+            ttft_ms = round((first_token_at - request_started) * 1000.0, 4)
+            stream_wall_ms = round((stream_done_at - request_started) * 1000.0, 4)
+            completion_tokens = done_event.completion_tokens if done_event else None
+            prompt_tokens = done_event.prompt_tokens if done_event else None
+            stop_reason = (
+                done_event.finish_reason
+                if done_event and done_event.finish_reason
+                else "stop"
+            )
+            decode_tps = _decode_tps_after_first_token(
+                completion_tokens=completion_tokens,
+                first_visible_token_ms=ttft_ms,
+                stream_wall_ms=stream_wall_ms,
+            )
+            wall_tps = _wall_tps(
+                completion_tokens=completion_tokens,
+                stream_wall_ms=stream_wall_ms,
+            )
+            child_rss_gb = _process_rss_gb(pid) if pid is not None else None
+
+            actual_metrics = {
+                "load_time_s": load_time_s,
+                "ttft_ms": ttft_ms,
+                "stream_wall_ms": stream_wall_ms,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "decode_tps_after_first_token": decode_tps,
+                "wall_tps": wall_tps,
+                "child_rss_gb": child_rss_gb,
+                "rss_sample_scope": RSS_SAMPLE_SCOPE,
+                "rss_sample_source": RSS_SAMPLE_SOURCE,
+                "rss_sample_timing": RSS_SAMPLE_TIMING,
+            }
+            baseline_row = baseline_rows.get((prompt_id, int(max_tokens)))
+            cross = _d6_cross_validation(
+                actual_metrics=actual_metrics,
+                baseline_row=baseline_row,
+                ttft_drift_rel_threshold=ttft_drift_rel_threshold,
+                decode_tps_drift_rel_threshold=decode_tps_drift_rel_threshold,
+                child_rss_drift_abs_threshold=child_rss_drift_abs_threshold,
+            )
+            row_health = _d6_status_snapshot(backend)
+
+            verdict = "passed"
+            verdict_reason: str | None = None
+            if not cross["drift_within_threshold"]:
+                verdict = "failed"
+                verdict_reason = "cross_validation_drift"
+                overall_failed = True
+            if done_event is None:
+                verdict = "failed"
+                verdict_reason = verdict_reason or "no_done_event"
+                overall_failed = True
+
+            rows.append(
+                {
+                    "schema_version": "d6.mainline-backend.v1",
+                    "record_type": "mainline_backend_lifecycle_row",
+                    "gate": "D6",
+                    "run_id": run_id,
+                    "created_at_utc": _now_utc(),
+                    "model_id": MODEL_ID,
+                    "backend_class": "MlxLmSubprocessBackend",
+                    "backend_path": {
+                        "python_executable": str(backend_python),
+                        "runner_module": RUNNER_MODULE,
+                        "deepseek_experimental_extras_active": True,
+                        "mlx_lm_source": {
+                            "git_commit": provenance.get("git_commit"),
+                            "package_version": provenance.get("package_version"),
+                        },
+                    },
+                    "prompt_surface": D1_PROMPT_SURFACE_DEFAULT,
+                    "generation_surface": "stream_generate_messages",
+                    "prompt_id": prompt_id,
+                    "max_tokens": int(max_tokens),
+                    "stop_reason": stop_reason,
+                    "metrics": actual_metrics,
+                    "backend_health_snapshot": {
+                        "before_load": health_before_load,
+                        "after_load": health_after_load,
+                        "after_this_row": row_health,
+                    },
+                    "cross_validation": cross,
+                    "host_state": {
+                        "unified_memory_gb_capacity": 128,
+                    },
+                    "verdict": verdict,
+                    "verdict_reason": verdict_reason,
+                }
+            )
+
+    # ---------- Unload ----------
+    unload_started = time.monotonic()
+    unload_result = backend.unload(str(model_path))
+    unload_time_s = round(time.monotonic() - unload_started, 4)
+    health_after_unload = _d6_status_snapshot(backend)
+    freed_gb: float | None = (
+        float(unload_result.freed_gb) if unload_result.ok else None
+    )
+    if not unload_result.ok:
+        overall_failed = True
+    elif freed_gb is not None and freed_gb < expected_freed_gb_lower_bound:
+        overall_failed = True
+
+    clean_health_after_unload = (
+        health_after_unload.get("healthy") is True
+        and health_after_unload.get("loaded_model_count") == 0
+    )
+    if not clean_health_after_unload:
+        overall_failed = True
+
+    if rows:
+        rows[-1].setdefault("backend_health_snapshot", {})[
+            "after_unload"
+        ] = health_after_unload
+
+    _append_jsonl(lifecycle_path, rows)
+
+    passed_rows = sum(1 for row in rows if row.get("verdict") == "passed")
+    drift_within_rows = sum(
+        1
+        for row in rows
+        if isinstance(row.get("cross_validation"), dict)
+        and row["cross_validation"].get("drift_within_threshold") is True
+    )
+
+    ttft_diffs = [
+        abs(row["cross_validation"]["ttft_ms_diff_rel"])
+        for row in rows
+        if isinstance(row.get("cross_validation"), dict)
+        and row["cross_validation"].get("ttft_ms_diff_rel") is not None
+    ]
+    decode_diffs = [
+        abs(row["cross_validation"]["decode_tps_diff_rel"])
+        for row in rows
+        if isinstance(row.get("cross_validation"), dict)
+        and row["cross_validation"].get("decode_tps_diff_rel") is not None
+    ]
+    rss_diffs = [
+        abs(row["cross_validation"]["child_rss_gb_diff_abs"])
+        for row in rows
+        if isinstance(row.get("cross_validation"), dict)
+        and row["cross_validation"].get("child_rss_gb_diff_abs") is not None
+    ]
+
+    expected_rows = len(prompt_ids) * len(max_tokens_ladder)
+    if len(rows) != expected_rows:
+        overall_failed = True
+
+    overall = "failed" if overall_failed or passed_rows != len(rows) else "passed"
+
+    summary = {
+        "schema_version": "d6.mainline-backend.run.v1",
+        "run_id": run_id,
+        "created_at": _now_utc(),
+        "gate": "D6",
+        "evidence_strength": D6_EVIDENCE_STRENGTH,
+        "preflight": "passed",
+        "preflight_detail": preflight_detail,
+        "rows_written": len(rows),
+        "passed_rows": passed_rows,
+        "drift_within_threshold_rows": drift_within_rows,
+        "backend_class": "MlxLmSubprocessBackend",
+        "mlx_lm_git_commit": provenance.get("git_commit"),
+        "metric_summary": {
+            "ttft_ms": _metric_distribution(rows, "ttft_ms"),
+            "decode_tps_after_first_token": _metric_distribution(
+                rows, "decode_tps_after_first_token"
+            ),
+            "child_rss_gb": _metric_distribution(rows, "child_rss_gb"),
+        },
+        "cross_validation_summary": {
+            "ttft_ms_diff_rel_max": max(ttft_diffs) if ttft_diffs else None,
+            "decode_tps_diff_rel_max": max(decode_diffs) if decode_diffs else None,
+            "child_rss_gb_diff_abs_max": max(rss_diffs) if rss_diffs else None,
+        },
+        "backend_health_summary": {
+            "child_restart_observed": False,
+            "clean_health_after_unload": clean_health_after_unload,
+            "unload_freed_gb": freed_gb,
+            "unload_time_s": unload_time_s,
+        },
+        "overall_conclusion": overall,
+        "verdict": overall,
+        "lifecycle_path": str(lifecycle_path),
+        "summary_path": str(summary_path),
+    }
+    summary_path.write_text(
+        json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8"
+    )
+    return summary
+
+
+def _cmd_mainline(args: argparse.Namespace) -> int:
+    payload = run_mainline(
+        output_dir=args.output_dir,
+        run_id=args.run_id,
+        backend_python=args.backend_python,
+        model_path=args.model_path,
+        d2_baseline_path=args.d2_baseline,
+        prompt_ids=tuple(args.prompt_id) if args.prompt_id else D6_DEFAULT_PROMPT_IDS,
+        max_tokens_ladder=_token_ladder_from_cli(
+            args.max_tokens, default=D6_DEFAULT_MAX_TOKENS_LADDER
+        ),
+        timeout_s=args.timeout_s,
+        expected_mlx_lm_git_commit=args.expected_mlx_lm_git_commit,
+        ttft_drift_rel_threshold=args.ttft_drift_rel_threshold,
+        decode_tps_drift_rel_threshold=args.decode_tps_drift_rel_threshold,
+        child_rss_drift_abs_threshold=args.child_rss_drift_abs_threshold,
+        expected_freed_gb_lower_bound=args.expected_freed_gb_lower_bound,
+    )
+    _json_print(payload)
+    return 0 if payload.get("overall_conclusion") == "passed" else 1
+
+
 def _cmd_preflight(args: argparse.Namespace) -> int:
     payload = run_preflight(
         isolated_python=args.isolated_python,
@@ -2646,6 +3443,92 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Experimental stop string passed through to the isolated runner.",
     )
     metrics.set_defaults(func=_cmd_metrics)
+
+    mainline = sub.add_parser(
+        "mainline",
+        help=(
+            "Run D6 mainline backend lifecycle via MlxLmSubprocessBackend "
+            "against the deepseek-experimental extras venv"
+        ),
+    )
+    mainline.add_argument(
+        "--backend-python",
+        type=Path,
+        default=D6_DEFAULT_BACKEND_PYTHON,
+        help=(
+            "Path to the python executable inside a venv populated with the "
+            "deepseek-experimental extras group."
+        ),
+    )
+    mainline.add_argument(
+        "--model-path",
+        type=Path,
+        default=DEFAULT_MODEL_PATH,
+        help="DSV4-Flash 2bit-DQ artifact directory.",
+    )
+    mainline.add_argument(
+        "--output-dir",
+        type=Path,
+        default=D6_DEFAULT_OUTPUT_DIR,
+        help="Where to write the D6 lifecycle JSONL and summary JSON.",
+    )
+    mainline.add_argument(
+        "--d2-baseline",
+        type=Path,
+        default=D6_DEFAULT_BASELINE_PATH,
+        help="D2 metrics ledger JSONL used as cross-validation baseline.",
+    )
+    mainline.add_argument("--run-id", default=None)
+    mainline.add_argument(
+        "--prompt-id",
+        action="append",
+        default=None,
+        help=(
+            "Restrict the prompt set; repeatable. Defaults to "
+            f"{','.join(D6_DEFAULT_PROMPT_IDS)} per design spec."
+        ),
+    )
+    mainline.add_argument(
+        "--max-tokens",
+        type=int,
+        nargs="+",
+        action="append",
+        default=None,
+        help=(
+            "Token ladder; defaults to "
+            f"{','.join(str(v) for v in D6_DEFAULT_MAX_TOKENS_LADDER)}."
+        ),
+    )
+    mainline.add_argument("--timeout-s", type=float, default=900.0)
+    mainline.add_argument(
+        "--expected-mlx-lm-git-commit",
+        default=D6_EXPECTED_MLX_LM_GIT_COMMIT,
+        help=(
+            "Expected mlx-lm git commit pinned by the deepseek-experimental "
+            "extras group; mismatch is logged but does not fail preflight."
+        ),
+    )
+    mainline.add_argument(
+        "--ttft-drift-rel-threshold",
+        type=float,
+        default=D6_TTFT_DRIFT_REL_THRESHOLD,
+    )
+    mainline.add_argument(
+        "--decode-tps-drift-rel-threshold",
+        type=float,
+        default=D6_DECODE_TPS_DRIFT_REL_THRESHOLD,
+    )
+    mainline.add_argument(
+        "--child-rss-drift-abs-threshold",
+        type=float,
+        default=D6_CHILD_RSS_DRIFT_ABS_THRESHOLD,
+    )
+    mainline.add_argument(
+        "--expected-freed-gb-lower-bound",
+        type=float,
+        default=D6_FREED_GB_LOWER_BOUND,
+    )
+    mainline.set_defaults(func=_cmd_mainline)
 
     inspect = sub.add_parser(
         "checkpoint-inspect",

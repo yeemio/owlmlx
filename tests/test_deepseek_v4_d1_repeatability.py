@@ -1796,3 +1796,385 @@ def test_subprocess_cli_preflight_nonzero_and_dry_run_zero(tmp_path):
     )
     assert dry.returncode == 0
     assert json.loads(dry.stdout)["rows_written"] == 15
+
+
+# ---------------------------------------------------------------------------
+# D6 · mainline backend integration · unit tests for run_mainline
+# ---------------------------------------------------------------------------
+
+
+def _write_dsv4_config_only_model(path: Path) -> None:
+    """Minimal DSV4-shaped artifact dir: only config.json with model_type=deepseek_v4."""
+
+    path.mkdir(parents=True)
+    (path / "config.json").write_text(
+        json.dumps({"model_type": "deepseek_v4", "architectures": ["DeepseekV4ForCausalLM"]}),
+        encoding="utf-8",
+    )
+
+
+def _write_fake_d2_baseline(
+    path: Path,
+    *,
+    ttft_ms: float = 100.0,
+    decode_tps: float = 35.0,
+    child_rss_gb: float = 7.0,
+    prompt_ids: tuple[str, ...] = ("p1_short_cn", "p2_short_en", "p4_long_context"),
+    max_tokens_levels: tuple[int, ...] = (128, 512),
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows: list[dict] = []
+    for prompt_id in prompt_ids:
+        for max_tokens in max_tokens_levels:
+            rows.append(
+                {
+                    "schema_version": "d2.metrics.v2",
+                    "gate": "D2",
+                    "prompt_id": prompt_id,
+                    "max_tokens": max_tokens,
+                    "metrics": {
+                        "ttft_ms": ttft_ms,
+                        "decode_tps_after_first_token": decode_tps,
+                        "child_rss_gb": child_rss_gb,
+                    },
+                    "verdict": "passed",
+                }
+            )
+    path.write_text(
+        "\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n",
+        encoding="utf-8",
+    )
+
+
+class _DSV4FakeBackend:
+    """Fake MlxLmSubprocessBackend for D6 mainline unit tests.
+
+    Simulates a successful lifecycle with controllable per-row wall-clock timing.
+    Accepts and discards any keyword arguments the harness passes to the real
+    backend constructor (python_executable, timeout_s, auto_restart_dead_session,
+    max_restart_attempts, etc.) so harness/backend coupling can evolve without
+    breaking these tests.
+    """
+
+    name = "mlx-lm-subprocess"
+
+    def __init__(
+        self,
+        *,
+        ttft_sleep_s: float = 0.02,
+        post_first_token_sleep_s: float = 0.02,
+        completion_tokens: int = 2,
+        freed_gb: float = 95.0,
+        load_ok: bool = True,
+        unload_ok: bool = True,
+        **_kwargs,
+    ) -> None:
+        import time as _time  # local import keeps top of test file clean
+        self._time = _time
+        self.ttft_sleep_s = ttft_sleep_s
+        self.post_first_token_sleep_s = post_first_token_sleep_s
+        self.completion_tokens = completion_tokens
+        self.freed_gb = freed_gb
+        self.load_ok = load_ok
+        self.unload_ok = unload_ok
+        self._loaded: dict[str, object] = {}
+        self.calls: list[tuple] = []
+
+    def load(self, model_id, memory_gb=None):
+        from owlmlx.runtime.types import (
+            LoadResult,
+            LoadedModelInfo,
+            RuntimeErrorCode,
+        )
+
+        self.calls.append(("load", model_id, memory_gb))
+        if not self.load_ok:
+            return LoadResult(
+                ok=False,
+                message="fake load failure",
+                error_code=RuntimeErrorCode.backend_error,
+                detail={"pid": None, "load_time_s": 0.0},
+            )
+        info = LoadedModelInfo(
+            model_id=model_id,
+            memory_gb=float(memory_gb or 0.0),
+            backend=self.name,
+            loaded_at=self._time.time(),
+        )
+        self._loaded[model_id] = info
+        return LoadResult(
+            ok=True,
+            message=f"loaded {model_id} in persistent child pid=4242",
+            detail={
+                "pid": 4242,
+                "load_time_s": 0.01,
+                "runner_model_id": model_id,
+            },
+            model=info,
+        )
+
+    def stream_generate_messages(self, model_id, messages, **kwargs):
+        from owlmlx.runtime.types import StreamEvent
+
+        self.calls.append(
+            ("stream_generate_messages", model_id, kwargs.get("max_tokens"))
+        )
+        self._time.sleep(self.ttft_sleep_s)
+        yield StreamEvent(
+            event="token",
+            model_id=model_id,
+            text="hi",
+            sequence=1,
+            prompt_tokens=5,
+            completion_tokens=1,
+        )
+        per_token_sleep = self.post_first_token_sleep_s / max(
+            self.completion_tokens - 1, 1
+        )
+        for i in range(1, self.completion_tokens):
+            self._time.sleep(per_token_sleep)
+            yield StreamEvent(
+                event="token",
+                model_id=model_id,
+                text=" ok",
+                sequence=i + 1,
+                prompt_tokens=5,
+                completion_tokens=i + 1,
+            )
+        yield StreamEvent(
+            event="done",
+            model_id=model_id,
+            text="hi" + (" ok" * (self.completion_tokens - 1)),
+            sequence=self.completion_tokens,
+            prompt_tokens=5,
+            completion_tokens=self.completion_tokens,
+            finish_reason="stop",
+        )
+
+    def unload(self, model_id):
+        from owlmlx.runtime.types import RuntimeErrorCode, UnloadResult
+
+        self.calls.append(("unload", model_id))
+        if not self.unload_ok:
+            return UnloadResult(
+                ok=False,
+                message="fake unload failure",
+                error_code=RuntimeErrorCode.backend_error,
+                model_id=model_id,
+            )
+        self._loaded.pop(model_id, None)
+        return UnloadResult(
+            ok=True,
+            message=f"unloaded {model_id}",
+            model_id=model_id,
+            freed_gb=self.freed_gb,
+        )
+
+    def status(self):
+        from owlmlx.runtime.types import BackendStatus
+
+        return BackendStatus(
+            backend_name=self.name,
+            healthy=True,
+            loaded_models=tuple(self._loaded.values()),
+            detail={"backend_kind": "mlx_lm_subprocess_fake"},
+        )
+
+
+def _mock_d6_probes(
+    monkeypatch,
+    *,
+    supported: bool = True,
+    fake_rss_gb: float = 7.0,
+) -> None:
+    monkeypatch.setattr(
+        d1,
+        "_d6_probe_model_type_support",
+        lambda python_executable, model_type: {
+            "supported": supported,
+            "module_name": f"mlx_lm.models.{model_type}",
+            "returncode": 0,
+            "stdout": "",
+            "stderr": "",
+        },
+        raising=False,
+    )
+    monkeypatch.setattr(
+        d1,
+        "_d6_runtime_provenance",
+        lambda python_executable: {
+            "origin": "mocked",
+            "package_version": "0.22.0",
+            "git_commit": "5c10538136b9038b9626c134612b08afc18d697a",
+        },
+        raising=False,
+    )
+    # The fake backend reports pid=4242 which does not exist; mock the RSS probe
+    # so cross-validation can compute child_rss_gb_diff_abs deterministically.
+    monkeypatch.setattr(
+        d1,
+        "_process_rss_gb",
+        lambda pid, **_kw: fake_rss_gb,
+        raising=True,
+    )
+
+
+def test_mainline_writes_d6_evidence_on_happy_path(tmp_path, monkeypatch):
+    baseline_path = tmp_path / "d2_baseline.jsonl"
+    _write_fake_d2_baseline(
+        baseline_path, ttft_ms=50.0, decode_tps=40.0, child_rss_gb=7.0
+    )
+
+    model_path = tmp_path / "DSV4-fake"
+    _write_dsv4_config_only_model(model_path)
+
+    backend_python = tmp_path / "fake-python"
+    backend_python.write_text("")
+
+    _mock_d6_probes(monkeypatch, supported=True)
+
+    output_dir = tmp_path / "evidence"
+
+    def _fake_backend_factory(**_kwargs):
+        return _DSV4FakeBackend(
+            ttft_sleep_s=0.05,
+            post_first_token_sleep_s=0.02,
+            completion_tokens=2,
+        )
+
+    payload = d1.run_mainline(
+        output_dir=output_dir,
+        run_id="20260527T-d6-happy-path-test",
+        backend_python=backend_python,
+        model_path=model_path,
+        d2_baseline_path=baseline_path,
+        backend_factory=_fake_backend_factory,
+        # Test-only relaxed thresholds; unit test verifies schema/orchestration,
+        # not wall-clock precision against the spec's frozen drift budget.
+        ttft_drift_rel_threshold=10.0,
+        decode_tps_drift_rel_threshold=10.0,
+        child_rss_drift_abs_threshold=100.0,
+    )
+
+    assert payload["overall_conclusion"] == "passed", payload
+    assert payload["verdict"] == "passed"
+
+    jsonl_files = list(output_dir.glob("*.jsonl"))
+    assert len(jsonl_files) == 1, sorted(output_dir.iterdir())
+    rows = _records(jsonl_files[0])
+    assert len(rows) == 6
+
+    for row in rows:
+        assert row["schema_version"] == "d6.mainline-backend.v1"
+        assert row["gate"] == "D6"
+        assert row["backend_class"] == "MlxLmSubprocessBackend"
+        assert row["backend_path"]["deepseek_experimental_extras_active"] is True
+        assert row["prompt_surface"] == "messages"
+        assert row["generation_surface"] == "stream_generate_messages"
+        assert row["metrics"]["completion_tokens"] == 2
+        assert "ttft_ms" in row["metrics"]
+        assert "child_rss_gb" in row["metrics"]
+        assert row["cross_validation"]["drift_within_threshold"] is True
+        assert row["verdict"] == "passed"
+
+    summary_files = list(
+        output_dir.glob("*.summary.json")
+    )
+    assert len(summary_files) == 1
+    summary = json.loads(summary_files[0].read_text(encoding="utf-8"))
+    assert summary["schema_version"] == "d6.mainline-backend.run.v1"
+    assert summary["rows_written"] == 6
+    assert summary["passed_rows"] == 6
+    assert summary["overall_conclusion"] == "passed"
+    assert summary["backend_class"] == "MlxLmSubprocessBackend"
+    assert (
+        summary["mlx_lm_git_commit"]
+        == "5c10538136b9038b9626c134612b08afc18d697a"
+    )
+    assert summary["backend_health_summary"]["child_restart_observed"] is False
+    assert summary["backend_health_summary"]["clean_health_after_unload"] is True
+
+
+def test_mainline_flags_cross_validation_drift_as_failed(tmp_path, monkeypatch):
+    # Baseline TTFT 1ms; fake yields after ~50ms -> ~5000% drift, way over 20%
+    baseline_path = tmp_path / "d2_baseline.jsonl"
+    _write_fake_d2_baseline(
+        baseline_path, ttft_ms=1.0, decode_tps=1000.0, child_rss_gb=100.0
+    )
+
+    model_path = tmp_path / "DSV4-fake"
+    _write_dsv4_config_only_model(model_path)
+
+    backend_python = tmp_path / "fake-python"
+    backend_python.write_text("")
+
+    _mock_d6_probes(monkeypatch, supported=True)
+
+    output_dir = tmp_path / "evidence"
+    payload = d1.run_mainline(
+        output_dir=output_dir,
+        run_id="20260527T-d6-drift-test",
+        backend_python=backend_python,
+        model_path=model_path,
+        d2_baseline_path=baseline_path,
+        backend_factory=lambda **_kw: _DSV4FakeBackend(
+            ttft_sleep_s=0.05,
+            post_first_token_sleep_s=0.01,
+            completion_tokens=2,
+        ),
+    )
+
+    assert payload["overall_conclusion"] == "failed"
+    assert payload["verdict"] == "failed"
+
+    jsonl_files = list(output_dir.glob("*.jsonl"))
+    rows = _records(jsonl_files[0])
+    assert len(rows) == 6
+    drift_violations = [
+        r for r in rows if r["cross_validation"]["drift_within_threshold"] is False
+    ]
+    assert len(drift_violations) >= 1
+    for violation in drift_violations:
+        assert violation["verdict"] == "failed"
+
+
+def test_mainline_emits_blocked_when_model_type_probe_unsupported(
+    tmp_path, monkeypatch
+):
+    baseline_path = tmp_path / "d2_baseline.jsonl"
+    _write_fake_d2_baseline(baseline_path)
+
+    model_path = tmp_path / "DSV4-fake"
+    _write_dsv4_config_only_model(model_path)
+
+    backend_python = tmp_path / "fake-python"
+    backend_python.write_text("")
+
+    _mock_d6_probes(monkeypatch, supported=False)
+
+    fake_backend_constructed: list[_DSV4FakeBackend] = []
+
+    def _factory(**_kw):
+        backend = _DSV4FakeBackend()
+        fake_backend_constructed.append(backend)
+        return backend
+
+    output_dir = tmp_path / "evidence"
+    payload = d1.run_mainline(
+        output_dir=output_dir,
+        run_id="20260527T-d6-blocked-test",
+        backend_python=backend_python,
+        model_path=model_path,
+        d2_baseline_path=baseline_path,
+        backend_factory=_factory,
+    )
+
+    assert payload["overall_conclusion"] == "blocked"
+    assert payload["verdict"] == "blocked"
+    # Preflight block must short-circuit before any backend lifecycle call.
+    for backend in fake_backend_constructed:
+        load_calls = [c for c in backend.calls if c[0] == "load"]
+        assert load_calls == [], (
+            "preflight block must not start backend lifecycle; "
+            f"observed calls: {backend.calls}"
+        )

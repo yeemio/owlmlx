@@ -82,6 +82,30 @@ records `schema_version=d4.preload_reject.v1`,
 before and after. Treat this as failure isolation for an unavailable MTP path,
 not as DeepSeek MTP serving support.
 
+**D6 follow-up status (2026-05-27):** the mainline-backend integration path is
+now executable but **D6 did not pass**.
+
+- `.runtime-deepseek-experimental/` was populated with the Blaizzy
+  `mlx-lm` fork at `5c10538136b9038b9626c134612b08afc18d697a`; the normal
+  `.venv` remains on stock `mlx-lm 0.31.3` without `mlx_lm.models.deepseek_v4`.
+- First D6 run
+  `20260527T071857Z-d6-mainline-backend-lifecycle.summary.json` passed
+  preflight but failed during model load with a Metal GPU timeout.
+- Second D6 run
+  `20260527T072206Z-d6-mainline-backend-lifecycle.jsonl` completed load,
+  6/6 generation rows, unload, and clean post-unload health through
+  `MlxLmSubprocessBackend`; `unload_freed_gb=100.0`,
+  `child_restart_observed=false`, and the fork commit matched the expected
+  D1-D4 baseline commit.
+- The D6 verdict remains `failed` because D2 cross-validation thresholds were
+  not met: all six rows exceeded the frozen child-RSS drift budget, and some
+  rows also exceeded TTFT or decode-TPS drift budgets.
+
+Treat D6 as triage evidence for the mainline backend path, not as a promotion
+gate pass. D5/D7 remain blocked until D6 is either re-run against a comparable
+baseline or the D6 design-spec is explicitly amended with a new
+evidence-backed cross-validation rule.
+
 **2026-05-11: Lifecycle complete via intermediate path.**
 
 `DeepSeek-V4-Flash-2bit-DQ` completed load → generate → unload → clean health

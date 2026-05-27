@@ -20,9 +20,15 @@ runtime = [
 dev = [
     "pytest>=8.0",
 ]
+deepseek-experimental = [
+    "mlx-lm @ git+https://github.com/Blaizzy/mlx-lm@5c10538136b9038b9626c134612b08afc18d697a",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["owlmlx"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.owlmlx]
 release_channel = "engineering"
