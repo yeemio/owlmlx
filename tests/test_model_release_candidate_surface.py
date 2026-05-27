@@ -144,18 +144,21 @@ def test_schema_constants_are_frozen() -> None:
     assert set(MODEL_RELEASE_CANDIDATE_LANES) == {
         "mainline",
         "flagship_experimental",
+        "technical_preview",
     }
     assert set(MODEL_RELEASE_CANDIDATE_VISIBILITY_STATUSES) == {
         "visible",
         "blocked",
         "not_registered",
         "unknown",
+        "technical_preview_registered",
     }
     assert set(MODEL_RELEASE_CANDIDATE_VERDICTS) == {
         "pass",
         "needs_optimization",
         "blocked",
         "experimental_only",
+        "partial",
     }
 
 
@@ -299,9 +302,9 @@ def test_dry_run_matrix_contains_mainline_and_deepseek_without_pass_claims() -> 
     assert "gpt-oss-120b-MXFP4-Q4" not in by_model
 
     deepseek = by_model["DeepSeek-V4-Flash-2bit-DQ"]
-    assert deepseek["lane"] == "flagship_experimental"
-    assert deepseek["visibility_status"] == "not_registered"
-    assert deepseek["verdict"] == "experimental_only"
+    assert deepseek["lane"] == "technical_preview"
+    assert deepseek["visibility_status"] == "technical_preview_registered"
+    assert deepseek["verdict"] == "partial"
     assert "DeepSeek-V4-Flash-2bit-DQ" in deepseek["artifact_path"]
 
     assert all(entry["verdict"] != "pass" for entry in payload)
@@ -311,9 +314,28 @@ def test_dry_run_matrix_contains_mainline_and_deepseek_without_pass_claims() -> 
 
 def test_validate_rejects_flagship_experimental_pass() -> None:
     payload = _record_dicts()[-1]
+    payload["lane"] = "flagship_experimental"
     payload["verdict"] = "pass"
     with pytest.raises(ModelReleaseCandidateSchemaError):
         validate_model_release_candidate_record(payload)
+
+
+def test_validate_rejects_technical_preview_pass() -> None:
+    payload = _record_dicts()[-1]
+    payload["lane"] = "technical_preview"
+    payload["visibility_status"] = "technical_preview_registered"
+    payload["verdict"] = "pass"
+    with pytest.raises(ModelReleaseCandidateSchemaError):
+        validate_model_release_candidate_record(payload)
+
+
+def test_validate_accepts_technical_preview_partial() -> None:
+    payload = _record_dicts()[-1]
+    payload["lane"] = "technical_preview"
+    payload["visibility_status"] = "technical_preview_registered"
+    payload["verdict"] = "partial"
+
+    validate_model_release_candidate_record(payload)
 
 
 def test_validate_rejects_banned_verdict_vocabulary() -> None:

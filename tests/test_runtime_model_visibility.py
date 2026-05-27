@@ -70,9 +70,11 @@ def test_registered_models_require_base_dir_and_config(tmp_path: Path) -> None:
     assert gate.rule == RUNTIME_MODEL_VISIBILITY_RULE
     assert gate.contract_version == RUNTIME_MODEL_VISIBILITY_CONTRACT_VERSION
     assert gate.visible_model_ids == ("visible-a",)
+    assert gate.technical_preview_visible_model_ids == ()
 
     by_id = {entry.model_id: entry for entry in gate.entries}
     assert by_id["visible-a"].visible is True
+    assert by_id["visible-a"].tier == "default"
     assert by_id["visible-a"].block_reason is None
     assert by_id["missing-config"].visible is False
     assert by_id["missing-config"].block_reason == "base_model_config_missing"
@@ -98,6 +100,7 @@ def test_contract_declares_formal_surface_and_loaded_inventory_distinction(
     assert contract["loaded_inventory_surface"]["endpoint"] == "/v1/models"
     assert contract["gate"]["kind"] == "registered_base_model_config_present"
     assert contract["visible_model_ids"] == ["visible-a"]
+    assert contract["technical_preview_visible_model_ids"] == []
     assert contract["blocked_model_ids"] == []
 
 
@@ -138,7 +141,88 @@ def test_v1_models_embeds_visibility_contract_without_overwriting_inventory(
 
     contract = payload["visibility_contract"]
     assert contract["visible_model_ids"] == ["visible-a"]
+    assert "technical_preview_visible_model_ids" not in contract
     assert contract["loaded_inventory_surface"]["semantic_role"] == (
         "currently_loaded_inventory_only"
     )
     assert contract["distinct_from_loaded_inventory"]["loaded_model_ids"] == ["fake-a"]
+
+
+def test_technical_preview_tier_is_diagnostic_only(tmp_path: Path) -> None:
+    _write_base_config(tmp_path, "default-a")
+    _write_base_config(tmp_path, "preview-a")
+    registry = (
+        RegisteredRuntimeVisibleModel("default-a"),
+        RegisteredRuntimeVisibleModel("preview-a", tier="technical_preview"),
+    )
+
+    gate = build_runtime_model_visibility(models_root=tmp_path, registry=registry)
+
+    assert gate.visible_model_ids == ("default-a",)
+    assert gate.technical_preview_visible_model_ids == ("preview-a",)
+    by_id = {entry.model_id: entry for entry in gate.entries}
+    assert by_id["default-a"].tier == "default"
+    assert by_id["preview-a"].tier == "technical_preview"
+
+    contract = derive_runtime_model_visibility_contract(
+        models_root=tmp_path,
+        registry=registry,
+    )
+    assert contract["visible_model_ids"] == ["default-a"]
+    assert contract["technical_preview_visible_model_ids"] == ["preview-a"]
+    assert contract["entries"][0]["tier"] == "default"
+    assert contract["entries"][1]["tier"] == "technical_preview"
+
+
+def test_dict_registry_preserves_technical_preview_tier(tmp_path: Path) -> None:
+    _write_base_config(tmp_path, "preview-dict")
+
+    gate = build_runtime_model_visibility(
+        models_root=tmp_path,
+        registry=(
+            {
+                "model_id": "preview-dict",
+                "tier": "technical_preview",
+            },
+        ),
+    )
+
+    assert gate.visible_model_ids == ()
+    assert gate.technical_preview_visible_model_ids == ("preview-dict",)
+
+
+def test_default_registry_contains_dsv4_as_technical_preview_only() -> None:
+    by_id = {
+        entry.model_id: entry
+        for entry in DEFAULT_REGISTERED_RUNTIME_VISIBLE_MODELS
+    }
+
+    deepseek = by_id["DeepSeek-V4-Flash-2bit-DQ"]
+    assert deepseek.tier == "technical_preview"
+
+
+def test_v1_models_scrubs_technical_preview_tier_from_default_surface(
+    tmp_path: Path,
+) -> None:
+    _write_base_config(tmp_path, "visible-a")
+    _write_base_config(tmp_path, "DeepSeek-V4-Flash-2bit-DQ")
+    registry = (
+        RegisteredRuntimeVisibleModel("visible-a"),
+        RegisteredRuntimeVisibleModel(
+            "DeepSeek-V4-Flash-2bit-DQ",
+            tier="technical_preview",
+        ),
+    )
+    client = _client(tmp_path, registry=registry)
+
+    models_payload = client.get("/v1/models").json()
+    default_contract = models_payload["visibility_contract"]
+    assert "technical_preview_visible_model_ids" not in default_contract
+    assert default_contract["visible_model_ids"] == ["visible-a"]
+    assert "DeepSeek-V4-Flash-2bit-DQ" not in str(default_contract)
+
+    diagnostic = client.get("/v1/runtime/model-visibility").json()
+    assert diagnostic["visible_model_ids"] == ["visible-a"]
+    assert diagnostic["technical_preview_visible_model_ids"] == [
+        "DeepSeek-V4-Flash-2bit-DQ"
+    ]

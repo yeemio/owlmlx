@@ -37,6 +37,7 @@ RUNTIME_MODEL_VISIBILITY_DETAIL_SURFACE = "/v1/runtime/model-visibility"
 RUNTIME_LOADED_INVENTORY_SURFACE = "/v1/models"
 RUNTIME_MODEL_VISIBILITY_GATE_KIND = "registered_base_model_config_present"
 DEFAULT_MODELS_ROOT = Path("/Users/yeemio/AI/Agent/models")
+RUNTIME_MODEL_VISIBILITY_TIERS = ("default", "technical_preview")
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,10 +46,15 @@ class RegisteredRuntimeVisibleModel:
 
     model_id: str
     local_dir_name: str | None = None
+    tier: str = "default"
 
     def __post_init__(self) -> None:
         if not self.model_id:
             raise ValueError("model_id must be non-empty")
+        if self.tier not in RUNTIME_MODEL_VISIBILITY_TIERS:
+            raise ValueError(
+                f"tier must be one of {RUNTIME_MODEL_VISIBILITY_TIERS!r}"
+            )
 
     @property
     def effective_local_dir_name(self) -> str:
@@ -72,6 +78,7 @@ class RuntimeVisibleModelState:
     config_present: bool
     visible: bool
     block_reason: str | None = None
+    tier: str = "default"
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +91,7 @@ class RuntimeModelVisibilityGate:
     entries: tuple[RuntimeVisibleModelState, ...]
     visible_model_ids: tuple[str, ...]
     loaded_model_ids: tuple[str, ...]
+    technical_preview_visible_model_ids: tuple[str, ...] = ()
 
 
 DEFAULT_REGISTERED_RUNTIME_VISIBLE_MODELS: tuple[RegisteredRuntimeVisibleModel, ...] = (
@@ -94,6 +102,11 @@ DEFAULT_REGISTERED_RUNTIME_VISIBLE_MODELS: tuple[RegisteredRuntimeVisibleModel, 
     RegisteredRuntimeVisibleModel("gemma-4-31B-it"),
     RegisteredRuntimeVisibleModel("gpt-oss-20b-MXFP4-Q4"),
     RegisteredRuntimeVisibleModel("Qwen3-Embedding-8B-4bit-DWQ"),
+    RegisteredRuntimeVisibleModel(
+        "DeepSeek-V4-Flash-2bit-DQ",
+        local_dir_name="../model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ",
+        tier="technical_preview",
+    ),
 )
 
 
@@ -125,6 +138,7 @@ def normalize_registered_runtime_visible_models(
             RegisteredRuntimeVisibleModel(
                 model_id=str(item.get("model_id", "")),
                 local_dir_name=str(item.get("local_dir_name", "") or "") or None,
+                tier=str(item.get("tier", "default") or "default"),
             )
         )
     return tuple(normalized)
@@ -152,6 +166,7 @@ def build_runtime_model_visibility(
     root = Path(models_root) if models_root is not None else default_models_root()
     entries: list[RuntimeVisibleModelState] = []
     visible_model_ids: list[str] = []
+    technical_preview_visible_model_ids: list[str] = []
     for entry in normalize_registered_runtime_visible_models(registry):
         local_model_dir = entry.local_model_dir(root)
         config_path = entry.config_path(root)
@@ -165,6 +180,7 @@ def build_runtime_model_visibility(
             block_reason = "base_model_config_missing"
         state = RuntimeVisibleModelState(
             model_id=entry.model_id,
+            tier=entry.tier,
             local_model_dir=str(local_model_dir),
             config_path=str(config_path),
             local_model_dir_present=local_model_dir_present,
@@ -174,7 +190,10 @@ def build_runtime_model_visibility(
         )
         entries.append(state)
         if visible:
-            visible_model_ids.append(entry.model_id)
+            if entry.tier == "technical_preview":
+                technical_preview_visible_model_ids.append(entry.model_id)
+            else:
+                visible_model_ids.append(entry.model_id)
     return RuntimeModelVisibilityGate(
         rule=RUNTIME_MODEL_VISIBILITY_RULE,
         contract_version=RUNTIME_MODEL_VISIBILITY_CONTRACT_VERSION,
@@ -182,6 +201,9 @@ def build_runtime_model_visibility(
         entries=tuple(entries),
         visible_model_ids=tuple(visible_model_ids),
         loaded_model_ids=_loaded_model_ids(snapshot),
+        technical_preview_visible_model_ids=tuple(
+            technical_preview_visible_model_ids
+        ),
     )
 
 
@@ -191,6 +213,9 @@ def runtime_model_visibility_contract(
     """Return the machine-readable runtime-owned visibility contract."""
 
     visible_model_ids = list(gate.visible_model_ids)
+    technical_preview_visible_model_ids = list(
+        gate.technical_preview_visible_model_ids
+    )
     blocked_model_ids = [entry.model_id for entry in gate.entries if not entry.visible]
     return {
         "surface": "owlmlx.runtime.model_visibility",
@@ -245,12 +270,15 @@ def runtime_model_visibility_contract(
             ),
         },
         "visible_model_ids": visible_model_ids,
+        "technical_preview_visible_model_ids": technical_preview_visible_model_ids,
         "blocked_model_ids": blocked_model_ids,
         "model_count": len(visible_model_ids),
+        "technical_preview_model_count": len(technical_preview_visible_model_ids),
         "registered_model_count": len(gate.entries),
         "entries": [
             {
                 "model_id": entry.model_id,
+                "tier": entry.tier,
                 "registered": True,
                 "visible": entry.visible,
                 "block_reason": entry.block_reason,

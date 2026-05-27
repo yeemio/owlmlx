@@ -1,7 +1,7 @@
 # owlmlx Runtime Capability Matrix
 
 > Status: authoritative
-> Updated: 2026-05-25 (Stage 3.3 — adds B-1c §2 Qwen-only drift accounting result; no capability promotion)
+> Updated: 2026-05-27 (Campaign D7 — DSV4 technical-preview visibility registration; DSV4 label moves to `partial`, not `supported`)
 
 Stage 1 (2026-05-11) archived 151 spec-as-code modules whose dataclasses
 were never read by runtime decision code. This refresh removes capability
@@ -93,7 +93,7 @@ Capability labels:
 | Generalized foreground-interactive runtime | experimental | Not yet established as current truth |
 | Additional runtime paths beyond large-weight | experimental | Future only when real capability truth exists |
 | Real MLX model load/generate through owlmlx | supported | `MlxLmSubprocessBackend` has real successful local smokes through the clean `.runtime1-mlx` environment on `gpt-oss-20b-MXFP4-Q4`, `Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit`, and `Qwen3.5-35B-A3B-4bit`; Runtime-2 further proves persistent child reuse on `gpt-oss-20b` and `Qwen3.5-27B` and has a steady-state benchmark script |
-| DeepSeek V4 Flash 2bit-DQ adapter optimization | experimental | `DeepSeek-V4-Flash-2bit-DQ` is a 284.3B-parameter, about-90G local MLX artifact with a first short generation smoke through an isolated DeepSeek V4 PR runtime; it is not yet visible on the technical-preview `GET /v1/openai/models` surface and is tracked by `deepseek-v4-flash-adapter-optimization-candidate.md` plus `model-release-candidate-program.md` |
+| DeepSeek V4 Flash 2bit-DQ adapter optimization | partial | `DeepSeek-V4-Flash-2bit-DQ` is a 284.3B-parameter, about-90G local MLX artifact. D6 (2026-05-27) proved one-shot lifecycle through `MlxLmSubprocessBackend` on the `.runtime-deepseek-experimental` venv (`mlx-lm` fork `5c10538136b9038b9626c134612b08afc18d697a`); D5 (2026-05-27) proved sustained N=20 same-prompt repeatability with RSS range 0.012 GB and decode TPS CV 0.026. Registered on `GET /v1/runtime/model-visibility` at `technical_preview` tier per D7; NOT on the `/v1/models` default surface or `/v1/openai/models`. `lane=technical_preview`, `visibility_status=technical_preview_registered`, and `verdict=partial` in `owlmlx/model_release_candidate_record.py`. |
 | Persistent child health probe | supported | Backend `status()` actively issues `ping` to live child sessions and surfaces `child_health` in status detail |
 | Dead child restart policy | supported | Registration survives child death; the next generation request can restart the child session within configured restart-attempt limits |
 | Explicit runtime restart surface | supported | `POST /v1/runtime/restart` restarts one loaded model through `RuntimeKernel.restart_model()` |

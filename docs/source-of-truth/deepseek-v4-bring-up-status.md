@@ -141,9 +141,34 @@ gate now passes through the same D6 mainline backend path.
   `deepseek_v4_flash_2bit_dq_128g_sustained_load=passed`; the row keeps
   `verdict=experimental_only` and `visibility_status=not_registered`.
 
-D5 passing does **not** promote DSV4-Flash 2bit-DQ on its own. D7
-(`technical_preview` visibility registration) remains the final prerequisite
-before the Campaign D `partial` promotion can be considered.
+D5 passing did **not** promote DSV4-Flash 2bit-DQ on its own; it supplied the
+last measurement prerequisite that D7 consumed for the Campaign D `partial`
+promotion.
+
+**D7 follow-up status (2026-05-27):** the technical-preview visibility
+registration gate is now complete, so DSV4-Flash 2bit-DQ is promoted from the
+Campaign D experimental lane to `partial` at the diagnostic visibility tier
+only.
+
+- D7 decision evidence:
+  `files/evidence/owlmlx/deepseek-v4/d7-technical-preview-visibility/20260527T093211Z-d7-technical-preview-visibility.jsonl`.
+- `owlmlx/model_release_candidate_schema.py` now accepts
+  `lane=technical_preview`, `visibility_status=technical_preview_registered`,
+  and `verdict=partial`, while still rejecting `verdict=pass` for
+  `technical_preview` records.
+- `owlmlx/runtime_model_visibility.py` now has a tier-aware registry split:
+  default-tier IDs remain in `visible_model_ids`; DSV4 appears only in
+  `technical_preview_visible_model_ids`.
+- Runtime surface discipline: `/v1/runtime/model-visibility` is the only D7
+  visibility surface for DSV4. `/v1/models` and `/v1/openai/models` remain
+  default surfaces and must not list DSV4 as a default visible model.
+- The model-release-candidate cumulative ledger now has a D7 row with
+  `lane=technical_preview`, `visibility_status=technical_preview_registered`,
+  and `verdict=partial`.
+
+D7 still does **not** claim supported DeepSeek serving and does not change the
+upstream dependency status. It is a bounded technical-preview registration
+based on the D5 + D6 evidence chain.
 
 **2026-05-11: Lifecycle complete via intermediate path.**
 
@@ -225,8 +250,13 @@ Bring-up uses the 2-bit-DQ variant exclusively with `memory_gb=100`.
 Until upstream merges, the following are explicitly deferred:
 
 - Any measured TPS comparison against reference runtimes for DeepSeek
-- Any visibility registration on `GET /v1/openai/models`
+- Any visibility registration on `GET /v1/openai/models` or the `/v1/models`
+  default surface
 - Any claim of DeepSeek support in external communication
+
+Allowed after D7: visibility on `GET /v1/runtime/model-visibility` at
+`technical_preview` tier only. This diagnostic registration is not a default
+model-list registration and is not a `supported` serving claim.
 
 The `BANNED_VERDICT_VOCABULARY` enforcement in `owlmlx.comparative_evidence_schema`
 ensures no premature parity or replacement claim can pass schema validation.

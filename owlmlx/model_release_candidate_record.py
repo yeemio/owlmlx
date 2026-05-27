@@ -37,13 +37,13 @@ DEFAULT_MODEL_RELEASE_CANDIDATES: tuple[dict[str, str], ...] = (
     },
     {
         "model_id": "DeepSeek-V4-Flash-2bit-DQ",
-        "lane": "flagship_experimental",
+        "lane": "technical_preview",
         "artifact_path": (
             "/Users/yeemio/AI/Agent/model-candidates/mlx-community/"
             "DeepSeek-V4-Flash-2bit-DQ"
         ),
-        "visibility_status": "not_registered",
-        "verdict": "experimental_only",
+        "visibility_status": "technical_preview_registered",
+        "verdict": "partial",
     },
 )
 
@@ -373,9 +373,14 @@ def build_dry_run_model_release_candidate_records(
     records: list[ModelReleaseCandidateRecord] = []
     for candidate in DEFAULT_MODEL_RELEASE_CANDIDATES:
         lane = candidate["lane"]
-        is_deepseek = lane == "flagship_experimental"
+        is_deepseek = candidate["model_id"] == "DeepSeek-V4-Flash-2bit-DQ"
         blockers = (
             (
+                "technical_preview_visibility_only",
+                "owlops_observation_missing",
+            )
+            if is_deepseek and lane == "technical_preview"
+            else (
                 "deepseek_runtime_adapter_not_integrated",
                 "technical_preview_visibility_not_registered",
                 "repeated_live_run_missing",

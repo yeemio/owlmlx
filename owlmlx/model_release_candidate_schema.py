@@ -14,6 +14,7 @@ MODEL_RELEASE_CANDIDATE_RECORD_VERSION = "v1"
 MODEL_RELEASE_CANDIDATE_LANES: tuple[str, ...] = (
     "mainline",
     "flagship_experimental",
+    "technical_preview",
 )
 
 MODEL_RELEASE_CANDIDATE_VISIBILITY_STATUSES: tuple[str, ...] = (
@@ -21,6 +22,7 @@ MODEL_RELEASE_CANDIDATE_VISIBILITY_STATUSES: tuple[str, ...] = (
     "blocked",
     "not_registered",
     "unknown",
+    "technical_preview_registered",
 )
 
 MODEL_RELEASE_CANDIDATE_VERDICTS: tuple[str, ...] = (
@@ -28,6 +30,7 @@ MODEL_RELEASE_CANDIDATE_VERDICTS: tuple[str, ...] = (
     "needs_optimization",
     "blocked",
     "experimental_only",
+    "partial",
 )
 
 MODEL_RELEASE_CANDIDATE_RESULT_STATUSES: tuple[str, ...] = (
@@ -390,6 +393,10 @@ def validate_model_release_candidate_record(record: Mapping[str, Any]) -> None:
     if record["lane"] == "flagship_experimental" and record["verdict"] == "pass":
         raise ModelReleaseCandidateSchemaError(
             "flagship_experimental lane cannot use verdict='pass'"
+        )
+    if record["lane"] == "technical_preview" and record["verdict"] == "pass":
+        raise ModelReleaseCandidateSchemaError(
+            "technical_preview lane cannot use verdict='pass'"
         )
 
 

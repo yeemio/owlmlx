@@ -8,7 +8,7 @@ import logging
 import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from fastapi import FastAPI, Query, Request
 from pydantic import BaseModel, Field
@@ -348,6 +348,33 @@ def create_app(
             models_root=visibility_models_root,
             registry=visibility_registry,
         )
+
+    def _default_surface_visibility_contract(contract: Mapping[str, Any]) -> dict[str, Any]:
+        """Return the default-surface subset of the diagnostic visibility contract."""
+
+        payload = dict(contract)
+        entries = [
+            dict(entry)
+            for entry in payload.get("entries", [])
+            if str(entry.get("tier", "default")) == "default"
+        ]
+        visible_model_ids = [
+            str(model_id)
+            for model_id in payload.get("visible_model_ids", [])
+            if any(entry.get("model_id") == model_id for entry in entries)
+        ]
+        payload.pop("technical_preview_visible_model_ids", None)
+        payload.pop("technical_preview_model_count", None)
+        payload["visible_model_ids"] = visible_model_ids
+        payload["blocked_model_ids"] = [
+            str(entry["model_id"])
+            for entry in entries
+            if not bool(entry.get("visible"))
+        ]
+        payload["model_count"] = len(visible_model_ids)
+        payload["registered_model_count"] = len(entries)
+        payload["entries"] = entries
+        return payload
 
     def _model_release_candidate_records_and_status() -> tuple[
         list[dict[str, Any]],
@@ -1253,7 +1280,9 @@ def create_app(
             "health": status["health"],
             "generation_gate": status["generation_gate"],
             "backend": status["backend"],
-            "visibility_contract": visibility_contract,
+            "visibility_contract": _default_surface_visibility_contract(
+                visibility_contract
+            ),
         }
 
     @app.get("/v1/runtime/model-visibility")
