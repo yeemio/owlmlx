@@ -115,6 +115,40 @@ D6_DEFAULT_PROMPT_IDS: tuple[str, ...] = (
     "p4_long_context",
 )
 D6_DEFAULT_MAX_TOKENS_LADDER: tuple[int, ...] = (128, 512)
+D5_EVIDENCE_STRENGTH = "sustained_load_repeatability"
+D5_DEFAULT_OUTPUT_DIR = (
+    REPO_ROOT
+    / "files"
+    / "evidence"
+    / "owlmlx"
+    / "deepseek-v4"
+    / "d5-sustained-load"
+)
+D5_DEFAULT_D6_SUMMARY_PATH = (
+    D6_DEFAULT_OUTPUT_DIR / "20260527T072206Z-d6-mainline-backend-lifecycle.summary.json"
+)
+D5_DEFAULT_D6_BASELINE_PATH = (
+    D6_DEFAULT_OUTPUT_DIR / "20260527T072206Z-d6-mainline-backend-lifecycle.jsonl"
+)
+D5_DEFAULT_D6_LEDGER_PATH = (
+    REPO_ROOT
+    / "files"
+    / "evidence"
+    / "owlmlx"
+    / "model-release-candidates"
+    / "cumulative-ledger.jsonl"
+)
+D5_D6_ACCEPTANCE_CAVEAT = (
+    "deepseek_v4_flash_2bit_dq_mainline_backend_integration=passed"
+)
+D5_DEFAULT_PROMPT_ID = "p2_short_en"
+D5_DEFAULT_MAX_TOKENS = 512
+D5_DEFAULT_ROUND_COUNT = 20
+D5_CHILD_RSS_RANGE_THRESHOLD_GB = 1.0
+D5_CHILD_RSS_CEILING_GB = 30.0
+D5_DECODE_TPS_CV_THRESHOLD = 0.20
+D5_TTFT_WARM_CV_THRESHOLD = 0.30
+D5_RSS_SAMPLE_TIMING = "after_generation_before_next_round"
 MTP_WEIGHT_TERMS = (
     "mtp",
     "draft",
@@ -2604,6 +2638,244 @@ def _d6_status_snapshot(backend: Any) -> dict[str, Any]:
     }
 
 
+def _d5_status_snapshot(backend: Any) -> dict[str, Any]:
+    try:
+        status = backend.status()
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "healthy": None,
+            "loaded_model_count": None,
+            "backend_name": None,
+            "child_restart_count": None,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    detail = status.detail if isinstance(status.detail, dict) else {}
+    restart_count = (
+        detail.get("child_restart_count")
+        if "child_restart_count" in detail
+        else detail.get("restart_count", 0)
+    )
+    try:
+        restart_count_int = int(restart_count or 0)
+    except (TypeError, ValueError):
+        restart_count_int = 0
+    return {
+        "healthy": bool(status.healthy),
+        "loaded_model_count": len(status.loaded_models),
+        "backend_name": status.backend_name,
+        "child_restart_count": restart_count_int,
+    }
+
+
+def _d5_d6_acceptance(
+    *,
+    summary_path: Path,
+    ledger_path: Path,
+) -> dict[str, Any]:
+    summary = _read_json_object(summary_path)
+    summary_run_id = str(summary.get("run_id") or "")
+    summary_stability = (
+        summary.get("intra_run_stability")
+        if isinstance(summary.get("intra_run_stability"), dict)
+        else {}
+    )
+    summary_passed = (
+        summary.get("overall_conclusion") == "passed"
+        and summary_stability.get("within_threshold") is True
+    )
+    detail: dict[str, Any] = {
+        "accepted": False,
+        "mode": None,
+        "summary_path": str(summary_path),
+        "summary_exists": summary_path.exists(),
+        "summary_run_id": summary_run_id or None,
+        "summary_overall_conclusion": summary.get("overall_conclusion"),
+        "summary_intra_run_within_threshold": summary_stability.get("within_threshold"),
+        "ledger_path": str(ledger_path),
+        "ledger_exists": ledger_path.exists(),
+    }
+    if summary_passed:
+        detail.update({"accepted": True, "mode": "summary_passed"})
+        return detail
+
+    summary_name = summary_path.name
+    summary_text = str(summary_path)
+    for row in _read_jsonl_rows(ledger_path):
+        caveats = row.get("quality_caveats")
+        if not isinstance(caveats, list) or D5_D6_ACCEPTANCE_CAVEAT not in caveats:
+            continue
+        pointers = [
+            row.get("owlops_observation_path"),
+            row.get("owlops_observation_evidence_pointer"),
+            row.get("owlops_observation_evidence_path"),
+        ]
+        pointer_text = "\n".join(str(value) for value in pointers if value)
+        if summary_name in pointer_text or summary_text in pointer_text:
+            detail.update(
+                {
+                    "accepted": True,
+                    "mode": "d6_1_attested",
+                    "ledger_quality_caveat": D5_D6_ACCEPTANCE_CAVEAT,
+                    "ledger_verdict": row.get("verdict"),
+                }
+            )
+            return detail
+
+    detail["reason"] = "d6_prerequisite_missing"
+    return detail
+
+
+def _d5_metric_values(rows: list[dict[str, Any]], key: str) -> list[float]:
+    values: list[float] = []
+    for row in rows:
+        metrics = row.get("metrics") if isinstance(row.get("metrics"), dict) else {}
+        value = _as_float(metrics.get(key))
+        if value is not None:
+            values.append(value)
+    return values
+
+
+def _d5_distribution(values: list[float]) -> dict[str, Any]:
+    sorted_values = sorted(values)
+    if not sorted_values:
+        return {
+            "count": 0,
+            "mean": None,
+            "stddev": None,
+            "cv": None,
+            "min": None,
+            "p50": None,
+            "max": None,
+        }
+    count = len(sorted_values)
+    mean = sum(sorted_values) / count
+    if count >= 2:
+        stddev = (
+            sum((value - mean) ** 2 for value in sorted_values) / (count - 1)
+        ) ** 0.5
+    else:
+        stddev = None
+    midpoint = count // 2
+    if count % 2:
+        p50 = sorted_values[midpoint]
+    else:
+        p50 = (sorted_values[midpoint - 1] + sorted_values[midpoint]) / 2.0
+    cv = (stddev / mean) if stddev is not None and mean > 0 else None
+    return {
+        "count": count,
+        "mean": round(mean, 6),
+        "stddev": round(stddev, 6) if stddev is not None else None,
+        "cv": round(cv, 6) if cv is not None else None,
+        "min": round(sorted_values[0], 6),
+        "p50": round(p50, 6),
+        "max": round(sorted_values[-1], 6),
+    }
+
+
+def _d5_rss_distribution(values: list[float]) -> dict[str, Any]:
+    distribution = _d5_distribution(values)
+    if values:
+        distribution["range"] = round(max(values) - min(values), 6)
+    else:
+        distribution["range"] = None
+    return distribution
+
+
+def _d5_host_memory_watermark(*, run_factory: Any = subprocess.run) -> str:
+    try:
+        memsize = run_factory(
+            ["sysctl", "-n", "hw.memsize"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+        )
+        vmstat = run_factory(
+            ["vm_stat"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+        )
+    except Exception:
+        return "UNKNOWN"
+    if memsize.returncode != 0 or vmstat.returncode != 0:
+        return "UNKNOWN"
+    try:
+        total_bytes = float(str(memsize.stdout).strip())
+    except ValueError:
+        return "UNKNOWN"
+    page_size = 16384.0
+    free_pages = 0.0
+    for line in str(vmstat.stdout).splitlines():
+        if "page size of" in line:
+            try:
+                page_size = float(line.split("page size of", 1)[1].split("bytes", 1)[0].strip())
+            except (IndexError, ValueError):
+                page_size = 16384.0
+        label, _, raw_value = line.partition(":")
+        if label.strip() not in {
+            "Pages free",
+            "Pages inactive",
+            "Pages speculative",
+            "Pages purgeable",
+        }:
+            continue
+        digits = "".join(ch for ch in raw_value if ch.isdigit())
+        if digits:
+            free_pages += float(digits)
+    if total_bytes <= 0:
+        return "UNKNOWN"
+    headroom_gb = (free_pages * page_size) / 1024.0 / 1024.0 / 1024.0
+    if headroom_gb < 4.0:
+        return "FATAL"
+    if headroom_gb < 8.0:
+        return "RED"
+    if headroom_gb < 16.0:
+        return "YELLOW"
+    return "GREEN"
+
+
+def _d5_baseline_diff(
+    *,
+    actual_decode_tps: float | None,
+    actual_warm_ttft_ms: float | None,
+    actual_child_rss_gb: float | None,
+    baseline_row: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not baseline_row:
+        return {
+            "baseline_row_present": False,
+            "decode_tps_diff_rel": None,
+            "ttft_ms_warm_diff_rel": None,
+            "child_rss_gb_diff_abs": None,
+        }
+    metrics = (
+        baseline_row.get("metrics")
+        if isinstance(baseline_row.get("metrics"), dict)
+        else {}
+    )
+
+    def _rel(actual: float | None, key: str) -> float | None:
+        baseline = _as_float(metrics.get(key))
+        if actual is None or baseline is None or baseline == 0.0:
+            return None
+        return round((actual - baseline) / baseline, 6)
+
+    def _abs(actual: float | None, key: str) -> float | None:
+        baseline = _as_float(metrics.get(key))
+        if actual is None or baseline is None:
+            return None
+        return round(actual - baseline, 6)
+
+    return {
+        "baseline_row_present": True,
+        "decode_tps_diff_rel": _rel(actual_decode_tps, "decode_tps_after_first_token"),
+        "ttft_ms_warm_diff_rel": _rel(actual_warm_ttft_ms, "ttft_ms"),
+        "child_rss_gb_diff_abs": _abs(actual_child_rss_gb, "child_rss_gb"),
+    }
+
+
 def run_mainline(
     *,
     output_dir: Path,
@@ -3126,6 +3398,556 @@ def run_mainline(
     return summary
 
 
+def run_sustained(
+    *,
+    output_dir: Path,
+    backend_python: Path,
+    model_path: Path,
+    run_id: str | None = None,
+    d2_baseline_path: Path = D6_DEFAULT_BASELINE_PATH,
+    d6_summary_path: Path = D5_DEFAULT_D6_SUMMARY_PATH,
+    d6_ledger_path: Path = D5_DEFAULT_D6_LEDGER_PATH,
+    d6_baseline_path: Path = D5_DEFAULT_D6_BASELINE_PATH,
+    prompt_id: str = D5_DEFAULT_PROMPT_ID,
+    max_tokens: int = D5_DEFAULT_MAX_TOKENS,
+    round_count: int = D5_DEFAULT_ROUND_COUNT,
+    timeout_s: float = 900.0,
+    expected_mlx_lm_git_commit: str = D6_EXPECTED_MLX_LM_GIT_COMMIT,
+    expected_freed_gb_lower_bound: float = D6_FREED_GB_LOWER_BOUND,
+    child_rss_range_threshold_gb: float = D5_CHILD_RSS_RANGE_THRESHOLD_GB,
+    child_rss_ceiling_gb: float = D5_CHILD_RSS_CEILING_GB,
+    decode_tps_cv_threshold: float = D5_DECODE_TPS_CV_THRESHOLD,
+    ttft_warm_cv_threshold: float = D5_TTFT_WARM_CV_THRESHOLD,
+    backend_factory: Any = None,
+    watermark_sampler: Any = None,
+) -> dict[str, Any]:
+    """Drive D5 sustained-load repeatability through the D6 backend path."""
+
+    run_id = run_id or f"{_compact_stamp()}-d5-sustained-load"
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    lifecycle_path = output_dir / f"{run_id}.jsonl"
+    summary_path = output_dir / f"{run_id}.summary.json"
+
+    backend_python = Path(backend_python)
+    model_path = Path(model_path)
+    d2_baseline_path = Path(d2_baseline_path)
+    d6_summary_path = Path(d6_summary_path)
+    d6_ledger_path = Path(d6_ledger_path)
+    d6_baseline_path = Path(d6_baseline_path)
+
+    model_type = _d6_read_model_type_from_config(model_path)
+    probe = _d6_probe_model_type_support(backend_python, model_type or MODEL_TYPE)
+    provenance = _d6_runtime_provenance(backend_python)
+    d6_acceptance = _d5_d6_acceptance(
+        summary_path=d6_summary_path,
+        ledger_path=d6_ledger_path,
+    )
+    d2_baseline_rows = (
+        _d6_load_baseline(d2_baseline_path) if d2_baseline_path.exists() else {}
+    )
+    d6_baseline_rows = (
+        _d6_load_baseline(d6_baseline_path) if d6_baseline_path.exists() else {}
+    )
+    d2_baseline_row = d2_baseline_rows.get((prompt_id, int(max_tokens)))
+    d6_baseline_row = d6_baseline_rows.get((prompt_id, int(max_tokens)))
+    mainline_runtime_path_str = (
+        str(backend_python.parent.parent)
+        if backend_python.parent.name == "bin"
+        else str(backend_python.parent)
+    )
+    preflight_detail: dict[str, Any] = {
+        "mainline_runtime_path": mainline_runtime_path_str,
+        "deepseek_experimental_extras_installed": bool(probe.get("supported")),
+        "d6_acceptance": d6_acceptance,
+        "backend_class": "MlxLmSubprocessBackend",
+        "python_executable": str(backend_python),
+        "model_artifact_path": str(model_path),
+        "model_type_in_config": model_type,
+        "model_type_support_probe": {
+            "module_name": probe.get("module_name"),
+            "supported": bool(probe.get("supported")),
+            "returncode": probe.get("returncode"),
+        },
+        "mlx_lm_source": {
+            "origin": provenance.get("origin"),
+            "package_version": provenance.get("package_version"),
+            "git_commit": provenance.get("git_commit"),
+            "git_commit_matches_expected": (
+                provenance.get("git_commit") == expected_mlx_lm_git_commit
+            ),
+        },
+        "prompt_id": prompt_id,
+        "max_tokens": int(max_tokens),
+        "round_count_N": int(round_count),
+        "d2_baseline_evidence_path": str(d2_baseline_path),
+        "d2_baseline_row_present": d2_baseline_row is not None,
+        "d6_baseline_evidence_path": str(d6_baseline_path),
+        "d6_baseline_row_present": d6_baseline_row is not None,
+        "stock_runtime_untouched": True,
+        "default_model_surface_unchanged": True,
+    }
+
+    blocked_reasons: list[str] = []
+    if not d6_acceptance.get("accepted"):
+        blocked_reasons.append("d6_prerequisite_missing")
+    if not model_type:
+        blocked_reasons.append("model_type_missing_from_config")
+    if not probe.get("supported"):
+        blocked_reasons.append("model_type_support_probe_unsupported")
+    if not model_path.exists():
+        blocked_reasons.append("model_artifact_path_missing")
+    if int(round_count) < D5_DEFAULT_ROUND_COUNT:
+        blocked_reasons.append(f"round_count_below_20 ({round_count})")
+
+    def _write_summary(payload: dict[str, Any]) -> dict[str, Any]:
+        summary_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        return payload
+
+    if blocked_reasons:
+        _append_jsonl(lifecycle_path, [])
+        return _write_summary(
+            {
+                "schema_version": "d5.sustained-load.run.v1",
+                "run_id": run_id,
+                "created_at": _now_utc(),
+                "gate": "D5",
+                "campaign_label": "repeatability_evidence",
+                "evidence_strength": D5_EVIDENCE_STRENGTH,
+                "preflight": "blocked",
+                "preflight_detail": preflight_detail,
+                "blocked_reasons": blocked_reasons,
+                "rounds_attempted": 0,
+                "rounds_passed": 0,
+                "rounds_failed": 0,
+                "backend_class": "MlxLmSubprocessBackend",
+                "mlx_lm_git_commit": provenance.get("git_commit"),
+                "overall_conclusion": "blocked",
+                "verdict": "blocked",
+                "lifecycle_path": str(lifecycle_path),
+                "summary_path": str(summary_path),
+            }
+        )
+
+    if backend_factory is None:
+        def _default_backend_factory(**kwargs: Any) -> Any:
+            from owlmlx.runtime.mlx_lm_subprocess_backend import MlxLmSubprocessBackend
+
+            return MlxLmSubprocessBackend(**kwargs)
+
+        backend_factory = _default_backend_factory
+    if watermark_sampler is None:
+        watermark_sampler = _d5_host_memory_watermark
+
+    try:
+        _prompt_index, _prompt_key, prompt_text = _prompt_by_id(prompt_id)
+    except ValueError:
+        _append_jsonl(lifecycle_path, [])
+        return _write_summary(
+            {
+                "schema_version": "d5.sustained-load.run.v1",
+                "run_id": run_id,
+                "created_at": _now_utc(),
+                "gate": "D5",
+                "campaign_label": "repeatability_evidence",
+                "evidence_strength": D5_EVIDENCE_STRENGTH,
+                "preflight": "blocked",
+                "preflight_detail": preflight_detail,
+                "blocked_reasons": ["unknown_prompt_id"],
+                "rounds_attempted": 0,
+                "rounds_passed": 0,
+                "rounds_failed": 0,
+                "backend_class": "MlxLmSubprocessBackend",
+                "mlx_lm_git_commit": provenance.get("git_commit"),
+                "overall_conclusion": "blocked",
+                "verdict": "blocked",
+                "lifecycle_path": str(lifecycle_path),
+                "summary_path": str(summary_path),
+            }
+        )
+
+    backend = backend_factory(
+        python_executable=str(backend_python),
+        timeout_s=timeout_s,
+        auto_restart_dead_session=False,
+        max_restart_attempts=0,
+    )
+    health_before_load = _d5_status_snapshot(backend)
+
+    load_started = time.monotonic()
+    load_result = backend.load(str(model_path), memory_gb=100.0)
+    load_time_s = round(time.monotonic() - load_started, 4)
+    if not load_result.ok:
+        _append_jsonl(lifecycle_path, [])
+        return _write_summary(
+            {
+                "schema_version": "d5.sustained-load.run.v1",
+                "run_id": run_id,
+                "created_at": _now_utc(),
+                "gate": "D5",
+                "campaign_label": "repeatability_evidence",
+                "evidence_strength": D5_EVIDENCE_STRENGTH,
+                "preflight": "passed",
+                "preflight_detail": preflight_detail,
+                "rounds_attempted": 0,
+                "rounds_passed": 0,
+                "rounds_failed": 0,
+                "backend_class": "MlxLmSubprocessBackend",
+                "mlx_lm_git_commit": provenance.get("git_commit"),
+                "load_error": {
+                    "message": load_result.message,
+                    "error_code": (
+                        load_result.error_code.value
+                        if load_result.error_code
+                        else None
+                    ),
+                    "detail": load_result.detail,
+                },
+                "overall_conclusion": "failed",
+                "verdict": "failed",
+                "lifecycle_path": str(lifecycle_path),
+                "summary_path": str(summary_path),
+            }
+        )
+
+    from owlmlx.repeatability_statistics import (
+        RepeatRunSample,
+        compute_repeatability_statistics,
+        repeatability_statistics_to_dict,
+    )
+    from owlmlx.runtime.types import ChatTurn
+
+    health_after_load = _d5_status_snapshot(backend)
+    pid = load_result.detail.get("pid") if isinstance(load_result.detail, dict) else None
+    messages_dicts = _messages_for_prompt(prompt_text)
+    fixed_messages_sha256 = hashlib.sha256(
+        json.dumps(messages_dicts, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    messages = [
+        ChatTurn(role=msg["role"], content=msg["content"])
+        for msg in messages_dicts
+    ]
+
+    rows: list[dict[str, Any]] = []
+    overall_failed = False
+    overall_blocked = False
+
+    for round_index in range(int(round_count)):
+        request_started = time.monotonic()
+        first_token_at: float | None = None
+        done_event = None
+        stream_exception: BaseException | None = None
+        try:
+            for event in backend.stream_generate_messages(
+                str(model_path),
+                messages,
+                max_tokens=int(max_tokens),
+            ):
+                if event.event == "token" and first_token_at is None:
+                    first_token_at = time.monotonic()
+                if event.event == "done":
+                    done_event = event
+                if event.event == "error":
+                    stream_exception = RuntimeError(f"stream error: {event.detail}")
+                    break
+        except BaseException as exc:  # noqa: BLE001
+            stream_exception = exc
+        stream_done_at = time.monotonic()
+        if first_token_at is None:
+            first_token_at = stream_done_at
+
+        ttft_ms = round((first_token_at - request_started) * 1000.0, 4)
+        stream_wall_ms = round((stream_done_at - request_started) * 1000.0, 4)
+        completion_tokens = done_event.completion_tokens if done_event else None
+        prompt_tokens = done_event.prompt_tokens if done_event else None
+        stop_reason = (
+            done_event.finish_reason
+            if done_event and done_event.finish_reason
+            else "stop"
+        )
+        decode_tps = _decode_tps_after_first_token(
+            completion_tokens=completion_tokens,
+            first_visible_token_ms=ttft_ms,
+            stream_wall_ms=stream_wall_ms,
+        )
+        wall_tps = _wall_tps(
+            completion_tokens=completion_tokens,
+            stream_wall_ms=stream_wall_ms,
+        )
+        child_rss_gb = _process_rss_gb(pid) if pid is not None else None
+        row_health = _d5_status_snapshot(backend)
+        watermark = str(watermark_sampler())
+        if watermark not in {"GREEN", "YELLOW", "RED", "FATAL", "UNKNOWN"}:
+            watermark = "UNKNOWN"
+
+        verdict = "passed"
+        verdict_reason: str | None = None
+        if stream_exception is not None:
+            verdict = "failed"
+            verdict_reason = "stream_exception"
+            overall_failed = True
+        elif done_event is None:
+            verdict = "failed"
+            verdict_reason = "no_done_event"
+            overall_failed = True
+        elif row_health.get("healthy") is not True:
+            verdict = "failed"
+            verdict_reason = "backend_unhealthy_after_round"
+            overall_failed = True
+        elif row_health.get("child_restart_count", 0) not in (0, None):
+            verdict = "failed"
+            verdict_reason = "child_restart_observed"
+            overall_failed = True
+        elif watermark in {"RED", "FATAL"}:
+            verdict = "blocked"
+            verdict_reason = "host_watermark_red_or_fatal"
+            overall_blocked = True
+
+        rows.append(
+            {
+                "schema_version": "d5.sustained-load.v1",
+                "record_type": "sustained_load_round",
+                "gate": "D5",
+                "run_id": run_id,
+                "created_at_utc": _now_utc(),
+                "model_id": MODEL_ID,
+                "backend_class": "MlxLmSubprocessBackend",
+                "backend_path": {
+                    "python_executable": str(backend_python),
+                    "runner_module": RUNNER_MODULE,
+                    "deepseek_experimental_extras_active": True,
+                    "mlx_lm_source": {
+                        "git_commit": provenance.get("git_commit"),
+                        "package_version": provenance.get("package_version"),
+                    },
+                },
+                "campaign_label": "repeatability_evidence",
+                "prompt_surface": D1_PROMPT_SURFACE_DEFAULT,
+                "generation_surface": "stream_generate_messages",
+                "prompt_id": prompt_id,
+                "max_tokens": int(max_tokens),
+                "fixed_messages_sha256": fixed_messages_sha256,
+                "round_index": round_index,
+                "metrics": {
+                    "load_time_s": load_time_s,
+                    "ttft_ms": ttft_ms,
+                    "stream_wall_ms": stream_wall_ms,
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "decode_tps_after_first_token": decode_tps,
+                    "wall_tps": wall_tps,
+                    "child_rss_gb": child_rss_gb,
+                    "rss_sample_scope": RSS_SAMPLE_SCOPE,
+                    "rss_sample_source": RSS_SAMPLE_SOURCE,
+                    "rss_sample_timing": D5_RSS_SAMPLE_TIMING,
+                },
+                "backend_health_snapshot_after_this_round": row_health,
+                "host_state": {
+                    "unified_memory_gb_capacity": 128,
+                    "watermark_observed": watermark,
+                },
+                "stop_reason": stop_reason,
+                "repetition_flag": False,
+                "verdict": verdict,
+                "verdict_reason": verdict_reason,
+                **(
+                    {"stream_error": f"{type(stream_exception).__name__}: {stream_exception}"}
+                    if stream_exception is not None
+                    else {}
+                ),
+            }
+        )
+
+    unload_started = time.monotonic()
+    unload_result = backend.unload(str(model_path))
+    unload_time_s = round(time.monotonic() - unload_started, 4)
+    health_after_unload = _d5_status_snapshot(backend)
+    freed_gb: float | None = (
+        float(unload_result.freed_gb) if unload_result.ok else None
+    )
+    if not unload_result.ok:
+        overall_failed = True
+    elif freed_gb is not None and freed_gb < expected_freed_gb_lower_bound:
+        overall_failed = True
+
+    clean_health_after_unload = (
+        health_after_unload.get("healthy") is True
+        and health_after_unload.get("loaded_model_count") == 0
+    )
+    if not clean_health_after_unload:
+        overall_failed = True
+
+    _append_jsonl(lifecycle_path, rows)
+
+    ttft_values = _d5_metric_values(rows, "ttft_ms")
+    warm_ttft_values = ttft_values[1:] if len(ttft_values) > 1 else []
+    decode_values = _d5_metric_values(rows, "decode_tps_after_first_token")
+    wall_values = _d5_metric_values(rows, "wall_tps")
+    rss_values = _d5_metric_values(rows, "child_rss_gb")
+
+    all_stats = _d5_distribution(ttft_values)
+    warm_stats = _d5_distribution(warm_ttft_values)
+    decode_stats = _d5_distribution(decode_values)
+    wall_stats = _d5_distribution(wall_values)
+    rss_stats = _d5_rss_distribution(rss_values)
+
+    repeat_samples = [
+        RepeatRunSample(
+            ttft_ms=(
+                None
+                if row.get("round_index") == 0
+                else _as_float(row.get("metrics", {}).get("ttft_ms"))
+            ),
+            decode_tps=_as_float(
+                row.get("metrics", {}).get("decode_tps_after_first_token")
+            ),
+            wall_ms=_as_float(row.get("metrics", {}).get("stream_wall_ms")),
+            rss_bytes=(
+                int(rss_gb * 1024 * 1024 * 1024)
+                if (rss_gb := _as_float(row.get("metrics", {}).get("child_rss_gb")))
+                is not None
+                else None
+            ),
+        )
+        for row in rows
+        if isinstance(row.get("metrics"), dict)
+    ]
+    campaign_a_stats = repeatability_statistics_to_dict(
+        compute_repeatability_statistics(repeat_samples)
+    )
+
+    rss_range = rss_stats.get("range")
+    rss_max = rss_stats.get("max")
+    decode_cv = decode_stats.get("cv")
+    warm_ttft_cv = warm_stats.get("cv")
+    monotonic_rss_growth = (
+        len(rss_values) >= 2
+        and all(next_value >= value for value, next_value in zip(rss_values, rss_values[1:]))
+        and max(rss_values) > min(rss_values)
+    )
+    intra_run_ok = (
+        rss_range is not None
+        and rss_max is not None
+        and decode_cv is not None
+        and warm_ttft_cv is not None
+        and rss_range <= child_rss_range_threshold_gb
+        and rss_max <= child_rss_ceiling_gb
+        and decode_cv <= decode_tps_cv_threshold
+        and warm_ttft_cv <= ttft_warm_cv_threshold
+    )
+    if not intra_run_ok:
+        overall_failed = True
+
+    rounds_passed = sum(1 for row in rows if row.get("verdict") == "passed")
+    rounds_blocked = sum(1 for row in rows if row.get("verdict") == "blocked")
+    rounds_failed = sum(1 for row in rows if row.get("verdict") == "failed")
+    if len(rows) != int(round_count) or rounds_passed != len(rows):
+        if rounds_blocked:
+            overall_blocked = True
+        else:
+            overall_failed = True
+
+    worst_order = {"UNKNOWN": 0, "GREEN": 1, "YELLOW": 2, "RED": 3, "FATAL": 4}
+    watermarks = [
+        str(row.get("host_state", {}).get("watermark_observed") or "UNKNOWN")
+        for row in rows
+        if isinstance(row.get("host_state"), dict)
+    ]
+    worst_watermark = max(watermarks or ["UNKNOWN"], key=lambda value: worst_order.get(value, 0))
+    watermark_red_or_fatal = any(value in {"RED", "FATAL"} for value in watermarks)
+
+    actual_decode_mean = decode_stats.get("mean")
+    actual_warm_ttft_mean = warm_stats.get("mean")
+    actual_rss_max = rss_stats.get("max")
+    cross_validation = {
+        "advisory": True,
+        "vs_d2_baseline": _d5_baseline_diff(
+            actual_decode_tps=actual_decode_mean,
+            actual_warm_ttft_ms=actual_warm_ttft_mean,
+            actual_child_rss_gb=actual_rss_max,
+            baseline_row=d2_baseline_row,
+        ),
+        "vs_d6_baseline": _d5_baseline_diff(
+            actual_decode_tps=actual_decode_mean,
+            actual_warm_ttft_ms=actual_warm_ttft_mean,
+            actual_child_rss_gb=actual_rss_max,
+            baseline_row=d6_baseline_row,
+        ),
+    }
+
+    if overall_blocked:
+        overall = "blocked"
+    elif overall_failed:
+        overall = "failed"
+    else:
+        overall = "passed"
+
+    summary = {
+        "schema_version": "d5.sustained-load.run.v1",
+        "run_id": run_id,
+        "created_at": _now_utc(),
+        "gate": "D5",
+        "campaign_label": "repeatability_evidence",
+        "evidence_strength": D5_EVIDENCE_STRENGTH,
+        "preflight": "passed",
+        "preflight_detail": preflight_detail,
+        "rounds_attempted": len(rows),
+        "rounds_passed": rounds_passed,
+        "rounds_failed": rounds_failed,
+        "backend_class": "MlxLmSubprocessBackend",
+        "mlx_lm_git_commit": provenance.get("git_commit"),
+        "repeatability_statistics": {
+            "ttft_ms": {
+                "all_rounds": all_stats,
+                "warm_rounds_2_to_20": warm_stats,
+            },
+            "decode_tps_after_first_token": {"all_rounds": decode_stats},
+            "wall_tps": {"all_rounds": wall_stats},
+            "child_rss_gb": {"all_rounds": rss_stats},
+        },
+        "campaign_a_repeatability_statistics": campaign_a_stats,
+        "intra_run_stability": {
+            "child_rss_gb_range_gb": rss_range,
+            "child_rss_gb_max_gb": rss_max,
+            "child_rss_gb_range_threshold_gb": child_rss_range_threshold_gb,
+            "child_rss_gb_ceiling_gb": child_rss_ceiling_gb,
+            "decode_tps_cv_all_rounds": decode_cv,
+            "decode_tps_cv_threshold": decode_tps_cv_threshold,
+            "ttft_ms_cv_warm_rounds": warm_ttft_cv,
+            "ttft_ms_cv_warm_threshold": ttft_warm_cv_threshold,
+            "monotonic_rss_growth_detected": monotonic_rss_growth,
+            "within_threshold": intra_run_ok,
+        },
+        "cross_validation": cross_validation,
+        "backend_health_summary": {
+            "child_restart_observed": any(
+                (row.get("backend_health_snapshot_after_this_round") or {}).get(
+                    "child_restart_count", 0
+                )
+                not in (0, None)
+                for row in rows
+            ),
+            "clean_health_after_unload": clean_health_after_unload,
+            "unload_freed_gb": freed_gb,
+            "unload_time_s": unload_time_s,
+            "health_before_load": health_before_load,
+            "health_after_load": health_after_load,
+            "health_after_unload": health_after_unload,
+        },
+        "host_state_summary": {
+            "worst_watermark_observed": worst_watermark,
+            "watermark_red_or_fatal_observed": watermark_red_or_fatal,
+        },
+        "overall_conclusion": overall,
+        "verdict": overall,
+        "lifecycle_path": str(lifecycle_path),
+        "summary_path": str(summary_path),
+    }
+    return _write_summary(summary)
+
+
 def _cmd_mainline(args: argparse.Namespace) -> int:
     payload = run_mainline(
         output_dir=args.output_dir,
@@ -3143,6 +3965,31 @@ def _cmd_mainline(args: argparse.Namespace) -> int:
         decode_tps_drift_rel_threshold=args.decode_tps_drift_rel_threshold,
         child_rss_drift_abs_threshold=args.child_rss_drift_abs_threshold,
         expected_freed_gb_lower_bound=args.expected_freed_gb_lower_bound,
+    )
+    _json_print(payload)
+    return 0 if payload.get("overall_conclusion") == "passed" else 1
+
+
+def _cmd_sustained(args: argparse.Namespace) -> int:
+    payload = run_sustained(
+        output_dir=args.output_dir,
+        run_id=args.run_id,
+        backend_python=args.backend_python,
+        model_path=args.model_path,
+        d2_baseline_path=args.d2_baseline,
+        d6_summary_path=args.d6_passed_evidence,
+        d6_ledger_path=args.d6_ledger,
+        d6_baseline_path=args.d6_baseline,
+        prompt_id=args.prompt_id,
+        max_tokens=args.max_tokens,
+        round_count=args.round_count,
+        timeout_s=args.timeout_s,
+        expected_mlx_lm_git_commit=args.expected_mlx_lm_git_commit,
+        expected_freed_gb_lower_bound=args.expected_freed_gb_lower_bound,
+        child_rss_range_threshold_gb=args.child_rss_range_threshold_gb,
+        child_rss_ceiling_gb=args.child_rss_ceiling_gb,
+        decode_tps_cv_threshold=args.decode_tps_cv_threshold,
+        ttft_warm_cv_threshold=args.ttft_warm_cv_threshold,
     )
     _json_print(payload)
     return 0 if payload.get("overall_conclusion") == "passed" else 1
@@ -3564,6 +4411,97 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         default=D6_FREED_GB_LOWER_BOUND,
     )
     mainline.set_defaults(func=_cmd_mainline)
+
+    sustained = sub.add_parser(
+        "sustained",
+        help=(
+            "Run D5 sustained-load N>=20 repeatability through the D6 "
+            "MlxLmSubprocessBackend path"
+        ),
+    )
+    sustained.add_argument(
+        "--backend-python",
+        type=Path,
+        default=D6_DEFAULT_BACKEND_PYTHON,
+        help=(
+            "Path to the python executable inside a venv populated with the "
+            "deepseek-experimental extras group."
+        ),
+    )
+    sustained.add_argument(
+        "--model-path",
+        type=Path,
+        default=DEFAULT_MODEL_PATH,
+        help="DSV4-Flash 2bit-DQ artifact directory.",
+    )
+    sustained.add_argument(
+        "--output-dir",
+        type=Path,
+        default=D5_DEFAULT_OUTPUT_DIR,
+        help="Where to write the D5 sustained-load JSONL and summary JSON.",
+    )
+    sustained.add_argument(
+        "--d2-baseline",
+        type=Path,
+        default=D6_DEFAULT_BASELINE_PATH,
+        help="D2 metrics ledger JSONL used as advisory baseline.",
+    )
+    sustained.add_argument(
+        "--d6-passed-evidence",
+        type=Path,
+        default=D5_DEFAULT_D6_SUMMARY_PATH,
+        help=(
+            "D6 summary path accepted either by a passed summary or by the "
+            "D6.1 model-release-candidate attestation chain."
+        ),
+    )
+    sustained.add_argument(
+        "--d6-ledger",
+        type=Path,
+        default=D5_DEFAULT_D6_LEDGER_PATH,
+        help="Model-release-candidate cumulative ledger used for D6.1 attestation.",
+    )
+    sustained.add_argument(
+        "--d6-baseline",
+        type=Path,
+        default=D5_DEFAULT_D6_BASELINE_PATH,
+        help="D6 lifecycle JSONL used as advisory same-path baseline.",
+    )
+    sustained.add_argument("--run-id", default=None)
+    sustained.add_argument("--prompt-id", default=D5_DEFAULT_PROMPT_ID)
+    sustained.add_argument("--max-tokens", type=int, default=D5_DEFAULT_MAX_TOKENS)
+    sustained.add_argument("--round-count", type=int, default=D5_DEFAULT_ROUND_COUNT)
+    sustained.add_argument("--timeout-s", type=float, default=900.0)
+    sustained.add_argument(
+        "--expected-mlx-lm-git-commit",
+        default=D6_EXPECTED_MLX_LM_GIT_COMMIT,
+    )
+    sustained.add_argument(
+        "--expected-freed-gb-lower-bound",
+        type=float,
+        default=D6_FREED_GB_LOWER_BOUND,
+    )
+    sustained.add_argument(
+        "--child-rss-range-threshold-gb",
+        type=float,
+        default=D5_CHILD_RSS_RANGE_THRESHOLD_GB,
+    )
+    sustained.add_argument(
+        "--child-rss-ceiling-gb",
+        type=float,
+        default=D5_CHILD_RSS_CEILING_GB,
+    )
+    sustained.add_argument(
+        "--decode-tps-cv-threshold",
+        type=float,
+        default=D5_DECODE_TPS_CV_THRESHOLD,
+    )
+    sustained.add_argument(
+        "--ttft-warm-cv-threshold",
+        type=float,
+        default=D5_TTFT_WARM_CV_THRESHOLD,
+    )
+    sustained.set_defaults(func=_cmd_sustained)
 
     inspect = sub.add_parser(
         "checkpoint-inspect",

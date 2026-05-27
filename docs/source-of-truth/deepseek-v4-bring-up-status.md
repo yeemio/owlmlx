@@ -123,6 +123,28 @@ prerequisite. The 14 GB inter-path child_rss_gb offset is preserved as a
 documented architectural characteristic; future D6.x or D8 rounds may
 investigate it but D5/D7 are not contingent on that resolution.
 
+**D5 follow-up status (2026-05-27):** the sustained-load N≥20 repeatability
+gate now passes through the same D6 mainline backend path.
+
+- D5 evidence:
+  `files/evidence/owlmlx/deepseek-v4/d5-sustained-load/20260527T084115Z-d5-sustained-load.jsonl`
+  and `.summary.json`.
+- Shape: one `MlxLmSubprocessBackend` load, fixed `p2_short_en × 512`, 20
+  consecutive rounds, one unload, clean post-unload health.
+- Result: 20/20 rounds passed; `child_restart_observed=false`,
+  `unload_freed_gb=100.0`, `clean_health_after_unload=true`.
+- Stability gates: intra-run `child_rss_gb` range is 0.012146 GB (≤ 1.0 GB
+  gate), observed max is 16.772614 GB (≤ 30 GB ceiling), decode TPS CV is
+  0.025760 (≤ 0.20), and warm TTFT CV is 0.060038 (≤ 0.30). Round 0 cold
+  TTFT remains recorded but is excluded from the warm TTFT CV gate.
+- The model-release-candidate cumulative ledger now has a D5 row with
+  `deepseek_v4_flash_2bit_dq_128g_sustained_load=passed`; the row keeps
+  `verdict=experimental_only` and `visibility_status=not_registered`.
+
+D5 passing does **not** promote DSV4-Flash 2bit-DQ on its own. D7
+(`technical_preview` visibility registration) remains the final prerequisite
+before the Campaign D `partial` promotion can be considered.
+
 **2026-05-11: Lifecycle complete via intermediate path.**
 
 `DeepSeek-V4-Flash-2bit-DQ` completed load → generate → unload → clean health

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 import time
+from pathlib import Path
 
 import pytest
 
@@ -205,6 +206,10 @@ def test_real_model_two_streams_serialize_under_admission() -> None:
 _DSV4_SUBPROCESS_PYTHON_ENV = "OWLMLX_DSV4_SUBPROCESS_SMOKE_PYTHON"
 _DSV4_SUBPROCESS_MODEL_ENV = "OWLMLX_DSV4_SUBPROCESS_SMOKE_MODEL_PATH"
 _DSV4_SUBPROCESS_MAX_TOKENS_ENV = "OWLMLX_DSV4_SUBPROCESS_SMOKE_MAX_TOKENS"
+_DSV4_SUSTAINED_PYTHON_ENV = "OWLMLX_DSV4_SUSTAINED_SMOKE_PYTHON"
+_DSV4_SUSTAINED_MODEL_ENV = "OWLMLX_DSV4_SUSTAINED_SMOKE_MODEL_PATH"
+_DSV4_SUSTAINED_MAX_TOKENS_ENV = "OWLMLX_DSV4_SUSTAINED_SMOKE_MAX_TOKENS"
+_DSV4_SUSTAINED_ROUNDS_ENV = "OWLMLX_DSV4_SUSTAINED_SMOKE_ROUNDS"
 _DSV4_SUBPROCESS_FALLBACK_PYTHON_ENV = (
     "OWLMLX_DSV4_SUBPROCESS_SMOKE_FALLBACK_PYTHON"
 )
@@ -218,6 +223,14 @@ def _dsv4_subprocess_model_path() -> str | None:
     return os.environ.get(_DSV4_SUBPROCESS_MODEL_ENV) or None
 
 
+def _dsv4_sustained_python() -> str | None:
+    return os.environ.get(_DSV4_SUSTAINED_PYTHON_ENV) or None
+
+
+def _dsv4_sustained_model_path() -> str | None:
+    return os.environ.get(_DSV4_SUSTAINED_MODEL_ENV) or None
+
+
 def _dsv4_subprocess_max_tokens() -> int:
     raw = os.environ.get(_DSV4_SUBPROCESS_MAX_TOKENS_ENV)
     if not raw:
@@ -229,6 +242,28 @@ def _dsv4_subprocess_max_tokens() -> int:
     return max(1, min(n, 128))
 
 
+def _dsv4_subprocess_sustained_max_tokens() -> int:
+    raw = os.environ.get(_DSV4_SUSTAINED_MAX_TOKENS_ENV)
+    if not raw:
+        return 512
+    try:
+        n = int(raw)
+    except ValueError:
+        return 512
+    return max(1, min(n, 2048))
+
+
+def _dsv4_subprocess_sustained_rounds() -> int:
+    raw = os.environ.get(_DSV4_SUSTAINED_ROUNDS_ENV)
+    if not raw:
+        return 20
+    try:
+        n = int(raw)
+    except ValueError:
+        return 20
+    return max(20, n)
+
+
 def _dsv4_subprocess_fallback_python() -> str | None:
     return os.environ.get(_DSV4_SUBPROCESS_FALLBACK_PYTHON_ENV) or None
 
@@ -237,6 +272,13 @@ def _dsv4_subprocess_smoke_enabled() -> bool:
     return (
         _dsv4_subprocess_python() is not None
         and _dsv4_subprocess_model_path() is not None
+    )
+
+
+def _dsv4_sustained_smoke_enabled() -> bool:
+    return (
+        _dsv4_sustained_python() is not None
+        and _dsv4_sustained_model_path() is not None
     )
 
 
@@ -358,4 +400,48 @@ def test_dsv4_subprocess_backend_rejects_when_extras_missing() -> None:
 
     status_after = backend.status()
     assert status_before.healthy == status_after.healthy
+
+
+@pytest.mark.skipif(
+    not _dsv4_sustained_smoke_enabled(),
+    reason=(
+        f"{_DSV4_SUSTAINED_PYTHON_ENV} and {_DSV4_SUSTAINED_MODEL_ENV} "
+        "must both be set; D5 subprocess-backend sustained-load smoke is opt-in"
+    ),
+)
+def test_dsv4_subprocess_backend_d5_sustained_load_n20(tmp_path: Path) -> None:
+    """Drive the D5 N>=20 sustained-load harness through the real backend path."""
+
+    from scripts.bench import deepseek_v4_d1_repeatability as d1
+
+    backend_python = _dsv4_sustained_python()
+    model_path = _dsv4_sustained_model_path()
+    assert backend_python is not None
+    assert model_path is not None
+
+    output_dir = tmp_path / "d5-sustained-load"
+    round_count = _dsv4_subprocess_sustained_rounds()
+    max_tokens = _dsv4_subprocess_sustained_max_tokens()
+    payload = d1.run_sustained(
+        output_dir=output_dir,
+        run_id="pytest-d5-sustained-load",
+        backend_python=Path(backend_python),
+        model_path=Path(model_path),
+        round_count=round_count,
+        max_tokens=max_tokens,
+    )
+
+    assert payload["schema_version"] == "d5.sustained-load.run.v1"
+    assert payload["rounds_attempted"] == round_count
+    assert payload["rounds_passed"] == round_count
+    assert payload["overall_conclusion"] == "passed", payload
+    assert payload["intra_run_stability"]["within_threshold"] is True
+
+    print(
+        f"\n[dsv4_d5_sustained_smoke] python={backend_python} "
+        f"rounds={round_count} max_tokens={max_tokens} "
+        f"decode_cv={payload['intra_run_stability']['decode_tps_cv_all_rounds']} "
+        f"warm_ttft_cv={payload['intra_run_stability']['ttft_ms_cv_warm_rounds']} "
+        f"rss_range_gb={payload['intra_run_stability']['child_rss_gb_range_gb']}"
+    )
     assert status_after.loaded_models == ()

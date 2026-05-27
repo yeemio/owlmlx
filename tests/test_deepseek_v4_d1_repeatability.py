@@ -2281,3 +2281,249 @@ def test_mainline_emits_blocked_when_model_type_probe_unsupported(
             "preflight block must not start backend lifecycle; "
             f"observed calls: {backend.calls}"
         )
+
+
+# ---------------------------------------------------------------------------
+# D5 · sustained-load repeatability · unit tests for run_sustained
+# ---------------------------------------------------------------------------
+
+
+def _write_fake_d6_acceptance_attestation(
+    *,
+    summary_path: Path,
+    ledger_path: Path,
+    baseline_path: Path,
+) -> None:
+    """Write the D6.1 attestation shape D5 accepts as prerequisite."""
+
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    run_id = "20260527T072206Z-d6-mainline-backend-lifecycle"
+    summary_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "d6.mainline-backend.run.v1",
+                "run_id": run_id,
+                # Historical D6 summary verdict remains failed; D6.1
+                # reclassification is attested by spec + ledger.
+                "overall_conclusion": "failed",
+                "intra_run_stability": {"within_threshold": True},
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(
+        json.dumps(
+            {
+                "surface": "owlmlx.model_release_candidate_record",
+                "model_id": "DeepSeek-V4-Flash-2bit-DQ",
+                "quality_caveats": [
+                    "deepseek_v4_flash_2bit_dq_mainline_backend_integration=passed",
+                    "verdict:experimental_only_until_d5_and_d7_pass",
+                ],
+                "owlops_observation_path": str(summary_path),
+                "owlops_observation_evidence_pointer": str(summary_path),
+                "verdict": "experimental_only",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    baseline_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "d6.mainline-backend.v1",
+                "gate": "D6",
+                "prompt_id": "p2_short_en",
+                "max_tokens": 512,
+                "metrics": {
+                    "ttft_ms": 210.0,
+                    "decode_tps_after_first_token": 42.0,
+                    "child_rss_gb": 21.4,
+                },
+                "verdict": "passed",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_sustained_writes_d5_evidence_on_happy_path(tmp_path, monkeypatch):
+    baseline_path = tmp_path / "d2_baseline.jsonl"
+    _write_fake_d2_baseline(
+        baseline_path,
+        ttft_ms=200.0,
+        decode_tps=40.0,
+        child_rss_gb=7.0,
+        prompt_ids=("p2_short_en",),
+        max_tokens_levels=(512,),
+    )
+
+    d6_summary = tmp_path / "d6" / "20260527T072206Z-d6-mainline-backend-lifecycle.summary.json"
+    d6_ledger = tmp_path / "model-release-candidates" / "cumulative-ledger.jsonl"
+    d6_baseline = tmp_path / "d6" / "20260527T072206Z-d6-mainline-backend-lifecycle.jsonl"
+    _write_fake_d6_acceptance_attestation(
+        summary_path=d6_summary,
+        ledger_path=d6_ledger,
+        baseline_path=d6_baseline,
+    )
+
+    model_path = tmp_path / "DSV4-fake"
+    _write_dsv4_config_only_model(model_path)
+    backend_python = tmp_path / "fake-python"
+    backend_python.write_text("")
+    _mock_d6_probes(monkeypatch, supported=True, fake_rss_gb=21.25)
+
+    backend = _DSV4FakeBackend(
+        ttft_sleep_s=0.01,
+        post_first_token_sleep_s=0.01,
+        completion_tokens=8,
+    )
+    payload = d1.run_sustained(
+        output_dir=tmp_path / "evidence",
+        run_id="20260527T-d5-happy-path-test",
+        backend_python=backend_python,
+        model_path=model_path,
+        d2_baseline_path=baseline_path,
+        d6_summary_path=d6_summary,
+        d6_ledger_path=d6_ledger,
+        d6_baseline_path=d6_baseline,
+        round_count=20,
+        backend_factory=lambda **_kw: backend,
+    )
+
+    assert payload["overall_conclusion"] == "passed", payload
+    assert payload["schema_version"] == "d5.sustained-load.run.v1"
+    assert payload["campaign_label"] == "repeatability_evidence"
+    assert payload["rounds_attempted"] == 20
+    assert payload["rounds_passed"] == 20
+    assert payload["preflight_detail"]["d6_acceptance"]["accepted"] is True
+    assert payload["preflight_detail"]["d6_acceptance"]["mode"] == "d6_1_attested"
+    assert payload["intra_run_stability"]["within_threshold"] is True
+    assert payload["cross_validation"]["advisory"] is True
+
+    rows = _records(Path(payload["lifecycle_path"]))
+    assert len(rows) == 20
+    fixed_hashes = {row["fixed_messages_sha256"] for row in rows}
+    assert len(fixed_hashes) == 1
+    for i, row in enumerate(rows):
+        assert row["schema_version"] == "d5.sustained-load.v1"
+        assert row["record_type"] == "sustained_load_round"
+        assert row["gate"] == "D5"
+        assert row["campaign_label"] == "repeatability_evidence"
+        assert row["round_index"] == i
+        assert row["prompt_id"] == "p2_short_en"
+        assert row["max_tokens"] == 512
+        assert row["metrics"]["completion_tokens"] == 8
+        assert row["metrics"]["child_rss_gb"] == 21.25
+        assert row["host_state"]["watermark_observed"] in {
+            "GREEN",
+            "YELLOW",
+            "RED",
+            "FATAL",
+            "UNKNOWN",
+        }
+        assert row["verdict"] == "passed"
+
+    assert [call[0] for call in backend.calls].count("load") == 1
+    assert [call[0] for call in backend.calls].count("stream_generate_messages") == 20
+    assert [call[0] for call in backend.calls].count("unload") == 1
+
+
+def test_sustained_flags_intra_run_rss_instability_as_failed(tmp_path, monkeypatch):
+    baseline_path = tmp_path / "d2_baseline.jsonl"
+    _write_fake_d2_baseline(
+        baseline_path,
+        prompt_ids=("p2_short_en",),
+        max_tokens_levels=(512,),
+    )
+    d6_summary = tmp_path / "d6" / "20260527T072206Z-d6-mainline-backend-lifecycle.summary.json"
+    d6_ledger = tmp_path / "model-release-candidates" / "cumulative-ledger.jsonl"
+    d6_baseline = tmp_path / "d6" / "20260527T072206Z-d6-mainline-backend-lifecycle.jsonl"
+    _write_fake_d6_acceptance_attestation(
+        summary_path=d6_summary,
+        ledger_path=d6_ledger,
+        baseline_path=d6_baseline,
+    )
+    model_path = tmp_path / "DSV4-fake"
+    _write_dsv4_config_only_model(model_path)
+    backend_python = tmp_path / "fake-python"
+    backend_python.write_text("")
+    _mock_d6_probes(monkeypatch, supported=True)
+
+    rss_samples = iter([21.0 + (i * 0.08) for i in range(20)])  # range 1.52 GB
+    monkeypatch.setattr(
+        d1,
+        "_process_rss_gb",
+        lambda pid, **_kw: next(rss_samples, 22.52),
+        raising=True,
+    )
+
+    payload = d1.run_sustained(
+        output_dir=tmp_path / "evidence",
+        run_id="20260527T-d5-rss-instability-test",
+        backend_python=backend_python,
+        model_path=model_path,
+        d2_baseline_path=baseline_path,
+        d6_summary_path=d6_summary,
+        d6_ledger_path=d6_ledger,
+        d6_baseline_path=d6_baseline,
+        round_count=20,
+        backend_factory=lambda **_kw: _DSV4FakeBackend(
+            ttft_sleep_s=0.01,
+            post_first_token_sleep_s=0.01,
+            completion_tokens=8,
+        ),
+    )
+
+    assert payload["overall_conclusion"] == "failed", payload
+    stability = payload["intra_run_stability"]
+    assert stability["within_threshold"] is False
+    assert stability["child_rss_gb_range_gb"] > 1.0
+
+
+def test_sustained_emits_blocked_when_d6_prerequisite_missing(
+    tmp_path, monkeypatch
+):
+    baseline_path = tmp_path / "d2_baseline.jsonl"
+    _write_fake_d2_baseline(
+        baseline_path,
+        prompt_ids=("p2_short_en",),
+        max_tokens_levels=(512,),
+    )
+    model_path = tmp_path / "DSV4-fake"
+    _write_dsv4_config_only_model(model_path)
+    backend_python = tmp_path / "fake-python"
+    backend_python.write_text("")
+    _mock_d6_probes(monkeypatch, supported=True)
+
+    constructed: list[_DSV4FakeBackend] = []
+
+    def _factory(**_kw):
+        backend = _DSV4FakeBackend()
+        constructed.append(backend)
+        return backend
+
+    payload = d1.run_sustained(
+        output_dir=tmp_path / "evidence",
+        run_id="20260527T-d5-blocked-test",
+        backend_python=backend_python,
+        model_path=model_path,
+        d2_baseline_path=baseline_path,
+        d6_summary_path=tmp_path / "missing-d6.summary.json",
+        d6_ledger_path=tmp_path / "missing-ledger.jsonl",
+        d6_baseline_path=tmp_path / "missing-d6.jsonl",
+        round_count=20,
+        backend_factory=_factory,
+    )
+
+    assert payload["overall_conclusion"] == "blocked"
+    assert payload["preflight_detail"]["d6_acceptance"]["accepted"] is False
+    assert "d6_prerequisite_missing" in payload["blocked_reasons"]
+    assert constructed == []

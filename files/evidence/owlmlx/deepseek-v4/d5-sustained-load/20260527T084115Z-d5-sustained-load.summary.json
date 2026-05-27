@@ -1,0 +1,192 @@
+{
+  "backend_class": "MlxLmSubprocessBackend",
+  "backend_health_summary": {
+    "child_restart_observed": false,
+    "clean_health_after_unload": true,
+    "health_after_load": {
+      "backend_name": "mlx-lm-subprocess",
+      "child_restart_count": 0,
+      "healthy": true,
+      "loaded_model_count": 1
+    },
+    "health_after_unload": {
+      "backend_name": "mlx-lm-subprocess",
+      "child_restart_count": 0,
+      "healthy": true,
+      "loaded_model_count": 0
+    },
+    "health_before_load": {
+      "backend_name": "mlx-lm-subprocess",
+      "child_restart_count": 0,
+      "healthy": true,
+      "loaded_model_count": 0
+    },
+    "unload_freed_gb": 100.0,
+    "unload_time_s": 0.8846
+  },
+  "campaign_a_repeatability_statistics": {
+    "contract": {
+      "surface": "owlmlx.repeatability_statistics",
+      "version": "v1"
+    },
+    "decode_tps": {
+      "max": 43.3255,
+      "mean": 42.101815,
+      "min": 40.091,
+      "stddev": 1.0845237360121183
+    },
+    "n": 20,
+    "rss_bytes_max": 18009457149,
+    "stability_label": "stable",
+    "stability_note": "n=20 ttft_cv=0.060 tps_cv=0.026",
+    "ttft_ms": {
+      "max": 245.6677,
+      "mean": 208.35886842105262,
+      "min": 193.522,
+      "stddev": 12.509454995680164
+    }
+  },
+  "campaign_label": "repeatability_evidence",
+  "created_at": "2026-05-27T08:42:11Z",
+  "cross_validation": {
+    "advisory": true,
+    "vs_d2_baseline": {
+      "baseline_row_present": true,
+      "child_rss_gb_diff_abs": 9.558777,
+      "decode_tps_diff_rel": 0.044928,
+      "ttft_ms_warm_diff_rel": -0.043848
+    },
+    "vs_d6_baseline": {
+      "baseline_row_present": true,
+      "child_rss_gb_diff_abs": -4.663543,
+      "decode_tps_diff_rel": -0.045237,
+      "ttft_ms_warm_diff_rel": 0.062874
+    }
+  },
+  "evidence_strength": "sustained_load_repeatability",
+  "gate": "D5",
+  "host_state_summary": {
+    "watermark_red_or_fatal_observed": false,
+    "worst_watermark_observed": "YELLOW"
+  },
+  "intra_run_stability": {
+    "child_rss_gb_ceiling_gb": 30.0,
+    "child_rss_gb_max_gb": 16.772614,
+    "child_rss_gb_range_gb": 0.012146,
+    "child_rss_gb_range_threshold_gb": 1.0,
+    "decode_tps_cv_all_rounds": 0.02576,
+    "decode_tps_cv_threshold": 0.2,
+    "monotonic_rss_growth_detected": false,
+    "ttft_ms_cv_warm_rounds": 0.060038,
+    "ttft_ms_cv_warm_threshold": 0.3,
+    "within_threshold": true
+  },
+  "lifecycle_path": "files/evidence/owlmlx/deepseek-v4/d5-sustained-load/20260527T084115Z-d5-sustained-load.jsonl",
+  "mlx_lm_git_commit": "5c10538136b9038b9626c134612b08afc18d697a",
+  "overall_conclusion": "passed",
+  "preflight": "passed",
+  "preflight_detail": {
+    "backend_class": "MlxLmSubprocessBackend",
+    "d2_baseline_evidence_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/deepseek-v4/d2-metrics-ledger/20260517T-d2-p1-p2-p4-128-512-metrics-v2.jsonl",
+    "d2_baseline_row_present": true,
+    "d6_acceptance": {
+      "accepted": true,
+      "ledger_exists": true,
+      "ledger_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/model-release-candidates/cumulative-ledger.jsonl",
+      "ledger_quality_caveat": "deepseek_v4_flash_2bit_dq_mainline_backend_integration=passed",
+      "ledger_verdict": "experimental_only",
+      "mode": "d6_1_attested",
+      "summary_exists": true,
+      "summary_intra_run_within_threshold": null,
+      "summary_overall_conclusion": "failed",
+      "summary_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/deepseek-v4/d6-mainline-backend-integration/20260527T072206Z-d6-mainline-backend-lifecycle.summary.json",
+      "summary_run_id": "20260527T072206Z-d6-mainline-backend-lifecycle"
+    },
+    "d6_baseline_evidence_path": "/Users/yeemio/AI/gitrep/owlmlx/files/evidence/owlmlx/deepseek-v4/d6-mainline-backend-integration/20260527T072206Z-d6-mainline-backend-lifecycle.jsonl",
+    "d6_baseline_row_present": true,
+    "deepseek_experimental_extras_installed": true,
+    "default_model_surface_unchanged": true,
+    "mainline_runtime_path": ".runtime-deepseek-experimental",
+    "max_tokens": 512,
+    "mlx_lm_source": {
+      "git_commit": "5c10538136b9038b9626c134612b08afc18d697a",
+      "git_commit_matches_expected": true,
+      "origin": "/Users/yeemio/AI/gitrep/owlmlx/.runtime-deepseek-experimental/lib/python3.13/site-packages/mlx_lm/__init__.py",
+      "package_version": "0.31.3"
+    },
+    "model_artifact_path": "/Users/yeemio/AI/Agent/model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ",
+    "model_type_in_config": "deepseek_v4",
+    "model_type_support_probe": {
+      "module_name": "mlx_lm.models.deepseek_v4",
+      "returncode": 0,
+      "supported": true
+    },
+    "prompt_id": "p2_short_en",
+    "python_executable": ".runtime-deepseek-experimental/bin/python",
+    "round_count_N": 20,
+    "stock_runtime_untouched": true
+  },
+  "repeatability_statistics": {
+    "child_rss_gb": {
+      "all_rounds": {
+        "count": 20,
+        "cv": 0.000202,
+        "max": 16.772614,
+        "mean": 16.769263,
+        "min": 16.760468,
+        "p50": 16.771515,
+        "range": 0.012146,
+        "stddev": 0.003386
+      }
+    },
+    "decode_tps_after_first_token": {
+      "all_rounds": {
+        "count": 20,
+        "cv": 0.02576,
+        "max": 43.3255,
+        "mean": 42.101815,
+        "min": 40.091,
+        "p50": 42.17345,
+        "stddev": 1.084524
+      }
+    },
+    "ttft_ms": {
+      "all_rounds": {
+        "count": 20,
+        "cv": 3.505561,
+        "max": 15321.3725,
+        "mean": 964.00955,
+        "min": 193.522,
+        "p50": 205.5523,
+        "stddev": 3379.394517
+      },
+      "warm_rounds_2_to_20": {
+        "count": 19,
+        "cv": 0.060038,
+        "max": 245.6677,
+        "mean": 208.358868,
+        "min": 193.522,
+        "p50": 204.7462,
+        "stddev": 12.509455
+      }
+    },
+    "wall_tps": {
+      "all_rounds": {
+        "count": 20,
+        "cv": 0.218982,
+        "max": 36.9091,
+        "mean": 33.9728,
+        "min": 2.6394,
+        "p50": 35.7173,
+        "stddev": 7.439437
+      }
+    }
+  },
+  "rounds_attempted": 20,
+  "rounds_failed": 0,
+  "rounds_passed": 20,
+  "run_id": "20260527T084115Z-d5-sustained-load",
+  "schema_version": "d5.sustained-load.run.v1",
+  "summary_path": "files/evidence/owlmlx/deepseek-v4/d5-sustained-load/20260527T084115Z-d5-sustained-load.summary.json",
+  "verdict": "passed"
+}

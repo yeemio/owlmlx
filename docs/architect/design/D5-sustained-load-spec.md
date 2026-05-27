@@ -489,7 +489,7 @@ Tests use the same `_DSV4FakeBackend` + `_mock_d6_probes` helpers introduced for
 
 One new env-gated test (extend, do not create new file):
 
-`test_dsv4_subprocess_backend_sustained_load_n20` — gated by `OWLMLX_DSV4_SUSTAINED_SMOKE_PYTHON` / `OWLMLX_DSV4_SUSTAINED_SMOKE_MODEL_PATH` (separate from D6 env vars so users can opt into sustained load specifically). Runs 20 rounds of `p2_short_en × 512` through `MlxLmSubprocessBackend`; asserts all 20 complete, intra-run RSS range ≤ 1.0 GB, no restart, clean post-unload health.
+`test_dsv4_subprocess_backend_d5_sustained_load_n20` — gated by `OWLMLX_DSV4_SUSTAINED_SMOKE_PYTHON` / `OWLMLX_DSV4_SUSTAINED_SMOKE_MODEL_PATH` (separate from D6 env vars so users can opt into sustained load specifically). Optional overrides: `OWLMLX_DSV4_SUSTAINED_SMOKE_ROUNDS` and `OWLMLX_DSV4_SUSTAINED_SMOKE_MAX_TOKENS`. Runs 20 rounds of `p2_short_en × 512` through `MlxLmSubprocessBackend`; asserts all 20 complete, intra-run RSS range ≤ 1.0 GB, no restart, clean post-unload health.
 
 ### 8.5 No new modules
 
