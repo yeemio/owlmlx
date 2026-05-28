@@ -1,0 +1,89 @@
+{
+  "schema_version": "f4.grammar_feasibility_probe.summary.v1",
+  "phase": "f4-grammar-feasibility-probe",
+  "verdict": "probe-positive",
+  "ts_utc": "20260528T063524Z",
+  "mlx_lm_version": "0.31.3",
+  "mlx_lm_fork": "mainline-pypi",
+  "platform": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "python": "3.11.15"
+  },
+  "api_surface": {
+    "logits_processors_exposed": true,
+    "sampler_hook_exposed": true,
+    "notes": "mlx_lm.generate.generate_step exposes both `sampler` and `logits_processors`; stream_generate kwargs pass through. Hook signature (tokens, logits) -> logits with logits shape [1, vocab_size]."
+  },
+  "library_attempted": "xgrammar",
+  "library_version": "0.2.1",
+  "library_mount_succeeded": true,
+  "step3_ran": true,
+  "model": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B-4bit",
+  "model_load_s": 1.23,
+  "grammar_compile_s": 0.01,
+  "family": "json_schema_flat",
+  "schema_used": {
+    "type": "object",
+    "properties": {
+      "task_id": {
+        "type": "string"
+      },
+      "category": {
+        "type": "string",
+        "enum": [
+          "bugfix",
+          "feature",
+          "docs",
+          "test"
+        ]
+      },
+      "priority": {
+        "type": "integer"
+      },
+      "requires_review": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "task_id",
+      "category",
+      "priority",
+      "requires_review"
+    ],
+    "additionalProperties": false
+  },
+  "samples_per_arm": 10,
+  "temperature": 0.3,
+  "max_tokens": 128,
+  "prompt_tokens": 63,
+  "control": {
+    "n": 10,
+    "json_parse_ok": 0,
+    "json_parse_failed": 10,
+    "json_parse_failed_rate": 1.0,
+    "generation_error_count": 0,
+    "tokens_per_sec_median": 84.338,
+    "tokens_per_sec_mean": 90.8508
+  },
+  "treatment": {
+    "n": 10,
+    "json_parse_ok": 10,
+    "json_parse_failed": 0,
+    "json_parse_failed_rate": 0.0,
+    "generation_error_count": 0,
+    "tokens_per_sec_median": 74.99600000000001,
+    "tokens_per_sec_mean": 74.8563
+  },
+  "tokens_per_sec_degradation_x": 1.125,
+  "evidence": {
+    "rows_path": "files/evidence/owlmlx/bench/structured-output-invariance/20260528T063524Z-f4-grammar-feasibility-probe.jsonl",
+    "summary_path": "files/evidence/owlmlx/bench/structured-output-invariance/20260528T063524Z-f4-grammar-feasibility-probe-summary.json"
+  },
+  "verdict_rationale": "mount path: xgrammar 0.2.1 → mlx logits_processors via numpy unpackbits bridge (apply_token_bitmask_inplace is torch-only). control json_parse_failed_rate=1.00; treatment json_parse_failed_rate=0.00; tokens/sec median control=84.34, treatment=75.00; degradation=1.12x. Treatment meets handoff thresholds (break ≤ 0.20, degradation ≤ 5x); in-process grammar-constrained decoding is viable. F-4.2 production path also has to thread logits_processors through MlxLmSubprocessBackend (probe was in-process direct); that is F-4.2 design-grade scope, not probe scope. Probe was executed in the same session as the F-4.1 closeout per user direction, NOT in a fresh session as the handoff originally specified. Recorded here for audit per feedback-fresh-session-grade-transitions.",
+  "out_of_scope_caveats": [
+    "Probe is in-process direct mlx_lm.stream_generate; production wiring through MlxLmSubprocessBackend is F-4.2 design-grade.",
+    "xgrammar's `apply_token_bitmask_inplace` is torch-only; this probe uses numpy unpackbits which adds Python-side per-token cost. A production path may want a native mlx mask op for hot loop.",
+    "Probe model is the 4bit DWQ variant for tractable in-process load; F-4.1 measured the same model family but via subprocess backend."
+  ]
+}

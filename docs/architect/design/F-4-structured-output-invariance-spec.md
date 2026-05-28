@@ -510,6 +510,61 @@ Next code-grade round:
 3. Preserve F-4 wording as `experimental`; no `partial_candidate` claim is
    supported by the smoke data.
 
+### 12.1 Grammar Feasibility Probe Outcome
+
+Probe handoff: [`owlmlx-f4-grammar-feasibility-probe-20260528.md`](../../phase-prompts/owlmlx-f4-grammar-feasibility-probe-20260528.md).
+Probe run: 2026-05-28, continued in the same session as F-4.1 closeout per
+explicit user direction (NOT in a fresh session as the handoff originally
+specified); audit note captured in the evidence ``verdict_rationale`` field
+per the `feedback-fresh-session-grade-transitions` rule.
+
+Configuration:
+
+- Model: `/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B-4bit` (in-process
+  direct `mlx_lm.stream_generate`, NOT `MlxLmSubprocessBackend`).
+- Family: `json_schema_flat` (F-4.1 hardest-failing family at 12/12 break).
+- Library: xgrammar 0.2.1, mounted via a numpy unpackbits bridge
+  (`apply_token_bitmask_inplace` is torch-only).
+- 10 control samples + 10 treatment samples, temperature 0.3, max_tokens 128.
+
+Evidence:
+
+- `files/evidence/owlmlx/bench/structured-output-invariance/20260528T063524Z-f4-grammar-feasibility-probe.jsonl`
+- `files/evidence/owlmlx/bench/structured-output-invariance/20260528T063524Z-f4-grammar-feasibility-probe-summary.json`
+
+Result: `verdict=probe-positive`.
+
+| metric | control | treatment |
+|---|---|---|
+| json_parse_failed_rate | 1.00 | 0.00 |
+| tokens/sec median | 84.34 | 75.00 |
+| samples | 10 | 10 |
+
+Tokens/sec degradation 1.125× (handoff threshold ≤ 5×). All 10 treatment
+outputs parsed as valid JSON whose keys match `task_id` / `category` /
+`priority` / `requires_review`; all 10 control outputs emitted a Qwen
+thinking-tag prefix that broke top-level JSON parsing.
+
+Recommended F-4.2 direction (by this evidence; NOT a commitment):
+walk a grammar-constrained baseline path. F-4.2 design-grade still has to:
+
+1. Thread `logits_processors` through `MlxLmSubprocessBackend` — the probe
+   was in-process direct; the production path crosses the subprocess
+   boundary and Python-callable processors do not pickle cleanly.
+2. Decide whether the numpy-unpackbits hot loop is acceptable or whether a
+   native mlx mask op is required (the 1.12× degradation is on a 35B-A3B
+   4bit model; smaller models will pay a larger relative Python cost per
+   token).
+3. Add a `grammar-experimental` extras group in `pyproject.toml` once the
+   library choice is committed (the probe ran with xgrammar installed
+   into the venv only; `pyproject.toml` is unchanged).
+
+Caveat: probe covered a single family on a single model. F-4.2 must
+re-validate on the full F-4 family/model matrix; this probe does not
+generalise the verdict to `function_call_arguments`, `nested_object`,
+`enum_constrained`, or `thinking_tag_closed` families, nor to Qwen 27B
+or Gemma 31B.
+
 ---
 
 ## 13. References
