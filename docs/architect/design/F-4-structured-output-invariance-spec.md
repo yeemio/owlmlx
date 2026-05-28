@@ -3,7 +3,7 @@
 > **Gate**: Campaign F · F-4 — structured-output invariance matrix
 > **Layer**: design-grade, downstream of [`../08-campaign-F4-structured-output-invariance-plan.md`](../08-campaign-F4-structured-output-invariance-plan.md), upstream of code-grade (validator + smoke harness)
 > **Plan-grade source**: [`../08-campaign-F4-structured-output-invariance-plan.md`](../08-campaign-F4-structured-output-invariance-plan.md)
-> **Status**: design-grade draft for review; no code-grade implementation yet
+> **Status**: F-4.0 validator fixtures implemented 2026-05-28; F-4.1 smoke matrix not yet run
 > **Prerequisite**: F-1 landed; F-2 serving integration is not required; B prefill chunking closeout provides chunk-size knobs but no speed claim
 > **Non-goal**: this spec does not implement grammar-constrained decoding, JSON repair, tool-call protocol changes, or speculative serving
 
@@ -459,15 +459,28 @@ F-4.0/F-4.1 code-grade should commit fixtures, tests, runner, and evidence toget
 
 ## 12. Status / Next Step
 
-Current status: design-grade draft ready for review.
+Current status: F-4.0 validator fixtures implemented and green.
 
-Next code-grade round, after review:
+F-4.0 evidence:
 
-1. Implement validator and fixture tests
-2. Implement smoke runner with a fake/offline mode first
-3. Run F-4.0 validator fixtures
-4. If clean, run F-4.1 smoke matrix only
-5. Update this spec with measured results, without source-of-truth promotion
+- `files/evidence/owlmlx/bench/structured-output-invariance/20260528T025514Z-f4-validator-fixtures.jsonl`
+- `files/evidence/owlmlx/bench/structured-output-invariance/20260528T025514Z-f4-validator-fixtures-rollup.jsonl`
+
+F-4.0 rollup:
+
+- `sample_count=10`
+- `hard_break_count=7`
+- `fixture_mismatch_count=0`
+- `graduates.validator_contract=true`
+- `graduates.measurement_harness=false` (expected; F-4.1 smoke matrix has not run)
+
+Next code-grade round:
+
+1. Keep the existing validator fixed unless a fixture proves ambiguity.
+2. Implement F-4.1 smoke matrix only.
+3. Run the 60-output smoke matrix.
+4. Record hard break rates by model / family / temperature / chunk.
+5. Do not start F-4.2 until F-4.1 produces a durable rollup.
 
 ---
 
@@ -486,3 +499,4 @@ Next code-grade round, after review:
 | Date | Change | By |
 |---|---|---|
 | 2026-05-27 | Initial design-grade spec for F-4 validator + smoke + stratified matrix; keeps measurement separate from grammar-constrained decoding or speculative serving | Codex architect loop |
+| 2026-05-28 | F-4.0 validator fixtures implemented. Evidence `20260528T025514Z-f4-validator-fixtures*` records 10 fixtures, 7 expected hard breaks, 0 fixture mismatches, and `validator_contract=true`; measurement harness remains false until F-4.1 smoke. | Codex code-grade loop |
