@@ -3,7 +3,7 @@
 > **Gate**: Campaign F · F-4 — structured-output invariance matrix
 > **Layer**: design-grade, downstream of [`../08-campaign-F4-structured-output-invariance-plan.md`](../08-campaign-F4-structured-output-invariance-plan.md), upstream of code-grade (validator + smoke harness)
 > **Plan-grade source**: [`../08-campaign-F4-structured-output-invariance-plan.md`](../08-campaign-F4-structured-output-invariance-plan.md)
-> **Status**: F-4.0 validator fixtures implemented 2026-05-28; F-4.1 smoke matrix not yet run
+> **Status**: F-4.1 smoke matrix implemented 2026-05-28; measurement harness passed with 59/60 hard breaks, so no promotion candidate
 > **Prerequisite**: F-1 landed; F-2 serving integration is not required; B prefill chunking closeout provides chunk-size knobs but no speed claim
 > **Non-goal**: this spec does not implement grammar-constrained decoding, JSON repair, tool-call protocol changes, or speculative serving
 
@@ -459,7 +459,7 @@ F-4.0/F-4.1 code-grade should commit fixtures, tests, runner, and evidence toget
 
 ## 12. Status / Next Step
 
-Current status: F-4.0 validator fixtures implemented and green.
+Current status: F-4.1 smoke matrix implemented and green as a measurement harness.
 
 F-4.0 evidence:
 
@@ -472,15 +472,43 @@ F-4.0 rollup:
 - `hard_break_count=7`
 - `fixture_mismatch_count=0`
 - `graduates.validator_contract=true`
-- `graduates.measurement_harness=false` (expected; F-4.1 smoke matrix has not run)
+- `graduates.measurement_harness=false` (expected for validator-fixtures phase)
+
+F-4.1 evidence:
+
+- `files/evidence/owlmlx/bench/structured-output-invariance/20260528T030803Z-f4-smoke-matrix.jsonl`
+- `files/evidence/owlmlx/bench/structured-output-invariance/20260528T030803Z-f4-smoke-matrix-rollup.jsonl`
+
+F-4.1 rollup:
+
+- `sample_count=60`
+- `generation_error_count=0`
+- `hard_break_count=59`
+- `hard_break_rate=0.9833333333333333`
+- `graduates.validator_contract=true`
+- `graduates.measurement_harness=true`
+- `graduates.structured_output_invariance_promotion_candidate=false`
+
+F-4.1 family/model summary:
+
+| Dimension | Result |
+|---|---|
+| By model | Qwen27B 20/20 hard breaks; Qwen35B-A3B 19/20; Gemma31B 20/20 |
+| By family | json_schema_flat 12/12; function_call_arguments 11/12; nested_object 12/12; enum_constrained 12/12; thinking_tag_closed 12/12 |
+| By temperature | temp=0.0 30/30; temp=0.3 29/30 |
+| Dominant failures | `json_parse_failed=47`, `extra_prose_outside_envelope=8`, `thinking_tag_unclosed=4` |
+
+This is not a reliability pass. It is a successful measurement-harness pass that
+shows the current prompt-only structured-output path is not promotion-ready.
 
 Next code-grade round:
 
-1. Keep the existing validator fixed unless a fixture proves ambiguity.
-2. Implement F-4.1 smoke matrix only.
-3. Run the 60-output smoke matrix.
-4. Record hard break rates by model / family / temperature / chunk.
-5. Do not start F-4.2 until F-4.1 produces a durable rollup.
+1. Do not start F-4.2 as a promotion campaign from the current prompts.
+2. Decide whether F-4.2 should test prompt-only strictness again, add a
+   grammar-constrained baseline, or split tool-call JSON into a dedicated
+   repair/constrained-decoding campaign.
+3. Preserve F-4 wording as `experimental`; no `partial_candidate` claim is
+   supported by the smoke data.
 
 ---
 
@@ -499,4 +527,5 @@ Next code-grade round:
 | Date | Change | By |
 |---|---|---|
 | 2026-05-27 | Initial design-grade spec for F-4 validator + smoke + stratified matrix; keeps measurement separate from grammar-constrained decoding or speculative serving | Codex architect loop |
-| 2026-05-28 | F-4.0 validator fixtures implemented. Evidence `20260528T025514Z-f4-validator-fixtures*` records 10 fixtures, 7 expected hard breaks, 0 fixture mismatches, and `validator_contract=true`; measurement harness remains false until F-4.1 smoke. | Codex code-grade loop |
+| 2026-05-28 | F-4.0 validator fixtures implemented. Evidence `20260528T025514Z-f4-validator-fixtures*` records 10 fixtures, 7 expected hard breaks, 0 fixture mismatches, and `validator_contract=true`; measurement harness is false for the validator-fixtures phase. | Codex code-grade loop |
+| 2026-05-28 | F-4.1 smoke matrix implemented. Evidence `20260528T030803Z-f4-smoke-matrix*` records 60 samples across 3 models, 5 families, 2 temperatures, and chunk 2048; `measurement_harness=true`, `hard_break_count=59`, and no promotion candidate. | Codex code-grade loop |

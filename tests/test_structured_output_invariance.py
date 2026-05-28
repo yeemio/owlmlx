@@ -8,9 +8,13 @@ from pathlib import Path
 import pytest
 
 from scripts.bench.structured_output_invariance import (
+    F4_ROLLUP_SCHEMA_VERSION,
     F4_VALIDATOR_FIXTURE_SCHEMA_VERSION,
+    build_smoke_plan,
     load_fixture_rows,
+    load_smoke_cases,
     record_for_fixture,
+    record_for_smoke_output,
     rollup_records,
     validate_structured_output,
 )
@@ -23,6 +27,13 @@ FIXTURE_PATH = (
     / "fixtures"
     / "structured_output_invariance"
     / "f4_validator_fixtures.jsonl"
+)
+CASES_PATH = (
+    REPO_ROOT
+    / "tests"
+    / "fixtures"
+    / "structured_output_invariance"
+    / "f4_cases.jsonl"
 )
 
 
@@ -83,6 +94,21 @@ def test_validator_classification_is_deterministic() -> None:
     assert first == second
 
 
+def test_thinking_validator_handles_closed_tag_with_leading_prose() -> None:
+    result = validate_structured_output(
+        family="thinking_tag_closed",
+        output=(
+            "Here is the answer. "
+            '<thinking>brief check</thinking>{"final":"ok","confidence":"high"}'
+        ),
+    )
+
+    assert result.parse_ok is True
+    assert result.schema_ok is True
+    assert result.hard_break is True
+    assert result.failure_codes == ("extra_prose_outside_envelope",)
+
+
 def test_fixture_rollup_reports_break_rate_and_graduation() -> None:
     rows = [
         record_for_fixture(row, run_id="rollup", created_at_utc=None)
@@ -103,6 +129,132 @@ def test_fixture_rollup_reports_break_rate_and_graduation() -> None:
     assert rollup["graduates"] == {
         "validator_contract": True,
         "measurement_harness": False,
+        "structured_output_invariance_promotion_candidate": False,
+    }
+
+
+def test_smoke_cases_cover_required_families() -> None:
+    rows = load_smoke_cases(CASES_PATH)
+
+    assert {row["family"] for row in rows} == {
+        "json_schema_flat",
+        "function_call_arguments",
+        "nested_object",
+        "enum_constrained",
+        "thinking_tag_closed",
+    }
+    assert all(row["case_id"].startswith("f4-") for row in rows)
+    assert all(row["prompt"] for row in rows)
+
+
+def test_smoke_plan_builds_minimum_f4_1_matrix() -> None:
+    cases = load_smoke_cases(CASES_PATH)
+    plan = build_smoke_plan(
+        cases=cases,
+        models=("m1", "m2", "m3"),
+        chunks=(2048,),
+        temperatures=(0.0, 0.3),
+        samples_per_family=2,
+    )
+
+    assert len(plan) == 60
+    assert {cell["family"] for cell in plan} == {
+        "json_schema_flat",
+        "function_call_arguments",
+        "nested_object",
+        "enum_constrained",
+        "thinking_tag_closed",
+    }
+    assert {cell["model_id"] for cell in plan} == {"m1", "m2", "m3"}
+    assert {cell["temperature"] for cell in plan} == {0.0, 0.3}
+    assert {cell["chunk_tokens"] for cell in plan} == {2048}
+    assert {cell["run_idx"] for cell in plan} == {1, 2}
+
+
+def test_smoke_record_uses_validator_contract_fields() -> None:
+    case = next(
+        row
+        for row in load_smoke_cases(CASES_PATH)
+        if row["family"] == "json_schema_flat"
+    )
+    cell = {
+        **case,
+        "model_id": "m1",
+        "chunk_tokens": 2048,
+        "temperature": 0.0,
+        "run_idx": 1,
+    }
+
+    row = record_for_smoke_output(
+        cell,
+        run_id="smoke",
+        created_at_utc=None,
+        output=(
+            '{"task_id":"F4-JSON-001","category":"bugfix",'
+            '"priority":1,"requires_review":false}'
+        ),
+        metrics={"ttft_ms": 12.5},
+    )
+
+    assert row["schema_version"] == "f4.structured_output_invariance.cell.v1"
+    assert row["phase"] == "smoke"
+    assert row["status"] == "ok"
+    assert row["model_id"] == "m1"
+    assert row["chunk_tokens"] == 2048
+    assert row["temperature"] == 0.0
+    assert row["parse_ok"] is True
+    assert row["schema_ok"] is True
+    assert row["hard_break"] is False
+    assert row["failure_codes"] == []
+    assert row["diagnostic_codes"] == []
+    assert row["metrics"]["ttft_ms"] == 12.5
+
+
+def test_smoke_rollup_reports_matrix_break_rates() -> None:
+    cases = load_smoke_cases(CASES_PATH)
+    plan = build_smoke_plan(
+        cases=cases,
+        models=("m1", "m2", "m3"),
+        chunks=(2048,),
+        temperatures=(0.0, 0.3),
+        samples_per_family=2,
+    )
+    rows = [
+        record_for_smoke_output(
+            cell,
+            run_id="smoke",
+            created_at_utc=None,
+            output="{not json}",
+            metrics={},
+        )
+        for cell in plan
+    ]
+
+    rollup = rollup_records(
+        rows,
+        run_id="smoke",
+        phase="smoke",
+        expected_sample_count=60,
+    )
+
+    assert rollup["schema_version"] == F4_ROLLUP_SCHEMA_VERSION
+    assert rollup["sample_count"] == 60
+    assert rollup["expected_sample_count"] == 60
+    assert rollup["hard_break_count"] == 60
+    assert rollup["generation_error_count"] == 0
+    assert set(rollup["by_model"]) == {"m1", "m2", "m3"}
+    assert set(rollup["by_family"]) == {
+        "json_schema_flat",
+        "function_call_arguments",
+        "nested_object",
+        "enum_constrained",
+        "thinking_tag_closed",
+    }
+    assert set(rollup["by_temperature"]) == {"0", "0.3"}
+    assert set(rollup["by_chunk_tokens"]) == {"2048"}
+    assert rollup["graduates"] == {
+        "validator_contract": True,
+        "measurement_harness": True,
         "structured_output_invariance_promotion_candidate": False,
     }
 

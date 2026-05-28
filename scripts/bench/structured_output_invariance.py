@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import sys
+import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -25,6 +26,13 @@ DEFAULT_FIXTURE_PATH = (
     / "fixtures"
     / "structured_output_invariance"
     / "f4_validator_fixtures.jsonl"
+)
+DEFAULT_CASES_PATH = (
+    REPO_ROOT
+    / "tests"
+    / "fixtures"
+    / "structured_output_invariance"
+    / "f4_cases.jsonl"
 )
 DEFAULT_OUTPUT_DIR = (
     REPO_ROOT
@@ -48,6 +56,13 @@ ALLOWED_FAMILIES = (
     "enum_constrained",
     "thinking_tag_closed",
 )
+DEFAULT_SMOKE_MODELS = (
+    "qwen3.6-27b-4bit",
+    "qwen3.6-35b-a3b-4bit",
+    "gemma-4-31b-it-4bit",
+)
+DEFAULT_SMOKE_CHUNKS = (2048,)
+DEFAULT_SMOKE_TEMPERATURES = (0.0, 0.3)
 HARD_FAILURE_CODES = (
     "json_parse_failed",
     "schema_required_missing",
@@ -86,6 +101,12 @@ def _now_iso_utc() -> str:
 
 def _json_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _dimension_key(value: Any) -> str:
+    if isinstance(value, float):
+        return f"{value:g}"
+    return str(value)
 
 
 def _append_unique(values: list[str], code: str) -> None:
@@ -130,7 +151,8 @@ def _parse_thinking_envelope(output: str) -> tuple[bool, Any | None, bool, list[
         _append_unique(failures, "thinking_tag_unclosed")
         return False, None, False, failures
     if not stripped.startswith("<thinking>"):
-        return _parse_json_envelope(stripped)
+        parse_ok, value, extra_prose = _parse_json_envelope(stripped)
+        return parse_ok, value, extra_prose, failures
 
     close_marker = "</thinking>"
     _, after = stripped.split(close_marker, 1)
@@ -378,6 +400,51 @@ def load_fixture_rows(path: str | Path = DEFAULT_FIXTURE_PATH) -> list[dict[str,
     return rows
 
 
+def load_smoke_cases(path: str | Path = DEFAULT_CASES_PATH) -> list[dict[str, Any]]:
+    cases_path = Path(path)
+    cases: list[dict[str, Any]] = []
+    for line_number, line in enumerate(cases_path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        if row.get("family") not in ALLOWED_FAMILIES:
+            raise ValueError(f"{cases_path}:{line_number} has unsupported family")
+        if not row.get("case_id") or not row.get("prompt"):
+            raise ValueError(f"{cases_path}:{line_number} must include case_id and prompt")
+        cases.append(row)
+    return cases
+
+
+def build_smoke_plan(
+    *,
+    cases: list[Mapping[str, Any]],
+    models: tuple[str, ...],
+    chunks: tuple[int, ...],
+    temperatures: tuple[float, ...],
+    samples_per_family: int,
+) -> list[dict[str, Any]]:
+    if samples_per_family < 1:
+        raise ValueError("samples_per_family must be >= 1")
+    plan: list[dict[str, Any]] = []
+    for model_id in models:
+        for chunk_tokens in chunks:
+            for temperature in temperatures:
+                for run_idx in range(1, samples_per_family + 1):
+                    for case in cases:
+                        plan.append(
+                            {
+                                "case_id": case["case_id"],
+                                "family": case["family"],
+                                "prompt": case["prompt"],
+                                "model_id": model_id,
+                                "chunk_tokens": int(chunk_tokens),
+                                "temperature": float(temperature),
+                                "run_idx": run_idx,
+                            }
+                        )
+    return plan
+
+
 def _result_to_payload(result: ValidationResult) -> dict[str, Any]:
     return {
         "parse_ok": result.parse_ok,
@@ -431,8 +498,100 @@ def record_for_fixture(
     return payload
 
 
+def record_for_smoke_output(
+    cell: Mapping[str, Any],
+    *,
+    run_id: str,
+    created_at_utc: str | None,
+    output: str,
+    metrics: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    result = validate_structured_output(
+        family=str(cell["family"]),
+        output=output,
+    )
+    actual = _result_to_payload(result)
+    payload: dict[str, Any] = {
+        "schema_version": F4_CELL_SCHEMA_VERSION,
+        "run_id": run_id,
+        "phase": "smoke",
+        "created_at_utc": created_at_utc,
+        "case_id": cell["case_id"],
+        "family": cell["family"],
+        "model_id": cell["model_id"],
+        "chunk_tokens": cell["chunk_tokens"],
+        "temperature": cell["temperature"],
+        "run_idx": cell["run_idx"],
+        "status": "ok",
+        "prompt_hash": _json_hash(str(cell["prompt"])),
+        "output_hash": _json_hash(output),
+        "output_text": output,
+        "parse_ok": actual["parse_ok"],
+        "schema_ok": actual["schema_ok"],
+        "hard_break": actual["hard_break"],
+        "failure_codes": actual["failure_codes"],
+        "diagnostic_codes": actual["diagnostic_codes"],
+        "metrics": dict(metrics or {}),
+    }
+    if actual["extracted_json"] is not None:
+        payload["extracted_json"] = actual["extracted_json"]
+    return payload
+
+
+def record_for_generation_error(
+    cell: Mapping[str, Any],
+    *,
+    run_id: str,
+    created_at_utc: str | None,
+    message: str,
+    metrics: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": F4_CELL_SCHEMA_VERSION,
+        "run_id": run_id,
+        "phase": "smoke",
+        "created_at_utc": created_at_utc,
+        "case_id": cell["case_id"],
+        "family": cell["family"],
+        "model_id": cell["model_id"],
+        "chunk_tokens": cell["chunk_tokens"],
+        "temperature": cell["temperature"],
+        "run_idx": cell["run_idx"],
+        "status": "generation_error",
+        "prompt_hash": _json_hash(str(cell["prompt"])),
+        "output_hash": None,
+        "parse_ok": False,
+        "schema_ok": False,
+        "hard_break": False,
+        "failure_codes": [],
+        "diagnostic_codes": [],
+        "metrics": dict(metrics or {}),
+        "error_message": message,
+    }
+
+
 def _counter_to_dict(counter: Counter[str]) -> dict[str, int]:
     return {key: counter[key] for key in sorted(counter)}
+
+
+def _bump_bucket(bucket: dict[str, int], row: Mapping[str, Any]) -> None:
+    bucket["sample_count"] += 1
+    if row.get("hard_break") is True:
+        bucket["hard_break_count"] += 1
+    if row.get("status") != "ok":
+        bucket["generation_error_count"] += 1
+
+
+def _finalize_bucket(bucket: dict[str, int]) -> dict[str, Any]:
+    sample_count = bucket["sample_count"]
+    return {
+        "sample_count": sample_count,
+        "hard_break_count": bucket["hard_break_count"],
+        "hard_break_rate": (
+            bucket["hard_break_count"] / sample_count if sample_count else 0.0
+        ),
+        "generation_error_count": bucket["generation_error_count"],
+    }
 
 
 def rollup_records(
@@ -441,52 +600,92 @@ def rollup_records(
     run_id: str,
     phase: str,
     created_at_utc: str | None = None,
+    expected_sample_count: int | None = None,
 ) -> dict[str, Any]:
     sample_count = len(rows)
     hard_break_count = sum(1 for row in rows if row.get("hard_break") is True)
     fixture_mismatch_count = sum(
         1 for row in rows if row.get("fixture_expected_match") is False
     )
+    generation_error_count = sum(1 for row in rows if row.get("status") != "ok")
+    diagnostic_variant_count = sum(1 for row in rows if row.get("diagnostic_codes"))
     failure_counts: Counter[str] = Counter()
     diagnostic_counts: Counter[str] = Counter()
     by_family: dict[str, dict[str, int]] = {}
+    by_model: dict[str, dict[str, int]] = {}
+    by_temperature: dict[str, dict[str, int]] = {}
+    by_chunk_tokens: dict[str, dict[str, int]] = {}
     for row in rows:
         family = str(row.get("family", "unknown"))
-        bucket = by_family.setdefault(family, {"sample_count": 0, "hard_break_count": 0})
-        bucket["sample_count"] += 1
-        if row.get("hard_break") is True:
-            bucket["hard_break_count"] += 1
+        model = str(row.get("model_id", "unknown"))
+        temperature = _dimension_key(row.get("temperature", "unknown"))
+        chunk_tokens = _dimension_key(row.get("chunk_tokens", "unknown"))
+        for buckets, key in (
+            (by_family, family),
+            (by_model, model),
+            (by_temperature, temperature),
+            (by_chunk_tokens, chunk_tokens),
+        ):
+            bucket = buckets.setdefault(
+                key,
+                {"sample_count": 0, "hard_break_count": 0, "generation_error_count": 0},
+            )
+            _bump_bucket(bucket, row)
         for code in row.get("failure_codes", []):
             failure_counts[str(code)] += 1
         for code in row.get("diagnostic_codes", []):
             diagnostic_counts[str(code)] += 1
 
-    for bucket in by_family.values():
-        bucket["hard_break_rate"] = (
-            bucket["hard_break_count"] / bucket["sample_count"]
-            if bucket["sample_count"]
-            else 0.0
-        )
-
     validator_contract = sample_count > 0 and fixture_mismatch_count == 0
-    return {
-        "schema_version": F4_VALIDATOR_FIXTURE_SCHEMA_VERSION,
+    expected_ok = expected_sample_count is None or sample_count >= expected_sample_count
+    measurement_harness = (
+        phase != "validator-fixtures"
+        and validator_contract
+        and expected_ok
+        and generation_error_count == 0
+    )
+    payload: dict[str, Any] = {
+        "schema_version": (
+            F4_VALIDATOR_FIXTURE_SCHEMA_VERSION
+            if phase == "validator-fixtures"
+            else F4_ROLLUP_SCHEMA_VERSION
+        ),
         "run_id": run_id,
         "phase": phase,
         "created_at_utc": created_at_utc,
         "sample_count": sample_count,
+        "expected_sample_count": expected_sample_count,
         "hard_break_count": hard_break_count,
         "hard_break_rate": hard_break_count / sample_count if sample_count else 0.0,
+        "generation_error_count": generation_error_count,
+        "diagnostic_variant_count": diagnostic_variant_count,
+        "diagnostic_variant_rate": (
+            diagnostic_variant_count / sample_count if sample_count else 0.0
+        ),
         "fixture_mismatch_count": fixture_mismatch_count,
         "failure_code_counts": _counter_to_dict(failure_counts),
         "diagnostic_code_counts": _counter_to_dict(diagnostic_counts),
-        "by_family": {key: by_family[key] for key in sorted(by_family)},
+        "by_family": {
+            key: _finalize_bucket(by_family[key]) for key in sorted(by_family)
+        },
         "graduates": {
             "validator_contract": validator_contract,
-            "measurement_harness": phase != "validator-fixtures" and validator_contract,
+            "measurement_harness": measurement_harness,
             "structured_output_invariance_promotion_candidate": False,
         },
     }
+    if phase != "validator-fixtures":
+        payload["by_model"] = {
+            key: _finalize_bucket(by_model[key]) for key in sorted(by_model)
+        }
+        payload["by_temperature"] = {
+            key: _finalize_bucket(by_temperature[key]) for key in sorted(by_temperature)
+        }
+        payload["by_chunk_tokens"] = {
+            key: _finalize_bucket(by_chunk_tokens[key])
+            for key in sorted(by_chunk_tokens)
+        }
+    return payload
 
 
 def write_jsonl(path: Path, rows: list[Mapping[str, Any]]) -> None:
@@ -495,6 +694,13 @@ def write_jsonl(path: Path, rows: list[Mapping[str, Any]]) -> None:
         for row in rows:
             handle.write(json.dumps(row, sort_keys=True, ensure_ascii=False))
             handle.write("\n")
+
+
+def append_jsonl_row(path: Path, row: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, sort_keys=True, ensure_ascii=False))
+        handle.write("\n")
 
 
 def run_validator_fixtures(
@@ -531,6 +737,184 @@ def run_validator_fixtures(
     }
 
 
+def _model_path_resolver(model_id: str) -> str:
+    from scripts.bench.long_context_ladder import MODEL_PATHS
+
+    return MODEL_PATHS[model_id]
+
+
+def _run_generation_cell(
+    *,
+    backend: Any,
+    cell: Mapping[str, Any],
+    max_tokens: int,
+) -> tuple[str | None, dict[str, Any], str | None]:
+    t_start = time.perf_counter()
+    t_first_token: float | None = None
+    output_parts: list[str] = []
+    prefill_progress_events = 0
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    finish_reason: str | None = None
+    error_message: str | None = None
+
+    for event in backend.stream_generate(
+        str(cell["model_id"]),
+        str(cell["prompt"]),
+        max_tokens=max_tokens,
+        temperature=float(cell["temperature"]),
+        prefill_chunk_tokens=int(cell["chunk_tokens"]),
+    ):
+        if event.event == "prefill_progress":
+            prefill_progress_events += 1
+            continue
+        if event.event == "token":
+            if t_first_token is None:
+                t_first_token = time.perf_counter()
+            output_parts.append(str(event.text or ""))
+            if event.prompt_tokens is not None:
+                prompt_tokens = int(event.prompt_tokens)
+            if event.completion_tokens is not None:
+                completion_tokens = int(event.completion_tokens)
+            continue
+        if event.event == "done":
+            if event.prompt_tokens is not None:
+                prompt_tokens = int(event.prompt_tokens)
+            if event.completion_tokens is not None:
+                completion_tokens = int(event.completion_tokens)
+            if event.finish_reason is not None:
+                finish_reason = str(event.finish_reason)
+            break
+        if event.event == "error":
+            detail = event.detail if isinstance(event.detail, Mapping) else {}
+            error_message = str(detail.get("message") or event.error_code or "stream error")
+            break
+
+    finished = time.perf_counter()
+    metrics: dict[str, Any] = {
+        "elapsed_ms": round((finished - t_start) * 1000, 3),
+        "ttft_ms": (
+            round((t_first_token - t_start) * 1000, 3)
+            if t_first_token is not None
+            else None
+        ),
+        "prefill_progress_event_count": prefill_progress_events,
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "finish_reason": finish_reason,
+    }
+    if error_message:
+        return None, metrics, error_message
+    return "".join(output_parts), metrics, None
+
+
+def run_smoke_matrix(
+    *,
+    cases: Path,
+    output_dir: Path,
+    run_id: str,
+    models: tuple[str, ...],
+    chunks: tuple[int, ...],
+    temperatures: tuple[float, ...],
+    samples_per_family: int,
+    max_tokens: int,
+    timeout_s: float,
+    python_executable: str | None = None,
+) -> dict[str, Any]:
+    from owlmlx.runtime.mlx_lm_subprocess_backend import MlxLmSubprocessBackend
+
+    created_at = _now_iso_utc()
+    smoke_cases = load_smoke_cases(cases)
+    plan = build_smoke_plan(
+        cases=smoke_cases,
+        models=models,
+        chunks=chunks,
+        temperatures=temperatures,
+        samples_per_family=samples_per_family,
+    )
+    rows_path = output_dir / f"{run_id}.jsonl"
+    rollup_path = output_dir / f"{run_id}-rollup.jsonl"
+    if rows_path.exists():
+        rows_path.unlink()
+    if rollup_path.exists():
+        rollup_path.unlink()
+
+    backend = MlxLmSubprocessBackend(
+        python_executable=python_executable,
+        model_path_resolver=_model_path_resolver,
+        timeout_s=timeout_s,
+        extra_pythonpath=(str(REPO_ROOT),),
+    )
+    rows: list[dict[str, Any]] = []
+    loaded_model: str | None = None
+    try:
+        for cell in plan:
+            model_id = str(cell["model_id"])
+            if loaded_model != model_id:
+                if loaded_model is not None:
+                    backend.unload(loaded_model)
+                load_result = backend.load(model_id)
+                loaded_model = model_id if load_result.ok else None
+                if not load_result.ok:
+                    row = record_for_generation_error(
+                        cell,
+                        run_id=run_id,
+                        created_at_utc=created_at,
+                        message=load_result.message,
+                        metrics={"load_error_code": str(load_result.error_code)},
+                    )
+                    rows.append(row)
+                    append_jsonl_row(rows_path, row)
+                    continue
+
+            output, metrics, error_message = _run_generation_cell(
+                backend=backend,
+                cell=cell,
+                max_tokens=max_tokens,
+            )
+            if error_message is not None or output is None:
+                row = record_for_generation_error(
+                    cell,
+                    run_id=run_id,
+                    created_at_utc=created_at,
+                    message=error_message or "missing generation output",
+                    metrics=metrics,
+                )
+            else:
+                row = record_for_smoke_output(
+                    cell,
+                    run_id=run_id,
+                    created_at_utc=created_at,
+                    output=output,
+                    metrics=metrics,
+                )
+            rows.append(row)
+            append_jsonl_row(rows_path, row)
+    finally:
+        if loaded_model is not None:
+            backend.unload(loaded_model)
+
+    rollup = rollup_records(
+        rows,
+        run_id=run_id,
+        phase="smoke",
+        created_at_utc=created_at,
+        expected_sample_count=len(plan),
+    )
+    write_jsonl(rollup_path, [rollup])
+    return {
+        "phase": "smoke",
+        "run_id": run_id,
+        "rows_path": str(rows_path),
+        "rollup_path": str(rollup_path),
+        "sample_count": rollup["sample_count"],
+        "hard_break_count": rollup["hard_break_count"],
+        "hard_break_rate": rollup["hard_break_rate"],
+        "generation_error_count": rollup["generation_error_count"],
+        "graduates": rollup["graduates"],
+    }
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="F-4 structured-output invariance validator and smoke harness"
@@ -541,23 +925,41 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="validator-fixtures",
     )
     parser.add_argument("--fixtures", type=Path, default=DEFAULT_FIXTURE_PATH)
+    parser.add_argument("--cases", type=Path, default=DEFAULT_CASES_PATH)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--run-id", default="")
-    parser.add_argument("--models", nargs="*", default=())
-    parser.add_argument("--chunks", nargs="*", type=int, default=(2048,))
-    parser.add_argument("--temperatures", nargs="*", type=float, default=(0.0, 0.3))
+    parser.add_argument("--models", nargs="*", default=DEFAULT_SMOKE_MODELS)
+    parser.add_argument("--chunks", nargs="*", type=int, default=DEFAULT_SMOKE_CHUNKS)
+    parser.add_argument("--temperatures", nargs="*", type=float, default=DEFAULT_SMOKE_TEMPERATURES)
     parser.add_argument("--samples-per-family", type=int, default=2)
+    parser.add_argument("--max-tokens", type=int, default=128)
+    parser.add_argument("--timeout-s", type=float, default=600.0)
+    parser.add_argument("--python-executable", default=None)
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    run_id = args.run_id or f"{_now_compact_utc()}-f4-validator-fixtures"
+    run_id = args.run_id or (
+        f"{_now_compact_utc()}-f4-smoke-matrix"
+        if args.phase == "smoke"
+        else f"{_now_compact_utc()}-f4-validator-fixtures"
+    )
     if args.phase == "smoke":
-        raise SystemExit(
-            "F-4.1 smoke generation is scaffolded in CLI arguments but not "
-            "executed in F-4.0; run validator-fixtures first."
+        result = run_smoke_matrix(
+            cases=args.cases,
+            output_dir=args.output_dir,
+            run_id=run_id,
+            models=tuple(args.models),
+            chunks=tuple(args.chunks),
+            temperatures=tuple(args.temperatures),
+            samples_per_family=args.samples_per_family,
+            max_tokens=args.max_tokens,
+            timeout_s=args.timeout_s,
+            python_executable=args.python_executable,
         )
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result["graduates"]["measurement_harness"] else 1
 
     result = run_validator_fixtures(
         fixtures=args.fixtures,
