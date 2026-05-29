@@ -743,11 +743,148 @@ def _model_path_resolver(model_id: str) -> str:
     return MODEL_PATHS[model_id]
 
 
+# F-4.2b per-family grammar specs. These are the schemas verified model-free in
+# scripts/probe/f4_grammar_per_family_verify.py (evidence
+# 20260529T024253Z-f4-2-per-family-grammar-verify.json, all_families_pass=true):
+# four families use a plain JSON-schema grammar; thinking_tag_closed uses an
+# xgrammar structural tag triggered on the closing </thinking> tag so the
+# reasoning envelope stays free text and only the trailing JSON is constrained.
+F4_FAMILY_GRAMMARS: dict[str, dict[str, Any]] = {
+    "json_schema_flat": {
+        "kind": "json_schema",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string"},
+                "category": {
+                    "type": "string",
+                    "enum": ["bugfix", "feature", "docs", "test"],
+                },
+                "priority": {"type": "integer"},
+                "requires_review": {"type": "boolean"},
+            },
+            "required": ["task_id", "category", "priority", "requires_review"],
+            "additionalProperties": False,
+        },
+    },
+    "function_call_arguments": {
+        "kind": "json_schema",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "tool_name": {
+                    "type": "string",
+                    "enum": ["apply_patch", "run_tests", "inspect_logs"],
+                },
+                "arguments": {
+                    "type": "object",
+                    "properties": {
+                        "target": {"type": "string"},
+                        "risk_level": {
+                            "type": "string",
+                            "enum": ["low", "medium", "high"],
+                        },
+                    },
+                    "required": ["target", "risk_level"],
+                    "additionalProperties": False,
+                },
+            },
+            "required": ["tool_name", "arguments"],
+            "additionalProperties": False,
+        },
+    },
+    "nested_object": {
+        "kind": "json_schema",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "diagnosis": {
+                    "type": "object",
+                    "properties": {
+                        "root_cause": {"type": "string"},
+                        "evidence": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "source": {"type": "string"},
+                                    "summary": {"type": "string"},
+                                },
+                                "required": ["source", "summary"],
+                                "additionalProperties": False,
+                            },
+                        },
+                        "next_action": {
+                            "type": "object",
+                            "properties": {
+                                "kind": {
+                                    "type": "string",
+                                    "enum": ["retry", "fix", "escalate"],
+                                },
+                                "owner": {
+                                    "type": "string",
+                                    "enum": ["runtime", "operator"],
+                                },
+                            },
+                            "required": ["kind", "owner"],
+                            "additionalProperties": False,
+                        },
+                    },
+                    "required": ["root_cause", "evidence", "next_action"],
+                    "additionalProperties": False,
+                }
+            },
+            "required": ["diagnosis"],
+            "additionalProperties": False,
+        },
+    },
+    "enum_constrained": {
+        "kind": "json_schema",
+        # "supported" below is a fixture ENUM VALUE, not a capability claim.
+        "schema": {
+            "type": "object",
+            "properties": {
+                "capability_label": {
+                    "type": "string",
+                    "enum": ["supported", "partial", "experimental", "not_in_scope"],
+                },
+                "reason_code": {"type": "string"},
+            },
+            "required": ["capability_label", "reason_code"],
+            "additionalProperties": False,
+        },
+    },
+    "thinking_tag_closed": {
+        "kind": "structural_tag",
+        "begin": "</thinking>",
+        "end": "",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "final": {"type": "string"},
+                "confidence": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high"],
+                },
+            },
+            "required": ["final", "confidence"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
+def f4_family_grammar(family: str) -> dict[str, Any] | None:
+    """Return the grammar spec for an F-4 family, or None if unknown."""
+    return F4_FAMILY_GRAMMARS.get(family)
+
+
 def _run_generation_cell(
     *,
     backend: Any,
     cell: Mapping[str, Any],
     max_tokens: int,
+    grammar: Mapping[str, Any] | None = None,
 ) -> tuple[str | None, dict[str, Any], str | None]:
     t_start = time.perf_counter()
     t_first_token: float | None = None
@@ -758,12 +895,18 @@ def _run_generation_cell(
     finish_reason: str | None = None
     error_message: str | None = None
 
+    stream_kwargs: dict[str, Any] = {
+        "max_tokens": max_tokens,
+        "temperature": float(cell["temperature"]),
+        "prefill_chunk_tokens": int(cell["chunk_tokens"]),
+    }
+    if grammar is not None:
+        stream_kwargs["grammar"] = dict(grammar)
+
     for event in backend.stream_generate(
         str(cell["model_id"]),
         str(cell["prompt"]),
-        max_tokens=max_tokens,
-        temperature=float(cell["temperature"]),
-        prefill_chunk_tokens=int(cell["chunk_tokens"]),
+        **stream_kwargs,
     ):
         if event.event == "prefill_progress":
             prefill_progress_events += 1
@@ -820,6 +963,7 @@ def run_smoke_matrix(
     max_tokens: int,
     timeout_s: float,
     python_executable: str | None = None,
+    grammar_enabled: bool = False,
 ) -> dict[str, Any]:
     from owlmlx.runtime.mlx_lm_subprocess_backend import MlxLmSubprocessBackend
 
@@ -867,10 +1011,14 @@ def run_smoke_matrix(
                     append_jsonl_row(rows_path, row)
                     continue
 
+            cell_grammar = (
+                f4_family_grammar(str(cell["family"])) if grammar_enabled else None
+            )
             output, metrics, error_message = _run_generation_cell(
                 backend=backend,
                 cell=cell,
                 max_tokens=max_tokens,
+                grammar=cell_grammar,
             )
             if error_message is not None or output is None:
                 row = record_for_generation_error(
@@ -905,6 +1053,7 @@ def run_smoke_matrix(
     return {
         "phase": "smoke",
         "run_id": run_id,
+        "grammar_enabled": grammar_enabled,
         "rows_path": str(rows_path),
         "rollup_path": str(rollup_path),
         "sample_count": rollup["sample_count"],
@@ -935,13 +1084,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-tokens", type=int, default=128)
     parser.add_argument("--timeout-s", type=float, default=600.0)
     parser.add_argument("--python-executable", default=None)
+    parser.add_argument(
+        "--grammar",
+        action="store_true",
+        help="F-4.2b: constrain each cell with its per-family grammar spec",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+    smoke_label = "f4-2-grammar-matrix" if args.grammar else "f4-smoke-matrix"
     run_id = args.run_id or (
-        f"{_now_compact_utc()}-f4-smoke-matrix"
+        f"{_now_compact_utc()}-{smoke_label}"
         if args.phase == "smoke"
         else f"{_now_compact_utc()}-f4-validator-fixtures"
     )
@@ -957,6 +1112,7 @@ def main(argv: list[str] | None = None) -> int:
             max_tokens=args.max_tokens,
             timeout_s=args.timeout_s,
             python_executable=args.python_executable,
+            grammar_enabled=args.grammar,
         )
         print(json.dumps(result, sort_keys=True))
         return 0 if result["graduates"]["measurement_harness"] else 1

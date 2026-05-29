@@ -1,0 +1,57 @@
+{
+  "schema_version": "f4.2b.grammar_vs_baseline.v1",
+  "phase": "f4-2b-grammar-matrix-comparison",
+  "baseline_source": "files/evidence/owlmlx/bench/structured-output-invariance/20260528T030803Z-f4-smoke-matrix.jsonl",
+  "baseline_phase": "f4.1-smoke-matrix (prompt-only)",
+  "grammar_source": "files/evidence/owlmlx/bench/structured-output-invariance/20260529T062802Z-f4-2-grammar-matrix.jsonl",
+  "grammar_phase": "f4.2b-grammar-matrix (xgrammar constrained, child-side)",
+  "matrix": "5 families x 3 models x 2 temperatures (60 cells)",
+  "headline": {
+    "baseline_hard_breaks": 59,
+    "grammar_hard_breaks": 20,
+    "baseline_hard_break_rate": 0.9833,
+    "grammar_hard_break_rate": 0.3333,
+    "generation_error_count_grammar": 0
+  },
+  "by_family": {
+    "enum_constrained": {
+      "baseline_breaks": 12,
+      "grammar_breaks": 0,
+      "n_per_arm": 12
+    },
+    "function_call_arguments": {
+      "baseline_breaks": 11,
+      "grammar_breaks": 4,
+      "n_per_arm": 12
+    },
+    "json_schema_flat": {
+      "baseline_breaks": 12,
+      "grammar_breaks": 0,
+      "n_per_arm": 12
+    },
+    "nested_object": {
+      "baseline_breaks": 12,
+      "grammar_breaks": 4,
+      "n_per_arm": 12
+    },
+    "thinking_tag_closed": {
+      "baseline_breaks": 12,
+      "grammar_breaks": 12,
+      "n_per_arm": 12
+    }
+  },
+  "residual_grammar_breaks_by_family_model": {
+    "function_call_arguments|gemma-4-31b-it-4bit": 4,
+    "nested_object|gemma-4-31b-it-4bit": 3,
+    "nested_object|qwen3.6-35b-a3b-4bit": 1,
+    "thinking_tag_closed|gemma-4-31b-it-4bit": 4,
+    "thinking_tag_closed|qwen3.6-27b-4bit": 4,
+    "thinking_tag_closed|qwen3.6-35b-a3b-4bit": 4
+  },
+  "residual_root_causes": {
+    "thinking_tag_closed": "12/12 across all models. The structural tag triggers on '</thinking>', but the models emit their native '<think>' reasoning tag (not '<thinking>'), so the trigger never fires and the JSON is never constrained (failure_code extra_prose_outside_envelope). Fixture/family-premise mismatch, not a grammar-engine limit; the model-free per-family verify passed because it was fed the ideal '<thinking>...</thinking>{json}' string. Needs a fixture/family redesign (trigger on the model's actual reasoning tag) - deferred.",
+    "gemma_function_call_and_nested": "gemma-4-31b-it-4bit degenerates at the token level inside grammar-free fields: repeated characters inside a JSON string value (e.g. '/////lllll') and long whitespace runs, hitting max_tokens=128 (finish_reason=length) before the structure closes. The whitespace cap (16) fixed enum_constrained on gemma but nested/function still exceed the token budget. Follow-up mitigations: tighter max_whitespace_cnt, higher max_tokens for gemma, or a string-length bound. Gemma-specific; the Qwen models do not show this."
+  },
+  "interpretation": "Grammar-constrained decoding cuts hard breaks 59 -> 20 (0.983 -> 0.333) with zero generation errors. It fully resolves json_schema_flat and enum_constrained (0 breaks) and substantially helps function_call_arguments (11->4) and nested_object (12->4). The two Qwen models are essentially clean except thinking_tag_closed. NOT a reliability pass: thinking_tag_closed (all models) and gemma degeneracy remain. No promotion candidate; F-4 stays experimental.",
+  "note_supported_enum": "The enum_constrained schema contains 'supported' as a fixture enum value; not a capability claim about any model."
+}

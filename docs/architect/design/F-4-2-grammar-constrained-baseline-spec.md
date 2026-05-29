@@ -297,6 +297,52 @@ Any family where grammar does NOT help (e.g. `thinking_tag_closed` if the
 structural tag is unavailable) is reported as a per-family limitation, not a
 campaign failure.
 
+#### 8.2.1 F-4.2b results (run 2026-05-29)
+
+Run via `--grammar` on the full 5×3×2 matrix (60 cells, samples_per_family=2),
+same models/chunk/temps as F-4.1.
+
+- Evidence: `20260529T062802Z-f4-2-grammar-matrix.{jsonl,rollup.jsonl}`
+- Comparison: `20260529T062802Z-f4-2-grammar-vs-baseline-comparison.json`
+
+| family | F-4.1 prompt-only | F-4.2b grammar |
+|---|---|---|
+| json_schema_flat | 12/12 break | **0/12** |
+| enum_constrained | 12/12 break | **0/12** |
+| function_call_arguments | 11/12 break | 4/12 |
+| nested_object | 12/12 break | 4/12 |
+| thinking_tag_closed | 12/12 break | 12/12 |
+| **TOTAL** | **59/60 (0.983)** | **20/60 (0.333)** |
+
+`generation_error_count=0`. Grammar fully resolves `json_schema_flat` and
+`enum_constrained`, and substantially helps `function_call_arguments` and
+`nested_object`. The two Qwen models are clean except `thinking_tag_closed`.
+
+Two residual root causes (measured, not yet fixed):
+
+1. **`thinking_tag_closed` 12/12 (all models).** The structural tag triggers on
+   `</thinking>`, but the models emit their native `<think>` reasoning tag, so
+   the trigger never fires and the JSON is never constrained
+   (`extra_prose_outside_envelope`). This is a fixture/family-premise mismatch,
+   not a grammar-engine limit — the model-free §4.1 verify passed because it was
+   fed the ideal `<thinking>…</thinking>{json}` exemplar. Fix (deferred to a
+   follow-up): redesign the family to trigger on the model's actual reasoning
+   tag, or align the fixture envelope.
+
+2. **gemma `function_call_arguments` / `nested_object`.** `gemma-4-31b-it-4bit`
+   degenerates at the token level inside grammar-free fields — repeated
+   characters inside a JSON string value (`"/////lllll"`) and long whitespace
+   runs — hitting `max_tokens=128` (`finish_reason=length`) before the structure
+   closes. The whitespace cap added this round (`max_whitespace_cnt=16`, see
+   §8.1.1) fixed `enum_constrained` on gemma but not the deeper structures.
+   Gemma-specific (Qwen does not show it). Follow-up mitigations: tighter
+   whitespace cap, higher `max_tokens` for gemma, or a string-length bound.
+
+This is NOT a reliability pass and produces NO promotion candidate. F-4 stays
+`experimental`. A `partial_candidate` discussion for the clean families
+(`json_schema_flat`, `enum_constrained` on Qwen) would need the larger N≥1000
+run in §8.3 — out of scope here.
+
 ### 8.3 F-4.2c — Fresh Repeat (bench-grade, conditional)
 
 Only if F-4.2b shows a clean per-family pass: rerun with a different seed,
@@ -365,3 +411,4 @@ reason to gate on them.
 | 2026-05-28 | Initial F-4.2 design-grade spec. Pivots F-4.2 from the prompt-only stratified matrix (F-4 spec §4.3) to a grammar-constrained baseline, justified by the `probe-positive` verdict. Resolves the three §12.1 unresolved problems at design level (child-side matcher; accept numpy bridge + record degradation; add `grammar-experimental` extras). Flags the per-family grammar strategy as the central design risk (thinking_tag_closed needs a structural tag). Authored in the same session as the probe per user direction; honesty caveat recorded in the header and §12. | Post-probe session (with user direction) |
 | 2026-05-29 | Added §4.1: model-free per-family grammar construction verification (`all_families_pass=true`). Resolves the §4 central risk — `thinking_tag_closed` is expressible via `compile_structural_tag([StructuralTagItem(begin="</thinking>")], ["</thinking>"])`; no post-envelope fallback needed. Downgraded the family-table risk column accordingly. Recorded the deprecated-2arg-form caveat for code-grade. Evidence `20260529T024253Z-f4-2-per-family-grammar-verify.json`. | Post-probe session (with user direction) |
 | 2026-05-29 | F-4.2a code-grade landed (§8.1.1): child-side grammar builder + tokenizer resolver + wiring in `mlx_lm_runner.py`, `grammar-experimental` extras, TDD test (7 tests, caught a real tokenizer-unwrap bug), and an end-to-end backend-IPC smoke (control breaks, grammar yields valid JSON). Backend needed no change — kwargs already forward into params. Authored same-session per user direction. | Post-probe session (with user direction) |
+| 2026-05-29 | F-4.2b grammar matrix ran (§8.2.1): hard breaks 59→20 (0.983→0.333), 0 generation errors. Grammar fully fixes json_schema_flat + enum_constrained, substantially helps function_call_arguments + nested_object. Two residual root causes measured: thinking_tag_closed trigger mismatch (`<think>` vs `</thinking>`, all models) and gemma token-level degeneracy at max_tokens. Added `max_whitespace_cnt` cap (fixed gemma enum). Bench `--grammar` mode + per-family grammar specs + TDD helper tests. NOT a reliability pass; F-4 stays experimental. | Post-probe session (with user direction) |

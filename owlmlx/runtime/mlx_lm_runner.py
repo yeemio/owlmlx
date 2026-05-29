@@ -168,6 +168,12 @@ class GrammarCompileError(ValueError):
     """Raised child-side when a grammar spec cannot be compiled."""
 
 
+# Cap on consecutive whitespace tokens in JSON-schema grammars. Prevents the
+# unbounded-newline loop some models fall into after "{" when whitespace is
+# unconstrained. Overridable per request via grammar_spec["max_whitespace_cnt"].
+DEFAULT_GRAMMAR_MAX_WHITESPACE = 16
+
+
 def _resolve_hf_tokenizer_for_xgrammar(tokenizer: Any) -> Any:
     """Return the transformers tokenizer xgrammar's from_huggingface accepts.
 
@@ -241,7 +247,15 @@ def _build_grammar_logits_processor(tokenizer: Any, grammar_spec: dict[str, Any]
             )
             compiler = xgr.GrammarCompiler(tokenizer_info)
             if kind == "json_schema":
-                compiled = compiler.compile_json_schema(_json.dumps(schema))
+                # Cap consecutive whitespace. With xgrammar's default
+                # any_whitespace=True an unconstrained model (observed on
+                # gemma-4-31b at temp 0) can emit an unbounded run of newlines
+                # after "{" and never reach a key, burning max_tokens into a
+                # whitespace loop. A small cap still allows pretty-printing.
+                max_ws = int(grammar_spec.get("max_whitespace_cnt") or DEFAULT_GRAMMAR_MAX_WHITESPACE)
+                compiled = compiler.compile_json_schema(
+                    _json.dumps(schema), max_whitespace_cnt=max_ws
+                )
             elif kind == "structural_tag":
                 begin = str(grammar_spec.get("begin") or "")
                 end = str(grammar_spec.get("end") or "")

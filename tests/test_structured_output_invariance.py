@@ -297,3 +297,97 @@ def test_cli_writes_validator_fixture_evidence(tmp_path: Path) -> None:
     rollup = json.loads(rollup_path.read_text().strip())
     assert rollup["run_id"] == run_id
     assert rollup["graduates"]["validator_contract"] is True
+
+
+# --- F-4.2b grammar matrix helpers ------------------------------------------
+
+
+def test_f4_family_grammar_json_schema_families() -> None:
+    from scripts.bench.structured_output_invariance import f4_family_grammar
+
+    for family in (
+        "json_schema_flat",
+        "function_call_arguments",
+        "nested_object",
+        "enum_constrained",
+    ):
+        spec = f4_family_grammar(family)
+        assert spec is not None
+        assert spec["kind"] == "json_schema"
+        assert spec["schema"]["type"] == "object"
+
+
+def test_f4_family_grammar_thinking_tag_is_structural_tag() -> None:
+    from scripts.bench.structured_output_invariance import f4_family_grammar
+
+    spec = f4_family_grammar("thinking_tag_closed")
+    assert spec is not None
+    assert spec["kind"] == "structural_tag"
+    assert spec["begin"] == "</thinking>"
+    assert spec["schema"]["type"] == "object"
+
+
+def test_run_generation_cell_passes_grammar_when_enabled() -> None:
+    from scripts.bench.structured_output_invariance import _run_generation_cell
+
+    captured: dict = {}
+
+    class _FakeEvent:
+        event = "done"
+        text = ""
+        prompt_tokens = 1
+        completion_tokens = 1
+        finish_reason = "stop"
+        detail: dict = {}
+
+    class _FakeBackend:
+        def stream_generate(self, model_id, prompt, **kwargs):  # type: ignore[no-untyped-def]
+            captured["kwargs"] = kwargs
+            return iter([_FakeEvent()])
+
+    cell = {
+        "model_id": "m",
+        "prompt": "p",
+        "family": "json_schema_flat",
+        "temperature": 0.0,
+        "chunk_tokens": 2048,
+    }
+    _run_generation_cell(
+        backend=_FakeBackend(),
+        cell=cell,
+        max_tokens=8,
+        grammar={"kind": "json_schema", "schema": {"type": "object"}},
+    )
+    assert captured["kwargs"]["grammar"] == {
+        "kind": "json_schema",
+        "schema": {"type": "object"},
+    }
+
+
+def test_run_generation_cell_omits_grammar_when_none() -> None:
+    from scripts.bench.structured_output_invariance import _run_generation_cell
+
+    captured: dict = {}
+
+    class _FakeEvent:
+        event = "done"
+        text = ""
+        prompt_tokens = 1
+        completion_tokens = 1
+        finish_reason = "stop"
+        detail: dict = {}
+
+    class _FakeBackend:
+        def stream_generate(self, model_id, prompt, **kwargs):  # type: ignore[no-untyped-def]
+            captured["kwargs"] = kwargs
+            return iter([_FakeEvent()])
+
+    cell = {
+        "model_id": "m",
+        "prompt": "p",
+        "family": "json_schema_flat",
+        "temperature": 0.0,
+        "chunk_tokens": 2048,
+    }
+    _run_generation_cell(backend=_FakeBackend(), cell=cell, max_tokens=8)
+    assert "grammar" not in captured["kwargs"]
