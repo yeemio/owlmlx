@@ -133,6 +133,10 @@ def _prepare_generation_params(params: dict[str, Any]) -> dict[str, Any]:
     prepared = dict(params)
     prepared.pop("stop", None)
     prepared.pop("chat_template_kwargs", None)
+    # Grammar is handled child-side via a logits_processor (see
+    # _maybe_add_grammar_processor); it must never leak to mlx_lm as an
+    # unknown generate_step kwarg.
+    prepared.pop("grammar", None)
     prepared.pop(_PREFILL_PROGRESS_EVENTS_PARAM, None)
     raw_prefill_chunk_tokens = prepared.pop(_PREFILL_CHUNK_TOKENS_PARAM, None)
     if raw_prefill_chunk_tokens is None and "prefill_step_size" not in prepared:
@@ -158,6 +162,156 @@ def _prepare_generation_params(params: dict[str, Any]) -> dict[str, Any]:
         prepared["sampler"] = make_sampler(**sampler_kwargs)
 
     return prepared
+
+
+class GrammarCompileError(ValueError):
+    """Raised child-side when a grammar spec cannot be compiled."""
+
+
+def _resolve_hf_tokenizer_for_xgrammar(tokenizer: Any) -> Any:
+    """Return the transformers tokenizer xgrammar's from_huggingface accepts.
+
+    xgrammar wants a ``transformers.PreTrainedTokenizerBase``. Two cases:
+
+    * A raw HF tokenizer (e.g. ``Qwen2Tokenizer``) already IS that base — use it
+      directly. Do NOT unwrap its ``._tokenizer``; that is the inner Rust
+      ``tokenizers.Tokenizer`` which xgrammar rejects.
+    * mlx-lm's ``TokenizerWrapper`` is NOT a base; its ``._tokenizer`` is the
+      real HF tokenizer — unwrap one level.
+    """
+    try:
+        from transformers import PreTrainedTokenizerBase  # noqa: PLC0415
+
+        if isinstance(tokenizer, PreTrainedTokenizerBase):
+            return tokenizer
+    except ImportError:
+        pass
+    inner = getattr(tokenizer, "_tokenizer", None)
+    if inner is not None:
+        return inner
+    return tokenizer
+
+
+def _build_grammar_logits_processor(tokenizer: Any, grammar_spec: dict[str, Any]) -> Any:
+    """Build an mlx ``logits_processor`` that constrains decoding to a grammar.
+
+    Runs child-side: the xgrammar matcher holds a non-serializable C++ state and
+    cannot cross the parent/child IPC boundary, so the parent ships the
+    serializable ``grammar_spec`` (a JSON schema or a structural-tag envelope)
+    and the matcher is reconstructed here.
+
+    ``grammar_spec`` shape::
+
+        {"kind": "json_schema", "schema": {...}}
+        {"kind": "structural_tag", "schema": {...}, "begin": "</thinking>", "end": ""}
+
+    The xgrammar matcher is compiled lazily on the first processor call, using
+    ``logits.shape[-1]`` as the authoritative vocab size — that is the model's
+    real logits dimension, which can exceed the tokenizer's nominal vocab (e.g.
+    Qwen3.6 pads to 248320 vs a 248077-token tokenizer); using the tokenizer
+    size would make the bitmask fail to broadcast against the logits.
+
+    Verified behaviour (see scripts/probe/f4_grammar_feasibility.py and
+    f4_grammar_per_family_verify.py):
+      * mlx-lm hands the prompt-tail token to the first processor call, so the
+        first call records the offset and accepts nothing;
+      * later calls accept the newly generated tokens, then mask the next step.
+    """
+    import json as _json  # noqa: PLC0415
+
+    import mlx.core as mx  # noqa: PLC0415
+    import numpy as np  # noqa: PLC0415
+    import xgrammar as xgr  # noqa: PLC0415
+
+    hf_tok = _resolve_hf_tokenizer_for_xgrammar(tokenizer)
+    kind = str(grammar_spec.get("kind") or "json_schema")
+    schema = grammar_spec.get("schema")
+
+    state: dict[str, Any] = {
+        "matcher": None,
+        "bitmask": None,
+        "vocab_size": None,
+        "last_seen_len": -1,
+    }
+
+    def _ensure_compiled(vocab_size: int) -> None:
+        try:
+            tokenizer_info = xgr.TokenizerInfo.from_huggingface(
+                hf_tok, vocab_size=vocab_size
+            )
+            compiler = xgr.GrammarCompiler(tokenizer_info)
+            if kind == "json_schema":
+                compiled = compiler.compile_json_schema(_json.dumps(schema))
+            elif kind == "structural_tag":
+                begin = str(grammar_spec.get("begin") or "")
+                end = str(grammar_spec.get("end") or "")
+                item = xgr.StructuralTagItem(
+                    begin=begin, schema=_json.dumps(schema), end=end
+                )
+                compiled = compiler.compile_structural_tag([item], [begin])
+            else:
+                raise GrammarCompileError(f"unknown grammar kind: {kind!r}")
+        except GrammarCompileError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise GrammarCompileError(
+                f"grammar_compile_failed: {type(exc).__name__}: {exc}"
+            ) from exc
+        state["matcher"] = xgr.GrammarMatcher(compiled)
+        state["bitmask"] = xgr.allocate_token_bitmask(1, vocab_size)
+        state["vocab_size"] = vocab_size
+
+    def processor(tokens: Any, logits: Any) -> Any:
+        vocab_size = int(logits.shape[-1])
+        if state["matcher"] is None:
+            _ensure_compiled(vocab_size)
+        matcher = state["matcher"]
+        cur_len = int(tokens.shape[0])
+        if state["last_seen_len"] < 0:
+            # First call carries the prompt-tail token, not a generation.
+            state["last_seen_len"] = cur_len
+        elif cur_len > state["last_seen_len"]:
+            new_ids = tokens[state["last_seen_len"] : cur_len].tolist()
+            for tok_id in new_ids:
+                if matcher.is_terminated():
+                    break
+                if not matcher.accept_token(int(tok_id)):
+                    state["last_seen_len"] = cur_len
+                    return logits
+            state["last_seen_len"] = cur_len
+
+        if matcher.is_terminated():
+            return logits
+
+        bitmask = state["bitmask"]
+        matcher.fill_next_token_bitmask(bitmask)
+        flat_bytes = bitmask.numpy().view(np.uint8).reshape(-1)
+        allowed = np.unpackbits(flat_bytes, bitorder="little")[:vocab_size]
+        allowed_mx = mx.array(allowed.astype(np.bool_)).reshape((1, vocab_size))
+        neg_inf = mx.full(logits.shape, -mx.inf, dtype=logits.dtype)
+        return mx.where(allowed_mx, logits, neg_inf)
+
+    return processor
+
+
+def _maybe_add_grammar_processor(
+    generation_params: dict[str, Any],
+    params: dict[str, Any],
+    tokenizer: Any,
+) -> dict[str, Any]:
+    """Append a grammar logits_processor to ``generation_params`` if requested.
+
+    No-op when ``params`` carries no ``grammar`` spec, preserving today's
+    behavior byte-for-byte. Mutates and returns ``generation_params``.
+    """
+    grammar_spec = params.get("grammar")
+    if not grammar_spec:
+        return generation_params
+    processor = _build_grammar_logits_processor(tokenizer, grammar_spec)
+    processors = list(generation_params.get("logits_processors") or [])
+    processors.append(processor)
+    generation_params["logits_processors"] = processors
+    return generation_params
 
 
 def _bool_param(value: Any) -> bool:
@@ -358,12 +512,15 @@ def main() -> int:
                 import mlx_lm  # noqa: PLC0415
 
                 stop_strings = _stop_strings_from_params(params)
+                generation_params = _maybe_add_grammar_processor(
+                    _prepare_generation_params(params), params, tokenizer
+                )
                 with redirect_stdout(sys.stderr):
                     text = mlx_lm.generate(
                         model,
                         tokenizer,
                         prompt=str(prompt),
-                        **_prepare_generation_params(params),
+                        **generation_params,
                     )
                 text, stop_hit = _truncate_at_stop_strings(str(text), stop_strings)
                 generation_count += 1
@@ -462,12 +619,15 @@ def main() -> int:
                     chat_template_kwargs=_chat_template_kwargs_from_params(params),
                 )
                 stop_strings = _stop_strings_from_params(params)
+                generation_params = _maybe_add_grammar_processor(
+                    _prepare_generation_params(params), params, tokenizer
+                )
                 with redirect_stdout(sys.stderr):
                     text = mlx_lm.generate(
                         model,
                         tokenizer,
                         prompt=rendered_prompt,
-                        **_prepare_generation_params(params),
+                        **generation_params,
                     )
                 text, stop_hit = _truncate_at_stop_strings(str(text), stop_strings)
                 generation_count += 1
@@ -515,7 +675,9 @@ def main() -> int:
                 stop_filter = _StopStringStreamFilter(stop_strings)
                 first_response_ms = None
                 first_visible_token_ms = None
-                generation_params = _prepare_generation_params(params)
+                generation_params = _maybe_add_grammar_processor(
+                    _prepare_generation_params(params), params, tokenizer
+                )
                 prefill_progress_state: dict[str, Any] = {"count": 0, "last": None}
                 if _prefill_progress_requested(params):
                     prefill_progress_callback, prefill_progress_state = (
@@ -750,7 +912,9 @@ def main() -> int:
                 stop_filter = _StopStringStreamFilter(stop_strings)
                 first_response_ms = None
                 first_visible_token_ms = None
-                generation_params = _prepare_generation_params(params)
+                generation_params = _maybe_add_grammar_processor(
+                    _prepare_generation_params(params), params, tokenizer
+                )
                 prefill_progress_state: dict[str, Any] = {"count": 0, "last": None}
                 if _prefill_progress_requested(params):
                     prefill_progress_callback, prefill_progress_state = (

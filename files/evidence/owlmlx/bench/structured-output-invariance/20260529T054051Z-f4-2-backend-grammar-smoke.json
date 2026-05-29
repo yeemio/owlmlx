@@ -1,0 +1,19 @@
+{
+  "schema_version": "f4.2.backend_grammar_smoke.v1",
+  "phase": "f4-2a-backend-grammar-smoke",
+  "ts_utc": "20260529T054051Z",
+  "path": "real MlxLmSubprocessBackend IPC (parent->child runner)",
+  "model_id": "qwen3.6-35b-a3b-4bit",
+  "model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B-4bit",
+  "family": "json_schema_flat",
+  "control": {
+    "parses_json": false,
+    "text": "\n\n<think>\n\n</think>\n\n{\"task_id\": \"F4-JSON-001\", \"category\": \"bugfix\", \"priority\": 1, \"requires_review\": true}"
+  },
+  "treatment": {
+    "parses_json": true,
+    "text": "{\"task_id\": \"F4-JSON-001\", \"category\": \"bugfix\", \"priority\": 1, \"requires_review\": true}"
+  },
+  "passed": true,
+  "note": "End-to-end proof that a grammar spec crosses the subprocess boundary as a serializable param, the child rebuilds the xgrammar matcher, and constrained generation returns valid JSON. Single-sample integration smoke, not the F-4.2b matrix."
+}

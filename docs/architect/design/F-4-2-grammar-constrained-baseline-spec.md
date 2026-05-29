@@ -243,6 +243,37 @@ This spec does NOT prescribe the line-level diff; code-grade owns that.
   tests.
 - Commit; do not push unless requested.
 
+#### 8.1.1 F-4.2a implementation status (landed 2026-05-29)
+
+Implemented in `mlx_lm_runner.py`: `_build_grammar_logits_processor`
+(child-side, lazy-compiles the matcher using `logits.shape[-1]` as the
+authoritative vocab size), `_resolve_hf_tokenizer_for_xgrammar` (picks the
+`PreTrainedTokenizerBase` xgrammar wants — uses a raw HF tokenizer directly,
+unwraps mlx-lm's `TokenizerWrapper._tokenizer`), `_maybe_add_grammar_processor`
+(wiring), and `_prepare_generation_params` now strips `grammar`. Wired into all
+four generation action handlers (generate / generate_messages / stream_generate
+/ stream_generate_messages).
+
+**Backend needed no change.** The §6 table anticipated a backend edit, but
+`MlxLmSubprocessBackend` already forwards every kwarg into the request `params`
+(`"params": dict(kwargs)`), so a `grammar` kwarg reaches the child unchanged. A
+regression test guards that contract.
+
+Verification:
+- `tests/test_mlx_lm_runner_grammar.py` — 7 tests (param strip, wiring, real
+  xgrammar masking, backend forwarding). The masking test caught a real
+  tokenizer-unwrap bug before it shipped (the fix is `_resolve_hf_tokenizer_for_xgrammar`).
+- `scripts/probe/f4_2_backend_grammar_smoke.py` — end-to-end through the real
+  subprocess IPC: control (no grammar) returns a `<think>`-prefixed string that
+  fails JSON parse; treatment (grammar) returns valid JSON. Evidence
+  `files/evidence/owlmlx/bench/structured-output-invariance/20260529T054051Z-f4-2-backend-grammar-smoke.json`.
+- 108 passed across grammar + params + subprocess-backend + structured-output
+  suites.
+
+Not done in F-4.2a: the full family/model matrix (that is F-4.2b), and the
+`StructuralTag`-class form preference (the legacy 2-arg structural-tag form is
+in use; see §4.1 caveat).
+
 ### 8.2 F-4.2b — Grammar-On Stratified Matrix (bench-grade)
 
 - Reuse the F-4.1 runner with `--grammar` on.
@@ -333,3 +364,4 @@ reason to gate on them.
 |---|---|---|
 | 2026-05-28 | Initial F-4.2 design-grade spec. Pivots F-4.2 from the prompt-only stratified matrix (F-4 spec §4.3) to a grammar-constrained baseline, justified by the `probe-positive` verdict. Resolves the three §12.1 unresolved problems at design level (child-side matcher; accept numpy bridge + record degradation; add `grammar-experimental` extras). Flags the per-family grammar strategy as the central design risk (thinking_tag_closed needs a structural tag). Authored in the same session as the probe per user direction; honesty caveat recorded in the header and §12. | Post-probe session (with user direction) |
 | 2026-05-29 | Added §4.1: model-free per-family grammar construction verification (`all_families_pass=true`). Resolves the §4 central risk — `thinking_tag_closed` is expressible via `compile_structural_tag([StructuralTagItem(begin="</thinking>")], ["</thinking>"])`; no post-envelope fallback needed. Downgraded the family-table risk column accordingly. Recorded the deprecated-2arg-form caveat for code-grade. Evidence `20260529T024253Z-f4-2-per-family-grammar-verify.json`. | Post-probe session (with user direction) |
+| 2026-05-29 | F-4.2a code-grade landed (§8.1.1): child-side grammar builder + tokenizer resolver + wiring in `mlx_lm_runner.py`, `grammar-experimental` extras, TDD test (7 tests, caught a real tokenizer-unwrap bug), and an end-to-end backend-IPC smoke (control breaks, grammar yields valid JSON). Backend needed no change — kwargs already forward into params. Authored same-session per user direction. | Post-probe session (with user direction) |

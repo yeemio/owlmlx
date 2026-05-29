@@ -23,6 +23,17 @@ dev = [
 deepseek-experimental = [
     "mlx-lm @ git+https://github.com/Blaizzy/mlx-lm@5c10538136b9038b9626c134612b08afc18d697a",
 ]
+# Grammar-constrained structured-output decoding (F-4.2). Experimental-only:
+# xgrammar pulls torch transitively (~84MB), so this is never part of the
+# default or `runtime` install. The child runner builds the grammar matcher
+# from a serializable spec (see owlmlx/runtime/mlx_lm_runner.py
+# _build_grammar_logits_processor). xgrammar is pinned because the
+# structural-tag construction used for the thinking_tag family relies on a
+# form that is marked deprecated upstream (see
+# docs/architect/design/F-4-2-grammar-constrained-baseline-spec.md §4.1).
+grammar-experimental = [
+    "xgrammar==0.2.1",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["owlmlx"]
