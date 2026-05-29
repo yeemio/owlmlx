@@ -407,9 +407,12 @@ grammar-constrained lane — `json_schema_flat` + `enum_constrained`, on
 `qwen3.6-27b-4bit` + `qwen3.6-35b-a3b-4bit`, child-side xgrammar — is a
 `partial_candidate` at N=1024 with zero hard breaks. This is NOT an F-4-wide
 label change and NOT `supported`; the rollup `promotion_candidate` flag stays
-`False` (the bench never auto-promotes). Promoting this lane to a
-source-of-truth `partial` label is a separate review round with its own
-evidence bar (e.g. fresh-seed repeat per §8.3, OpenAI-surface coverage).
+`False` (the bench never auto-promotes).
+
+**Promoted to `partial` 2026-05-29 (§8.7).** The separate review round
+(fresh-seed repeat + OpenAI-surface coverage) passed; the lane now carries a
+source-of-truth `partial` label in
+[`structured-output-grammar-lane.md`](../../source-of-truth/structured-output-grammar-lane.md).
 
 ### 8.5 thinking_tag residual investigation (2026-05-29) — reframed, not salvaged
 
@@ -461,6 +464,28 @@ Re-measure (grammar-on, max_tokens 256, 2 families × 3 models × 2 temps × 8 =
 This is a small-N demonstration that the fix works, NOT a reliability claim.
 Folding `function_call_arguments` + `nested_object` (now clean on all three
 models) into the `partial_candidate` lane requires an N≥1000 run like §8.4.
+
+### 8.7 #1 lane promotion review (2026-05-29) — promoted to `partial`
+
+The lane partial_candidate (§8.4.1) was promoted to a source-of-truth `partial`
+after both pre-registered prerequisites passed:
+
+1. **Fresh-seed repeat.** Re-ran the F-4.3 lane at N=1024
+   (`20260529T105156Z-f4-3-grammar-lane-freshrepeat`): 0 hard breaks again, all
+   8 cells 128/0. temp=0.0 cells are greedy (deterministic) but temp=0.3 cells
+   re-sample, so the repeat genuinely re-tests stochastic stability. Two
+   independent N=1024 runs now sit at 0 breaks.
+2. **OpenAI-surface coverage.** Wired `response_format` json_schema (and
+   `extra_body.grammar`) → `params['grammar']` → `kernel.generate_messages` →
+   backend → child runner in `server_routes_openai.py` (`_grammar_from_openai_payload`).
+   Verified by 4 route unit tests + a real-model smoke
+   (`scripts/probe/f4_openai_surface_grammar_smoke.py`: Qwen 27B through
+   `/v1/chat/completions` → valid schema-conformant JSON).
+
+Verdict `20260529T105156Z-f4-1-promotion-review-verdict.json`. The `partial`
+label and its strict scope/exclusions live in the source-of-truth doc
+`structured-output-grammar-lane.md`. F-4 overall stays `experimental`;
+`supported` is claimed nowhere.
 
 ## 9. Validator Contract Additions
 
@@ -528,3 +553,4 @@ reason to gate on them.
 | 2026-05-29 | F-4.3 narrow reliability lane defined (§8.4, pre-registered gate + claim ceiling) and ran (§8.4.1): json_schema_flat + enum_constrained on Qwen 27B + 35B-A3B, N=1024, hard_break_count=0, generation_error_count=0 — all 8 cells uniformly clean. Lane-pass → the structured-JSON/enum grammar-constrained lane is a `partial_candidate` (lane-scoped only; NOT F-4-wide, NOT supported). Added `--families` filter (TDD). thinking_tag + gemma stay excluded as residuals. | Post-probe session (with user direction) |
 | 2026-05-29 | thinking_tag residual investigated (§8.5). Two false causes corrected — validator now tolerates the native `<think>` channel (TDD), grammar removed for thinking_tag (structural tag backfires per diagnose probe). Real residual isolated: reasoning models don't close `<think>` in budget (42/48 unclosed at max_tokens=512). NOT salvaged; stays a residual out of the clean lane. | Post-probe session (with user direction) |
 | 2026-05-29 | gemma degeneracy FIXED (§8.6): maxLength=120 on free-text strings + max_whitespace_cnt=4 for function_call_arguments + nested_object. Re-measure 0/96 hard breaks on all three models (gemma function_call 4/4→0/16, nested 3/4→0/16, no Qwen regression). Small-N demonstration; clean-lane schemas untouched (F-4.3 evidence stays valid). TDD: 2 schema-bound tests. | Post-probe session (with user direction) |
+| 2026-05-29 | #1 lane promotion review (§8.7): fresh-seed repeat (2nd N=1024 run, 0 breaks) + OpenAI-surface coverage (response_format→grammar wired in server_routes_openai.py, 4 route tests + real-model smoke). Both passed → lane promoted `partial_candidate`→`partial` in source-of-truth `structured-output-grammar-lane.md` (feature-lane label; F-4 overall stays experimental; supported claimed nowhere). | Post-probe session (with user direction) |

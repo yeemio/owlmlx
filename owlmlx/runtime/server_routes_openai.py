@@ -72,6 +72,7 @@ class ChatCompletionRequest(BaseModel):
     temperature: float | None = None
     stop: str | list[str] | None = None
     chat_template_kwargs: dict[str, Any] | None = None
+    response_format: dict[str, Any] | None = None
     extra_body: dict[str, Any] | None = None
     stream: bool = False
 
@@ -110,6 +111,35 @@ def _chat_template_kwargs_from_openai_payload(
             if isinstance(key, str) and key:
                 merged[key] = value
     return merged
+
+
+def _grammar_from_openai_payload(payload: "ChatCompletionRequest") -> dict[str, Any] | None:
+    """Translate an OpenAI-style structured-output request into a backend grammar spec.
+
+    Two inputs, in priority order:
+      * ``response_format`` (OpenAI standard):
+        ``{"type": "json_schema", "json_schema": {"schema": {...}}}`` →
+        ``{"kind": "json_schema", "schema": {...}}``.
+      * ``extra_body["grammar"]``: a backend grammar spec passed through verbatim
+        (escape hatch for structural_tag or other kinds the OpenAI shape can't
+        express).
+
+    Returns None when neither is present. The resulting spec rides the existing
+    kwargs path: route params → kernel.generate_messages(**params) → backend →
+    child runner, where the xgrammar matcher is built (see F-4.2a).
+    """
+    rf = payload.response_format
+    if isinstance(rf, dict) and rf.get("type") == "json_schema":
+        json_schema = rf.get("json_schema")
+        if isinstance(json_schema, dict):
+            schema = json_schema.get("schema")
+            if isinstance(schema, dict):
+                return {"kind": "json_schema", "schema": schema}
+    if isinstance(payload.extra_body, dict):
+        grammar = payload.extra_body.get("grammar")
+        if isinstance(grammar, dict):
+            return grammar
+    return None
 
 
 def _openai_profile_for_model(model_id: str | None) -> ModelProfile | None:
@@ -394,6 +424,9 @@ def register_openai_compat_routes(
         )
         if chat_template_kwargs:
             params["chat_template_kwargs"] = chat_template_kwargs
+        grammar_spec = _grammar_from_openai_payload(payload)
+        if grammar_spec is not None:
+            params["grammar"] = grammar_spec
         reasoning_policy = _openai_reasoning_trace_policy(payload, profile=profile)
         session_id = session_id_from_request(request)
         if session_id is not None:

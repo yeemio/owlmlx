@@ -1,0 +1,41 @@
+{
+  "schema_version": "f4.1.promotion_review_verdict.v1",
+  "phase": "f4-1-lane-promotion-review",
+  "gate": "two prerequisites for promoting the lane partial_candidate -> source-of-truth partial",
+  "prereq_1a_fresh_repeat": {
+    "requirement": "re-run the F-4.3 lane (different wall-clock sampling) at N>=1000, hard_break==0",
+    "run_original": {
+      "source": "files/evidence/owlmlx/bench/structured-output-invariance/20260529T070431Z-f4-3-grammar-lane.jsonl",
+      "n": 1024,
+      "hard_break": 0,
+      "gen_err": 0
+    },
+    "run_repeat": {
+      "source": "files/evidence/owlmlx/bench/structured-output-invariance/20260529T105156Z-f4-3-grammar-lane-freshrepeat.jsonl",
+      "n": 1024,
+      "hard_break": 0,
+      "gen_err": 0
+    },
+    "pass": true,
+    "note": "temp=0.0 cells are greedy (deterministic across runs); temp=0.3 cells vary, so the repeat genuinely re-tests stochastic stability. Both runs 0/1024."
+  },
+  "prereq_1b_openai_surface": {
+    "requirement": "grammar must work through the OpenAI /v1/chat/completions surface, not just direct backend",
+    "wiring": "response_format json_schema (and extra_body.grammar) -> params['grammar'] -> kernel.generate_messages(**params) -> backend -> child runner",
+    "unit_tests": "tests/test_server_routes_openai.py: 4 new (helper x3 + route forwards grammar to backend)",
+    "real_model_smoke": "scripts/probe/f4_openai_surface_grammar_smoke.py: Qwen 27B via TestClient, response_format -> valid schema-conformant JSON",
+    "pass": true
+  },
+  "verdict": "both prerequisites PASS -> lane eligible for source-of-truth partial",
+  "promoted_label": "partial",
+  "label_scope": "structured-output grammar lane = families {json_schema_flat, enum_constrained} x models {qwen3.6-27b-4bit, qwen3.6-35b-a3b-4bit} x grammar-constrained (child-side xgrammar). Reachable via OpenAI response_format json_schema.",
+  "explicitly_excluded_from_partial": [
+    "F-4 overall (stays experimental)",
+    "the word 'supported' for any model or for F-4",
+    "thinking_tag_closed (residual: reasoning models don't close <think> in budget, §8.5)",
+    "function_call_arguments / nested_object at scale (fixed at N=16/cell §8.6, NOT yet N>=1000)",
+    "gemma-4-31b-it-4bit for the partial lane (degeneracy fixed small-N only)",
+    "models / families / surfaces not listed above"
+  ],
+  "banned_vocab_check": "no parity/production-ready/equivalent/beats/supported-overclaim in the label or doc"
+}
