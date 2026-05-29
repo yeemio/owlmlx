@@ -1,0 +1,28 @@
+{
+  "schema_version": "f4.3.gemma_bounded_verdict.v1",
+  "phase": "f4-3-gemma-degeneracy-fix",
+  "source": "files/evidence/owlmlx/bench/structured-output-invariance/20260529T104334Z-f4-3-gemma-bounded-remeasure.jsonl",
+  "fix": "Added maxLength=120 to free-text string fields in the function_call_arguments and nested_object grammar schemas, and tightened max_whitespace_cnt to 4 for both. maxLength forces xgrammar to require the closing quote after the bound (verified: a 60-char string is rejected at maxLength=40), killing gemma's in-string repetition loop; the whitespace cap kills inter-token newline runs.",
+  "config": "grammar-on, max_tokens=256, 2 families x 3 models x 2 temps x 8 = 96",
+  "result": {
+    "sample_count": 96,
+    "hard_break_count": 0,
+    "generation_error_count": 0,
+    "finish_length_count": 0,
+    "by_family_model": {
+      "function_call_arguments|gemma-4-31b-it-4bit": "0/16",
+      "function_call_arguments|qwen3.6-27b-4bit": "0/16",
+      "function_call_arguments|qwen3.6-35b-a3b-4bit": "0/16",
+      "nested_object|gemma-4-31b-it-4bit": "0/16",
+      "nested_object|qwen3.6-27b-4bit": "0/16",
+      "nested_object|qwen3.6-35b-a3b-4bit": "0/16"
+    }
+  },
+  "before_after": {
+    "function_call_arguments_gemma": "F-4.2b 4/4 break -> 0/16",
+    "nested_object_gemma": "F-4.2b 3/4 break -> 0/16",
+    "qwen_regression_check": "both families still 0 break on both Qwen models (no regression)"
+  },
+  "verdict": "gemma token-level degeneracy on function_call + nested is FIXED by bounding string length and whitespace. Both families now pass on all three models at N=16/cell. This is a small-N demonstration of the fix, NOT a reliability claim: expanding the partial_candidate lane to include these families/models needs an N>=1000 run like F-4.3 (§8.4). No production runner/backend change; the fix is grammar-schema config in F4_FAMILY_GRAMMARS.",
+  "note_clean_lane_untouched": "json_schema_flat and enum_constrained schemas were NOT changed, so the committed F-4.3 N=1024 lane evidence (d7c1db0f) stays valid."
+}

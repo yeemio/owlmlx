@@ -470,3 +470,38 @@ def test_thinking_validator_still_breaks_on_bad_enum_after_envelope() -> None:
     out = '<think></think>{"final": "x", "confidence": "certain"}'
     result = validate_structured_output(family="thinking_tag_closed", output=out)
     assert result.hard_break is True
+
+
+# --- F-4 residual #3: bound gemma in-string / whitespace degeneracy ----------
+
+
+def _iter_string_props(schema):
+    """Yield every {"type":"string"} property subschema (recursive)."""
+    if isinstance(schema, dict):
+        if schema.get("type") == "string":
+            yield schema
+        for v in schema.values():
+            yield from _iter_string_props(v)
+    elif isinstance(schema, list):
+        for v in schema:
+            yield from _iter_string_props(v)
+
+
+def test_function_call_and_nested_grammars_bound_string_length() -> None:
+    from scripts.bench.structured_output_invariance import f4_family_grammar
+
+    for family in ("function_call_arguments", "nested_object"):
+        spec = f4_family_grammar(family)
+        # every free-text string field carries a maxLength bound (enum strings
+        # are already bounded by their enum, so they are exempt)
+        for prop in _iter_string_props(spec["schema"]):
+            if "enum" in prop:
+                continue
+            assert "maxLength" in prop, f"{family} string prop lacks maxLength: {prop}"
+
+
+def test_nested_grammar_tightens_whitespace_cap() -> None:
+    from scripts.bench.structured_output_invariance import f4_family_grammar
+
+    spec = f4_family_grammar("nested_object")
+    assert spec.get("max_whitespace_cnt", 16) <= 4

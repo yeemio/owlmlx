@@ -338,8 +338,9 @@ Two residual root causes (measured, not yet fixed):
    runs — hitting `max_tokens=128` (`finish_reason=length`) before the structure
    closes. The whitespace cap added this round (`max_whitespace_cnt=16`, see
    §8.1.1) fixed `enum_constrained` on gemma but not the deeper structures.
-   Gemma-specific (Qwen does not show it). Follow-up mitigations: tighter
-   whitespace cap, higher `max_tokens` for gemma, or a string-length bound.
+   **FIXED 2026-05-29 (§8.6):** adding `maxLength` to free-text string fields +
+   tightening the whitespace cap to 4 eliminates the degeneracy — both families
+   now pass 0/16 on all three models, no Qwen regression.
 
 This is NOT a reliability pass and produces NO promotion candidate. F-4 stays
 `experimental`. A `partial_candidate` discussion for the clean families
@@ -436,6 +437,31 @@ Evidence: `20260529T102738Z-f4-2-thinking-remeasure.{jsonl,rollup.jsonl}` +
 it stays a documented residual, OUT of the clean lane. Pushing `max_tokens`
 higher is diminishing-returns (reasoning length is unbounded) and not pursued.
 
+### 8.6 gemma degeneracy fix (2026-05-29) — FIXED at small N
+
+The §8.2.1 residual #2 (gemma in-string repetition + whitespace runs on
+`function_call_arguments` / `nested_object`) is resolved by bounding the
+grammar:
+
+- `maxLength` (120) on free-text string fields in both schemas. xgrammar
+  enforces it (a 60-char string is rejected at `maxLength=40`), forcing the
+  closing quote and killing the `"/////lllll"` loop.
+- `max_whitespace_cnt=4` per-family for both, killing inter-token newline runs.
+
+Both changes are grammar-schema config in `F4_FAMILY_GRAMMARS`; no production
+runner/backend change. The clean-lane schemas (`json_schema_flat`,
+`enum_constrained`) are untouched, so the F-4.3 N=1024 evidence stays valid.
+
+Re-measure (grammar-on, max_tokens 256, 2 families × 3 models × 2 temps × 8 =
+96): **0/96 hard breaks, 0 finish=length.** function_call_arguments gemma
+4/4→0/16, nested_object gemma 3/4→0/16, no Qwen regression. Evidence
+`20260529T104334Z-f4-3-gemma-bounded-remeasure.{jsonl,rollup.jsonl}` +
+`-gemma-bounded-verdict.json`.
+
+This is a small-N demonstration that the fix works, NOT a reliability claim.
+Folding `function_call_arguments` + `nested_object` (now clean on all three
+models) into the `partial_candidate` lane requires an N≥1000 run like §8.4.
+
 ## 9. Validator Contract Additions
 
 The F-4 validator (`scripts/bench/structured_output_invariance.py`) gains
@@ -501,3 +527,4 @@ reason to gate on them.
 | 2026-05-29 | F-4.2b grammar matrix ran (§8.2.1): hard breaks 59→20 (0.983→0.333), 0 generation errors. Grammar fully fixes json_schema_flat + enum_constrained, substantially helps function_call_arguments + nested_object. Two residual root causes measured: thinking_tag_closed trigger mismatch (`<think>` vs `</thinking>`, all models) and gemma token-level degeneracy at max_tokens. Added `max_whitespace_cnt` cap (fixed gemma enum). Bench `--grammar` mode + per-family grammar specs + TDD helper tests. NOT a reliability pass; F-4 stays experimental. | Post-probe session (with user direction) |
 | 2026-05-29 | F-4.3 narrow reliability lane defined (§8.4, pre-registered gate + claim ceiling) and ran (§8.4.1): json_schema_flat + enum_constrained on Qwen 27B + 35B-A3B, N=1024, hard_break_count=0, generation_error_count=0 — all 8 cells uniformly clean. Lane-pass → the structured-JSON/enum grammar-constrained lane is a `partial_candidate` (lane-scoped only; NOT F-4-wide, NOT supported). Added `--families` filter (TDD). thinking_tag + gemma stay excluded as residuals. | Post-probe session (with user direction) |
 | 2026-05-29 | thinking_tag residual investigated (§8.5). Two false causes corrected — validator now tolerates the native `<think>` channel (TDD), grammar removed for thinking_tag (structural tag backfires per diagnose probe). Real residual isolated: reasoning models don't close `<think>` in budget (42/48 unclosed at max_tokens=512). NOT salvaged; stays a residual out of the clean lane. | Post-probe session (with user direction) |
+| 2026-05-29 | gemma degeneracy FIXED (§8.6): maxLength=120 on free-text strings + max_whitespace_cnt=4 for function_call_arguments + nested_object. Re-measure 0/96 hard breaks on all three models (gemma function_call 4/4→0/16, nested 3/4→0/16, no Qwen regression). Small-N demonstration; clean-lane schemas untouched (F-4.3 evidence stays valid). TDD: 2 schema-bound tests. | Post-probe session (with user direction) |

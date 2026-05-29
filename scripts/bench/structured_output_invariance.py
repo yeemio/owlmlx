@@ -819,6 +819,10 @@ F4_FAMILY_GRAMMARS: dict[str, dict[str, Any]] = {
     },
     "function_call_arguments": {
         "kind": "json_schema",
+        # maxLength bounds the free-text "target" string + a tight whitespace
+        # cap: gemma-4-31b degenerates inside string values ("/////lllll") and
+        # in whitespace runs, hitting max_tokens before closing (F-4 residual #3).
+        "max_whitespace_cnt": 4,
         "schema": {
             "type": "object",
             "properties": {
@@ -829,7 +833,7 @@ F4_FAMILY_GRAMMARS: dict[str, dict[str, Any]] = {
                 "arguments": {
                     "type": "object",
                     "properties": {
-                        "target": {"type": "string"},
+                        "target": {"type": "string", "maxLength": 120},
                         "risk_level": {
                             "type": "string",
                             "enum": ["low", "medium", "high"],
@@ -845,20 +849,23 @@ F4_FAMILY_GRAMMARS: dict[str, dict[str, Any]] = {
     },
     "nested_object": {
         "kind": "json_schema",
+        # See function_call note: bound free-text strings + tight whitespace cap
+        # to contain gemma-4-31b degeneracy in the deeper nested structure.
+        "max_whitespace_cnt": 4,
         "schema": {
             "type": "object",
             "properties": {
                 "diagnosis": {
                     "type": "object",
                     "properties": {
-                        "root_cause": {"type": "string"},
+                        "root_cause": {"type": "string", "maxLength": 120},
                         "evidence": {
                             "type": "array",
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "source": {"type": "string"},
-                                    "summary": {"type": "string"},
+                                    "source": {"type": "string", "maxLength": 120},
+                                    "summary": {"type": "string", "maxLength": 120},
                                 },
                                 "required": ["source", "summary"],
                                 "additionalProperties": False,
