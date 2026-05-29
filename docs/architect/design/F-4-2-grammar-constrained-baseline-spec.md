@@ -128,14 +128,41 @@ reasoning envelope.
 | `nested_object` (§5.3) | nested JSON | `compile_json_schema` | low |
 | `enum_constrained` (§5.4) | JSON w/ enums | `compile_json_schema` (enums map to grammar alternation) | low |
 | `function_call_arguments` (§5.2) | tool-call arg object | `compile_json_schema`; consider xgrammar `openai_tool_call_schema` module | medium — verify the module shape matches the F-4 case |
-| `thinking_tag_closed` (§5.5) | `<think>…</think>{json}` | xgrammar `StructuralTag` (free text inside the think envelope, constrained JSON after) | **high — must verify StructuralTag covers this; else fall back** |
+| `thinking_tag_closed` (§5.5) | `<thinking>…</thinking>{json}` | xgrammar structural tag: `StructuralTagItem(begin="</thinking>", schema, end="")` triggered on `</thinking>` | resolved — see §4.1 |
 
 F-4.2a MUST verify, with a 1-sample probe per family, that the chosen grammar
-construction compiles and constrains correctly BEFORE the full matrix run. If
-`thinking_tag_closed` cannot be expressed as a structural tag, the fallback is:
-constrain only the post-envelope JSON via a second matcher started after the
-`</think>` token is observed, and record this as a known limitation. Do NOT
-silently drop the family from the matrix.
+construction compiles and constrains correctly BEFORE the full matrix run.
+
+### 4.1 Per-family construction verification (done 2026-05-29, model-free)
+
+This verification was run ahead of code-grade as a model-free grammar
+compile + `accept_string` check (no 35B load, no generation): for each family,
+compile the grammar, then confirm a known-good exemplar is accepted and a
+known-bad exemplar is rejected.
+
+- Probe: [`../../scripts/probe/f4_grammar_per_family_verify.py`](../../scripts/probe/f4_grammar_per_family_verify.py)
+- Evidence: `files/evidence/owlmlx/bench/structured-output-invariance/20260529T024253Z-f4-2-per-family-grammar-verify.json`
+
+Result: `all_families_pass=true`.
+
+| Family | Construction | good accepted | bad rejected |
+|---|---|---|---|
+| `json_schema_flat` | `compile_json_schema` | ✓ | ✓ |
+| `function_call_arguments` | `compile_json_schema` | ✓ | ✓ |
+| `nested_object` | `compile_json_schema` | ✓ | ✓ |
+| `enum_constrained` | `compile_json_schema` | ✓ | ✓ |
+| `thinking_tag_closed` | `compile_structural_tag([StructuralTagItem(begin="</thinking>")], ["</thinking>"])` | ✓ | ✓ |
+
+So the §4 central risk is resolved: `thinking_tag_closed` IS expressible as a
+structural tag, no post-envelope-fallback needed. Caveat for code-grade: the
+2-arg `compile_structural_tag(tags, triggers)` form is documented as
+deprecated in xgrammar 0.2.1 (the non-deprecated path is the `StructuralTag`
+pydantic class, which in 0.2.1 exposes only `{type, format}`). F-4.2a should
+prefer the `StructuralTag`-class form if the begin/end envelope can be
+expressed there, and pin xgrammar in the `grammar-experimental` extras so the
+legacy form does not vanish under an upgrade without notice. This verification
+is model-free; it proves grammar *shape* correctness, not end-to-end generation
+(that is F-4.2b's job, and is already proven for `json_schema_flat`).
 
 ## 5. Request / Response Contract
 
@@ -305,3 +332,4 @@ reason to gate on them.
 | Date | Change | By |
 |---|---|---|
 | 2026-05-28 | Initial F-4.2 design-grade spec. Pivots F-4.2 from the prompt-only stratified matrix (F-4 spec §4.3) to a grammar-constrained baseline, justified by the `probe-positive` verdict. Resolves the three §12.1 unresolved problems at design level (child-side matcher; accept numpy bridge + record degradation; add `grammar-experimental` extras). Flags the per-family grammar strategy as the central design risk (thinking_tag_closed needs a structural tag). Authored in the same session as the probe per user direction; honesty caveat recorded in the header and §12. | Post-probe session (with user direction) |
+| 2026-05-29 | Added §4.1: model-free per-family grammar construction verification (`all_families_pass=true`). Resolves the §4 central risk — `thinking_tag_closed` is expressible via `compile_structural_tag([StructuralTagItem(begin="</thinking>")], ["</thinking>"])`; no post-envelope fallback needed. Downgraded the family-table risk column accordingly. Recorded the deprecated-2arg-form caveat for code-grade. Evidence `20260529T024253Z-f4-2-per-family-grammar-verify.json`. | Post-probe session (with user direction) |

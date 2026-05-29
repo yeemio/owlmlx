@@ -1,0 +1,104 @@
+{
+  "schema_version": "f4.2.per_family_grammar_verify.v1",
+  "phase": "f4-2-per-family-grammar-verify",
+  "ts_utc": "20260529T024253Z",
+  "model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B-4bit",
+  "vocab_size": 248320,
+  "xgrammar_version": "0.2.1",
+  "model_free": true,
+  "all_families_pass": true,
+  "families": {
+    "json_schema_flat": {
+      "kind": "json_schema",
+      "compiled": true,
+      "construction": "compile_json_schema",
+      "good_exemplar": {
+        "accepted": true,
+        "terminated_after": false,
+        "completed_after": true,
+        "error": null
+      },
+      "bad_exemplar": {
+        "accepted": false,
+        "terminated_after": false,
+        "completed_after": false,
+        "error": null
+      },
+      "family_pass": true
+    },
+    "function_call_arguments": {
+      "kind": "json_schema",
+      "compiled": true,
+      "construction": "compile_json_schema",
+      "good_exemplar": {
+        "accepted": true,
+        "terminated_after": false,
+        "completed_after": true,
+        "error": null
+      },
+      "bad_exemplar": {
+        "accepted": false,
+        "terminated_after": false,
+        "completed_after": false,
+        "error": null
+      },
+      "family_pass": true
+    },
+    "nested_object": {
+      "kind": "json_schema",
+      "compiled": true,
+      "construction": "compile_json_schema",
+      "good_exemplar": {
+        "accepted": true,
+        "terminated_after": false,
+        "completed_after": true,
+        "error": null
+      },
+      "bad_exemplar": {
+        "accepted": false,
+        "terminated_after": false,
+        "completed_after": false,
+        "error": null
+      },
+      "family_pass": true
+    },
+    "enum_constrained": {
+      "kind": "json_schema",
+      "compiled": true,
+      "construction": "compile_json_schema",
+      "good_exemplar": {
+        "accepted": true,
+        "terminated_after": false,
+        "completed_after": true,
+        "error": null
+      },
+      "bad_exemplar": {
+        "accepted": false,
+        "terminated_after": false,
+        "completed_after": false,
+        "error": null
+      },
+      "family_pass": true
+    },
+    "thinking_tag_closed": {
+      "kind": "structural_tag",
+      "compiled": true,
+      "construction": "compile_structural_tag([StructuralTagItem], [trigger]) legacy-2arg",
+      "good_exemplar": {
+        "accepted": true,
+        "terminated_after": false,
+        "completed_after": true,
+        "error": null
+      },
+      "bad_exemplar": {
+        "accepted": false,
+        "terminated_after": false,
+        "completed_after": true,
+        "error": null
+      },
+      "family_pass": true
+    }
+  },
+  "notes": "Model-free grammar compile + accept_string verification. The enum_constrained family schema contains 'supported' as a fixture ENUM VALUE; that is not a capability claim about any owlmlx model. End-to-end constrained generation is proven separately for json_schema_flat by 20260528T063524Z-f4-grammar-feasibility-probe.",
+  "design_risk_resolved": "F-4.2 design spec §4 per-family grammar strategy: confirms which families compile via compile_json_schema and whether thinking_tag_closed is expressible via compile_structural_tag."
+}
