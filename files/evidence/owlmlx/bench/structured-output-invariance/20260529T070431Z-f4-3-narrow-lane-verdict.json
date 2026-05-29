@@ -1,0 +1,81 @@
+{
+  "schema_version": "f4.3.narrow_lane_verdict.v1",
+  "phase": "f4-3-narrow-reliability-lane",
+  "lane_source": "files/evidence/owlmlx/bench/structured-output-invariance/20260529T070431Z-f4-3-grammar-lane.jsonl",
+  "lane_rollup": "files/evidence/owlmlx/bench/structured-output-invariance/20260529T070431Z-f4-3-grammar-lane-rollup.jsonl",
+  "scope": {
+    "models": [
+      "qwen3.6-27b-4bit",
+      "qwen3.6-35b-a3b-4bit"
+    ],
+    "families": [
+      "json_schema_flat",
+      "enum_constrained"
+    ],
+    "temperatures": [
+      0.0,
+      0.3
+    ],
+    "chunk_tokens": 2048,
+    "grammar": "xgrammar json_schema, child-side, max_whitespace_cnt=16",
+    "cells": "2 models x 2 families x 2 temps = 8 cells x 128 samples"
+  },
+  "pre_registered_gate": {
+    "sample_count": ">=1000",
+    "hard_break_count": "==0",
+    "generation_error_count": "==0"
+  },
+  "result": {
+    "sample_count": 1024,
+    "hard_break_count": 0,
+    "generation_error_count": 0,
+    "parse_failed_count": 0,
+    "schema_failed_count": 0,
+    "diagnostic_variant_count": 0,
+    "per_cell": {
+      "enum_constrained|qwen3.6-27b-4bit|t0.0": {
+        "n": 128,
+        "breaks": 0
+      },
+      "enum_constrained|qwen3.6-27b-4bit|t0.3": {
+        "n": 128,
+        "breaks": 0
+      },
+      "enum_constrained|qwen3.6-35b-a3b-4bit|t0.0": {
+        "n": 128,
+        "breaks": 0
+      },
+      "enum_constrained|qwen3.6-35b-a3b-4bit|t0.3": {
+        "n": 128,
+        "breaks": 0
+      },
+      "json_schema_flat|qwen3.6-27b-4bit|t0.0": {
+        "n": 128,
+        "breaks": 0
+      },
+      "json_schema_flat|qwen3.6-27b-4bit|t0.3": {
+        "n": 128,
+        "breaks": 0
+      },
+      "json_schema_flat|qwen3.6-35b-a3b-4bit|t0.0": {
+        "n": 128,
+        "breaks": 0
+      },
+      "json_schema_flat|qwen3.6-35b-a3b-4bit|t0.3": {
+        "n": 128,
+        "breaks": 0
+      }
+    },
+    "gate_pass": true
+  },
+  "verdict": "lane-pass",
+  "claim_ceiling": "A clean pass licenses ONLY this: the structured-JSON / enum grammar-constrained lane -- families json_schema_flat and enum_constrained, on qwen3.6-27b-4bit and qwen3.6-35b-a3b-4bit, with child-side xgrammar constraint -- is a partial_candidate at N=1024, hard_break_count=0. This does NOT make F-4 overall partial, and NEVER supported. It does not generalize to other families, other models, longer outputs, or the OpenAI surfaces.",
+  "explicitly_excluded": {
+    "thinking_tag_closed": "F-4 residual: <think> vs </thinking> trigger mismatch (see §8.2.1).",
+    "function_call_arguments": "not in this lane; F-4.2b showed gemma degeneracy, Qwen was clean but unverified at N>=1000.",
+    "nested_object": "not in this lane; gemma degeneracy + 1 Qwen sampling break at small N.",
+    "gemma-4-31b-it-4bit": "excluded entirely; token-level degeneracy is a separate residual."
+  },
+  "note_supported_enum": "The enum_constrained schema contains 'supported' as a fixture enum value; the model emitting it is schema-conformance, not a capability claim about any owlmlx model.",
+  "honesty": "promotion_candidate in the rollup remains False (the bench never auto-promotes). 'partial_candidate' here is a lane-scoped human judgment gated on the pre-registered criteria, recorded for a later source-of-truth promotion review -- not an automatic or F-4-wide label change. Run done in the same session as the whole F-4.2/4.3 arc per user direction."
+}

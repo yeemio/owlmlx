@@ -415,6 +415,25 @@ def load_smoke_cases(path: str | Path = DEFAULT_CASES_PATH) -> list[dict[str, An
     return cases
 
 
+def _filter_cases_by_family(
+    cases: list[dict[str, Any]],
+    families: tuple[str, ...] | None,
+) -> list[dict[str, Any]]:
+    """Keep only cases whose family is in ``families`` (None = keep all).
+
+    Used by the F-4.3 narrow reliability lane to restrict the matrix to the
+    clean families. Raises on an unknown family so a typo cannot silently
+    produce an empty plan.
+    """
+    if not families:
+        return cases
+    unknown = [f for f in families if f not in ALLOWED_FAMILIES]
+    if unknown:
+        raise ValueError(f"unknown F-4 families requested: {unknown}")
+    wanted = set(families)
+    return [case for case in cases if case.get("family") in wanted]
+
+
 def build_smoke_plan(
     *,
     cases: list[Mapping[str, Any]],
@@ -964,11 +983,12 @@ def run_smoke_matrix(
     timeout_s: float,
     python_executable: str | None = None,
     grammar_enabled: bool = False,
+    families: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     from owlmlx.runtime.mlx_lm_subprocess_backend import MlxLmSubprocessBackend
 
     created_at = _now_iso_utc()
-    smoke_cases = load_smoke_cases(cases)
+    smoke_cases = _filter_cases_by_family(load_smoke_cases(cases), families)
     plan = build_smoke_plan(
         cases=smoke_cases,
         models=models,
@@ -1089,6 +1109,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="F-4.2b: constrain each cell with its per-family grammar spec",
     )
+    parser.add_argument(
+        "--families",
+        nargs="*",
+        default=None,
+        help="F-4.3: restrict the matrix to these families (default: all)",
+    )
     return parser.parse_args(argv)
 
 
@@ -1113,6 +1139,7 @@ def main(argv: list[str] | None = None) -> int:
             timeout_s=args.timeout_s,
             python_executable=args.python_executable,
             grammar_enabled=args.grammar,
+            families=tuple(args.families) if args.families else None,
         )
         print(json.dumps(result, sort_keys=True))
         return 0 if result["graduates"]["measurement_harness"] else 1

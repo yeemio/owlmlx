@@ -349,6 +349,64 @@ Only if F-4.2b shows a clean per-family pass: rerun with a different seed,
 same models/temperatures, to confirm stability before any source-of-truth
 promotion review. Promotion review itself is a later, separate round.
 
+### 8.4 F-4.3 — Narrow Reliability Lane (bench-grade, N≥1000)
+
+Rather than chase the two F-4.2b residuals (thinking_tag trigger mismatch,
+gemma degeneracy), F-4.3 drives a deliberately **narrow** lane to hard
+evidence. Scope decided by the user 2026-05-29; the gate is pre-registered
+here BEFORE the run so the result interpretation is fixed in advance.
+
+**Lane scope (only this):**
+
+- Models: `qwen3.6-27b-4bit`, `qwen3.6-35b-a3b-4bit` (Qwen only; gemma excluded — its degeneracy is a separate residual).
+- Families: `json_schema_flat`, `enum_constrained` (the two F-4.2b families that hit 0 breaks on Qwen).
+- Temperatures: 0.0, 0.3. Chunk: 2048.
+- N ≥ 1000 total across the lane (8 cells × samples_per_family; 2×2×2 cells).
+
+**Pre-registered gate:**
+
+| Metric | Threshold |
+|---|---|
+| `sample_count` | ≥ 1000 |
+| `hard_break_count` | **0** |
+| `generation_error_count` | **0** |
+
+**Claim ceiling (hard rule):** a clean pass licenses ONLY the statement that
+the *structured-JSON / enum grammar-constrained lane* (these two families, on
+these two Qwen models, grammar-on) is a `partial_candidate`. It does NOT make
+F-4 overall `partial`, and NEVER `supported`. `thinking_tag_closed` and gemma
+remain explicitly out of this lane and are tracked as F-4 residual follow-ups.
+Any non-zero hard break or generation error fails the lane and forbids the
+`partial_candidate` wording.
+
+Run: `--phase smoke --grammar --families json_schema_flat enum_constrained
+--models qwen3.6-27b-4bit qwen3.6-35b-a3b-4bit --temperatures 0.0 0.3
+--samples-per-family 128` (8 cells × 128 = 1024 rows).
+
+#### 8.4.1 F-4.3 results (run 2026-05-29) — lane-pass
+
+- Evidence: `20260529T070431Z-f4-3-grammar-lane.{jsonl,rollup.jsonl}`
+- Verdict: `20260529T070431Z-f4-3-narrow-lane-verdict.json`
+
+| Metric | Gate | Result |
+|---|---|---|
+| `sample_count` | ≥ 1000 | **1024** |
+| `hard_break_count` | 0 | **0** |
+| `generation_error_count` | 0 | **0** |
+
+All 8 cells uniformly clean (128 each, 0 breaks); `parse_failed=0`,
+`schema_failed=0`, `diagnostic_variant_count=0`. The pre-registered gate
+passes.
+
+**Verdict (within the claim ceiling above):** the structured-JSON / enum
+grammar-constrained lane — `json_schema_flat` + `enum_constrained`, on
+`qwen3.6-27b-4bit` + `qwen3.6-35b-a3b-4bit`, child-side xgrammar — is a
+`partial_candidate` at N=1024 with zero hard breaks. This is NOT an F-4-wide
+label change and NOT `supported`; the rollup `promotion_candidate` flag stays
+`False` (the bench never auto-promotes). Promoting this lane to a
+source-of-truth `partial` label is a separate review round with its own
+evidence bar (e.g. fresh-seed repeat per §8.3, OpenAI-surface coverage).
+
 ## 9. Validator Contract Additions
 
 The F-4 validator (`scripts/bench/structured_output_invariance.py`) gains
@@ -412,3 +470,4 @@ reason to gate on them.
 | 2026-05-29 | Added §4.1: model-free per-family grammar construction verification (`all_families_pass=true`). Resolves the §4 central risk — `thinking_tag_closed` is expressible via `compile_structural_tag([StructuralTagItem(begin="</thinking>")], ["</thinking>"])`; no post-envelope fallback needed. Downgraded the family-table risk column accordingly. Recorded the deprecated-2arg-form caveat for code-grade. Evidence `20260529T024253Z-f4-2-per-family-grammar-verify.json`. | Post-probe session (with user direction) |
 | 2026-05-29 | F-4.2a code-grade landed (§8.1.1): child-side grammar builder + tokenizer resolver + wiring in `mlx_lm_runner.py`, `grammar-experimental` extras, TDD test (7 tests, caught a real tokenizer-unwrap bug), and an end-to-end backend-IPC smoke (control breaks, grammar yields valid JSON). Backend needed no change — kwargs already forward into params. Authored same-session per user direction. | Post-probe session (with user direction) |
 | 2026-05-29 | F-4.2b grammar matrix ran (§8.2.1): hard breaks 59→20 (0.983→0.333), 0 generation errors. Grammar fully fixes json_schema_flat + enum_constrained, substantially helps function_call_arguments + nested_object. Two residual root causes measured: thinking_tag_closed trigger mismatch (`<think>` vs `</thinking>`, all models) and gemma token-level degeneracy at max_tokens. Added `max_whitespace_cnt` cap (fixed gemma enum). Bench `--grammar` mode + per-family grammar specs + TDD helper tests. NOT a reliability pass; F-4 stays experimental. | Post-probe session (with user direction) |
+| 2026-05-29 | F-4.3 narrow reliability lane defined (§8.4, pre-registered gate + claim ceiling) and ran (§8.4.1): json_schema_flat + enum_constrained on Qwen 27B + 35B-A3B, N=1024, hard_break_count=0, generation_error_count=0 — all 8 cells uniformly clean. Lane-pass → the structured-JSON/enum grammar-constrained lane is a `partial_candidate` (lane-scoped only; NOT F-4-wide, NOT supported). Added `--families` filter (TDD). thinking_tag + gemma stay excluded as residuals. | Post-probe session (with user direction) |

@@ -391,3 +391,40 @@ def test_run_generation_cell_omits_grammar_when_none() -> None:
     }
     _run_generation_cell(backend=_FakeBackend(), cell=cell, max_tokens=8)
     assert "grammar" not in captured["kwargs"]
+
+
+# --- F-4.3 narrow-lane family filter ----------------------------------------
+
+
+def test_filter_cases_by_family_keeps_only_requested() -> None:
+    from scripts.bench.structured_output_invariance import _filter_cases_by_family
+
+    cases = [
+        {"case_id": "a", "family": "json_schema_flat", "prompt": "p"},
+        {"case_id": "b", "family": "enum_constrained", "prompt": "p"},
+        {"case_id": "c", "family": "thinking_tag_closed", "prompt": "p"},
+    ]
+    kept = _filter_cases_by_family(cases, ("json_schema_flat", "enum_constrained"))
+    assert [c["case_id"] for c in kept] == ["a", "b"]
+
+
+def test_filter_cases_by_family_none_keeps_all() -> None:
+    from scripts.bench.structured_output_invariance import _filter_cases_by_family
+
+    cases = [
+        {"case_id": "a", "family": "json_schema_flat", "prompt": "p"},
+        {"case_id": "c", "family": "thinking_tag_closed", "prompt": "p"},
+    ]
+    assert _filter_cases_by_family(cases, None) == cases
+
+
+def test_filter_cases_by_family_unknown_family_raises() -> None:
+    import pytest as _pytest
+
+    from scripts.bench.structured_output_invariance import _filter_cases_by_family
+
+    with _pytest.raises(ValueError):
+        _filter_cases_by_family(
+            [{"case_id": "a", "family": "json_schema_flat", "prompt": "p"}],
+            ("does_not_exist",),
+        )
