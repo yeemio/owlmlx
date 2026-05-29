@@ -143,20 +143,51 @@ def _parse_json_envelope(output: str) -> tuple[bool, Any | None, bool]:
 
 
 def _parse_thinking_envelope(output: str) -> tuple[bool, Any | None, bool, list[str]]:
+    """Parse a closed-thinking-envelope-then-JSON output.
+
+    Tolerates reasoning models that emit their NATIVE ``<think>...</think>``
+    channel (from the chat template) before — or instead of — the literal
+    ``<thinking>`` envelope the prompt requests. Both ``<think>`` and
+    ``<thinking>`` count as a closed reasoning envelope; any number of leading
+    closed envelopes are stripped, then the remaining text is validated as a
+    JSON envelope. The family still requires at least one *closed* reasoning
+    envelope, and an opened-but-unclosed reasoning tag is a hard break.
+
+    Rationale: a reasoning model's native ``<think>...</think>`` IS a closed
+    thinking envelope; the earlier validator rejected it as extra prose, which
+    misclassified correct output (see f4_thinking_tag_diagnose probe).
+    """
     failures: list[str] = []
-    stripped = output.strip()
-    open_count = stripped.count("<thinking>")
-    close_count = stripped.count("</thinking>")
-    if open_count != close_count or open_count == 0:
+    text = output.strip()
+    # Balanced-count unclosed check for both the native <think> channel and the
+    # requested <thinking> envelope. ("<think>" is not a substring of
+    # "<thinking>" — the trailing '>' differs — so the two never cross-count.)
+    if text.count("<think>") != text.count("</think>") or text.count(
+        "<thinking>"
+    ) != text.count("</thinking>"):
         _append_unique(failures, "thinking_tag_unclosed")
         return False, None, False, failures
-    if not stripped.startswith("<thinking>"):
-        parse_ok, value, extra_prose = _parse_json_envelope(stripped)
-        return parse_ok, value, extra_prose, failures
-
-    close_marker = "</thinking>"
-    _, after = stripped.split(close_marker, 1)
-    parse_ok, value, extra_prose = _parse_json_envelope(after)
+    if text.count("</think>") + text.count("</thinking>") == 0:
+        # The family requires at least one closed reasoning envelope; bare JSON
+        # with no thinking block does not satisfy it.
+        _append_unique(failures, "thinking_tag_unclosed")
+        return False, None, False, failures
+    # Strip LEADING closed reasoning envelopes (native or requested). These are
+    # not "extra prose". Anything else before the JSON (real prose, or an
+    # envelope preceded by prose) is left for _parse_json_envelope to flag as
+    # extra_prose_outside_envelope.
+    rest = text
+    while True:
+        matched = False
+        for open_tag, close_tag in (("<thinking>", "</thinking>"), ("<think>", "</think>")):
+            if rest.startswith(open_tag):
+                close_idx = rest.find(close_tag)
+                rest = rest[close_idx + len(close_tag):].lstrip()
+                matched = True
+                break
+        if not matched:
+            break
+    parse_ok, value, extra_prose = _parse_json_envelope(rest)
     return parse_ok, value, extra_prose, failures
 
 
@@ -873,28 +904,16 @@ F4_FAMILY_GRAMMARS: dict[str, dict[str, Any]] = {
             "additionalProperties": False,
         },
     },
-    "thinking_tag_closed": {
-        "kind": "structural_tag",
-        "begin": "</thinking>",
-        "end": "",
-        "schema": {
-            "type": "object",
-            "properties": {
-                "final": {"type": "string"},
-                "confidence": {
-                    "type": "string",
-                    "enum": ["low", "medium", "high"],
-                },
-            },
-            "required": ["final", "confidence"],
-            "additionalProperties": False,
-        },
-    },
+    # thinking_tag_closed is intentionally absent: the f4_thinking_tag_diagnose
+    # probe showed the structural-tag constraint backfires (the </thinking>
+    # trigger never fires on the model's native <think> channel, and the
+    # constraint drives generation into a runaway). It is run prompt-only; a
+    # tolerant validator (_parse_thinking_envelope) accepts the native channel.
 }
 
 
 def f4_family_grammar(family: str) -> dict[str, Any] | None:
-    """Return the grammar spec for an F-4 family, or None if unknown."""
+    """Return the grammar spec for an F-4 family, or None if unknown / prompt-only."""
     return F4_FAMILY_GRAMMARS.get(family)
 
 

@@ -325,9 +325,12 @@ Two residual root causes (measured, not yet fixed):
    the trigger never fires and the JSON is never constrained
    (`extra_prose_outside_envelope`). This is a fixture/family-premise mismatch,
    not a grammar-engine limit — the model-free §4.1 verify passed because it was
-   fed the ideal `<thinking>…</thinking>{json}` exemplar. Fix (deferred to a
-   follow-up): redesign the family to trigger on the model's actual reasoning
-   tag, or align the fixture envelope.
+   fed the ideal `<thinking>…</thinking>{json}` exemplar.
+   **Investigated and reframed 2026-05-29 (§8.5).** Two false causes were
+   corrected (validator strictness, grammar backfire); the true residual is
+   that reasoning models do not reliably *close* their native `<think>` channel
+   within the token budget. thinking_tag stays a residual, out of the clean
+   lane.
 
 2. **gemma `function_call_arguments` / `nested_object`.** `gemma-4-31b-it-4bit`
    degenerates at the token level inside grammar-free fields — repeated
@@ -407,6 +410,32 @@ label change and NOT `supported`; the rollup `promotion_candidate` flag stays
 source-of-truth `partial` label is a separate review round with its own
 evidence bar (e.g. fresh-seed repeat per §8.3, OpenAI-surface coverage).
 
+### 8.5 thinking_tag residual investigation (2026-05-29) — reframed, not salvaged
+
+Diagnosis probe `scripts/probe/f4_thinking_tag_diagnose.py` (3 arms on Qwen
+35B) plus a 48-sample re-measure found that the F-4.2b thinking_tag failure had
+**three** causes, two of them false:
+
+1. **Validator too strict (false cause, FIXED).** `_parse_thinking_envelope`
+   required a literal `<thinking>` start and rejected the model's native
+   `<think>…</think>` channel as `extra_prose`. It now tolerates any leading
+   *closed* reasoning envelope (native `<think>` or requested `<thinking>`),
+   still flags real prose, still breaks on unclosed/bad-enum. Unit-tested.
+2. **Grammar backfires (false cause, REMOVED).** The structural-tag `</thinking>`
+   trigger never fires on the native `<think>` channel and the constraint sent
+   generation into a 2000+ char runaway. `thinking_tag_closed` is removed from
+   `F4_FAMILY_GRAMMARS` (now prompt-only).
+3. **Real residual (UNFIXED).** Even prompt-only at `max_tokens=512` with the
+   corrected validator, 42/48 samples are `thinking_tag_unclosed` with
+   `finish_reason=length`: the reasoning models do not reliably *close* their
+   native `<think>` reasoning within the budget at temp 0/0.3. Break rate moved
+   only ~100% → ~88%.
+
+Evidence: `20260529T102738Z-f4-2-thinking-remeasure.{jsonl,rollup.jsonl}` +
+`-thinking-residual-verdict.json`. Verdict: thinking_tag is **not salvaged**;
+it stays a documented residual, OUT of the clean lane. Pushing `max_tokens`
+higher is diminishing-returns (reasoning length is unbounded) and not pursued.
+
 ## 9. Validator Contract Additions
 
 The F-4 validator (`scripts/bench/structured_output_invariance.py`) gains
@@ -471,3 +500,4 @@ reason to gate on them.
 | 2026-05-29 | F-4.2a code-grade landed (§8.1.1): child-side grammar builder + tokenizer resolver + wiring in `mlx_lm_runner.py`, `grammar-experimental` extras, TDD test (7 tests, caught a real tokenizer-unwrap bug), and an end-to-end backend-IPC smoke (control breaks, grammar yields valid JSON). Backend needed no change — kwargs already forward into params. Authored same-session per user direction. | Post-probe session (with user direction) |
 | 2026-05-29 | F-4.2b grammar matrix ran (§8.2.1): hard breaks 59→20 (0.983→0.333), 0 generation errors. Grammar fully fixes json_schema_flat + enum_constrained, substantially helps function_call_arguments + nested_object. Two residual root causes measured: thinking_tag_closed trigger mismatch (`<think>` vs `</thinking>`, all models) and gemma token-level degeneracy at max_tokens. Added `max_whitespace_cnt` cap (fixed gemma enum). Bench `--grammar` mode + per-family grammar specs + TDD helper tests. NOT a reliability pass; F-4 stays experimental. | Post-probe session (with user direction) |
 | 2026-05-29 | F-4.3 narrow reliability lane defined (§8.4, pre-registered gate + claim ceiling) and ran (§8.4.1): json_schema_flat + enum_constrained on Qwen 27B + 35B-A3B, N=1024, hard_break_count=0, generation_error_count=0 — all 8 cells uniformly clean. Lane-pass → the structured-JSON/enum grammar-constrained lane is a `partial_candidate` (lane-scoped only; NOT F-4-wide, NOT supported). Added `--families` filter (TDD). thinking_tag + gemma stay excluded as residuals. | Post-probe session (with user direction) |
+| 2026-05-29 | thinking_tag residual investigated (§8.5). Two false causes corrected — validator now tolerates the native `<think>` channel (TDD), grammar removed for thinking_tag (structural tag backfires per diagnose probe). Real residual isolated: reasoning models don't close `<think>` in budget (42/48 unclosed at max_tokens=512). NOT salvaged; stays a residual out of the clean lane. | Post-probe session (with user direction) |

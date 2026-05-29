@@ -317,14 +317,14 @@ def test_f4_family_grammar_json_schema_families() -> None:
         assert spec["schema"]["type"] == "object"
 
 
-def test_f4_family_grammar_thinking_tag_is_structural_tag() -> None:
+def test_f4_family_grammar_thinking_tag_is_prompt_only() -> None:
     from scripts.bench.structured_output_invariance import f4_family_grammar
 
-    spec = f4_family_grammar("thinking_tag_closed")
-    assert spec is not None
-    assert spec["kind"] == "structural_tag"
-    assert spec["begin"] == "</thinking>"
-    assert spec["schema"]["type"] == "object"
+    # The f4_thinking_tag_diagnose probe showed the structural tag BACKFIRES:
+    # the trigger does not fire on the model's native <think> channel and the
+    # constraint sends generation into a runaway. thinking_tag is therefore run
+    # prompt-only (no grammar); a tolerant validator handles the native channel.
+    assert f4_family_grammar("thinking_tag_closed") is None
 
 
 def test_run_generation_cell_passes_grammar_when_enabled() -> None:
@@ -428,3 +428,45 @@ def test_filter_cases_by_family_unknown_family_raises() -> None:
             [{"case_id": "a", "family": "json_schema_flat", "prompt": "p"}],
             ("does_not_exist",),
         )
+
+
+# --- F-4 residual #2: thinking_tag validator tolerates native reasoning -------
+
+
+def test_thinking_validator_accepts_native_think_prefix_then_envelope() -> None:
+    from scripts.bench.structured_output_invariance import validate_structured_output
+
+    # Reasoning model emits its native <think></think> first, then the requested
+    # <thinking>...</thinking>{json}. This is the real Qwen control-arm shape.
+    out = (
+        "<think>\n\n</think>\n\n"
+        '<thinking>processed</thinking>{"final": "ok", "confidence": "high"}'
+    )
+    result = validate_structured_output(family="thinking_tag_closed", output=out)
+    assert result.hard_break is False, result.failure_codes
+
+
+def test_thinking_validator_accepts_native_think_envelope_then_json() -> None:
+    from scripts.bench.structured_output_invariance import validate_structured_output
+
+    # Native closed reasoning envelope IS a closed thinking envelope; trailing
+    # JSON should validate without requiring a literal <thinking> tag.
+    out = '<think>reasoning here</think>{"final": "done", "confidence": "low"}'
+    result = validate_structured_output(family="thinking_tag_closed", output=out)
+    assert result.hard_break is False, result.failure_codes
+
+
+def test_thinking_validator_still_breaks_on_unclosed_reasoning() -> None:
+    from scripts.bench.structured_output_invariance import validate_structured_output
+
+    out = '<think>rambling with no close and no json'
+    result = validate_structured_output(family="thinking_tag_closed", output=out)
+    assert result.hard_break is True
+
+
+def test_thinking_validator_still_breaks_on_bad_enum_after_envelope() -> None:
+    from scripts.bench.structured_output_invariance import validate_structured_output
+
+    out = '<think></think>{"final": "x", "confidence": "certain"}'
+    result = validate_structured_output(family="thinking_tag_closed", output=out)
+    assert result.hard_break is True

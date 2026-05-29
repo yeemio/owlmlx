@@ -1,0 +1,24 @@
+{
+  "schema_version": "f4.2.thinking_residual_verdict.v1",
+  "phase": "f4-2-thinking-tag-residual",
+  "remeasure_source": "files/evidence/owlmlx/bench/structured-output-invariance/20260529T102738Z-f4-2-thinking-remeasure.jsonl",
+  "config": "prompt-only (grammar removed), max_tokens=512, 3 models x 2 temps x 8 = 48",
+  "result": {
+    "sample_count": 48,
+    "hard_break_count": 42,
+    "hard_break_rate": 0.875,
+    "thinking_tag_unclosed_count": 42,
+    "finish_length_count": 42,
+    "by_model": {
+      "gemma-4-31b-it-4bit": "16/16",
+      "qwen3.6-27b-4bit": "12/16",
+      "qwen3.6-35b-a3b-4bit": "14/16"
+    }
+  },
+  "what_was_fixed": [
+    "Validator: _parse_thinking_envelope now tolerates the model's NATIVE <think>...</think> channel as a closed reasoning envelope (was rejected as extra_prose). Genuine correctness fix, unit-tested. This removed a FALSE cause.",
+    "Grammar: thinking_tag_closed removed from the grammar lane (f4_family_grammar -> None). The f4_thinking_tag_diagnose probe showed the structural-tag </thinking> trigger never fires on the native <think> channel and drives generation into a runaway. Removed a SECOND false cause."
+  ],
+  "real_residual": "Even prompt-only at max_tokens=512 with the corrected validator, 42/48 samples are thinking_tag_unclosed and 42/48 hit finish_reason=length: the reasoning models do not reliably CLOSE their <think> reasoning within the token budget at temp 0/0.3. That is the dominant cause, not the validator or grammar. The single empty-<think></think> success in the diagnosis was not representative.",
+  "verdict": "thinking_tag_closed is NOT salvaged. #2 corrected two false causes (validator strictness, grammar backfire) and isolated the true one (reasoning models do not close their native channel in budget). It stays a documented F-4 residual and remains OUT of the clean reliability lane. Break rate moved only ~100% -> ~88%, confirming the dominant cause was the reasoning-length problem all along."
+}
