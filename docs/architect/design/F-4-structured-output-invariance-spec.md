@@ -565,6 +565,10 @@ generalise the verdict to `function_call_arguments`, `nested_object`,
 `enum_constrained`, or `thinking_tag_closed` families, nor to Qwen 27B
 or Gemma 31B.
 
+The design-grade follow-up that turns this probe into a production path is
+[`F-4-2-grammar-constrained-baseline-spec.md`](F-4-2-grammar-constrained-baseline-spec.md),
+which supersedes the prompt-only §4.3 definition of F-4.2.
+
 ---
 
 ## 13. References
