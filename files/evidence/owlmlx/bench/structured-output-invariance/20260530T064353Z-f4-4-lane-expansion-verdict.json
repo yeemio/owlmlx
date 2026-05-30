@@ -1,0 +1,80 @@
+{
+  "schema_version": "f4.4.lane_expansion_verdict.v1",
+  "phase": "f4-4-grammar-lane-expansion",
+  "lane_source": "files/evidence/owlmlx/bench/structured-output-invariance/20260530T064353Z-f4-4-lane-expansion.jsonl",
+  "lane_rollup": "files/evidence/owlmlx/bench/structured-output-invariance/20260530T064353Z-f4-4-lane-expansion-rollup.jsonl",
+  "scope": {
+    "models": [
+      "qwen3.6-27b-4bit",
+      "qwen3.6-35b-a3b-4bit"
+    ],
+    "families": [
+      "function_call_arguments",
+      "nested_object"
+    ],
+    "temperatures": [
+      0.0,
+      0.3
+    ],
+    "chunk_tokens": 2048,
+    "grammar": "xgrammar json_schema, child-side, maxLength=120 on free-text strings + max_whitespace_cnt=4 (the #3 bounds)",
+    "cells": "2 models x 2 families x 2 temps = 8 cells x 128 samples"
+  },
+  "pre_registered_gate": {
+    "sample_count": ">=1000",
+    "hard_break_count": "==0",
+    "generation_error_count": "==0"
+  },
+  "result": {
+    "sample_count": 1024,
+    "hard_break_count": 0,
+    "generation_error_count": 0,
+    "parse_failed_count": 0,
+    "schema_failed_count": 0,
+    "diagnostic_variant_count": 0,
+    "per_cell": {
+      "function_call_arguments|qwen3.6-27b-4bit|t0.0": {
+        "n": 128,
+        "breaks": 0
+      },
+      "function_call_arguments|qwen3.6-27b-4bit|t0.3": {
+        "n": 128,
+        "breaks": 0
+      },
+      "function_call_arguments|qwen3.6-35b-a3b-4bit|t0.0": {
+        "n": 128,
+        "breaks": 0
+      },
+      "function_call_arguments|qwen3.6-35b-a3b-4bit|t0.3": {
+        "n": 128,
+        "breaks": 0
+      },
+      "nested_object|qwen3.6-27b-4bit|t0.0": {
+        "n": 128,
+        "breaks": 0
+      },
+      "nested_object|qwen3.6-27b-4bit|t0.3": {
+        "n": 128,
+        "breaks": 0
+      },
+      "nested_object|qwen3.6-35b-a3b-4bit|t0.0": {
+        "n": 128,
+        "breaks": 0
+      },
+      "nested_object|qwen3.6-35b-a3b-4bit|t0.3": {
+        "n": 128,
+        "breaks": 0
+      }
+    },
+    "gate_pass": true
+  },
+  "verdict": "lane-pass",
+  "claim_ceiling": "A clean pass licenses ONLY this: the grammar-constrained partial lane now also covers families function_call_arguments + nested_object, on qwen3.6-27b-4bit + qwen3.6-35b-a3b-4bit, with child-side xgrammar (the #3 maxLength + whitespace bounds), at N=1024 with hard_break_count=0. It does NOT make F-4 overall partial, and NEVER supported. It does not generalize to gemma, to other families, to longer outputs, or to temperatures/surfaces outside this scope.",
+  "explicitly_excluded": {
+    "thinking_tag_closed": "F-4 residual; reasoning models don't close <think> in budget (spec §8.5). Out of scope this round.",
+    "gemma-4-31b-it-4bit": "not in this round's lane scope; small-N fixed only. Wave 5 only measures, admission is a later review.",
+    "F-4 overall": "stays experimental; this is a feature-lane label only."
+  },
+  "note_supported_enum": "The enum_constrained schema contains 'supported' as a fixture enum value; it is not in this round's families and is never a capability claim.",
+  "honesty": "structured_output_invariance_promotion_candidate in the rollup stays False (the bench never auto-promotes). The source-of-truth lane label is edited by hand only on a clean pass. Run executed in a session separate from the F-4 grammar arc (d3d8273e..991cb391), per the fresh-session grade-transition discipline; the run was fully detached (os.setsid) so it survived session idle to reach N=1024."
+}

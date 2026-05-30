@@ -487,6 +487,39 @@ label and its strict scope/exclusions live in the source-of-truth doc
 `structured-output-grammar-lane.md`. F-4 overall stays `experimental`;
 `supported` is claimed nowhere.
 
+### 8.8 F-4.4 lane expansion (2026-05-30) — function_call + nested at N≥1000, lane-pass
+
+The §8.6 small-N fix (0/16) for `function_call_arguments` + `nested_object` was
+validated at scale, mirroring the §8.4 lane gate. Pre-registered gate (fixed
+before the run, identical to §8.4): `sample_count≥1000`, `hard_break_count==0`,
+`generation_error_count==0`.
+
+Run: `--phase smoke --grammar --families function_call_arguments nested_object
+--models qwen3.6-27b-4bit qwen3.6-35b-a3b-4bit --temperatures 0.0 0.3
+--samples-per-family 128 --max-tokens 256` (8 cells × 128 = 1024 rows), with the
+bounded grammar (maxLength=120 + max_whitespace_cnt=4, §8.6) in force.
+
+| Metric | Gate | Result |
+|---|---|---|
+| `sample_count` | ≥ 1000 | **1024** |
+| `hard_break_count` | 0 | **0** |
+| `generation_error_count` | 0 | **0** |
+
+All 8 cells uniformly clean (128 each, 0 breaks); `parse_failed=0`,
+`schema_failed=0`, `diagnostic_variant_count=0`. Evidence
+`20260530T064353Z-f4-4-lane-expansion.{jsonl,rollup.jsonl}` + `-verdict.json`.
+The rollup `structured_output_invariance_promotion_candidate` stays `False` (the
+bench never auto-promotes).
+
+**Verdict (the §8.4 claim ceiling, extended to these families):** the
+grammar-constrained `partial` lane now also covers `function_call_arguments` +
+`nested_object` on `qwen3.6-27b-4bit` + `qwen3.6-35b-a3b-4bit`; the source-of-
+truth `structured-output-grammar-lane.md` §2 is updated accordingly. This is NOT
+an F-4-wide change and NOT `supported`. **gemma stays excluded** on these
+families (its §8.6 fix is small-N only, unvalidated at N≥1000); `thinking_tag_closed`
+remains a residual (§8.5). Run executed in a session separate from the F-4 arc,
+fully detached (`os.setsid`) so it survived session idle to reach N=1024.
+
 ## 9. Validator Contract Additions
 
 The F-4 validator (`scripts/bench/structured_output_invariance.py`) gains
@@ -554,3 +587,4 @@ reason to gate on them.
 | 2026-05-29 | thinking_tag residual investigated (§8.5). Two false causes corrected — validator now tolerates the native `<think>` channel (TDD), grammar removed for thinking_tag (structural tag backfires per diagnose probe). Real residual isolated: reasoning models don't close `<think>` in budget (42/48 unclosed at max_tokens=512). NOT salvaged; stays a residual out of the clean lane. | Post-probe session (with user direction) |
 | 2026-05-29 | gemma degeneracy FIXED (§8.6): maxLength=120 on free-text strings + max_whitespace_cnt=4 for function_call_arguments + nested_object. Re-measure 0/96 hard breaks on all three models (gemma function_call 4/4→0/16, nested 3/4→0/16, no Qwen regression). Small-N demonstration; clean-lane schemas untouched (F-4.3 evidence stays valid). TDD: 2 schema-bound tests. | Post-probe session (with user direction) |
 | 2026-05-29 | #1 lane promotion review (§8.7): fresh-seed repeat (2nd N=1024 run, 0 breaks) + OpenAI-surface coverage (response_format→grammar wired in server_routes_openai.py, 4 route tests + real-model smoke). Both passed → lane promoted `partial_candidate`→`partial` in source-of-truth `structured-output-grammar-lane.md` (feature-lane label; F-4 overall stays experimental; supported claimed nowhere). | Post-probe session (with user direction) |
+| 2026-05-30 | F-4.4 lane expansion (§8.8): `function_call_arguments` + `nested_object` validated at N=1024 on Qwen 27B + 35B-A3B (8 cells 128/0, hard_break_count=0, generation_error_count=0; bounded grammar §8.6 in force). Lane-pass → folded into the source-of-truth `partial` lane §2 for the two Qwen models. gemma stays excluded (small-N only); thinking_tag still residual. Label unchanged (`partial`, feature-lane); F-4 overall stays experimental; supported claimed nowhere. Run in a session separate from the F-4 arc, fully detached (os.setsid) to survive session idle across the ~50-min N=1024 run. | Fresh-session executor (with user direction) |
