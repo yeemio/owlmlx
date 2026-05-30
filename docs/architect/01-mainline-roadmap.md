@@ -435,7 +435,7 @@
 | # | 条件 | 对应 Campaign | 估计达成时点 |
 |---|---|---|---|
 | RC1 | ≥3 主线 model family N≥20 repeatability 证据 | A + C + D | 6–9 月 |
-| RC2 | ≥1 owlmlx native-only 能力（非 wrapping mlx_lm） | B（session KV）+ F（spec safety on native）+ D（DS4 native MTP） | 9–12 月 |
+| RC2 | ≥1 owlmlx 自有、超出 stock `mlx_lm`（load+generate）的能力（建在 `mlx_lm` 之上但提供其不具备的能力；措辞修正见 `product-definition.md §11.4`） | B（session KV）+ F（spec safety on native）+ D（DS4 native MTP） | 9–12 月 |
 | RC3 | OwlOps 稳定消费 live runtime truth 并形成内部 operational 闭环 | E | 6–9 月 |
 
 **全部 3 条同时满足最早合理窗口**：**2026-11 ~ 2027-01**（6–8 个月）。

@@ -172,6 +172,15 @@ It also freezes the cache checkpoint boundary:
 
 ## 5. Current Dominant Gap
 
+> **⚠️ Point-in-time / superseded (flagged 2026-05-30 audit).** This section's
+> "dominant gap = `cache_scheduler_depth`" and "next executable mainline = native
+> MLX backend feasibility" are STALE. Native MLX backend feasibility (B-1 →
+> B-1.3) is complete; `native-mlx-backend-capability-matrix.md` §7 redirects
+> beyond it. Current active campaigns are F-1 / F-4 / B-1c (see
+> `runtime-capability-matrix.md` + `master-outline.md` §8.5). The terminal-notice
+> sentinel-chain decomposition below is historical phase-45 detail, not the live
+> selector. Do not use this section to pick the next mainline.
+
 `cache_scheduler_depth` now becomes the dominant locally reducible gap on the
 current environment:
 

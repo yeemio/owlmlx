@@ -23,6 +23,13 @@ Each gap identifies:
 
 Before listing gaps, this is what owlmlx already owns:
 
+> **⚠️ Snapshot caveat (flagged 2026-05-30 audit).** This table is a 2026-04-10
+> Round-1 snapshot; some module citations predate the Stage-1 (2026-05-11)
+> archival. Notably row 2 `runtime_status.py` was archived to
+> `archive/spec-layer-v0/`; that capability is now backed by
+> `RuntimeKernel.status_dict()` (see `runtime-capability-matrix.md`). Treat module
+> paths here as historical and verify current backing against the capability matrix.
+
 | # | Capability | Module / Doc | Status |
 |---|---|---|---|
 | 1 | Runtime identity + architecture truth | 20 source-of-truth docs | supported |

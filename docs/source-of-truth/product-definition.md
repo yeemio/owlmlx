@@ -330,8 +330,10 @@ Campaign 簇：
 | RC | 条件 | 对应 Campaign | 估计达成时点 |
 |---|---|---|---|
 | RC1 | 至少 3 条主线 model family 有 N≥20 重复运行证据 | Campaign A + C + D | 6–9 月 |
-| RC2 | 至少一个 owlmlx native-only 能力（非 wrapping mlx_lm） | Campaign B（session KV）+ Campaign F（spec on native）+ Campaign D（DS4 native MTP） | 9–12 月 |
+| RC2 | 至少一个 owlmlx 自有、超出 stock `mlx_lm`（仅 load+generate）的 runtime 能力——可建在 `mlx_lm` 之上但提供其不具备的能力（如跨请求 session-KV 复用 / grammar 约束解码 / native MTP） | Campaign B（session KV）+ Campaign F（spec on native）+ Campaign D（DS4 native MTP） | 9–12 月 |
 | RC3 | OwlOps 稳定消费 live runtime truth 并形成内部 operational 闭环 | Campaign E | 6–9 月 |
+
+> **RC2 措辞修正（2026-05-30）**：原表述"非 wrapping mlx_lm"不准确——owlmlx 的原生后端本身就 wrap 了 `mlx_lm.stream_generate`（见 `native-mlx-backend-capability-matrix.md` 的 `decode_step` 行，已标 `supported`），且 Mac 上的 runtime 普遍建在 MLX / `mlx_lm` 之上。RC2 的真实门槛是"owlmlx **自有、超出 stock `mlx_lm` 的 load+generate** 的能力"，不是"不用 `mlx_lm`"。grammar 约束 lane（F-4，`partial`）与 session-KV 复用是符合该定义的候选；是否满足 RC2 仍走单独 review，不在此自动判定。
 
 具体 Wave / Gate 路线见 `docs/architect/01-mainline-roadmap.md §V`。本节
 **不**承诺时点；任何加速尝试不得通过越级 promotion 实现（promotion 仍走

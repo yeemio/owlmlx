@@ -99,6 +99,16 @@ The same payload is also visible at:
 
 ## 6. Promotion Gate
 
+> **⚠️ Gate superseded (flagged 2026-05-30 audit).** The flat gate below predates
+> the B-1c framework. The live promotion gate is **B-1a + B-1b + B-1c §1 + B-1c §2**
+> together (the §1a Promotion Gate). B-1c §2 (≥24h aggregate soak + ≥6 model
+> swaps, every segment wall-clock-gap-free) is currently **`blocked` on
+> measurement continuity** (host-sleep wall-clock gaps), with the
+> runtime/allocator functionally passing. See `runtime-capability-matrix.md`
+> (session-KV row) + `docs/architect/design/B-1c-section-2-spec.md` §11. The
+> `experimental` label below is still correct; the *criteria* below are not the
+> current ones.
+
 The capability remains `experimental` until all of the following are true:
 
 - 24h soak with `OWLMLX_SESSION_CACHE_ENABLED=1` and mixed 1-10 sessions
