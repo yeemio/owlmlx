@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec + fake/schema runner landed; native §2 runner landed; token-boundary cache drops are closed, but Qwen-only accounting probes show 352 MB active-memory drift is explained only by a diagnostic positive-delta upper bound, so aggregate runs remain paused pending precise working-set accounting or bounded prompt-growth policy
+> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed AND the prompt-reset bounded-window policy resolved the drift (171.7 MB < 200 MiB budget, trim bypasses 173→3, validated across one real swap boundary). Functional stability criteria (§7 #2/#6/#7/#8/#9) pass. §2 promotion is now blocked on **measurement continuity** — system sleep produces wall-clock gaps inside long segments on this shared Mac — plus the 24h / 6-swap aggregate volume. See §11 Blocker Taxonomy (2026-05-30)
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -566,3 +566,66 @@ Close the gap-free swap-bearing proof gap before resuming aggregate evidence:
 5. Aggregate only gap-free, hard-failure-free segment rollups.
 6. Require cumulative duration >= 24h and aggregate swap count >= 6 before
    `soak_plus_swap_stability=passed`.
+
+## 11. Blocker Taxonomy (2026-05-30)
+
+Closeout review after the F-4 mainline. Maps the current state to the §7 pass
+criteria and classifies what blocks `soak_plus_swap_stability = passed`. The
+runtime / allocator layer is functionally clean; the dominant blocker is
+measurement infrastructure, not code.
+
+### B1 — Runtime / allocator stability: PASS (functional)
+
+The prompt-reset bounded-window policy
+(`reset_to_base_prompt_when_max_chars_exceeded`) closes the drift and trim
+blockers. Latest swap-bearing segment (`20260525T061019Z`, one real swap):
+
+- `max_drift_bytes = 171704320` ≤ `209715200` (200 MiB) ✓
+- `session_cache_drops / expirations / rejects = 0` ✓
+- `session_cache_trim_bypasses_total = 3` (was 173) ✓
+- `swap_boundaries_clean = true`, every unload OK ✓
+- `fatal_watermark_count = 0`, `unresolved_reclaim_barrier_events = 0` ✓
+- `ledger_gap_free = true`, session mix balanced (238 / 238 / 238) ✓
+
+§7 criteria #2, #6, #7, #8, #9 satisfied. No open runtime / allocator defect.
+
+### B2 — Measurement continuity: BLOCKED (system sleep) ← dominant blocker
+
+The same segment fails §7 #5 (`measurement_wall_clock_gap_free`): 6 gaps, max
+7064.873 s. Ledger-timestamp forensics:
+
+- sample 702 @ `10:08:43Z` → sample 703 @ `12:06:28Z` = ~1h58m with no samples,
+  then 703 / 704 / 705 emitted within the same second (catch-up burst).
+
+That freeze-then-instant-resume signature is **system sleep** (the process was
+frozen; timers fired together on wake), not a swap-induced stall (which would
+trickle) and not a runtime hang. `tmux + caffeinate -i` did not prevent it
+(lid-close / battery / manual sleep defeats `-i`). Because §3/§5 disqualify
+wall-clock gaps *inside* a segment, any sleep event during a segment voids that
+segment as aggregate input. **This is environmental — it cannot be fixed in
+`session_kv_cache.py`.**
+
+### B3 — Aggregate volume: BLOCKED (downstream of B2)
+
+§7 #3 (≥24h aggregate) and #4 (≥6 swaps) are unmet (latest: ~4h, 1 swap). They
+cannot accumulate while B2 keeps voiding segments. Not an independent blocker;
+resolves once B2 yields repeatable gap-free segments.
+
+### Route forward (no runtime code change implied)
+
+1. **Eliminate sleep for the segment window**: `caffeinate -dimsu` on AC power,
+   lid open; or `sudo pmset` to disable sleep for the window; keep the machine
+   unused during a segment.
+2. **Run segments only in confirmed-awake windows**, aggregate via the §2
+   interrupted route (each segment internally gap-free; segment *boundaries* are
+   allowed). Recommended `6 × 4h`, one swap per segment (§5, §10).
+3. **Dedicated always-on host** is the clean long-term route; a shared personal
+   Mac is not a reliable 24h-soak measurement environment.
+4. Do **not** relax §7 #5 — the gap-free requirement is correct; the fix is
+   keeping the machine awake, not tolerating gaps.
+
+### What this does NOT change
+
+Session KV cache stays `experimental`; `session_kv_supported = false`; the bench
+never auto-promotes. B1 passing is a functional observation of the §7 functional
+criteria — not a promotion, and not a cross-runtime or readiness claim.
