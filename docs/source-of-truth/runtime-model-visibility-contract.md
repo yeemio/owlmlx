@@ -135,6 +135,7 @@ This contract deliberately does **not** own:
 - product catalog membership
 - onboarding or provider policy
 - "currently loaded" backend inventory
+- feature-capability lanes (e.g. the grammar-constrained structured-output `partial` lane) — tracked in `runtime-capability-matrix.md` and `structured-output-grammar-lane.md`, not in model visibility
 
 Those remain outside this runtime contract unless explicitly absorbed later.
 

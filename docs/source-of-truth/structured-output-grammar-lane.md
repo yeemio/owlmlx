@@ -75,7 +75,25 @@ function_call_arguments/nested_object: 1 run, F-4.4).
   actual reasoning close, larger/var token budget) before it can rejoin.
 - Additional models beyond the two Qwen variants.
 
-## 7. Change Log
+## 7. Next-stage entry
+
+F-4 closeout is complete (2026-05-30): the won lane is registered in
+`runtime-capability-matrix.md`, cross-referenced from
+`native-mlx-backend-capability-matrix.md` and the model-visibility contract's
+"does NOT own" list, with residuals isolated. F-4 results are archived clean, so
+the mainline is free to move. Options from here:
+
+- **Continue F-4** (structured-output depth): gemma residual N≥1000 probe, or a
+  `thinking_tag_closed` reasoning-aware redesign (see §6).
+- **Switch mainline — runtime base**: B-1c session-kv / cache stability (B-1c §2
+  soak+swap still blocked on the drift budget).
+- **Switch mainline — product value**: wire the `function_call_arguments` /
+  `nested_object` lane into a real OwlCoda tool-call consumer.
+
+No further F-4 work is a precondition for switching; this entry exists so the
+next session can pick up cleanly.
+
+## 8. Change Log
 
 | Date | Change | By |
 |---|---|---|
