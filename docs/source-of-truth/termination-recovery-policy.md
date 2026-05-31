@@ -78,7 +78,7 @@ request-level non-recoverable cases. This intentional gap is recorded in
 | `load_failure` | `retry` | runtime-owned `load_failure` event recorded at `RuntimeKernel.load_model` boundary (excluding `invalid_request` preflight, `model_already_loaded`, and `memory_budget_exceeded`) |
 | `oom_class_failure` | `surface_to_coordinator` | runtime-owned `load_failure` event with `error_code = "memory_budget_exceeded"` (budget preflight failure) |
 | `host_forensics_anomaly` | `surface_to_coordinator` | `abort_recovery.snapshot()` reports `state == "contaminated"` or `recovery_required == True`, OR `runtime_status.summary.backend_healthy == False` |
-| `graceful_unload_failure` | `quarantine` | unresolved `owlmlx.reclaim_barrier_event` event (`failed_unload`, `failed_reclaim`, or `restart_unload_failed`) |
+| `graceful_unload_failure` | `quarantine` | unresolved `owlmlx.settle_barrier_event` event (`failed_unload`, `failed_reclaim`, or `restart_unload_failed`) |
 | `unknown` | `surface_to_coordinator` | no runtime-owned status payload, or no decisive cause active |
 
 When more than one cause is active, the dominant cause is selected by
@@ -161,7 +161,7 @@ fires.
 
 This contract:
 
-- consumes `owlmlx.reclaim_barrier_event` directly
+- consumes `owlmlx.settle_barrier_event` directly
 - consumes runtime-owned load-failure events from
   `runtime_status["load_failure"]`
 - consumes `runtime_status["summary"]["backend_healthy"]` for host

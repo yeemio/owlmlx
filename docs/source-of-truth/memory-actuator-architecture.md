@@ -48,6 +48,21 @@ The judgment-vs-actuator gap is the subject of this scaffold. The
 module **defines the actuator surface**; it does not change any
 production runtime path's behavior.
 
+> **Update (2026-05-09, `9f3c03c9`)**: the "owlmlx today calls none of
+> them" / "unload does not invoke `mx.clear_cache()`" framing above is the
+> pre-wiring C-3 scaffold state and is now stale. As of C-3.1/C-3.2/C-3.3
+> the actuator is wired into the native lifecycle: native `unload` calls
+> `actuator.release_single_model(...)` (`mlx_native_backend.py:799`), whose
+> single sanctioned site invokes `mlx_module.clear_cache()`
+> (`memory_actuator.py:293-297`); first load calls
+> `configure_allocator_floor(...)` (`mlx_native_backend.py:866`), which
+> applies `set_cache_limit` / `set_wired_limit` (`memory_actuator.py:415-423`);
+> and `UnloadResult` now carries **measured** `active_memory_freed_bytes` /
+> `cache_memory_freed_bytes` (`runtime/types.py:136-137`) alongside the
+> still-declared `freed_gb`. This wiring drove **no** capability-matrix
+> promotion — Line 3 stays `partial`. The scaffold narrative below is
+> retained as the as-authored C-3 record.
+
 ## 2. Status / Scope
 
 - Module: `owlmlx/memory_actuator.py` (this round adds it).
@@ -76,6 +91,13 @@ invokes `mx.clear_cache()`, `mx.set_cache_limit(...)`, or
 references but does not signal the allocator; the subprocess backend's
 `unload` truly frees memory only because subprocess termination tears
 down the address space. Neither path measures the allocator.
+
+> **Update (2026-05-09, `9f3c03c9`)**: stale for the native path — see the
+> §1 update. The native backend now routes `unload` through
+> `MemoryActuator.release_single_model` (the sole sanctioned
+> `clear_cache()` site) and configures the allocator floor on first load.
+> `memory_actuator.py` remains the single ownership point for these mlx
+> primitives; the paragraph above is the pre-wiring scaffold record.
 
 ## 4. Scaffold Contract
 
@@ -321,6 +343,14 @@ until a separate round can evaluate the dependency cost.
 
 ### 11.2 Native unload integration
 
+> **Update (2026-05-09, `9f3c03c9`)**: this follow-up has **landed** (C-3.1/
+> C-3.2). The native backend receives a `MemoryActuator` and calls
+> `release_single_model(...)` on the unload path
+> (`mlx_native_backend.py:799`); `UnloadResult` carries the measured
+> `active_memory_freed_bytes` / `cache_memory_freed_bytes` alongside the
+> declared `freed_gb` (`runtime/types.py:128/136-137`). The forward-looking
+> text below is retained as the original scaffold plan.
+
 `owlmlx/runtime/mlx_native_backend.py:314-335` will be modified in a
 follow-up round to receive a `MemoryActuator` (constructor injection)
 and call `release_single_model(...)` after dropping references. The
@@ -345,6 +375,14 @@ keeping `configure_allocator_floor`'s shape flat (no nested config
 blob).
 
 ## 12. What This Doc Does Not Claim
+
+> **Update (2026-05-09, `9f3c03c9`)**: the first two bullets below are
+> scoped to the C-3 scaffold round and are now superseded — the actuator
+> is wired into the native lifecycle and `mlx_native_backend.py` was
+> modified to route unload through it (see §1, §3, §11.2). The remaining
+> bullets (no matrix-row promotion; `pinned_models_never_evicted` not
+> enforced end-to-end; pressure-event seam not hooked to host pressure;
+> training governance deferred) still hold.
 
 - It does not claim the actuator releases memory. Releasing memory
   requires a real injected `mx` module, which the scaffold round

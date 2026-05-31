@@ -54,9 +54,19 @@ not collapsed in this round.
 | Explicit session KV reuse | `owlmlx/session_kv_cache.py` | default-off experimental store for explicit `(session_id, model_id)` cache reuse on the native backend only |
 | Legacy SSD / hot-cache schema | `owlmlx/cache_truth.py` | platform-shell-oriented cache profile + TurboQuant safety; not KV-cache-related |
 | Cache manager counters | `owlmlx/cache_manager.py` | declares the 5 live counter names; the older `cache_residency_evidence.py` scaffold is archived |
-| Pre-claim metadata / ticket staging | `owlmlx/cache_pre_claim_*.py` family (e.g. `cache_pre_claim_admission_contract.py:53-58`) | bounded metadata staging seam **before** gate claim; explicitly forbidden actions include `no_gate_claim_from_pre_claim_seam`, `no_child_exchange_from_pre_claim_seam`, `no_stream_start_from_pre_claim_seam`, `no_model_execution_from_pre_claim_seam` |
-| Pre-gate admission hook / cohort window | `owlmlx/cache_pre_gate_*.py` family | window feasibility, admission hook exactness; does not own KV cache lifetime |
-| Closure rung / counter feasibility / gap | `owlmlx/cache_closure_rung.py`, `owlmlx/cache_counter_*.py` | accounting truth surfaces; do not own KV cache lifetime |
+| Pre-claim metadata / ticket staging | `cache_pre_claim_*.py` family (e.g. `cache_pre_claim_admission_contract.py:53-58`), archived to `archive/spec-layer-v0/owlmlx/` | bounded metadata staging seam **before** gate claim; explicitly forbidden actions include `no_gate_claim_from_pre_claim_seam`, `no_child_exchange_from_pre_claim_seam`, `no_stream_start_from_pre_claim_seam`, `no_model_execution_from_pre_claim_seam` |
+| Pre-gate admission hook / cohort window | `cache_pre_gate_*.py` family, archived to `archive/spec-layer-v0/owlmlx/` | window feasibility, admission hook exactness; does not own KV cache lifetime |
+| Closure rung / counter feasibility / gap | `cache_closure_rung.py`, `cache_counter_*.py`, archived to `archive/spec-layer-v0/owlmlx/` | accounting truth surfaces; do not own KV cache lifetime |
+
+> **Update (2026-05-30)**: the Stage-1 spec-layer archival (`a6d32665` /
+> `a2bc5dd5`) moved the `cache_pre_claim_*`, `cache_pre_gate_*`,
+> `cache_closure_rung`, and `cache_counter_*` families to
+> `archive/spec-layer-v0/owlmlx/` (139 `cache_*.py` files now live there).
+> Only **4** `cache_*.py` files remain live in `owlmlx/`:
+> `cache_manager.py`, `cache_residency_tracker.py`,
+> `cache_scheduler_status.py`, and `cache_truth.py`. The original survey
+> sentence below (which counted 141 in `owlmlx/`) describes the pre-archival
+> tree and is retained for historical context.
 
 The 141 existing `cache_*.py` files in `owlmlx/` are surveyed by name and
 none of them own KV-cache lifetime: they are legacy schema, evidence /
@@ -231,10 +241,28 @@ will require:
 This scaffold deliberately skips all three by remaining unwired and not
 claiming any matrix transition.
 
+> **Update (2026-05-30)**: the "remaining unwired" framing above describes
+> the original C-1 scaffold round only. As of C-1.1 / C-1.2 (commit
+> `fc27a021`, 2026-05-12) `CacheManager` **is** wired into
+> `MlxNativeBackend`: `mlx_native_backend.py` imports it (`:37`),
+> instantiates `self._cache_manager = CacheManager()` (`:343`), acquires a
+> per-request handle via `acquire_for_request(...)` (`:412`), and releases
+> it via `release_for_request(...)` (`:677`). This wiring drove **no**
+> matrix-row promotion — the gate obligations (1)–(3) above remain the bar
+> for any status transition, which is still pending. §1 reflects this
+> as-built state.
+
 ## 9. What this doc does not claim
+
+> **Update (2026-05-30)**: the first bullet below was true for the C-1
+> scaffold round but is now stale — `CacheManager` was wired into
+> `MlxNativeBackend` in C-1.1 / C-1.2 (`fc27a021`); see the §8 update and
+> §1. The remaining bullets (no eviction / prefix reuse / cross-request
+> keying; no matrix-row promotion; no Line 5 closure) still hold.
 
 - it does **not** claim `cache_manager.py` is wired into
   `MlxNativeBackend` — the adapter remains untouched in this round
+  *(superseded — see the 2026-05-30 update above)*
 - it does **not** claim eviction, residency tracking beyond
   zero-baseline counters, prefix reuse, or cross-request handle keying
   exist

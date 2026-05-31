@@ -24,17 +24,36 @@ a follow-up round, executed one item at a time with operator review
 per hardening so that no `app.add_middleware(...)` call lands without
 a deliberate decision.
 
+> **Update (2026-05-09, `20645b7d` + `e339c774`)**: the follow-up wiring
+> rounds (D-1 `RequestIdMiddleware`, then D-2..D-6) have **landed**, so the
+> "primitives-only / does NOT modify `server.py` / does NOT install" framing
+> throughout §1–§3, §5, §7, §8 is now the pre-wiring scaffold record, not
+> the current state. As built, `create_app(...)` installs:
+> `RequestIdMiddleware` via `app.add_middleware(...)`
+> (`server.py:295`); a `GracefulShutdown` drain
+> (`server.py:491`); a unified unhandled-exception handler
+> (`app.add_exception_handler(...)`, `server.py:608`); a
+> `MetricsSnapshotExporter` (`server.py:562`) served at
+> `GET /metrics` (`server.py:1979`). **Still unwired**: the §5.2
+> per-request timeout + client-disconnect detection
+> (`asyncio.wait_for` / `Request.is_disconnected()`) remains a defined-but-
+> uninstalled primitive. This wiring drove **no** capability-matrix
+> promotion. The scaffold narrative below is retained as the as-authored
+> C-4 record; concrete code line anchors in §2 are refreshed inline.
+
 ## 2. Why This Module Exists
 
 The seven-line architectural assessment recorded in
 `docs/source-of-truth/native-mlx-backend-capability-matrix.md` §7
 identifies **Line 4 — Serving surface (`partial`)** as the lane the
 C-4 scaffold begins to close. Line 4 is `partial` today because the
-HTTP serving surface in `owlmlx/runtime/server.py` (a 2343-line
-FastAPI application built via `create_app(...)` at line 496, launched
+HTTP serving surface in `owlmlx/runtime/server.py` (a FastAPI
+application — ~2343 lines at scaffold-authoring time, 2056 lines as of
+2026-05-09 — built via `create_app(...)`, launched
 through `uvicorn.run(..., factory=True, ...)` in
-`scripts/runtime_technical_preview_server.py:101-107`) currently has
-**zero serving-surface hardening primitives installed**:
+`scripts/runtime_technical_preview_server.py:101-107`) at scaffold time
+had **zero serving-surface hardening primitives installed** (since wired
+— see the §1 update banner):
 
 - no middleware of any kind
 - no exception handlers (typed runtime errors today resolve to the
@@ -47,7 +66,10 @@ through `uvicorn.run(..., factory=True, ...)` in
 - no unified `x-request-id` propagation — caller-supplied ids are
   invisible to the runtime's own logs
 - no per-request timeout, no client-disconnect detection — the
-  `Condition.wait()` on `owlmlx/serving.py:417` is unbounded
+  `Condition.wait()` calls in `owlmlx/serving.py` (now at lines
+  193 / 300 / 456 / 599; the scaffold-time `:417` anchor has since
+  shifted) are unbounded. This hardening (§5.2) remains **unwired** as of
+  2026-05-09.
 
 The six minimum hardenings the scaffold defines, in the order this
 document discusses them, are:

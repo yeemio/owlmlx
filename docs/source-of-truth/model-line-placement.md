@@ -5,6 +5,11 @@
 > Program: owlmlx-platform-capability-absorption-and-convergence
 > Round: 3
 
+> **Note (2026-05-30)**: this is a frozen Round-3 (2026-04-10) placement
+> record. Model-line names current as of that round (e.g.
+> `Qwen3.5-35B-A3B-4bit` in §3.5 / §4) are retained verbatim as the
+> as-frozen record and are not retroactively renamed to later line names.
+
 ## 1. Purpose
 
 This document freezes the formal placement of each model line in the unified

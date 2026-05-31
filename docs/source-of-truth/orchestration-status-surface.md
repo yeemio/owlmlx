@@ -101,7 +101,7 @@ Current honest layer-assessment posture is:
   - `classification_status = partial`
   - recovery-barrier classification now comes from
     `recovery_supervisor_contract`, which consumes
-    `owlmlx.reclaim_barrier_event` cleanup-boundary failure events
+    `owlmlx.settle_barrier_event` cleanup-boundary failure events
     (failed unload, failed reclaim, restart unload stage failure) as a
     hard recovery barrier; the cause-to-action policy itself is frozen
     by `owlmlx.termination_recovery_policy` (`retry / quarantine /
@@ -121,7 +121,7 @@ Current honest layer-assessment posture is:
   - when `recovery_supervisor_contract` reports a hard recovery barrier
     such as backend unhealthy, restart exhausted, contaminated substrate,
     or `failed_reclaim_barrier` (any unresolved
-    `owlmlx.reclaim_barrier_event` cleanup-boundary failure)
+    `owlmlx.settle_barrier_event` cleanup-boundary failure)
 - `memory_pressure`
   - only when `memory_pressure_contract.summary.pressure_classification =
     "over_budget"`

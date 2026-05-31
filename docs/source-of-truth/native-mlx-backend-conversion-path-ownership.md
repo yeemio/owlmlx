@@ -9,7 +9,8 @@
 
 ## 1. Why This Document Exists
 
-owlmlx is a self-owned MLX runtime (`README.md` §"Project Definition"). Its
+owlmlx is a self-owned MLX runtime (identity contract recorded in
+`AGENTS.md:39` and `docs/source-of-truth/master-outline.md:225`). Its
 identity contract is explicit:
 
 > what `owlmlx` owns is identity, principles, governance, truth contracts,

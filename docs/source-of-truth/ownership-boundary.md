@@ -29,7 +29,7 @@ runtime truth must have exactly one truth owner.
 | # | Capability | Owner | Current Location | Absorption Status |
 |---|---|---|---|---|
 | R1 | Runtime identity and architecture | R | owlmlx docs | Already owned |
-| R2 | Runtime status schema validation | R | `owlmlx/runtime_status.py` | Already owned |
+| R2 | Runtime status schema validation | R | `owlmlx/runtime/types.py` (`RuntimeStatus`) + `owlmlx/runtime/kernel.py` (`status` / `status_dict`); legacy `runtime_status.py` validation helpers archived to `archive/spec-layer-v0/owlmlx/` (`1475e339`) | Already owned |
 | R3 | Generation gate (concurrency boundary) | R | `owlmlx/serving.py` | Already owned |
 | R4 | Large-weight serving status | R | `owlmlx/serving_status.py` | Already owned |
 | R5 | Training substrate contract | R | owlmlx docs | Already owned |

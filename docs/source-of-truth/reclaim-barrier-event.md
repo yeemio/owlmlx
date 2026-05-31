@@ -24,10 +24,10 @@ rules remain future 3.4 work.
 
 ## 2. Owned Contract
 
-`owlmlx/reclaim_barrier_event.py` now owns:
+`owlmlx/settle_barrier_event.py` now owns:
 
-- `build_reclaim_barrier_event(...)`
-- `reclaim_barrier_event_to_dict(...)`
+- `build_settle_barrier_event(...)`
+- `settle_barrier_event_to_dict(...)`
 
 Runtime transport surface:
 
@@ -36,7 +36,7 @@ Runtime transport surface:
 
 Contract:
 
-- `surface = "owlmlx.reclaim_barrier_event"`
+- `surface = "owlmlx.settle_barrier_event"`
 - `version = "v1"`
 
 Stable sections:

@@ -57,6 +57,16 @@ sequence of prompts on an admitted candidate without:
 
 None of the existing primitives owns that shape:
 
+> **Update (2026-05-30)**: three modules referenced below and in the §3
+> table — `heavy_weight_repeatability_status.py`,
+> `cache_repeatability_evidence.py`, and
+> `cache_runtime_observation_harness.py` — were since moved to
+> `archive/spec-layer-v0/owlmlx/` in the Stage-1 spec-layer archival
+> (`1475e339`); their `owlmlx/...` paths here are historical.
+> `host_pressure.py` and `comparative_evidence_*.py` remain live in
+> `owlmlx/`. This is an archived-scaffold doc; module descriptions are
+> retained as the as-authored record.
+
 - `owlmlx/heavy_weight_repeatability_status.py` is a rung-state machine
   over **declared** inputs (`supported_host_proof_visible`,
   `supported_host_repeat_runs`); it does not run a measurement loop.

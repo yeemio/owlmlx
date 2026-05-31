@@ -135,8 +135,8 @@ Measured on M5 Max 128 GB with gemma-4-31B-it (BF16, 30.7B params):
 | LoRA trainable params | 4.09M (0.013%, last 4 layers) |
 | Peak memory | 62 GB |
 | Memory headroom | 66 GB remaining |
-| Training throughput | 180–254 tokens/sec |
-| Loss trajectory | 10.7 → 6.1 (5 steps, gradient flowing correctly) |
+| Training throughput | 65 tokens/sec (pilot); 180–254 tokens/sec (viability test) |
+| Loss trajectory | 10.5 → 6.5 (5-step pilot; `10.506 → 6.480`, `3483afe4`) |
 
 ### 5.3 Scaling Potential
 

@@ -64,8 +64,18 @@ The following modules are owned by owlmlx for this path:
 | `GenerationGate` | `owlmlx/serving.py` | Queue-based single-worker generation discipline |
 | `build_large_weight_serving_status` | `owlmlx/serving_status.py` | Path-level runtime status shape |
 | `merge_specimen_identity` | `owlmlx/serving_status.py` | Specimen detail layered on path-level base |
-| `validate_runtime_status` | `owlmlx/runtime_status.py` | Schema validation for runtime status payloads |
-| `normalize_large_weight_runtime_status` | `owlmlx/runtime_status.py` | Payload normalization for large-weight path |
+| `validate_runtime_status` | `archive/spec-layer-v0/owlmlx/runtime_status.py` (archived `1475e339`) | Schema validation for runtime status payloads |
+| `normalize_large_weight_runtime_status` | `archive/spec-layer-v0/owlmlx/runtime_status.py` (archived `1475e339`) | Payload normalization for large-weight path |
+
+> **Update (2026-05-30)**: the last two rows cited a live
+> `owlmlx/runtime_status.py`, but that module was moved to
+> `archive/spec-layer-v0/owlmlx/runtime_status.py` in the Stage-1
+> spec-layer archival (`1475e339`); the two functions live there only. The
+> live runtime status surface is owned by `RuntimeStatus` in
+> `owlmlx/runtime/types.py` and `status` / `status_dict` on
+> `owlmlx/runtime/kernel.py` (different symbols — not a 1:1 rename of these
+> validation helpers). The first three rows above were verified live and
+> are unchanged.
 
 ## 4. Shell / Runtime Boundary
 

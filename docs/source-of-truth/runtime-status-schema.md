@@ -579,7 +579,7 @@ alongside `/v1/runtime/status` and is not part of the core status
 payload.
 
 - `GET /v1/runtime/reclaim-barrier-event`
-  - 200: read-only `owlmlx.reclaim_barrier_event` v1 contract
+  - 200: read-only `owlmlx.settle_barrier_event` v1 contract
     serialization
   - the route must not clear events, retry operations, or perform
     recovery

@@ -7,9 +7,15 @@
 
 ## TL;DR
 
+> **Update (2026-05-09, `90cefa5e`)**: `uv.lock` has since been committed
+> (it is now tracked in git). The "deliberately does not stage it yet" /
+> "follow-up operator action" wording throughout this doc predates that
+> commit and is retained as the as-authored 2026-05-08 record.
+
 - Project Python is **3.11.15**, pinned via `.python-version`
-- Toolchain is **uv**; `uv.lock` is the intended lock file, but this
-  landing slice deliberately does **not** stage it yet
+- Toolchain is **uv**; `uv.lock` is the lock file and is now committed
+  (`90cefa5e`); the original landing-slice wording below ("does not stage
+  it yet") predates that commit
 - All commands run **inside `.venv/`** — either via `uv run …` or
   `.venv/bin/python …`
 - The default shell `python3` on Apple Silicon machines often points to a
@@ -129,4 +135,5 @@ rows from `partial` to `supported`.
 - does not configure CI (CI lane spec is recommendation, not file)
 - does not auto-run `uv sync` — that is an operator action
 - does not stage `uv.lock`; that is reserved for the follow-up operator
-  action after `uv sync --extra runtime`
+  action after `uv sync --extra runtime` *(historical: `uv.lock` has since
+  been committed in `90cefa5e` — see the TL;DR update banner)*

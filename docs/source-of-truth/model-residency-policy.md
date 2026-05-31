@@ -117,7 +117,7 @@ It does not claim:
 - pressure-ranked eviction exists
 - TTL visibility equals full eviction policy closure
 - recovery policy is complete (cleanup-boundary failure events are now
-  recorded by `owlmlx.reclaim_barrier_event`, but resolution policy and
+  recorded by `owlmlx.settle_barrier_event`, but resolution policy and
   the four-class termination-cause recovery policy remain future
   release-floor `3.4` work; pinned TTL-expiry skips remain
   `ttl_expiry_blocked_by_pinning` in eviction history and are

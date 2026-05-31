@@ -1268,6 +1268,13 @@ release-readiness burn-down active floor is now
   `GET /v1/runtime/reclaim-barrier-event`, docs at
   `docs/source-of-truth/reclaim-barrier-event.md`, tests at
   `tests/test_reclaim_barrier_event.py`
+  - **Update (2026-05-12, `015c7580`)**: the module, surface
+    (`owlmlx.settle_barrier_event`), builder/dict functions, and test file
+    were later renamed `reclaim_barrier_event` → `settle_barrier_event`
+    (PR #649 "settle barrier" vocabulary). The HTTP route URL
+    `/v1/runtime/reclaim-barrier-event` and kernel-internal event
+    vocabulary were intentionally kept. The historical names above are
+    retained as the as-shipped 3.4A0 record.
 - `RuntimeKernel` now records cleanup-boundary failure events at the
   exact operation boundary for explicit unload, TTL sweep reclaim, and
   restart unload stage; `status_dict()` exposes them as the diagnostic

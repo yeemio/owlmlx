@@ -129,7 +129,7 @@ It does not claim:
   classification contract remains read-only and does not run eviction
   itself
 - a reclaim engine exists — only reclaim-attempt **result visibility**
-  exists, owned by `owlmlx.reclaim_barrier_event`
+  exists, owned by `owlmlx.settle_barrier_event`
   (`reclaim-barrier-event.md`); this contract surfaces that visibility
   via `policy_boundaries.runtime_owned_reclaim_attempt_result_visibility`
   but still keeps reclaim engine, pressure-ranked eviction execution,

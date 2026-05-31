@@ -13,7 +13,7 @@ semantic ownership belongs here.
 
 ## 2. Contract Families
 
-`owlmlx` currently recognizes three first-class contract families:
+`owlmlx` currently recognizes five first-class contract families:
 
 1. `core runtime status`
 2. `large-weight runtime path status`

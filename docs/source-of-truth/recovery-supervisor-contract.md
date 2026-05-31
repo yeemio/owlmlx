@@ -72,7 +72,7 @@ Current state vocabulary:
 - `backend_unhealthy`
   - backend health is false and generation must fail closed
 - `failed_reclaim_barrier`
-  - one or more unresolved `owlmlx.reclaim_barrier_event` cleanup-boundary
+  - one or more unresolved `owlmlx.settle_barrier_event` cleanup-boundary
     events exist (failed unload, failed reclaim, or restart unload stage
     failure); recovery barrier required until the future four-class
     recovery policy resolves them

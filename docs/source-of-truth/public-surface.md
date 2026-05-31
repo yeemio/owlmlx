@@ -194,7 +194,7 @@ inside a supported module.
 - `owlmlx.nonresident_loadability_lineage` — `supported`
 - `owlmlx.recovery_supervisor` — `supported`
 - `owlmlx.termination_recovery_policy` — `supported`
-- `owlmlx.reclaim_barrier_event` — `supported`
+- `owlmlx.settle_barrier_event` — `supported`
 - `owlmlx.scheduler_admission` — `supported`
 - `owlmlx.orchestration_status` — `supported`
 - `owlmlx.model_residency_policy` — `supported`

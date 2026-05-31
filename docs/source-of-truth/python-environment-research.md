@@ -63,6 +63,9 @@ hint: See PEP 668 for the detailed specification.
 
 ### 1.3 uv.lock state (untracked in git)
 
+> **Update (2026-05-09):** since committed in `90cefa5e` — `uv.lock` is now
+> tracked. The snapshot below is the dated 2026-05-08 observation.
+
 - `version = 1`, `revision = 3`
 - `requires-python = ">=3.10"`
 - Resolution markers: `python_full_version >= '3.11'` /
