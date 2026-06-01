@@ -138,7 +138,12 @@ into OpenAI `usage.prompt_tokens_details.cached_tokens` or Anthropic
 not synthesize these fields from aggregate status counters. Until automatic
 safe prefix reuse closes, upper-layer consumers must still treat
 `GET /v1/runtime/session-kv-cache` and this diagnostic section as experimental
-operator/debug truth only.
+operator/debug truth only. As of the 2026-06-01 B-1c §2 fast-swap drift triage,
+the section also exposes `resident_bytes_estimate_mode` and
+`resident_bytes_estimate_modes`; when upstream prompt-cache objects expose
+`nbytes`, the preferred mode is `cache_object_nbytes` rather than the older
+positive active-memory delta upper bound. This improves diagnostic accounting
+but does not promote automatic prefix reuse.
 
 `GET /healthz` is also frozen as a smaller liveness contract in Stabilization-1:
 

@@ -195,6 +195,7 @@ def test_b1c2_ledger_audit_separates_global_and_same_model_epoch_drift(tmp_path)
             "session_cache": {
                 "counter_delta": {},
                 "resident_bytes_estimate_after": 250,
+                "resident_bytes_estimate_mode": "cache_object_nbytes",
             },
             "memory": {
                 "active_memory_after_generation_bytes": 50_200,
@@ -212,6 +213,9 @@ def test_b1c2_ledger_audit_separates_global_and_same_model_epoch_drift(tmp_path)
         result["max_same_model_load_epoch_unaccounted_session_kv_drift_bytes"]
         == 0
     )
+    assert result["session_cache_resident_bytes_estimate_modes"] == [
+        "cache_object_nbytes"
+    ]
     assert result["same_model_load_epoch_drift_accounting"]["epoch_count"] == 2
 
 

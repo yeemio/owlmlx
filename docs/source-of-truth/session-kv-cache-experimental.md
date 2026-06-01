@@ -129,6 +129,14 @@ infer request-level cache hits from aggregate `/v1/runtime/session-kv-cache`
 counters. Automatic safe prefix reuse remains a separate B-2.3 gap, not
 something upper layers should normalize as their permanent integration burden.
 
+As of the 2026-06-01 B-1c §2 fast-swap drift triage, the diagnostic payload
+also reports resident-cache accounting mode. When upstream prompt-cache objects
+expose `nbytes`, OwlMLX records `resident_bytes_estimate_mode=cache_object_nbytes`
+and `resident_bytes_estimate_modes` rather than relying only on positive
+active-memory delta upper bounds. This is stronger operator evidence for the
+held cache working set, but it remains diagnostic and does not relax B-1c or
+B-2 promotion gates by itself.
+
 Session lifetime and cleanup are currently runtime-side TTL / unload / pressure
 behaviors, not a stable external clear-session API. If a future release adds an
 explicit clear-session endpoint, or promotes automatic prefix reuse, it must be

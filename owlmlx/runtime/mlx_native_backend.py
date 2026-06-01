@@ -304,6 +304,27 @@ def _trim_prompt_cache_with_reason(
     )
 
 
+def _prompt_cache_nbytes(prompt_cache: Any) -> int | None:
+    """Return cache-object resident bytes when the upstream cache exposes it."""
+
+    try:
+        nbytes = getattr(prompt_cache, "nbytes", None)
+    except Exception:
+        nbytes = None
+    if isinstance(nbytes, (int, float)):
+        return max(int(nbytes), 0)
+    if isinstance(prompt_cache, (list, tuple)):
+        total = 0
+        observed = False
+        for item in prompt_cache:
+            item_nbytes = _prompt_cache_nbytes(item)
+            if item_nbytes is not None:
+                total += item_nbytes
+                observed = True
+        return total if observed else None
+    return None
+
+
 def _non_empty_string(value: object) -> str | None:
     if value is None:
         return None
@@ -599,6 +620,17 @@ class MlxNativeBackend:
             prepared.active_memory_before_generation_bytes,
             self._read_active_memory_bytes(),
         )
+        cache_object_nbytes = _prompt_cache_nbytes(prepared.prompt_cache)
+        byte_estimate_kwargs: dict[str, object] = {}
+        if cache_object_nbytes is not None:
+            byte_estimate_kwargs = {
+                "byte_estimate": cache_object_nbytes,
+                "byte_estimate_mode": "cache_object_nbytes",
+            }
+        elif byte_estimate_delta is not None:
+            byte_estimate_kwargs = {
+                "byte_estimate_delta": byte_estimate_delta,
+            }
         if completion_tokens > 0:
             trim_result = _trim_prompt_cache_with_reason(
                 mlx_lm_module,
@@ -611,7 +643,7 @@ class MlxNativeBackend:
                     model_id=session.info.model_id,
                     prompt_tokens=prepared.prompt_tokens,
                     token_count=len(prepared.prompt_tokens),
-                    byte_estimate_delta=byte_estimate_delta,
+                    **byte_estimate_kwargs,
                 )
             if (
                 trim_result.trimmed_tokens == 0
@@ -626,7 +658,7 @@ class MlxNativeBackend:
                     model_id=session.info.model_id,
                     prompt_tokens=remembered_tokens,
                     token_count=len(remembered_tokens),
-                    byte_estimate_delta=byte_estimate_delta,
+                    **byte_estimate_kwargs,
                 )
             if trim_result.trimmed_tokens != completion_tokens:
                 self._session_kv_cache.drop_for_session_model(
@@ -658,7 +690,7 @@ class MlxNativeBackend:
             model_id=session.info.model_id,
             prompt_tokens=prepared.prompt_tokens,
             token_count=len(prepared.prompt_tokens),
-            byte_estimate_delta=byte_estimate_delta,
+            **byte_estimate_kwargs,
         )
 
     def _session_cache_stream_detail(

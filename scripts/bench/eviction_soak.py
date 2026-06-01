@@ -823,6 +823,29 @@ def _b1c2_same_model_load_epoch_drift(records: list[dict[str, Any]]) -> dict[str
     }
 
 
+def _b1c2_session_cache_resident_estimate_modes(
+    records: list[dict[str, Any]],
+) -> list[str]:
+    modes = {
+        str(record.get("session_cache", {}).get("resident_bytes_estimate_mode"))
+        for record in records
+        if record.get("session_cache", {}).get("resident_bytes_estimate_mode")
+        is not None
+    }
+    return sorted(modes)
+
+
+def _b1c2_session_cache_resident_estimate_kind(
+    modes: list[str],
+) -> str:
+    meaningful = [mode for mode in modes if mode and mode != "none"]
+    if not meaningful:
+        return "unknown"
+    if len(meaningful) == 1:
+        return meaningful[0]
+    return "mixed"
+
+
 def _read_first_jsonl_record(path: Path) -> dict[str, Any]:
     with Path(path).open("r", encoding="utf-8") as stream:
         for line in stream:
@@ -2187,6 +2210,12 @@ def _b1c2_rollup(
         for record in sample_records
         if record.get("session_cache", {}).get("resident_bytes_estimate_after") is not None
     ]
+    resident_estimate_modes = _b1c2_session_cache_resident_estimate_modes(
+        sample_records
+    )
+    resident_estimate_kind = _b1c2_session_cache_resident_estimate_kind(
+        resident_estimate_modes
+    )
     max_session_cache_resident_bytes = (
         max(resident_estimate_values) if resident_estimate_values else None
     )
@@ -2315,9 +2344,10 @@ def _b1c2_rollup(
         "session_kv_drift_accounting": {
             "mode": (
                 "same_model_load_epoch_active_memory_minus_session_kv_"
-                "positive_delta_upper_bound"
+                "resident_bytes_estimate"
             ),
-            "estimate_kind": "positive_active_memory_delta_upper_bound",
+            "estimate_kind": resident_estimate_kind,
+            "resident_estimate_modes": resident_estimate_modes,
             "max_session_cache_resident_bytes": max_session_cache_resident_bytes,
             "max_unaccounted_session_kv_drift_bytes": (
                 max_unaccounted_session_kv_drift_bytes
@@ -2602,8 +2632,14 @@ def run_b1c2_soak_plus_swap(
                     "resident_bytes_estimate_after": cache_after.get(
                         "resident_bytes_estimate"
                     ),
+                    "resident_bytes_estimate_mode_before": cache_before.get(
+                        "resident_bytes_estimate_mode"
+                    ),
                     "resident_bytes_estimate_mode": cache_after.get(
                         "resident_bytes_estimate_mode"
+                    ),
+                    "resident_bytes_estimate_modes_after": cache_after.get(
+                        "resident_bytes_estimate_modes"
                     ),
                     "max_prompt_tokens": cache_after.get("max_prompt_tokens"),
                     "prompt_window_policy": cache_after.get("prompt_window_policy"),

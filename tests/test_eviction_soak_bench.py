@@ -877,6 +877,7 @@ def test_b1c2_rollup_uses_same_load_epoch_drift_not_model_size_delta(tmp_path):
             },
             "session_cache": {
                 "resident_bytes_estimate_after": resident_bytes,
+                "resident_bytes_estimate_mode": "cache_object_nbytes",
                 "counter_delta": {},
             },
             "reclaim_barrier_stats_after_sample": {
@@ -958,6 +959,12 @@ def test_b1c2_rollup_uses_same_load_epoch_drift_not_model_size_delta(tmp_path):
     assert rollup["session_kv_drift_accounting"][
         "max_unaccounted_session_kv_drift_bytes"
     ] == 0
+    assert rollup["session_kv_drift_accounting"]["estimate_kind"] == (
+        "cache_object_nbytes"
+    )
+    assert rollup["session_kv_drift_accounting"]["resident_estimate_modes"] == [
+        "cache_object_nbytes"
+    ]
     assert rollup["soak_plus_swap_stability"] == "passed"
 
 

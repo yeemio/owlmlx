@@ -39,6 +39,7 @@ class SessionKVCacheEntrySnapshot:
     last_used_at_s: float
     token_count: int
     byte_estimate: int
+    byte_estimate_mode: str
     hit_count: int
 
     def to_dict(self) -> dict[str, Any]:
@@ -50,6 +51,7 @@ class SessionKVCacheEntrySnapshot:
             "last_used_at_s": self.last_used_at_s,
             "token_count": self.token_count,
             "byte_estimate": self.byte_estimate,
+            "byte_estimate_mode": self.byte_estimate_mode,
             "hit_count": self.hit_count,
         }
 
@@ -65,6 +67,7 @@ class _SessionKVCacheEntry:
     prompt_tokens: tuple[int, ...] = ()
     token_count: int = 0
     byte_estimate: int = 0
+    byte_estimate_mode: str = "unset"
     hit_count: int = 0
 
     def snapshot(self) -> SessionKVCacheEntrySnapshot:
@@ -76,6 +79,7 @@ class _SessionKVCacheEntry:
             last_used_at_s=self.last_used_at_s,
             token_count=self.token_count,
             byte_estimate=self.byte_estimate,
+            byte_estimate_mode=self.byte_estimate_mode,
             hit_count=self.hit_count,
         )
 
@@ -265,6 +269,7 @@ class SessionKVCacheStore:
         prompt_tokens: tuple[int, ...] | None = None,
         token_count: int = 0,
         byte_estimate: int = 0,
+        byte_estimate_mode: str | None = None,
     ) -> SessionKVCacheDecision:
         """Return a reusable session cache handle, or a refusal decision.
 
@@ -395,6 +400,11 @@ class SessionKVCacheStore:
                 last_used_at_s=now,
                 token_count=max(int(token_count), 0),
                 byte_estimate=max(int(byte_estimate), 0),
+                byte_estimate_mode=(
+                    _normalize_byte_estimate_mode(byte_estimate_mode)
+                    if int(byte_estimate) > 0
+                    else "unset"
+                ),
             )
             evicted_for_count = self._evict_to_max_entries_locked()
             self._counters = _replace_counter(
@@ -421,6 +431,7 @@ class SessionKVCacheStore:
         token_count: int | None = None,
         byte_estimate: int | None = None,
         byte_estimate_delta: int | None = None,
+        byte_estimate_mode: str | None = None,
     ) -> bool:
         """Persist the prompt-token prefix represented by a session entry."""
 
@@ -458,11 +469,19 @@ class SessionKVCacheStore:
                 entry.token_count = max(int(token_count), 0)
             if byte_estimate is not None:
                 entry.byte_estimate = max(int(byte_estimate), 0)
+                entry.byte_estimate_mode = _normalize_byte_estimate_mode(
+                    byte_estimate_mode,
+                    default="caller_supplied_absolute",
+                )
             if byte_estimate_delta is not None:
                 entry.byte_estimate = max(
                     entry.byte_estimate + int(byte_estimate_delta),
                     0,
                 )
+                if entry.byte_estimate_mode in {"unset", ""}:
+                    entry.byte_estimate_mode = (
+                        "positive_active_memory_delta_upper_bound"
+                    )
             return True
 
     def drop_for_session_model(
@@ -585,6 +604,8 @@ class SessionKVCacheStore:
             entries = [entry.snapshot().to_dict() for entry in self._entries.values()]
             counters = self._counters
             resident_bytes = self._resident_bytes_locked()
+            resident_modes = self._resident_modes_locked()
+            resident_mode = _summarize_resident_mode(resident_modes)
             last_drop_event = (
                 dict(self._last_drop_event)
                 if self._last_drop_event is not None
@@ -612,7 +633,8 @@ class SessionKVCacheStore:
             "active_entries": len(entries),
             "active_sessions": len({entry["session_id"] for entry in entries}),
             "resident_bytes_estimate": resident_bytes,
-            "resident_bytes_estimate_mode": "positive_active_memory_delta_upper_bound",
+            "resident_bytes_estimate_mode": resident_mode,
+            "resident_bytes_estimate_modes": resident_modes,
             "resident_bytes_estimate_used_for_promotion_gate": False,
             "counters": counters.to_dict(),
             "last_drop_event": last_drop_event,
@@ -656,6 +678,13 @@ class SessionKVCacheStore:
     def _resident_bytes_locked(self) -> int:
         return sum(entry.byte_estimate for entry in self._entries.values())
 
+    def _resident_modes_locked(self) -> dict[str, int]:
+        modes: dict[str, int] = {}
+        for entry in self._entries.values():
+            mode = entry.byte_estimate_mode or "unset"
+            modes[mode] = modes.get(mode, 0) + 1
+        return dict(sorted(modes.items()))
+
     def _prompt_exceeds_window(self, prompt_tokens: tuple[int, ...]) -> bool:
         return self.max_prompt_tokens > 0 and len(prompt_tokens) > self.max_prompt_tokens
 
@@ -674,6 +703,24 @@ def _common_prefix_len(left: tuple[int, ...], right: tuple[int, ...]) -> int:
             break
         count += 1
     return count
+
+
+def _normalize_byte_estimate_mode(
+    mode: str | None,
+    *,
+    default: str = "caller_supplied",
+) -> str:
+    normalized = str(mode or "").strip()
+    return normalized or default
+
+
+def _summarize_resident_mode(modes: dict[str, int]) -> str:
+    meaningful = {mode for mode, count in modes.items() if count > 0 and mode != "unset"}
+    if not meaningful:
+        return "none"
+    if len(meaningful) == 1:
+        return next(iter(meaningful))
+    return "mixed"
 
 
 def _session_cache_event(

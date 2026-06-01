@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed AND the prompt-reset bounded-window policy resolved the drift (171.7 MB < 200 MiB budget, trim bypasses 173→3, validated across real swap boundaries). Functional stability criteria (§7 #2/#6/#7/#8/#9) pass. The 2026-06-01 repeat (`20260601T025321Z`) also passes measurement continuity for one 4h / 1-swap segment, so §2 is now blocked on aggregate volume only (24h / 6 swaps), not on an open runtime/cache defect. See §11 Blocker Taxonomy (2026-06-01)
+> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed and prompt-reset bounded windows produced one aggregate-eligible 4h / 1-swap segment (`20260601T025321Z`). The later 5-minute-cadence forced-swap canaries proved swap boundaries stay clean, but they exposed a raw same-model load-epoch drift gate blocker: Gemma reaches `751370240` bytes raw drift while direct cache-object resident accounting (`cache_object_nbytes`) reports `1054965760` bytes and same-model unaccounted drift `0`. §2 is blocked on drift-gate closure plus aggregate volume, not on another passive wait. See §11 Blocker Taxonomy (2026-06-01)
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -562,6 +562,18 @@ must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
   `max_same_model_load_epoch_drift_bytes=751370240` on Gemma and
   `max_same_model_load_epoch_unaccounted_session_kv_drift_bytes=0`. This canary
   is diagnostic only; it is not aggregate input and it does not promote §2.
+- cache-object resident accounting canary:
+  `20260601T134131Z-b1c2-qwen-gemma-qwen35-cache-nbytes-5min-soak-swap-rollup.jsonl`
+  repeated the 5-minute cadence for 10 minutes / 2 swaps after the runtime began
+  recording upstream cache-object bytes when available. It completed both swap
+  boundaries cleanly, had drops / expirations / rejects all 0, and every
+  measurement row reported `resident_bytes_estimate_mode=cache_object_nbytes`.
+  The segment still failed the current raw drift gate
+  (`max_same_model_load_epoch_drift_bytes=751370240` on Gemma, budget
+  `209715200`), but direct resident-cache accounting reported
+  `max_session_cache_resident_bytes=1054965760` and same-model unaccounted drift
+  `0`. This is diagnostic only; it proves the drift is explained by a real held
+  cache working set, not that §2 has passed.
 
 The landed smoke-only slice covers:
 
@@ -574,9 +586,10 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-Do not resume passive aggregate evidence until the fast-swap drift metric is
+Do not resume passive aggregate evidence until the fast-swap drift gate is
 settled. The next step is not another 4h wait; it is a metric/root-cause closure
-for same-model load-epoch drift under high-frequency swaps.
+for same-model load-epoch drift under high-frequency swaps now that direct
+cache-object resident bytes are available.
 
 1. Keep the safe trim-unavailable bypass semantics: pre-generation reuse trim
    refusal may fall back to a fresh request cache and must be counted as
@@ -590,7 +603,9 @@ for same-model load-epoch drift under high-frequency swaps.
    working-set metric is the correct promotion gate.
 4. Any new focused or swap-bearing probe must report `session_cache_drops_total=0`,
    `session_cache_expirations_total=0`, `session_cache_rejects_total=0`, and
-   `max_drift_bytes <= 209715200` before §2 aggregate resumes.
+   either the existing raw drift gate (`max_drift_bytes <= 209715200`) or an
+   explicitly reviewed replacement gate based on direct cache-object resident
+   bytes before §2 aggregate resumes.
 5. Aggregate only gap-free, hard-failure-free segment rollups.
 6. Require cumulative duration >= 24h and aggregate swap count >= 6 before
    `soak_plus_swap_stability=passed`.
@@ -645,25 +660,39 @@ gap violations. That closes the single-segment measurement-continuity proof gap
 for the current policy, while preserving the rule that future sleeping segments
 must be excluded from aggregate evidence.
 
-### B3 — Aggregate volume: BLOCKED
+### B3 — Raw drift gate under direct cache-object accounting: BLOCKED
+
+The 2026-06-01 cache-object resident canary (`20260601T134131Z`) records direct
+cache-object bytes for every measurement row (`cache_object_nbytes`). It proves
+the Gemma same-model raw drift (`751370240` bytes) is fully covered by a real
+session-cache working set (`1054965760` bytes, unaccounted drift `0`). That is
+not a cache drop and not a 46GB leak, but the current §7 pass criterion still
+uses raw `max_drift_bytes <= 209715200`. Until the source-of-truth review
+decides whether raw drift remains the hard gate or is replaced by a
+cache-object-accounted resident working-set gate, §2 remains blocked.
+
+### B4 — Aggregate volume: BLOCKED
 
 §7 #3 (≥24h aggregate) and #4 (≥6 swaps) are unmet (latest aggregate-eligible
 input: ~4h, 1 swap). This is now the independent remaining blocker: repeat the
-same policy in five more gap-free segments, then aggregate only the clean
-rollups.
+same policy in five more gap-free segments only after B3 is closed, then
+aggregate only the clean rollups.
 
-### Route forward (no runtime code change implied)
+### Route forward
 
 1. **Eliminate sleep for the segment window**: `caffeinate -dis` on AC power,
    lid open; or `sudo pmset` to disable sleep for the window; keep the machine
    unused during a segment. On the current host, `caffeinate -m` is unsupported
    and `-u` exits quickly outside a user-idle assertion context.
-2. **Run segments only in confirmed-awake windows**, aggregate via the §2
+2. **Close the drift-gate decision before aggregate resumes**: preserve the
+   current raw gate unless a reviewed replacement gate explicitly uses direct
+   cache-object resident bytes and keeps unaccounted same-model drift at 0.
+3. **Run segments only in confirmed-awake windows**, aggregate via the §2
    interrupted route (each segment internally gap-free; segment *boundaries* are
    allowed). Recommended `6 × 4h`, one swap per segment (§5, §10).
-3. **Dedicated always-on host** is the clean long-term route; a shared personal
+4. **Dedicated always-on host** is the clean long-term route; a shared personal
    Mac is not a reliable 24h-soak measurement environment.
-4. Do **not** relax §7 #5 — the gap-free requirement is correct; the fix is
+5. Do **not** relax §7 #5 — the gap-free requirement is correct; the fix is
    keeping the machine awake, not tolerating gaps.
 
 ### What this does NOT change
@@ -686,3 +715,20 @@ epochs. Future B-1c §2 rollups must separate:
 
 The current actionable blocker is not "run longer". It is deciding and proving
 the correct drift gate for high-frequency multi-model cache reuse.
+
+### 2026-06-01 cache-object resident addendum
+
+The cache-object resident canary (`20260601T134131Z`) moves resident accounting
+from a positive active-memory delta upper bound to direct upstream cache-object
+`nbytes` when available:
+
+- `session_cache_resident_bytes_estimate_modes=["cache_object_nbytes"]`
+- `swap_count=2`, `swap_boundaries_clean=true`
+- `session_cache_drops_total=0`, `expirations=0`, `rejects=0`
+- `max_same_model_load_epoch_drift_bytes=751370240`
+- `max_same_model_load_epoch_session_cache_resident_bytes=1054965760`
+- `max_same_model_load_epoch_unaccounted_session_kv_drift_bytes=0`
+
+This does not pass §2 because the raw gate remains active. It narrows the
+blocker to a policy/gate decision: raw active-memory drift versus direct
+cache-object resident working set.

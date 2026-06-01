@@ -241,6 +241,31 @@ def test_session_kv_cache_accumulates_byte_estimate_delta() -> None:
     )
     assert status["resident_bytes_estimate_used_for_promotion_gate"] is False
     assert status["entries"][0]["byte_estimate"] == 40
+    assert status["entries"][0]["byte_estimate_mode"] == (
+        "positive_active_memory_delta_upper_bound"
+    )
+
+
+def test_session_kv_cache_prefers_absolute_cache_object_byte_estimate() -> None:
+    store = SessionKVCacheStore(enabled=True, ttl_s=60.0)
+    store.acquire_for_request(session_id="s1", model_id="m", make_cache=object)
+
+    remembered = store.remember_prompt(
+        session_id="s1",
+        model_id="m",
+        prompt_tokens=(1, 2, 3),
+        byte_estimate=128,
+        byte_estimate_mode="cache_object_nbytes",
+    )
+
+    status = store.status_dict()
+    assert remembered is True
+    assert status["resident_bytes_estimate"] == 128
+    assert status["resident_bytes_estimate_mode"] == "cache_object_nbytes"
+    assert status["resident_bytes_estimate_modes"] == {"cache_object_nbytes": 1}
+    assert status["resident_bytes_estimate_used_for_promotion_gate"] is False
+    assert status["entries"][0]["byte_estimate"] == 128
+    assert status["entries"][0]["byte_estimate_mode"] == "cache_object_nbytes"
 
 
 def test_session_kv_cache_bypasses_and_evicts_over_prompt_window() -> None:

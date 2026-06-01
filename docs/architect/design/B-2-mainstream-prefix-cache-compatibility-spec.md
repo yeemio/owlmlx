@@ -55,6 +55,15 @@ Current verified truth:
   `max_same_model_load_epoch_unaccounted_session_kv_drift_bytes=0`. The
   actionable blocker is therefore same-model fast-swap drift over the raw 200MiB
   B-1c section 2 gate, not a 46GB leak and not a consumer-header problem.
+- The follow-up `20260601T134131Z` 10-minute / 2-swap canary ran after the
+  runtime began recording direct upstream cache-object bytes
+  (`cache_object_nbytes`) in the session KV status surface. It again kept swap
+  boundaries clean and drops / expirations / rejects at 0. Every measurement row
+  used `resident_bytes_estimate_mode=cache_object_nbytes`; Gemma still had raw
+  same-model drift `751370240` bytes, but direct cache-object resident bytes
+  reached `1054965760` and same-model unaccounted drift remained `0`. B-2.3 is
+  therefore blocked on the B-1c §2 drift-gate decision, not on missing runtime
+  cache metadata.
 
 ## 3. Design Goal
 
@@ -319,8 +328,9 @@ Immediate handoff:
    cross-model baseline artifact, while the actionable same-model load-epoch
    blocker is 751370240 bytes on Gemma.
 2. Decide whether raw same-model drift should remain the promotion gate, or
-   whether a stricter resident-cache working-set metric is needed before any
-   B-2.3 reuse can consume this evidence.
+   whether direct `cache_object_nbytes` resident working-set accounting with
+   zero unaccounted same-model drift is the correct gate before any B-2.3 reuse
+   can consume this evidence.
 3. Keep the 5-minute forced-swap canary as the boundary-stress shape until the
    drift root cause is closed.
 4. Treat forced canaries as boundary diagnostics only, not as 24h/6-swap
@@ -363,3 +373,9 @@ compatibility usage counters match real per-request runtime metadata.
   actionable same-model Gemma drift (`751370240` bytes, unaccounted upper bound
   `0`). B-2.3 is blocked on this metric decision/root cause, not on another
   passive soak duration.
+- 2026-06-01: Recorded `20260601T134131Z` cache-object resident accounting
+  canary. Runtime status now reports direct upstream cache-object `nbytes` when
+  available; the canary shows all measurement rows using `cache_object_nbytes`,
+  Gemma raw same-model drift `751370240`, resident cache bytes `1054965760`,
+  and same-model unaccounted drift `0`. Automatic reuse remains blocked until
+  the B-1c §2 gate decision is reviewed.

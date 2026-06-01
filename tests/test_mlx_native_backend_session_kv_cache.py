@@ -41,8 +41,15 @@ def _build_fake_mlx_lm_with_observable_cache(
             self.finish_reason = finish_reason
             self.token = token
 
-    def make_prompt_cache(model: object) -> dict[str, object]:
-        cache = {"model": model, "tokens": []}
+    class FakePromptCache(dict):
+        @property
+        def nbytes(self) -> int:
+            tokens = self["tokens"]
+            assert isinstance(tokens, list)
+            return len(tokens) * 8
+
+    def make_prompt_cache(model: object) -> FakePromptCache:
+        cache = FakePromptCache({"model": model, "tokens": []})
         created_caches.append(cache)
         return cache
 
@@ -250,12 +257,12 @@ def test_native_session_kv_cache_accounts_positive_active_memory_growth(
         assert first[-1].event == "done"
         assert second[-1].event == "done"
         status = backend.status().detail["session_kv_cache"]
-        assert status["resident_bytes_estimate"] == 40
-        assert status["resident_bytes_estimate_mode"] == (
-            "positive_active_memory_delta_upper_bound"
-        )
+        assert status["resident_bytes_estimate"] == 72
+        assert status["resident_bytes_estimate_mode"] == "cache_object_nbytes"
         assert status["resident_bytes_estimate_used_for_promotion_gate"] is False
-        assert status["entries"][0]["byte_estimate"] == 40
+        assert status["resident_bytes_estimate_modes"] == {"cache_object_nbytes": 1}
+        assert status["entries"][0]["byte_estimate"] == 72
+        assert status["entries"][0]["byte_estimate_mode"] == "cache_object_nbytes"
     finally:
         importlib.reload(mod)
 
@@ -357,6 +364,7 @@ def test_native_session_kv_cache_drops_model_entries_before_unload(
     mod, _fake = _reload_native_backend_with_fake_mlx_lm(monkeypatch)
     try:
         backend = mod.MlxNativeBackend()
+        monkeypatch.setattr(backend, "_try_import_mlx_core", lambda: None)
         backend.load("fake-model")
         list(backend.stream_generate("fake-model", "hello", session_id="s1"))
         assert backend.status().detail["session_kv_cache"]["active_entries"] == 1

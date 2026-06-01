@@ -122,6 +122,13 @@ missing primitive precisely. Do not reframe the private header as the solution.
   Gemma active memory against the first Qwen27 measurement. Same-model load
   epoch accounting narrows the actionable blocker to Gemma drift of
   `751370240` bytes, with `max_same_model_load_epoch_unaccounted_session_kv_drift_bytes=0`.
+- The 2026-06-01 `20260601T134131Z` cache-object resident canary used the same
+  5-minute boundary-stress shape for 10 minutes / 2 swaps after runtime status
+  began recording direct upstream cache-object `nbytes` when available. It had
+  clean boundaries and zero drops / expirations / rejects. Every measurement
+  row used `resident_bytes_estimate_mode=cache_object_nbytes`; Gemma raw
+  same-model drift remained `751370240` bytes, but direct cache-object resident
+  bytes reached `1054965760` and same-model unaccounted drift stayed `0`.
 
 ## remaining_gaps
 
@@ -130,9 +137,10 @@ missing primitive precisely. Do not reframe the private header as the solution.
    can be considered. The operator-paused `20260601T074541Z` ledger does not
    reduce this gap because it ended before any swap boundary.
 2. The immediate executable gap is no longer passive duration. It is fast-swap
-   same-model drift triage: decide whether the raw 751MB Gemma drift remains a
-   hard promotion blocker, or whether the runner needs a stricter resident-cache
-   working-set metric before B-2.3 consumes this evidence.
+   same-model drift-gate triage: decide whether the raw 751MB Gemma drift
+   remains a hard promotion blocker, or whether direct `cache_object_nbytes`
+   resident working-set accounting with zero unaccounted same-model drift is
+   the correct gate before B-2.3 consumes this evidence.
 3. B-2.3 automatic safe prefix reuse is not implemented and must remain blocked
    until B-1c section 2 aggregate stability passes.
 4. The explicit `X-Owlmlx-Session-Id` lane is still the only runtime path that
@@ -154,4 +162,6 @@ run another passive 4h topoff to answer this question. First triage the
 46.8GB number was a cross-model baseline artifact, and the actionable raw
 same-model drift is 751MB on Gemma. Keep B-2.3 automatic reuse blocked as a
 capability claim until this blocker is closed and the 24h / 6-swap prerequisite
-is honestly met.
+is honestly met. The `20260601T134131Z` follow-up proves the resident working
+set can now be measured directly (`cache_object_nbytes`) and fully accounts for
+the Gemma drift; it does not by itself relax the raw gate.

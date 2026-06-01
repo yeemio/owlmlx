@@ -1,0 +1,70 @@
+{
+  "schema_version": "b1c2.cache_object_nbytes_canary_summary.v1",
+  "gate": "B-1c section 2",
+  "created_at_utc": "2026-06-01T13:58:00Z",
+  "source_run_id": "20260601T134131Z-owlmlx-native-b1c2-soak-plus-swap",
+  "source_ledger": "files/evidence/owlmlx/bench/session-kv-soak/20260601T134131Z-b1c2-qwen-gemma-qwen35-cache-nbytes-5min-soak-swap.jsonl",
+  "source_rollup": "files/evidence/owlmlx/bench/session-kv-soak/20260601T134131Z-b1c2-qwen-gemma-qwen35-cache-nbytes-5min-soak-swap-rollup.jsonl",
+  "purpose": "Verify direct cache-object resident byte accounting for the B-1c section 2 fast-swap drift blocker.",
+  "cadence": {
+    "duration_s": 600,
+    "swap_count": 2,
+    "swap_interval_s": 300,
+    "sample_interval_s": 30
+  },
+  "verdict": "failed_under_current_raw_drift_gate",
+  "failure_class": "fast_swap_same_model_epoch_raw_active_memory_drift_over_existing_gate",
+  "observed": {
+    "measurement_duration_s": 638.257,
+    "total_duration_s": 645.344,
+    "measurement_wall_clock_gap_free": true,
+    "record_count": 62,
+    "measurement_record_count": 57,
+    "swap_count": 2,
+    "swap_requirement_met": true,
+    "duration_requirement_met": true,
+    "swap_boundaries_clean": true,
+    "failed_sample_count": 0,
+    "fatal_watermark_count": 0,
+    "session_cache_drops_total": 0,
+    "session_cache_expirations_total": 0,
+    "session_cache_rejects_total": 0,
+    "session_cache_trim_bypasses_total": 0,
+    "session_cache_trim_evictions_total": 0,
+    "session_cache_resident_bytes_estimate_modes": [
+      "cache_object_nbytes"
+    ],
+    "max_same_model_load_epoch_drift_bytes": 751370240,
+    "max_same_model_load_epoch_session_cache_resident_bytes": 1054965760,
+    "max_same_model_load_epoch_unaccounted_session_kv_drift_bytes": 0,
+    "drift_budget_bytes": 209715200
+  },
+  "same_model_load_epoch_drift_accounting": {
+    "mode": "same_model_load_epoch_active_memory_delta",
+    "resident_estimate_kind": "cache_object_nbytes",
+    "max_same_model_load_epoch_drift_bytes": 751370240,
+    "max_same_model_load_epoch_unaccounted_session_kv_drift_bytes": 0,
+    "epochs": [
+      {
+        "model": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B-4bit",
+        "sample_count": 33,
+        "max_positive_active_memory_delta_bytes": 0,
+        "max_session_cache_resident_bytes": 512163840,
+        "max_unaccounted_positive_delta_bytes": 0
+      },
+      {
+        "model": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+        "sample_count": 24,
+        "max_positive_active_memory_delta_bytes": 751370240,
+        "max_session_cache_resident_bytes": 1054965760,
+        "max_unaccounted_positive_delta_bytes": 0
+      }
+    ]
+  },
+  "interpretation": {
+    "boundary_value": "Useful. Two 5-minute-cadence swap boundaries completed cleanly with unload_ok/load_ok/settle_barrier clean.",
+    "resident_accounting_value": "Useful. All measurement records used direct upstream cache-object nbytes instead of positive active-memory delta upper bound.",
+    "aggregate_value": "None. This is a forced boundary/metric canary, not 24h/6-swap aggregate promotion evidence.",
+    "b2_value": "B-2.3 remains blocked. The direct cache-object resident working set fully explains the Gemma raw active-memory drift, but the existing B-1c section 2 raw drift gate still fails until reviewed."
+  }
+}

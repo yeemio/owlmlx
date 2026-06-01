@@ -207,6 +207,12 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
         if record.get("session_cache", {}).get("resident_bytes_estimate_after")
         is not None
     ]
+    resident_estimate_modes = {
+        str(record.get("session_cache", {}).get("resident_bytes_estimate_mode"))
+        for record in records
+        if record.get("session_cache", {}).get("resident_bytes_estimate_mode")
+        is not None
+    }
     unaccounted_drift_values = []
     for record in records:
         drift = record.get("memory", {}).get("drift_from_measurement_start_bytes")
@@ -311,6 +317,9 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
         ),
         "max_session_cache_resident_bytes": (
             max(resident_estimate_values) if resident_estimate_values else None
+        ),
+        "session_cache_resident_bytes_estimate_modes": sorted(
+            resident_estimate_modes
         ),
         "max_unaccounted_session_kv_drift_bytes": (
             max(unaccounted_drift_values) if unaccounted_drift_values else None
