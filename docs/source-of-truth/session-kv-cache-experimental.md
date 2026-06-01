@@ -8,18 +8,22 @@
 ## 1. Scope
 
 Session KV cache is an experimental native-backend capability for explicit
-single-session prompt-prefix reuse.
+single-session prompt-prefix reuse plus a narrower opt-in automatic prefix
+reuse slice.
 
 It is intentionally narrow:
 
 - only `MlxNativeBackend`
 - only when `OWLMLX_SESSION_CACHE_ENABLED=1`
-- only when the caller sends `X-Owlmlx-Session-Id`
-- only within the same `session_id` and `model_id`
+- explicit reuse still requires `X-Owlmlx-Session-Id`
+- opt-in automatic reuse additionally requires
+  `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`
+- reuse is scoped to the same model and either the explicit session id or the
+  runtime-owned automatic prefix scope
 - append-only reuse is supported when the upstream cache cannot be trimmed
 - tail-edit reuse is attempted only when `mlx_lm.models.cache.trim_prompt_cache`
   can trim the concrete cache object
-- no implicit prefix matching
+- no default-on implicit prefix matching
 - no paged KV
 - no continuous batching
 - no subprocess cache-handle transport
@@ -48,8 +52,16 @@ Non-stream `generate` remains on the fresh single-request cache path in this
 experimental slice because it does not expose generated token ids needed to
 keep a persistent cache prefix honest.
 
-When disabled or when no session id is present, the native backend keeps its
-prior single-request behavior through `CacheManager.acquire_for_request(...)`.
+When disabled, or when no session id is present and automatic prefix reuse is
+not explicitly enabled, the native backend keeps its prior single-request
+behavior through `CacheManager.acquire_for_request(...)`.
+
+When `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`, a streaming request without
+`X-Owlmlx-Session-Id` may enter the runtime-owned automatic prefix scope. The
+backend reuses only when the remembered prompt and requested prompt satisfy the
+same token-prefix safety classifier used by the explicit lane. Ineligible
+requests evict the prior automatic entry and fall back to a fresh cache object;
+they do not silently merge unrelated prompts.
 
 ## 3. Memory Discipline
 
@@ -75,9 +87,13 @@ possess pressure truth.
 | `OWLMLX_SESSION_CACHE_ENABLED` | `0` | Enables explicit session cache reuse on the native backend |
 | `OWLMLX_SESSION_CACHE_TTL_S` | `60` | Idle TTL for session cache entries |
 | `OWLMLX_SESSION_CACHE_MAX_ENTRIES` | `64` | Maximum active session cache entries before LRU eviction |
+| `OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS` | `0` | Optional prompt-token window; `0` leaves it unbounded |
+| `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES` | `0` | Optional resident-cache byte cap; `0` leaves it unbounded |
+| `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED` | `0` | Enables the opt-in automatic prefix scope for no-header native streaming requests |
 
-No body schema changes are required. HTTP compatibility routes use the
-`X-Owlmlx-Session-Id` header.
+No body schema changes are required. HTTP compatibility routes may still use
+the `X-Owlmlx-Session-Id` header for the explicit lane, but the automatic lane
+does not require that private header.
 
 ## 5. Compatibility Boundary And OwlMLX-Owned Gap
 
@@ -101,12 +117,14 @@ The replacement-grade target is OwlMLX-owned mainstream compatibility:
   OwlMLX can prove token-prefix equivalence for the same model/runtime profile,
   and it must not merge unrelated conversations by hidden session id.
 
-Until that target exists, OwlMLX must honestly report this as a local runtime
-gap, not as an OwlCoda integration requirement.
+As of B-2.3, the first opt-in automatic prefix slice exists behind
+`OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1` for native streaming. OwlMLX must
+still report it as experimental and default-off until the B-1c section 2 policy
+gate and B-2 compatibility evidence justify a broader claim.
 
 This surface does **not** imply any of the following:
 
-- automatic cross-request prefix cache without an explicit session id
+- default-on or supported automatic cross-request prefix cache
 - subprocess/default serving prefix reuse
 - non-stream `generate` cross-request reuse
 - paged KV
@@ -126,8 +144,9 @@ As of B-2.2, compatibility routes may mirror cached-token counts into OpenAI
 `cache_read_input_tokens` only when the backend event/result carries real
 per-request `session_kv_cache.cached_prompt_tokens` metadata. They must not
 infer request-level cache hits from aggregate `/v1/runtime/session-kv-cache`
-counters. Automatic safe prefix reuse remains a separate B-2.3 gap, not
-something upper layers should normalize as their permanent integration burden.
+counters. As of B-2.3, automatic safe prefix reuse is implemented only as an
+opt-in native-streaming slice; upper layers should not normalize the private
+session header as their permanent integration burden.
 
 As of the 2026-06-01 B-1c §2 fast-swap drift triage, the diagnostic payload
 also reports resident-cache accounting mode. When upstream prompt-cache objects

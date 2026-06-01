@@ -175,6 +175,91 @@ def test_native_session_kv_cache_stream_reuses_prompt_cache_with_suffix_tokens(
         importlib.reload(mod)
 
 
+def test_native_session_kv_cache_auto_prefix_reuses_without_private_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED", "1")
+    mod, fake = _reload_native_backend_with_fake_mlx_lm(monkeypatch)
+    try:
+        backend = mod.MlxNativeBackend()
+        assert backend.load("fake-model").ok is True
+
+        first = list(backend.stream_generate("fake-model", "prefix A"))
+        second = list(backend.stream_generate("fake-model", "prefix B"))
+
+        assert first[-1].event == "done"
+        assert second[-1].event == "done"
+        assert len(fake._created_caches) == 1
+        assert fake._seen_prompt_caches[0] is fake._seen_prompt_caches[1]
+        assert fake._seen_stream_prompts[1] == [ord("B")]
+        detail = second[-1].detail["session_kv_cache"]
+        assert detail["cache_decision"] == "reuse"
+        assert detail["cache_reason_code"] == "session_cache_hit"
+        assert detail["cached_prompt_tokens"] == len("prefix ")
+        status = backend.status().detail["session_kv_cache"]
+        assert status["automatic_prefix_enabled"] is True
+        assert status["active_entries"] == 1
+        assert status["counters"]["hits"] == 1
+    finally:
+        importlib.reload(mod)
+
+
+def test_native_session_kv_cache_auto_prefix_disabled_keeps_fresh_no_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
+    monkeypatch.delenv("OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED", raising=False)
+    mod, fake = _reload_native_backend_with_fake_mlx_lm(monkeypatch)
+    try:
+        backend = mod.MlxNativeBackend()
+        assert backend.load("fake-model").ok is True
+
+        first = list(backend.stream_generate("fake-model", "prefix A"))
+        second = list(backend.stream_generate("fake-model", "prefix B"))
+
+        assert first[-1].event == "done"
+        assert second[-1].event == "done"
+        assert len(fake._created_caches) == 2
+        assert fake._seen_prompt_caches[0] is not fake._seen_prompt_caches[1]
+        assert "session_kv_cache" not in second[-1].detail
+        status = backend.status().detail["session_kv_cache"]
+        assert status["automatic_prefix_enabled"] is False
+        assert status["active_entries"] == 0
+    finally:
+        importlib.reload(mod)
+
+
+def test_native_session_kv_cache_auto_prefix_rejects_non_prefix_reuse(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED", "1")
+    mod, fake = _reload_native_backend_with_fake_mlx_lm(monkeypatch)
+    try:
+        backend = mod.MlxNativeBackend()
+        assert backend.load("fake-model").ok is True
+
+        first = list(backend.stream_generate("fake-model", "abc"))
+        second = list(backend.stream_generate("fake-model", "XYZ"))
+
+        assert first[-1].event == "done"
+        assert second[-1].event == "done"
+        assert len(fake._created_caches) == 2
+        assert fake._seen_prompt_caches[0] is not fake._seen_prompt_caches[1]
+        detail = second[-1].detail["session_kv_cache"]
+        assert detail["cache_decision"] == "new"
+        assert detail["cache_reason_code"] == "auto_prefix_ineligible_not_token_prefix"
+        assert detail["cached_prompt_tokens"] == 0
+        status = backend.status().detail["session_kv_cache"]
+        assert status["active_entries"] == 1
+        assert status["counters"]["hits"] == 0
+        assert status["counters"]["misses"] == 2
+        assert status["counters"]["trim_bypasses"] == 1
+    finally:
+        importlib.reload(mod)
+
+
 def test_native_session_kv_cache_exact_prompt_hit_streams_empty_suffix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

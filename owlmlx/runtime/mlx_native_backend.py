@@ -56,6 +56,7 @@ from .types import (
 
 
 _BACKEND_NAME = "mlx-native"
+_AUTO_PREFIX_SESSION_ID = "__owlmlx_auto_prefix_runtime_default__"
 _T = TypeVar("_T")
 
 
@@ -472,7 +473,16 @@ class MlxNativeBackend:
         needed to trim the persistent cache back to prompt-only state.
         """
 
-        if not self._session_kv_cache.enabled or not _non_empty_string(session_id):
+        normalized_session_id = _non_empty_string(session_id)
+        automatic_prefix_scope = False
+        if (
+            normalized_session_id is None
+            and self._session_kv_cache.automatic_prefix_enabled
+        ):
+            normalized_session_id = _AUTO_PREFIX_SESSION_ID
+            automatic_prefix_scope = True
+
+        if not self._session_kv_cache.enabled or normalized_session_id is None:
             return _PreparedPromptCache(
                 prompt_for_call=prompt,
                 prompt_cache=self._make_fresh_prompt_cache(mlx_lm_module, session),
@@ -493,12 +503,13 @@ class MlxNativeBackend:
 
         try:
             decision = self._session_kv_cache.acquire_for_request(
-                session_id=session_id,
+                session_id=normalized_session_id,
                 model_id=session.info.model_id,
                 make_cache=lambda: make_cache(session.model),
                 watermark=memory_watermark,
                 prompt_tokens=prompt_tokens,
                 token_count=len(prompt_tokens),
+                strict_prefix_reuse=automatic_prefix_scope,
             )
         except Exception as exc:  # pragma: no cover - defensive
             session.last_error = f"session KV cache failed: {exc}"
@@ -559,14 +570,14 @@ class MlxNativeBackend:
                     }
                     if trim_result.trimmed_tokens == 0:
                         self._session_kv_cache.bypass_for_session_model(
-                            session_id=session_id,
+                            session_id=normalized_session_id,
                             model_id=session.info.model_id,
                             reason_code="reuse_trim_unavailable_fresh_cache",
                             detail=detail,
                         )
                     else:
                         self._session_kv_cache.drop_for_session_model(
-                            session_id=session_id,
+                            session_id=normalized_session_id,
                             model_id=session.info.model_id,
                             reason_code="reuse_trim_partial_mismatch",
                             detail=detail,
@@ -589,7 +600,7 @@ class MlxNativeBackend:
             prompt_for_call=prompt_for_call,
             prompt_cache=cache,
             session_cache_active=True,
-            session_id=_non_empty_string(session_id),
+            session_id=normalized_session_id,
             prompt_tokens=prompt_tokens,
             active_memory_before_generation_bytes=self._read_active_memory_bytes(),
             cache_decision=decision.decision,

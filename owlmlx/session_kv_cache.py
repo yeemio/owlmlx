@@ -1,14 +1,18 @@
 """Experimental session-scoped KV cache store for the native MLX backend.
 
-This module owns only explicit session cache reuse:
+This module owns explicit session cache reuse plus an opt-in automatic prefix
+scope for native streaming:
 
-- callers must provide a session_id
-- entries are scoped to one model_id and one session_id
 - the feature is disabled unless OWLMLX_SESSION_CACHE_ENABLED=1
+- explicit callers provide a session_id
+- automatic no-header reuse additionally requires
+  OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1
+- entries are scoped to one model_id and either one session_id or the automatic
+  runtime prefix scope
 - pressure watermarks at yellow/red/fatal evict live entries and refuse reuse
 
-It does not implement implicit prefix matching, paged KV, continuous batching,
-or subprocess cache-handle transport.
+It does not implement default-on implicit prefix matching, paged KV, continuous
+batching, or subprocess cache-handle transport.
 """
 
 from __future__ import annotations
@@ -27,6 +31,7 @@ _DEFAULT_TTL_S = 60.0
 _DEFAULT_MAX_ENTRIES = 64
 _DEFAULT_MAX_PROMPT_TOKENS = 0
 _DEFAULT_MAX_RESIDENT_BYTES = 0
+_DEFAULT_AUTO_PREFIX_ENABLED = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,12 +241,14 @@ class SessionKVCacheStore:
         max_entries: int = _DEFAULT_MAX_ENTRIES,
         max_prompt_tokens: int = _DEFAULT_MAX_PROMPT_TOKENS,
         max_resident_bytes: int = _DEFAULT_MAX_RESIDENT_BYTES,
+        automatic_prefix_enabled: bool = _DEFAULT_AUTO_PREFIX_ENABLED,
     ) -> None:
         self.enabled = bool(enabled)
         self.ttl_s = max(float(ttl_s), 0.0)
         self.max_entries = max(int(max_entries), 1)
         self.max_prompt_tokens = max(int(max_prompt_tokens), 0)
         self.max_resident_bytes = max(int(max_resident_bytes), 0)
+        self.automatic_prefix_enabled = bool(automatic_prefix_enabled)
         self._entries: dict[tuple[str, str], _SessionKVCacheEntry] = {}
         self._counters = SessionKVCacheCounters()
         self._last_drop_event: dict[str, Any] | None = None
@@ -263,6 +270,10 @@ class SessionKVCacheStore:
                 "OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES",
                 _DEFAULT_MAX_RESIDENT_BYTES,
             ),
+            automatic_prefix_enabled=_env_bool(
+                "OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED",
+                default=_DEFAULT_AUTO_PREFIX_ENABLED,
+            ),
         )
 
     def acquire_for_request(
@@ -277,6 +288,7 @@ class SessionKVCacheStore:
         token_count: int = 0,
         byte_estimate: int = 0,
         byte_estimate_mode: str | None = None,
+        strict_prefix_reuse: bool = False,
     ) -> SessionKVCacheDecision:
         """Return a reusable session cache handle, or a refusal decision.
 
@@ -320,6 +332,7 @@ class SessionKVCacheStore:
             )
 
         key = (normalized_session_id, model_id)
+        new_reason_code = "session_cache_miss"
         if self._prompt_exceeds_window(requested_prompt_tokens):
             with self._lock:
                 expired = self._expire_locked(now)
@@ -364,29 +377,66 @@ class SessionKVCacheStore:
                     requested_isolation_scope=normalized_session_id,
                     trim_available=True,
                 )
-                entry.last_used_at_s = now
-                entry.hit_count += 1
-                self._counters = _replace_counter(
-                    self._counters,
-                    hits=self._counters.hits + 1,
-                    expirations=self._counters.expirations + expired,
-                )
-                return SessionKVCacheDecision(
-                    decision="reuse",
-                    reason_code="session_cache_hit",
-                    cache_object=entry.cache_object,
-                    cache_object_id=entry.cache_object_id,
-                    suffix_tokens=(
-                        requested_prompt_tokens[candidate.common_prefix_token_count:]
-                        if requested_prompt_tokens
-                        else None
-                    ),
-                    common_prefix_token_count=candidate.common_prefix_token_count,
-                    previous_prompt_token_count=(
-                        candidate.previous_prompt_token_count
-                    ),
-                    reused=True,
-                )
+                if strict_prefix_reuse and not candidate.eligible:
+                    removed = self._entries.pop(key, None)
+                    if removed is not None:
+                        self._last_bypass_event = _session_cache_event(
+                            reason_code=(
+                                f"auto_prefix_ineligible_{candidate.reason_code}"
+                            ),
+                            session_id=normalized_session_id,
+                            model_id=model_id,
+                            removed=removed,
+                            detail={
+                                "candidate_reason_code": candidate.reason_code,
+                                "common_prefix_token_count": (
+                                    candidate.common_prefix_token_count
+                                ),
+                                "previous_prompt_token_count": (
+                                    candidate.previous_prompt_token_count
+                                ),
+                                "requested_prompt_token_count": (
+                                    candidate.requested_prompt_token_count
+                                ),
+                                "suffix_token_count": candidate.suffix_token_count,
+                                "needs_trim": candidate.needs_trim,
+                            },
+                        )
+                    self._counters = _replace_counter(
+                        self._counters,
+                        trim_bypasses=self._counters.trim_bypasses + 1,
+                        trim_evictions=(
+                            self._counters.trim_evictions
+                            + (1 if removed is not None else 0)
+                        ),
+                    )
+                    new_reason_code = (
+                        f"auto_prefix_ineligible_{candidate.reason_code}"
+                    )
+                else:
+                    entry.last_used_at_s = now
+                    entry.hit_count += 1
+                    self._counters = _replace_counter(
+                        self._counters,
+                        hits=self._counters.hits + 1,
+                        expirations=self._counters.expirations + expired,
+                    )
+                    return SessionKVCacheDecision(
+                        decision="reuse",
+                        reason_code="session_cache_hit",
+                        cache_object=entry.cache_object,
+                        cache_object_id=entry.cache_object_id,
+                        suffix_tokens=(
+                            requested_prompt_tokens[candidate.common_prefix_token_count:]
+                            if requested_prompt_tokens
+                            else None
+                        ),
+                        common_prefix_token_count=candidate.common_prefix_token_count,
+                        previous_prompt_token_count=(
+                            candidate.previous_prompt_token_count
+                        ),
+                        reused=True,
+                    )
             counters_after_expiry = _replace_counter(
                 self._counters,
                 misses=self._counters.misses + 1,
@@ -423,7 +473,7 @@ class SessionKVCacheStore:
             )
         return SessionKVCacheDecision(
             decision="new",
-            reason_code="session_cache_miss",
+            reason_code=new_reason_code,
             cache_object=cache_object,
             cache_object_id=cache_object_id,
             suffix_tokens=requested_prompt_tokens if requested_prompt_tokens else None,
@@ -635,12 +685,17 @@ class SessionKVCacheStore:
             "surface": "owlmlx.session_kv_cache",
             "capability_label": "experimental",
             "enabled": self.enabled,
-            "scope": "native_backend_explicit_session_id_only",
+            "scope": (
+                "native_backend_explicit_session_id_or_opt_in_auto_prefix"
+                if self.automatic_prefix_enabled
+                else "native_backend_explicit_session_id_only"
+            ),
             "default_enabled": False,
             "ttl_s": self.ttl_s,
             "max_entries": self.max_entries,
             "max_prompt_tokens": self.max_prompt_tokens,
             "max_resident_bytes": self.max_resident_bytes,
+            "automatic_prefix_enabled": self.automatic_prefix_enabled,
             "prompt_window_policy": (
                 "bypass_and_evict_over_limit"
                 if self.max_prompt_tokens > 0

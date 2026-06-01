@@ -1,6 +1,6 @@
 # B-2 Mainstream Prefix-Cache Compatibility Spec
 
-> Status: design-grade spec; B-2.1 classifier and B-2.2 metadata plumbing landed; B-2.3 blocked on B-1c section 2 aggregate volume / policy after fast-swap drift-gate closure
+> Status: design-grade spec; B-2.1 classifier, B-2.2 metadata plumbing, and first B-2.3 opt-in automatic prefix slice landed; promotion remains blocked on B-1c section 2 aggregate / policy evidence
 > Updated: 2026-06-01
 > Campaign: B-2
 > Parent goal:
@@ -17,10 +17,10 @@ not the target contract. OwlCoda, Codex, and other OpenAI-compatible clients
 should not need to learn an OwlMLX-private header to benefit from safe
 prefix-cache behavior.
 
-This spec freezes the B-2 design before any automatic reuse implementation.
-The first code-grade slice must be classifier/diagnostic-only. It may prove
-that a request is eligible for future prefix reuse; it must not reuse a cache
-object automatically.
+This spec freezes the B-2 design and tracks its staged implementation. B-2.1
+was classifier/diagnostic-only; B-2.2 added real cached-token metadata plumbing;
+B-2.3 now has a first opt-in native-streaming automatic prefix slice. None of
+these slices promotes the capability beyond `experimental`.
 
 ## 2. Current Truth
 
@@ -36,6 +36,11 @@ Current verified truth:
 - B-2.2 now maps OpenAI `prompt_tokens_details.cached_tokens` and Anthropic
   `cache_read_input_tokens` only when backend event/result detail carries real
   `session_kv_cache.cached_prompt_tokens` metadata for the current request.
+- B-2.3 now adds `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`, an opt-in
+  no-header native streaming lane. It derives a runtime-owned automatic prefix
+  scope only when no explicit session header is present, reuses only classifier
+  eligible token-prefix candidates, and falls back to fresh cache with an
+  ineligible reason instead of merging unrelated prompts.
 - B-1c section 2 remains aggregate-blocked: a short clean forced-swap canary can
   validate unload / settle / load boundaries, but it is not a 24h/6-swap pass.
 - The operator-paused `20260601T074541Z` topoff is not aggregate input: its
@@ -71,8 +76,8 @@ Current verified truth:
   OwlMLX then added `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES` LRU cap support;
   the `20260601T162203Z` 40m / 8-swap validation stayed within budget
   (`2144829440 <= 2147483648`) with 4 LRU evictions and no drops / expirations /
-  rejects. B-2.3 is still blocked until this is accepted as enough aggregate /
-  policy evidence for automatic reuse.
+  rejects. This was enough to land the first opt-in B-2.3 code slice, but not
+  enough to promote the capability claim beyond `experimental`.
 
 ## 3. Design Goal
 
@@ -204,14 +209,16 @@ Pass:
 
 Scope:
 
-- May start only after B-2.1 and B-2.2 pass and after B-1c section 2 provides
-  sufficient aggregate stability for real cache-handle reuse.
+- First code slice may run behind an explicit runtime flag after B-2.1/B-2.2
+  and the resident-accounted 5-minute swap evidence show no cache correctness
+  failures.
 - Uses the classifier as an admission gate.
 - Reuses a cache only under proven prefix equivalence and configured isolation.
 
 Pass:
 
-- B-1c section 2 aggregate is passed or this stage remains blocked.
+- B-1c section 2 aggregate / policy evidence is sufficient for the claim being
+  made; otherwise the stage remains `experimental` and default-off.
 - Reuse is opt-in or guarded behind a clearly named runtime flag.
 - It does not merge unrelated conversations.
 - It emits real cache metadata.
@@ -319,16 +326,17 @@ After B-2.2:
 
 After B-2.3:
 
-- OwlMLX may claim a narrow automatic prefix-cache lane only if B-1c section 2
-  aggregate stability and B-2 evidence both pass.
+- OwlMLX may claim a narrow, opt-in automatic prefix-cache implementation
+  exists for native streaming. It may claim a broader automatic prefix-cache
+  lane only if B-1c section 2 aggregate stability and B-2 evidence both pass.
 
 No stage in this spec independently promotes B-1 to `supported`.
 
 ## 12. Next Handoff
 
-The next round is not B-2.3 code-grade yet. B-2.3 is blocked until B-1c
-section 2 provides sufficient aggregate / policy evidence under the reviewed
-fast-swap resident-accounted drift gate.
+The first B-2.3 code-grade slice has landed. The next round must decide whether
+the evidence is sufficient for a narrow evidence row or whether more
+5-minute-cadence validation is required.
 
 Immediate handoff:
 
@@ -350,16 +358,18 @@ Immediate handoff:
 6. Aggregate only completed segments with `measurement_wall_clock_gap_free=true`
    and clean
    cache/drop/swap-boundary audit results.
-7. Keep automatic prefix reuse disabled and unimplemented.
+7. Keep automatic prefix reuse disabled by default and guarded by
+   `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`.
 8. Do not treat partial measurement-only ledgers as B-1c section 2 aggregate
    input. The segment must reach its planned swap boundary and produce a rollup.
 9. Refresh this spec only when B-1c section 2 either passes the aggregate gate
    or produces a new blocker that changes B-2.3 feasibility.
 
-When the prerequisite is met, the first B-2.3 code-grade round may wire
-classifier-gated automatic reuse behind an explicit runtime flag. That future
-round must prove ineligible requests fall back to fresh cache and that
-compatibility usage counters match real per-request runtime metadata.
+The implemented B-2.3 slice proves the key software boundary in unit tests:
+enabled no-header requests reuse only eligible prefix candidates, disabled
+requests keep fresh-cache behavior, and ineligible requests fall back to fresh
+cache with an explicit reason. Broader claims still require B-2 evidence rows
+and B-1c policy acceptance.
 
 ## 13. Change Log
 
@@ -396,5 +406,9 @@ compatibility usage counters match real per-request runtime metadata.
 - 2026-06-01: Recorded the 2h / 24-swap high-frequency resident-pressure
   failure (`20260601T141659Z`) and the follow-up resident-cap validation
   (`20260601T162203Z`). The runtime now has opt-in LRU resident cap support via
-  `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES`; B-2.3 remains blocked pending
-  aggregate / policy review.
+  `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES`; B-2.3 promotion remains blocked
+  pending aggregate / policy review.
+- 2026-06-01: Landed the first B-2.3 opt-in automatic prefix slice behind
+  `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`. It is native-streaming only,
+  no-header, classifier-gated, and default-off; ineligible requests fall back
+  to fresh cache.

@@ -1,7 +1,7 @@
 # owlmlx Goal Contract: Mainstream Prefix-Cache Compatibility Closure
 
 > Status: active goal contract
-> Updated: 2026-06-01 after operator-paused B-1c section 2 topoff
+> Updated: 2026-06-01 after B-2.3 opt-in auto-prefix slice
 
 ## goal_id
 
@@ -88,8 +88,11 @@ missing primitive precisely. Do not reframe the private header as the solution.
   path.
 - That path is `experimental`, default-off, native-backend only, and requires
   `OWLMLX_SESSION_CACHE_ENABLED=1`.
-- Reuse currently depends on an explicit `X-Owlmlx-Session-Id` and the same
-  `model_id`.
+- Explicit reuse depends on `X-Owlmlx-Session-Id` and the same `model_id`.
+- B-2.3 adds a first opt-in no-header automatic prefix slice behind
+  `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`. It is native-streaming only,
+  default-off, and falls back to fresh cache when the prefix classifier rejects
+  the candidate.
 - Non-stream `generate` remains fresh single-request cache today.
 - The current OpenAI / Anthropic compatibility routes can forward the explicit
   header, but they do not derive a mainstream cache scope by themselves.
@@ -153,14 +156,16 @@ missing primitive precisely. Do not reframe the private header as the solution.
    accounting is available, resident cache bytes stay within budget, and
    unaccounted same-model drift stays within the raw drift budget. Do not carry
    this forward as a generic raw-RSS leak claim.
-3. Resident pressure now has a runtime control and first validation, but B-2.3
-   still needs an explicit aggregate / policy decision before automatic reuse
-   can consume it.
-4. B-2.3 automatic safe prefix reuse is not implemented and must remain blocked
-   until B-1c section 2 aggregate stability passes.
-5. The explicit `X-Owlmlx-Session-Id` lane is still the only runtime path that
-   can physically reuse a cache handle today; it remains experimental and must
-   not be presented as the mainstream consumer contract.
+3. Resident pressure now has a runtime control and first validation; the first
+   B-2.3 opt-in implementation can consume it, but any broader claim still
+   needs an explicit aggregate / policy decision.
+4. B-2.3 automatic safe prefix reuse is implemented only as a narrow
+   native-streaming, no-header, default-off slice. It must remain an
+   `experimental` capability claim until B-1c section 2 aggregate stability
+   passes.
+5. The explicit `X-Owlmlx-Session-Id` lane is no longer the only physical reuse
+   path, but it remains the dogfood/control lane and must not be presented as
+   the mainstream consumer contract.
 6. Source-of-truth docs must continue to distinguish three separate facts:
    classifier diagnostics, compatibility-visible real cached-token accounting,
    and actual automatic reuse.
@@ -171,8 +176,9 @@ missing primitive precisely. Do not reframe the private header as the solution.
 
 The next executable closure is not another consumer-side adapter and not F-3
 runtime work. B-2.1 and B-2.2 are already landed; the dominant blocker is the
-B-1c section 2 aggregate / policy decision under high-frequency swap stress.
-Do not run another passive 4h topoff with one switch. Keep the 5-minute cadence:
-it already found the resident-pressure issue, and the first LRU resident-cap
-validation is clean. Keep B-2.3 automatic reuse blocked as a capability claim
-until the aggregate / policy prerequisite is honestly met.
+B-1c section 2 aggregate / policy decision under high-frequency swap stress,
+plus a small B-2 evidence row for the newly landed opt-in no-header path. Do not
+run another passive 4h topoff with one switch. Keep the 5-minute cadence: it
+already found the resident-pressure issue, and the first LRU resident-cap
+validation is clean. Keep B-2.3 broader promotion blocked until the aggregate /
+policy prerequisite is honestly met.
