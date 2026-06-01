@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed AND the prompt-reset bounded-window policy resolved the drift (171.7 MB < 200 MiB budget, trim bypasses 173→3, validated across one real swap boundary). Functional stability criteria (§7 #2/#6/#7/#8/#9) pass. §2 promotion is now blocked on **measurement continuity** — system sleep produces wall-clock gaps inside long segments on this shared Mac — plus the 24h / 6-swap aggregate volume. See §11 Blocker Taxonomy (2026-05-30)
+> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed AND the prompt-reset bounded-window policy resolved the drift (171.7 MB < 200 MiB budget, trim bypasses 173→3, validated across real swap boundaries). Functional stability criteria (§7 #2/#6/#7/#8/#9) pass. The 2026-06-01 repeat (`20260601T025321Z`) also passes measurement continuity for one 4h / 1-swap segment, so §2 is now blocked on aggregate volume only (24h / 6 swaps), not on an open runtime/cache defect. See §11 Blocker Taxonomy (2026-06-01)
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -538,6 +538,19 @@ must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
   `measurement_wall_clock_gap_free=false` with 6 measurement wall-clock gap
   violations (max `7064.873s`). It must not be counted toward interrupted
   aggregate duration or used for promotion.
+- prompt-reset swap-bearing repeat:
+  `20260601T025321Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-soak-swap-rollup.jsonl`
+  repeated the same 4h / 1-swap policy with drops / expirations / rejects all
+  0, `session_cache_trim_bypasses_total=3`,
+  `session_cache_trim_evictions_total=3`,
+  `max_drift_bytes=171704320 <= 209715200`,
+  `measurement_wall_clock_gap_free=true` (max gap `60.642s`),
+  `ledger_gap_free=true`, `swap_boundaries_clean=true`, FATAL 0, unresolved
+  reclaim barrier 0, cleanup unload OK, and cleanup settle active memory 18
+  bytes. `scripts/bench/session_kv_soak_audit.py` reports
+  `clean_for_interrupted_aggregate=true`. The segment rollup still correctly
+  remains `blocked` because it is only 4h / 1 swap against the §7 24h / 6-swap
+  requirement; it is aggregate input, not a pass.
 
 The landed smoke-only slice covers:
 
@@ -550,16 +563,17 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-Close the gap-free swap-bearing proof gap before resuming aggregate evidence:
+Resume aggregate evidence using only gap-free swap-bearing segments:
 
 1. Keep the safe trim-unavailable bypass semantics: pre-generation reuse trim
    refusal may fall back to a fresh request cache and must be counted as
    `trim_bypasses`, not as `drops`; partial trim mismatch remains a hard drop.
 2. Use `reset_to_base_prompt_when_max_chars_exceeded` as the current
    prompt-window candidate; it passes the focused Qwen-only 720-sample
-   drift/drop criteria but does not yet prove swap-boundary stability.
-3. Repeat one gap-free swap-bearing §2 fail-fast segment with the same
-   prompt-reset policy before resuming 24h aggregate evidence.
+   drift/drop criteria and now has one gap-free swap-bearing aggregate input
+   segment (`20260601T025321Z`).
+3. Repeat five more gap-free swap-bearing §2 fail-fast segments with the same
+   prompt-reset policy before a 24h aggregate pass review.
 4. Any new focused or swap-bearing probe must report `session_cache_drops_total=0`,
    `session_cache_expirations_total=0`, `session_cache_rejects_total=0`, and
    `max_drift_bytes <= 209715200` before §2 aggregate resumes.
@@ -567,32 +581,38 @@ Close the gap-free swap-bearing proof gap before resuming aggregate evidence:
 6. Require cumulative duration >= 24h and aggregate swap count >= 6 before
    `soak_plus_swap_stability=passed`.
 
-## 11. Blocker Taxonomy (2026-05-30)
+## 11. Blocker Taxonomy (2026-06-01)
 
-Closeout review after the F-4 mainline. Maps the current state to the §7 pass
-criteria and classifies what blocks `soak_plus_swap_stability = passed`. The
-runtime / allocator layer is functionally clean; the dominant blocker is
-measurement infrastructure, not code.
+Closeout review after the first gap-free prompt-reset repeat. Maps the current
+state to the §7 pass criteria and classifies what blocks
+`soak_plus_swap_stability = passed`. The runtime / allocator layer is
+functionally clean, and the current segment no longer has a measurement
+continuity blocker. The remaining blocker is aggregate volume.
 
 ### B1 — Runtime / allocator stability: PASS (functional)
 
 The prompt-reset bounded-window policy
 (`reset_to_base_prompt_when_max_chars_exceeded`) closes the drift and trim
-blockers. Latest swap-bearing segment (`20260525T061019Z`, one real swap):
+blockers. Latest gap-free swap-bearing segment (`20260601T025321Z`, one real
+swap):
 
 - `max_drift_bytes = 171704320` ≤ `209715200` (200 MiB) ✓
 - `session_cache_drops / expirations / rejects = 0` ✓
 - `session_cache_trim_bypasses_total = 3` (was 173) ✓
 - `swap_boundaries_clean = true`, every unload OK ✓
 - `fatal_watermark_count = 0`, `unresolved_reclaim_barrier_events = 0` ✓
-- `ledger_gap_free = true`, session mix balanced (238 / 238 / 238) ✓
+- `measurement_wall_clock_gap_free = true`, `ledger_gap_free = true`,
+  session mix balanced (238 / 238 / 238) ✓
+- audit reports `clean_for_interrupted_aggregate = true` ✓
 
-§7 criteria #2, #6, #7, #8, #9 satisfied. No open runtime / allocator defect.
+§7 criteria #2, #5, #6, #7, #8, #9 satisfied for this segment. No open runtime /
+allocator defect.
 
-### B2 — Measurement continuity: BLOCKED (system sleep) ← dominant blocker
+### B2 — Measurement continuity: CLOSED for latest segment
 
-The same segment fails §7 #5 (`measurement_wall_clock_gap_free`): 6 gaps, max
-7064.873 s. Ledger-timestamp forensics:
+The earlier `20260525T061019Z` segment failed §7 #5
+(`measurement_wall_clock_gap_free`): 6 gaps, max 7064.873 s.
+Ledger-timestamp forensics:
 
 - sample 702 @ `10:08:43Z` → sample 703 @ `12:06:28Z` = ~1h58m with no samples,
   then 703 / 704 / 705 emitted within the same second (catch-up burst).
@@ -605,17 +625,25 @@ wall-clock gaps *inside* a segment, any sleep event during a segment voids that
 segment as aggregate input. **This is environmental — it cannot be fixed in
 `session_kv_cache.py`.**
 
-### B3 — Aggregate volume: BLOCKED (downstream of B2)
+The 2026-06-01 repeat used an explicit `caffeinate -dis` guard and produced
+`measurement_wall_clock_gap_free=true`, max measurement gap `60.642s`, and zero
+gap violations. That closes the single-segment measurement-continuity proof gap
+for the current policy, while preserving the rule that future sleeping segments
+must be excluded from aggregate evidence.
 
-§7 #3 (≥24h aggregate) and #4 (≥6 swaps) are unmet (latest: ~4h, 1 swap). They
-cannot accumulate while B2 keeps voiding segments. Not an independent blocker;
-resolves once B2 yields repeatable gap-free segments.
+### B3 — Aggregate volume: BLOCKED
+
+§7 #3 (≥24h aggregate) and #4 (≥6 swaps) are unmet (latest aggregate-eligible
+input: ~4h, 1 swap). This is now the independent remaining blocker: repeat the
+same policy in five more gap-free segments, then aggregate only the clean
+rollups.
 
 ### Route forward (no runtime code change implied)
 
-1. **Eliminate sleep for the segment window**: `caffeinate -dimsu` on AC power,
+1. **Eliminate sleep for the segment window**: `caffeinate -dis` on AC power,
    lid open; or `sudo pmset` to disable sleep for the window; keep the machine
-   unused during a segment.
+   unused during a segment. On the current host, `caffeinate -m` is unsupported
+   and `-u` exits quickly outside a user-idle assertion context.
 2. **Run segments only in confirmed-awake windows**, aggregate via the §2
    interrupted route (each segment internally gap-free; segment *boundaries* are
    allowed). Recommended `6 × 4h`, one swap per segment (§5, §10).

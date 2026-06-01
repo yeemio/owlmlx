@@ -147,7 +147,8 @@ gate. Session KV cache remains experimental: B-1a passed (Gemma 4-31B-it
 2.246× warm TTFT), B-1b passed (cache-on no-regress N=20), B-1c §1
 current-Mac `interrupted_no_swap_rehearsal=passed` @ ≈24.69h cumulative
 clean native segments, B-1c §2 (soak plus swap) has closed the drop / drift /
-swap-boundary subcriteria and is now in measurement-continuity closure
+swap-boundary / single-segment measurement-continuity subcriteria and is now in
+aggregate-volume closure
 (2026-05-22 boundary-safe 4h segment recorded `max_drift_bytes=352MB
 > 200MB budget`; 2026-05-24 Qwen-only no-swap probe reproduced the same
 352MB drift with cache drops/expirations/rejects all 0; 2026-05-25 accounting
@@ -160,11 +161,16 @@ Qwen-only samples with drops / expirations / rejects all 0, trim bypasses down
 to 3, and `max_drift_bytes=171704320 < 209715200`; the first swap-bearing
 prompt-reset segment (`20260525T061019Z`) kept drops / expirations / rejects at
 0, trim bypasses at 3, drift within budget (`171704320 < 209715200`), and the
-swap boundary clean, but its rollup is still `blocked` and
-`clean_for_interrupted_aggregate=false` because measurement wall-clock
-continuity failed (`measurement_wall_clock_gap_free=false`, 6 gap violations,
-max gap `7064.873s`). The next step is a gap-free repeat of the same
-swap-bearing §2 policy, not promotion per
+swap boundary clean, but could not count toward aggregate because measurement
+wall-clock continuity failed (`measurement_wall_clock_gap_free=false`, 6 gap
+violations, max gap `7064.873s`). The 2026-06-01 repeat
+(`20260601T025321Z`) ran the same 4h / 1-swap policy gap-free
+(`measurement_wall_clock_gap_free=true`, max gap `60.642s`) with drops /
+expirations / rejects all 0, trim bypasses still 3, `max_drift_bytes=171704320`,
+and `swap_boundaries_clean=true`; audit reports
+`clean_for_interrupted_aggregate=true`, while the segment rollup correctly
+remains `blocked` because 24h / 6 swaps are still unmet. The next step is five
+more gap-free repeat segments before any §2 pass or promotion review per
 `docs/architect/design/B-1c-section-2-spec.md §10`). Stage 1 refactor
 (2026-05-11) archived 151 spec-as-code modules; Stage 2 aligned landmark
 vocabulary with [PR #649][pr649]; Wave H · H1 (2026-05-17) extracted
