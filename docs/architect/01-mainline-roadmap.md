@@ -291,13 +291,14 @@
 
 #### Campaign B · 其他近期闭环（0–3 月）
 
-- B2：cache_manager 退出 scaffold-only，按 `release-floor-3-1-cache-scheduler-capability-audit.md` 选 1–2 个 extension point 实装；**不**实装跨用户共享
-- B3：scheduler_admission 加入 prefill warmup 决策权（与 Campaign C 联动）
+- B-2：mainstream prefix-cache compatibility closure（见 `files/goals/owlmlx/mainstream-prefix-cache-compatibility-closure-goal-contract.md` 与 `docs/architect/design/B-2-mainstream-prefix-cache-compatibility-spec.md`）。目标是把 explicit `X-Owlmlx-Session-Id` dogfood/control lane 与 OpenAI/Anthropic-compatible prefix-cache contract 分开：先做 read-only prefix-candidate classifier 与真实 cache metadata 规划，再在 B-1c §2 aggregate 通过后评估自动 safe reuse；**不**要求 OwlCoda/Codex 适配私有 header，**不**实装跨用户共享。
+- B-3：cache_manager 退出 scaffold-only，按 `release-floor-3-1-cache-scheduler-capability-audit.md` 选 1–2 个 extension point 实装；**不**实装跨用户共享
+- B-4：scheduler_admission 加入 prefill warmup 决策权（与 Campaign C 联动）
 
 #### Campaign B · 中期 / 远期 / 跨战役
 
 - **中期（3–6 月）**：workspace-aware safety boundary；session TTL/驱逐契约
-- **远期（6–12 月）**：跨模型版本 invalidation；prefix-cache 跨会话探针（status surface only）；量化-cache 共享可行性
+- **远期（6–12 月）**：跨模型版本 invalidation；量化-cache 共享可行性
 - **跨战役**：依赖 Campaign A（共用 N≥20 harness）；为 Campaign C/F 提供 cache 状态契约；**B-1 supported 晋级是 RC2（owlmlx native-only 能力）的最早期到达项**；B-1a 通过同时关闭 §VI 4-gate G1
 - **与 Campaign D 编排（决策 E3）**：D 不与 B-1a 抢资源；D1 启动时点 = B-1a 完成后
 

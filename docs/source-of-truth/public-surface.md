@@ -133,7 +133,11 @@ documented in its source-of-truth file.
 
 - `GET /v1/runtime/session-kv-cache` — `experimental` — native-backend
   session KV cache status for explicit `X-Owlmlx-Session-Id` reuse; see
-  `session-kv-cache-experimental.md`
+  `session-kv-cache-experimental.md`. This route is the current diagnostic
+  truth surface for the explicit session lane; it is not a mainstream
+  OpenAI/Anthropic prefix-cache contract. OpenAI `cached_tokens` and Anthropic
+  cache-read usage fields remain absent unless a later B-2 compatibility round
+  wires them to real runtime accounting.
 
 ## 4. Supported Runtime Modules / Python APIs
 
