@@ -19,6 +19,10 @@
   `/Users/yeemio/AI/gitrep/runtime-probes/mlx-vlm-mtp-probe-py311/.venv` because
   the older Python 3.14 probe venv cannot import MLX under current macOS system
   policy.
+- Added the operator probe script:
+  `scripts/runtime_gemma4_mtp_resident_probe.py`.
+- Added unit coverage for F-3.1 verdict classification and ledger fields:
+  `tests/test_runtime_gemma4_mtp_resident_probe.py`.
 
 ## Verified This Round
 
@@ -33,18 +37,28 @@
 - Programmatic API exists in the py311 env:
   `mlx_vlm.generate.load`, `mlx_vlm.generate.generate`,
   `mlx_vlm.generate.stream_generate`, and `PromptCacheState`.
+- The committed probe script's API inspection path passes:
+  `uv run python scripts/runtime_gemma4_mtp_resident_probe.py inspect-api`
+  reports `resident_api_candidate=true` with `mlx-vlm 0.5.0`,
+  `mlx-lm 0.31.3`, and `mlx 0.31.2`.
 - Focused tests still pass:
-  `uv run pytest tests/test_gemma4_mtp_drafter.py tests/test_mlx_vlm_mtp_runner.py -q`
-  → `12 passed`.
+  `uv run pytest tests/test_runtime_gemma4_mtp_resident_probe.py tests/test_gemma4_mtp_drafter.py tests/test_mlx_vlm_mtp_runner.py -q`
+  → `16 passed`.
+- Script compile check passes:
+  `uv run python -m py_compile scripts/runtime_gemma4_mtp_resident_probe.py`.
+- Host safety check: a B-1c native soak is currently running under
+  `eviction_soak.py` with `caffeinate`; the heavy Gemma4 resident probe was
+  not run in this round to avoid contaminating active memory evidence.
 
 ## Current Dominant Gap
 
 `f3-1-real-resident-probe-run`
 
 The local runtime can now import the relevant `mlx-vlm` stack and exposes a
-candidate programmatic resident surface. The next round should run the minimal
-Gemma4 target + assistant drafter probe only when host state is safe for a
-large model load, then emit the F-3.1 JSONL verdict.
+candidate programmatic resident surface, and owlmlx now has a reproducible
+operator probe that can emit the F-3.1 verdict ledger. The next round should
+run the minimal Gemma4 target + assistant drafter probe only when host state is
+safe for a large model load, then emit the F-3.1 JSONL verdict.
 
 ## Honest Claim Ceiling
 

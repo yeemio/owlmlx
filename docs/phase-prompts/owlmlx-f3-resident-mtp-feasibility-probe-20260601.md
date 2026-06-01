@@ -80,16 +80,22 @@ keeps F-3 design-ready but code-grade-blocked.
 
 ```bash
 uv run pytest tests/test_gemma4_mtp_drafter.py tests/test_mlx_vlm_mtp_runner.py -q
+uv run pytest tests/test_runtime_gemma4_mtp_resident_probe.py tests/test_gemma4_mtp_drafter.py tests/test_mlx_vlm_mtp_runner.py -q
+
+uv run python scripts/runtime_gemma4_mtp_resident_probe.py inspect-api
 
 /Users/yeemio/AI/gitrep/runtime-probes/mlx-vlm-mtp-probe-py311/.venv/bin/python - <<'PY'
 import importlib.metadata as m
 for name in ["mlx-vlm", "mlx-lm", "mlx"]:
     print(name, m.version(name))
 PY
+
+uv run python scripts/runtime_gemma4_mtp_resident_probe.py run-probe
 ```
 
-Run any heavy Gemma4 probe only after the API-surface inspection proves it is
-testing a real resident path rather than per-request CLI reload.
+Run the heavy Gemma4 probe only after the API-surface inspection proves it is
+testing a real resident path rather than per-request CLI reload, and only when
+no other memory-sensitive soak/evidence run is active on the host.
 
 ## Expected Outcome
 
