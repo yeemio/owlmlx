@@ -64,3 +64,26 @@ safe for a large model load, then emit the F-3.1 JSONL verdict.
 
 F-3 remains `experimental`. No F-3.2 resident backend, F-3.3 A/B benchmark, or
 `assistant_drafter` promotion has started.
+
+## Continuation Check: 2026-06-01T08:43Z
+
+- `mlx-lm #980` is still `CLOSED` as of a live `gh issue view` check, with
+  `closedAt=2026-04-14T23:24:14Z`. The latest visible issue comment
+  (2026-04-17) still reports a similar hybrid prefix-cache failure mode on a
+  different model, so F-3 must continue to rely on its own local resident
+  verdict rather than treating the closed issue as sufficient evidence.
+- Local model artifacts are present:
+  - target: `/Users/yeemio/AI/Agent/models/gemma-4-31B-it` (`58G`,
+    two safetensor shards);
+  - drafter:
+    `/Users/yeemio/AI/Agent/model-candidates/mlx-community/gemma-4-31B-it-assistant-bf16`
+    (`926M`, single safetensor file).
+- The probe script's `inspect-api` path still reports
+  `resident_api_candidate=true` in the py311 isolated env.
+- Targeted tests still pass:
+  `uv run pytest tests/test_runtime_gemma4_mtp_resident_probe.py tests/test_gemma4_mtp_drafter.py tests/test_mlx_vlm_mtp_runner.py -q`
+  -> `16 passed`.
+- The current B-1c native soak is still active (`eviction_soak.py` plus
+  `caffeinate`). Its latest ledger sample at `2026-06-01T08:42Z` shows
+  `elapsed_s=3353.233` of a `14400` second segment. The F-3 heavy resident
+  probe therefore remains queued behind the host-safety gate.
