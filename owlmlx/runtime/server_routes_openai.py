@@ -257,6 +257,7 @@ def _openai_response_dict(
     finish_reason: str = "stop",
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
+    cached_prompt_tokens: int | None = None,
     reasoning_trace_policy: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     usage = None
@@ -268,6 +269,10 @@ def _openai_response_dict(
             "completion_tokens": ct,
             "total_tokens": pt + ct,
         }
+        if cached_prompt_tokens is not None:
+            usage["prompt_tokens_details"] = {
+                "cached_tokens": max(int(cached_prompt_tokens), 0),
+            }
     message: dict[str, Any] = {"role": "assistant", "content": text}
     if reasoning_trace_policy is not None:
         message["owlmlx_reasoning_trace_policy"] = reasoning_trace_policy
@@ -352,12 +357,52 @@ def _openai_completion_dict(
     }
 
 
-def _anthropic_usage_dict(*, input_tokens: int | None, output_tokens: int | None) -> dict[str, int]:
+def _compat_cached_prompt_tokens(detail: dict[str, Any] | None) -> int | None:
+    if not isinstance(detail, dict):
+        return None
+    session_cache = detail.get("session_kv_cache")
+    if not isinstance(session_cache, dict):
+        return None
+    cached = session_cache.get("cached_prompt_tokens")
+    if cached is None:
+        return None
+    try:
+        return max(int(cached), 0)
+    except (TypeError, ValueError):
+        return None
+
+
+def _openai_usage_dict(
+    *,
+    prompt_tokens: int | None,
+    completion_tokens: int | None,
+    cached_prompt_tokens: int | None = None,
+) -> dict[str, Any]:
+    pt = int(prompt_tokens or 0)
+    ct = int(completion_tokens or 0)
+    usage: dict[str, Any] = {
+        "prompt_tokens": pt,
+        "completion_tokens": ct,
+        "total_tokens": pt + ct,
+    }
+    if cached_prompt_tokens is not None:
+        usage["prompt_tokens_details"] = {
+            "cached_tokens": max(int(cached_prompt_tokens), 0),
+        }
+    return usage
+
+
+def _anthropic_usage_dict(
+    *,
+    input_tokens: int | None,
+    output_tokens: int | None,
+    cache_read_input_tokens: int | None = None,
+) -> dict[str, int]:
     return {
         "input_tokens": int(input_tokens or 0),
         "output_tokens": int(output_tokens or 0),
         "cache_creation_input_tokens": 0,
-        "cache_read_input_tokens": 0,
+        "cache_read_input_tokens": max(int(cache_read_input_tokens or 0), 0),
     }
 
 
@@ -369,6 +414,7 @@ def _anthropic_message_dict(
     stop_reason: str = "end_turn",
     input_tokens: int | None = None,
     output_tokens: int | None = None,
+    cache_read_input_tokens: int | None = None,
 ) -> dict[str, Any]:
     return {
         "id": message_id,
@@ -381,6 +427,7 @@ def _anthropic_message_dict(
         "usage": _anthropic_usage_dict(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            cache_read_input_tokens=cache_read_input_tokens,
         ),
     }
 
@@ -456,6 +503,7 @@ def register_openai_compat_routes(
                     finish_reason=result.finish_reason or "stop",
                     prompt_tokens=result.prompt_tokens,
                     completion_tokens=result.completion_tokens,
+                    cached_prompt_tokens=_compat_cached_prompt_tokens(result.detail),
                     reasoning_trace_policy=reasoning_policy_payload,
                 ),
             )
@@ -466,6 +514,7 @@ def register_openai_compat_routes(
                 finish_reason = "stop"
                 prompt_tokens: int | None = None
                 completion_tokens: int | None = None
+                cached_prompt_tokens: int | None = None
                 async for event in runtime.generate_stream_messages(
                     messages,
                     model_id=target_model,
@@ -475,6 +524,11 @@ def register_openai_compat_routes(
                         prompt_tokens = event.prompt_tokens
                     if event.completion_tokens is not None:
                         completion_tokens = event.completion_tokens
+                    event_cached_prompt_tokens = _compat_cached_prompt_tokens(
+                        event.detail
+                    )
+                    if event_cached_prompt_tokens is not None:
+                        cached_prompt_tokens = event_cached_prompt_tokens
                     if event.finish_reason:
                         finish_reason = event.finish_reason
                     if event.event == "token":
@@ -517,12 +571,11 @@ def register_openai_compat_routes(
                         if policy_payload is not None:
                             done_chunk["owlmlx_reasoning_trace_policy"] = policy_payload
                         if prompt_tokens is not None or completion_tokens is not None:
-                            done_chunk["usage"] = {
-                                "prompt_tokens": int(prompt_tokens or 0),
-                                "completion_tokens": int(completion_tokens or 0),
-                                "total_tokens": int(prompt_tokens or 0)
-                                + int(completion_tokens or 0),
-                            }
+                            done_chunk["usage"] = _openai_usage_dict(
+                                prompt_tokens=prompt_tokens,
+                                completion_tokens=completion_tokens,
+                                cached_prompt_tokens=cached_prompt_tokens,
+                            )
                         yield f"data: {json.dumps(done_chunk)}\n\n"
                         yield "data: [DONE]\n\n"
                         return
@@ -574,6 +627,13 @@ def register_openai_compat_routes(
                             }
                         ],
                     }
+                    cached_prompt_tokens = _compat_cached_prompt_tokens(event.detail)
+                    if cached_prompt_tokens is not None:
+                        chunk["usage"] = _openai_usage_dict(
+                            prompt_tokens=event.prompt_tokens,
+                            completion_tokens=event.completion_tokens,
+                            cached_prompt_tokens=cached_prompt_tokens,
+                        )
                     yield f"data: {json.dumps(chunk)}\n\n"
                     yield "data: [DONE]\n\n"
                     return
@@ -638,6 +698,9 @@ def register_openai_compat_routes(
                             stop_reason="tool_use" if result.finish_reason == "tool_use" else "end_turn",
                             input_tokens=result.prompt_tokens or input_tokens,
                             output_tokens=result.completion_tokens,
+                            cache_read_input_tokens=_compat_cached_prompt_tokens(
+                                result.detail
+                            ),
                         ),
                         "content": (
                             [
@@ -657,6 +720,7 @@ def register_openai_compat_routes(
             )
 
         async def anthropic_sse_source():
+            stream_cache_read_input_tokens: int | None = None
             yield (
                 "event: message_start\n"
                 f"data: {json.dumps({'type': 'message_start', 'message': _anthropic_message_dict(message_id=message_id, model=target_model or 'unknown', text='', stop_reason=None, input_tokens=input_tokens, output_tokens=0)})}\n\n"
@@ -667,6 +731,9 @@ def register_openai_compat_routes(
                 model_id=target_model,
                 **params,
             ):
+                event_cached_prompt_tokens = _compat_cached_prompt_tokens(event.detail)
+                if event_cached_prompt_tokens is not None:
+                    stream_cache_read_input_tokens = event_cached_prompt_tokens
                 if event.event == "token":
                     if not text_block_started:
                         yield (
@@ -717,6 +784,10 @@ def register_openai_compat_routes(
                         "delta": {"stop_reason": "tool_use" if event.finish_reason == "tool_use" else "end_turn", "stop_sequence": None},
                         "usage": {"output_tokens": int(event.completion_tokens or 0)},
                     }
+                    if stream_cache_read_input_tokens is not None:
+                        message_delta["usage"]["cache_read_input_tokens"] = (
+                            stream_cache_read_input_tokens
+                        )
                     yield f"event: message_delta\ndata: {json.dumps(message_delta)}\n\n"
                     yield "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
                     return

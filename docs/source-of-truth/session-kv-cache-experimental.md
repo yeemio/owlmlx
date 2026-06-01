@@ -111,8 +111,8 @@ This surface does **not** imply any of the following:
 - non-stream `generate` cross-request reuse
 - paged KV
 - continuous batching
-- OpenAI `usage.prompt_tokens_details.cached_tokens`
-- Anthropic `cache_read_input_tokens`
+- automatic OpenAI `usage.prompt_tokens_details.cached_tokens`
+- automatic Anthropic `cache_read_input_tokens`
 
 The current experimental observability source is:
 
@@ -121,10 +121,13 @@ GET /v1/runtime/session-kv-cache
 /v1/runtime/status -> backend.detail.session_kv_cache
 ```
 
-OpenAI/Anthropic compatibility usage payloads currently do not carry OwlMLX
-session-cache hit/miss counters. That is an OwlMLX compatibility gap to close,
-not something upper layers should normalize as their permanent integration
-burden.
+As of B-2.2, compatibility routes may mirror cached-token counts into OpenAI
+`usage.prompt_tokens_details.cached_tokens` or Anthropic
+`cache_read_input_tokens` only when the backend event/result carries real
+per-request `session_kv_cache.cached_prompt_tokens` metadata. They must not
+infer request-level cache hits from aggregate `/v1/runtime/session-kv-cache`
+counters. Automatic safe prefix reuse remains a separate B-2.3 gap, not
+something upper layers should normalize as their permanent integration burden.
 
 Session lifetime and cleanup are currently runtime-side TTL / unload / pressure
 behaviors, not a stable external clear-session API. If a future release adds an

@@ -10,7 +10,7 @@ from owlmlx.host_pressure import host_pressure_not_sampled_snapshot
 from owlmlx.runtime.backends import FakeBackend
 from owlmlx.runtime.kernel import RuntimeKernel
 from owlmlx.runtime.server import create_app
-from owlmlx.runtime.types import GenerateCohortResult
+from owlmlx.runtime.types import GenerateCohortResult, GenerateResult
 
 
 class _RecordingBackend(FakeBackend):
@@ -36,8 +36,40 @@ class _RecordingBackend(FakeBackend):
         return super().generate_cohort(model_id, prompts, **kwargs)
 
 
+class _CacheMetadataBackend(_RecordingBackend):
+    def generate_messages(self, model_id: str, messages, **kwargs: object):
+        self.last_kwargs = dict(kwargs)
+        return GenerateResult(
+            ok=True,
+            message="generated with real cache metadata",
+            model_id=model_id,
+            text="cached response",
+            finish_reason="stop",
+            prompt_tokens=8,
+            completion_tokens=2,
+            detail={
+                "session_kv_cache": {
+                    "cached_prompt_tokens": 5,
+                    "cache_decision": "reuse",
+                    "cache_reason_code": "session_cache_hit",
+                }
+            },
+        )
+
+
 def _client_with_recording_backend() -> tuple[TestClient, _RecordingBackend]:
     backend = _RecordingBackend()
+    kernel = RuntimeKernel(
+        backend,
+        host_pressure_sampler=host_pressure_not_sampled_snapshot,
+    )
+    loaded = kernel.load_model("fake-model")
+    assert loaded.ok is True
+    return TestClient(create_app(kernel)), backend
+
+
+def _client_with_cache_metadata_backend() -> tuple[TestClient, _CacheMetadataBackend]:
+    backend = _CacheMetadataBackend()
     kernel = RuntimeKernel(
         backend,
         host_pressure_sampler=host_pressure_not_sampled_snapshot,
@@ -102,3 +134,41 @@ def test_openai_chat_usage_does_not_fabricate_cached_tokens() -> None:
     usage = response.json()["usage"]
     assert usage["prompt_tokens"] >= 1
     assert "prompt_tokens_details" not in usage
+
+
+def test_openai_chat_usage_maps_real_cached_tokens_from_backend_detail() -> None:
+    client, _backend = _client_with_cache_metadata_backend()
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-model",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 2,
+        },
+    )
+
+    assert response.status_code == 200
+    usage = response.json()["usage"]
+    assert usage["prompt_tokens"] == 8
+    assert usage["completion_tokens"] == 2
+    assert usage["prompt_tokens_details"]["cached_tokens"] == 5
+
+
+def test_anthropic_usage_maps_real_cached_tokens_from_backend_detail() -> None:
+    client, _backend = _client_with_cache_metadata_backend()
+
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-model",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 2,
+        },
+    )
+
+    assert response.status_code == 200
+    usage = response.json()["usage"]
+    assert usage["input_tokens"] == 8
+    assert usage["output_tokens"] == 2
+    assert usage["cache_read_input_tokens"] == 5

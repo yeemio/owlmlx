@@ -33,9 +33,9 @@ Current verified truth:
 - Native streaming can reuse an explicit `(session_id, model_id)` prompt cache.
 - Non-stream `generate` still uses a fresh single-request cache.
 - `/v1/runtime/session-kv-cache` is the diagnostic status surface.
-- OpenAI usage does not report `prompt_tokens_details.cached_tokens`.
-- Anthropic cache usage is absent or zero; it is not real runtime cache-hit
-  accounting.
+- B-2.2 now maps OpenAI `prompt_tokens_details.cached_tokens` and Anthropic
+  `cache_read_input_tokens` only when backend event/result detail carries real
+  `session_kv_cache.cached_prompt_tokens` metadata for the current request.
 - B-1c section 2 remains aggregate-blocked: one clean 4h/one-swap segment is
   not a 24h/6-swap pass.
 
@@ -122,6 +122,8 @@ Pass:
 - Tests prove no cache handle is reused and no reuse claim is emitted.
 
 ### 5.3 B-2.2 Real Cache Metadata Plumbing
+
+Status: landed on 2026-06-01.
 
 Scope:
 
@@ -277,7 +279,8 @@ After B-2.1:
 After B-2.2:
 
 - OwlMLX may claim compatibility-visible cache accounting only for runtime paths
-  that report real cached-token counts.
+  that report real cached-token counts. It must not claim automatic safe prefix
+  reuse or infer per-request counts from aggregate status counters.
 
 After B-2.3:
 
@@ -303,3 +306,6 @@ The next code-grade round should implement B-2.1 only:
   compatibility closure.
 - 2026-06-01: B-2.1 read-only prefix-candidate classifier landed with focused
   tests; automatic reuse and cached-token usage fields remain future stages.
+- 2026-06-01: B-2.2 real cache metadata plumbing landed. Native stream events
+  carry per-request `session_kv_cache.cached_prompt_tokens`, and
+  OpenAI/Anthropic compatibility usage maps that field only when present.

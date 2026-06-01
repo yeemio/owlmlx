@@ -131,12 +131,14 @@ truth.
 It is experimental, default-off, and scoped to explicit `X-Owlmlx-Session-Id`
 callers. Product layers must not treat its presence as support for paged KV,
 continuous batching, implicit prefix matching, or subprocess cache reuse.
-Its counters are runtime diagnostics; they are not mirrored into OpenAI
-`usage.prompt_tokens_details.cached_tokens` or Anthropic
-`cache_read_input_tokens`. That absence is an OwlMLX compatibility gap, not a
-permanent product-layer adaptation requirement. Until OwlMLX closes it,
-upper-layer consumers must treat `GET /v1/runtime/session-kv-cache` and this
-diagnostic section as experimental operator/debug truth only.
+As of B-2.2, compatibility routes may mirror per-request cached-token counts
+into OpenAI `usage.prompt_tokens_details.cached_tokens` or Anthropic
+`cache_read_input_tokens` only when a backend event/result carries real
+`session_kv_cache.cached_prompt_tokens` metadata for that request. They must
+not synthesize these fields from aggregate status counters. Until automatic
+safe prefix reuse closes, upper-layer consumers must still treat
+`GET /v1/runtime/session-kv-cache` and this diagnostic section as experimental
+operator/debug truth only.
 
 `GET /healthz` is also frozen as a smaller liveness contract in Stabilization-1:
 

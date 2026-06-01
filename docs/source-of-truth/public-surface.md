@@ -135,9 +135,10 @@ documented in its source-of-truth file.
   session KV cache status for explicit `X-Owlmlx-Session-Id` reuse; see
   `session-kv-cache-experimental.md`. This route is the current diagnostic
   truth surface for the explicit session lane; it is not a mainstream
-  OpenAI/Anthropic prefix-cache contract. OpenAI `cached_tokens` and Anthropic
-  cache-read usage fields remain absent unless a later B-2 compatibility round
-  wires them to real runtime accounting.
+  OpenAI/Anthropic prefix-cache contract. B-2.2 allows OpenAI `cached_tokens`
+  and Anthropic cache-read usage fields only when the backend event/result
+  carries real per-request cache metadata; automatic safe prefix reuse without
+  the private header remains unimplemented.
 
 ## 4. Supported Runtime Modules / Python APIs
 

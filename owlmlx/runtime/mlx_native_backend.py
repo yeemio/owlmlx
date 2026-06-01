@@ -661,6 +661,35 @@ class MlxNativeBackend:
             byte_estimate_delta=byte_estimate_delta,
         )
 
+    def _session_cache_stream_detail(
+        self,
+        prepared: _PreparedPromptCache | None,
+    ) -> dict[str, Any]:
+        if (
+            prepared is None
+            or not prepared.session_cache_active
+            or prepared.prompt_tokens is None
+        ):
+            return {}
+        cached_prompt_tokens = (
+            prepared.common_prefix_token_count
+            if prepared.cache_decision == "reuse"
+            else 0
+        )
+        return {
+            "session_kv_cache": {
+                "capability_label": "experimental",
+                "cache_decision": prepared.cache_decision,
+                "cache_reason_code": prepared.cache_reason_code,
+                "cached_prompt_tokens": max(int(cached_prompt_tokens or 0), 0),
+                "prompt_token_count": len(prepared.prompt_tokens),
+                "previous_prompt_token_count": prepared.previous_prompt_token_count,
+                "common_prefix_token_count": prepared.common_prefix_token_count,
+                "suffix_token_count": prepared.suffix_token_count,
+                "exact_prompt_hit": prepared.exact_prompt_hit,
+            }
+        }
+
     def _release_active_cache(self, session: _NativeSession) -> None:
         """Hand the active cache handle back to the manager. Idempotent.
 
@@ -1227,10 +1256,17 @@ class MlxNativeBackend:
                 event="done",
                 model_id=model_id,
                 sequence=sequence,
+                prompt_tokens=(
+                    len(prepared_cache.prompt_tokens)
+                    if prepared_cache is not None
+                    and prepared_cache.prompt_tokens is not None
+                    else None
+                ),
                 completion_tokens=completion_tokens,
                 finish_reason=finish_reason or "stop",
                 wait_time_s=wait_time_s,
                 was_queued=was_queued,
+                detail=self._session_cache_stream_detail(prepared_cache),
             )
         finally:
             # C-1.2: release the active cache handle on terminal yield, on

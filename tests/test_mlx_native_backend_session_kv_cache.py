@@ -150,6 +150,14 @@ def test_native_session_kv_cache_stream_reuses_prompt_cache_with_suffix_tokens(
         assert fake._seen_stream_prompts[0] == [ord(ch) for ch in "prefix A"]
         assert fake._seen_stream_prompts[1] == [ord("B")]
         assert fake._trim_calls == [1, 1, 1]
+        assert second[-1].detail["session_kv_cache"]["cache_decision"] == "reuse"
+        assert second[-1].detail["session_kv_cache"]["cache_reason_code"] == (
+            "session_cache_hit"
+        )
+        assert second[-1].detail["session_kv_cache"]["cached_prompt_tokens"] == len(
+            "prefix "
+        )
+        assert second[-1].detail["session_kv_cache"]["suffix_token_count"] == 1
         assert backend._cache_manager.counters().entries == 0
         status = backend.status().detail["session_kv_cache"]
         assert status["enabled"] is True

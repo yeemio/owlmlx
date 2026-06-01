@@ -93,10 +93,9 @@ missing primitive precisely. Do not reframe the private header as the solution.
 - Non-stream `generate` remains fresh single-request cache today.
 - The current OpenAI / Anthropic compatibility routes can forward the explicit
   header, but they do not derive a mainstream cache scope by themselves.
-- OpenAI compatibility responses do not currently report
-  `usage.prompt_tokens_details.cached_tokens`.
-- Anthropic compatibility responses currently report cache usage as absent or
-  zero, not as real cache-hit accounting.
+- B-2.2 maps OpenAI `usage.prompt_tokens_details.cached_tokens` and Anthropic
+  `cache_read_input_tokens` only when backend event/result detail carries real
+  `session_kv_cache.cached_prompt_tokens` metadata for the current request.
 - `/v1/runtime/session-kv-cache` remains the diagnostic truth surface for the
   explicit session lane.
 - B-1c section 2 has one recent gap-free swap-bearing segment, but the
@@ -114,8 +113,7 @@ missing primitive precisely. Do not reframe the private header as the solution.
 3. No design-grade B-2 spec freezes the safe automatic-prefix candidate rules,
    usage-accounting rules, and promotion ceiling.
 4. No read-only prefix-candidate classifier exists yet.
-5. No compatibility-visible cached-token accounting exists yet.
-6. No automatic safe prefix reuse exists yet.
+5. No automatic safe prefix reuse exists yet.
 
 ## dominant_next_gap
 
