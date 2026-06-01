@@ -1,6 +1,6 @@
 # B-2 Mainstream Prefix-Cache Compatibility Spec
 
-> Status: design-grade spec; B-2.1 classifier landed
+> Status: design-grade spec; B-2.1 classifier and B-2.2 metadata plumbing landed; B-2.3 blocked on B-1c section 2 aggregate stability
 > Updated: 2026-06-01
 > Campaign: B-2
 > Parent goal:
@@ -289,16 +289,24 @@ After B-2.3:
 
 No stage in this spec independently promotes B-1 to `supported`.
 
-## 12. Code-Grade Handoff
+## 12. Next Handoff
 
-The next code-grade round should implement B-2.1 only:
+The next round is not B-2.3 code-grade yet. B-2.3 is blocked until B-1c
+section 2 provides sufficient aggregate stability for real cache-handle reuse.
 
-1. Add the prefix-candidate classifier.
-2. Keep it read-only.
-3. Add tests for the reason-code matrix.
-4. Do not wire automatic cache reuse.
-5. Do not add OpenAI / Anthropic cached-token fields yet unless real runtime
-   metadata already exists in the same round.
+Immediate handoff:
+
+1. Continue B-1c section 2 gap-free prompt-reset swap segments.
+2. Aggregate only segments with `measurement_wall_clock_gap_free=true` and clean
+   cache/drop/swap-boundary audit results.
+3. Keep automatic prefix reuse disabled and unimplemented.
+4. Refresh this spec only when B-1c section 2 either passes the aggregate gate
+   or produces a new blocker that changes B-2.3 feasibility.
+
+When the prerequisite is met, the first B-2.3 code-grade round may wire
+classifier-gated automatic reuse behind an explicit runtime flag. That future
+round must prove ineligible requests fall back to fresh cache and that
+compatibility usage counters match real per-request runtime metadata.
 
 ## 13. Change Log
 
@@ -309,3 +317,6 @@ The next code-grade round should implement B-2.1 only:
 - 2026-06-01: B-2.2 real cache metadata plumbing landed. Native stream events
   carry per-request `session_kv_cache.cached_prompt_tokens`, and
   OpenAI/Anthropic compatibility usage maps that field only when present.
+- 2026-06-01: Updated next handoff after B-2.1/B-2.2 landed. B-2.3 automatic
+  reuse remains blocked on B-1c section 2 aggregate stability, so the dominant
+  execution path returns to clean gap-free prompt-reset swap segments.

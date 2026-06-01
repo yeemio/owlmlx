@@ -1,7 +1,7 @@
 # owlmlx Goal Contract: Mainstream Prefix-Cache Compatibility Closure
 
 > Status: active goal contract
-> Updated: 2026-06-01
+> Updated: 2026-06-01 after B-2.1/B-2.2 landed
 
 ## goal_id
 
@@ -93,6 +93,9 @@ missing primitive precisely. Do not reframe the private header as the solution.
 - Non-stream `generate` remains fresh single-request cache today.
 - The current OpenAI / Anthropic compatibility routes can forward the explicit
   header, but they do not derive a mainstream cache scope by themselves.
+- B-2.1 adds a read-only prefix-candidate classifier with stable reason codes;
+  it proves eligibility/ineligibility for future reuse but does not return or
+  mutate cache handles.
 - B-2.2 maps OpenAI `usage.prompt_tokens_details.cached_tokens` and Anthropic
   `cache_read_input_tokens` only when backend event/result detail carries real
   `session_kv_cache.cached_prompt_tokens` metadata for the current request.
@@ -104,28 +107,25 @@ missing primitive precisely. Do not reframe the private header as the solution.
 
 ## remaining_gaps
 
-1. Source-of-truth documents still contain stale wording that says native
-   cross-request KV reuse is fully `not_in_scope`, even though the explicit
-   session lane now exists as `experimental`.
-2. The roadmap still parks mainstream prefix-cache compatibility as a distant
-   status-surface probe instead of the OwlMLX-owned replacement-grade gap now
-   selected for closure.
-3. No design-grade B-2 spec freezes the safe automatic-prefix candidate rules,
-   usage-accounting rules, and promotion ceiling.
-4. No read-only prefix-candidate classifier exists yet.
-5. No automatic safe prefix reuse exists yet.
+1. B-1c section 2 still needs aggregate stability: the current clean evidence
+   volume is below the 24h / 6-swap gate required before real cache-handle reuse
+   can be considered.
+2. B-2.3 automatic safe prefix reuse is not implemented and must remain blocked
+   until B-1c section 2 aggregate stability passes.
+3. The explicit `X-Owlmlx-Session-Id` lane is still the only runtime path that
+   can physically reuse a cache handle today; it remains experimental and must
+   not be presented as the mainstream consumer contract.
+4. Source-of-truth docs must continue to distinguish three separate facts:
+   classifier diagnostics, compatibility-visible real cached-token accounting,
+   and actual automatic reuse.
 
 ## dominant_next_gap
 
-`B-2-mainstream-prefix-cache-compatibility-design-grade`
+`B-1c-section-2-aggregate-stability-for-B-2.3`
 
-The next executable closure is not automatic cache-handle reuse. It is to freeze
-the B-2 contract and first code-grade slices:
-
-1. correct stale source-of-truth wording;
-2. document the mainstream compatibility target and explicit-header ceiling;
-3. define a read-only prefix-candidate classifier that proves eligibility
-   without reusing a cache object;
-4. define how real cache-hit counts may later flow into OpenAI / Anthropic
-   usage fields without fabrication;
-5. archive the next code-grade prompt.
+The next executable closure is not another consumer-side adapter and not F-3
+runtime work. B-2.1 and B-2.2 are already landed; the dominant blocker is the
+B-1c section 2 aggregate gate that B-2.3 explicitly depends on. Continue
+gap-free 4h/one-swap prompt-reset segments, aggregate only clean
+`measurement_wall_clock_gap_free=true` segments, and keep B-2.3 automatic reuse
+blocked until the 24h / 6-swap prerequisite is honestly met.
