@@ -86,7 +86,8 @@ the mainline is free to move. Options from here:
 - **Continue F-4** (structured-output depth): gemma residual N≥1000 probe, or a
   `thinking_tag_closed` reasoning-aware redesign (see §6).
 - **Switch mainline — runtime base**: B-1c session-kv / cache stability (B-1c §2
-  soak+swap still blocked on the drift budget).
+  soak+swap still blocked on aggregate / policy evidence under high-frequency
+  swap cadence).
 - **Switch mainline — product value**: wire the `function_call_arguments` /
   `nested_object` lane into a real OwlCoda tool-call consumer.
 

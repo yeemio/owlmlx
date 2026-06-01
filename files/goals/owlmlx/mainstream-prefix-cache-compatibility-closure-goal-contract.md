@@ -132,15 +132,15 @@ missing primitive precisely. Do not reframe the private header as the solution.
 
 ## remaining_gaps
 
-1. B-1c section 2 still needs aggregate stability: the current clean evidence
-   volume is below the 24h / 6-swap gate required before real cache-handle reuse
-   can be considered. The operator-paused `20260601T074541Z` ledger does not
-   reduce this gap because it ended before any swap boundary.
-2. The immediate executable gap is no longer passive duration. It is fast-swap
-   same-model drift-gate triage: decide whether the raw 751MB Gemma drift
-   remains a hard promotion blocker, or whether direct `cache_object_nbytes`
-   resident working-set accounting with zero unaccounted same-model drift is
-   the correct gate before B-2.3 consumes this evidence.
+1. B-1c section 2 still needs aggregate / policy evidence: the current clean
+   evidence volume is below the 24h / 6-swap gate required before real
+   cache-handle reuse can be considered. The operator-paused `20260601T074541Z`
+   ledger does not reduce this gap because it ended before any swap boundary.
+2. The immediate false blocker is closed: raw 751MB Gemma same-model drift is
+   accepted only when direct `cache_object_nbytes` resident working-set
+   accounting is available, resident cache bytes stay within budget, and
+   unaccounted same-model drift stays within the raw drift budget. Do not carry
+   this forward as a generic raw-RSS leak claim.
 3. B-2.3 automatic safe prefix reuse is not implemented and must remain blocked
    until B-1c section 2 aggregate stability passes.
 4. The explicit `X-Owlmlx-Session-Id` lane is still the only runtime path that
@@ -152,16 +152,13 @@ missing primitive precisely. Do not reframe the private header as the solution.
 
 ## dominant_next_gap
 
-`B-1c-section-2-fast-swap-same-model-drift-triage-for-B-2.3`
+`B-1c-section-2-high-frequency-swap-aggregate-policy-for-B-2.3`
 
 The next executable closure is not another consumer-side adapter and not F-3
-runtime work. B-2.1 and B-2.2 are already landed; the dominant blocker is the
-B-1c section 2 fast-swap drift failure that B-2.3 explicitly depends on. Do not
-run another passive 4h topoff to answer this question. First triage the
-`20260601T125751Z` 5-minute-cadence canary: boundaries were clean, the legacy
-46.8GB number was a cross-model baseline artifact, and the actionable raw
-same-model drift is 751MB on Gemma. Keep B-2.3 automatic reuse blocked as a
-capability claim until this blocker is closed and the 24h / 6-swap prerequisite
-is honestly met. The `20260601T134131Z` follow-up proves the resident working
-set can now be measured directly (`cache_object_nbytes`) and fully accounts for
-the Gemma drift; it does not by itself relax the raw gate.
+runtime work. B-2.1 and B-2.2 are already landed; the dominant blocker is B-1c
+section 2 aggregate / policy evidence under high-frequency swap stress. Do not
+run another passive 4h topoff with one switch. Keep the 5-minute cadence as the
+stress shape: boundaries were clean, the legacy 46.8GB number was a cross-model
+baseline artifact, and the raw 751MB Gemma same-model drift is fully accounted
+for by direct cache-object resident bytes. Keep B-2.3 automatic reuse blocked as
+a capability claim until the aggregate / policy prerequisite is honestly met.

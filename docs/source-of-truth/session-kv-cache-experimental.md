@@ -134,8 +134,10 @@ also reports resident-cache accounting mode. When upstream prompt-cache objects
 expose `nbytes`, OwlMLX records `resident_bytes_estimate_mode=cache_object_nbytes`
 and `resident_bytes_estimate_modes` rather than relying only on positive
 active-memory delta upper bounds. This is stronger operator evidence for the
-held cache working set, but it remains diagnostic and does not relax B-1c or
-B-2 promotion gates by itself.
+held cache working set. B-1c §2 now accepts this as the narrow functional drift
+gate only when the estimate kind is `cache_object_nbytes`, resident cache bytes
+stay within budget, and unaccounted same-model drift stays within the raw drift
+budget. It does not relax the aggregate / supported promotion gate by itself.
 
 Session lifetime and cleanup are currently runtime-side TTL / unload / pressure
 behaviors, not a stable external clear-session API. If a future release adds an
@@ -166,8 +168,9 @@ The same payload is also visible at:
 > the B-1c framework. The live promotion gate is **B-1a + B-1b + B-1c §1 + B-1c §2**
 > together (the §1a Promotion Gate). B-1c §2 (≥24h aggregate soak + ≥6 model
 > swaps, every segment wall-clock-gap-free) is currently **`blocked` on
-> aggregate volume**: the 2026-06-01 repeat produced one gap-free 4h / 1-swap
-> aggregate-clean segment, but 24h / 6 swaps are still unmet. See
+> aggregate volume / policy**, not on the raw-RSS false-fail: the reviewed
+> direct cache-object resident gate closes the Gemma fast-swap drift false-fail,
+> but the completed evidence is still below the aggregate gate. See
 > `runtime-capability-matrix.md` (session-KV row) +
 > `docs/architect/design/B-1c-section-2-spec.md` §11. The `experimental` label
 > below is still correct; the *criteria* below are not the current ones.

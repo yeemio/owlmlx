@@ -64,6 +64,7 @@ DEFAULT_PROMPT = "Reply with exactly: owlmlx eviction soak"
 B1C1_DURATION_S = 24 * 60 * 60
 B1C1_SAMPLE_INTERVAL_S = 60.0
 B1C1_DRIFT_BUDGET_BYTES = 200 * 1024 * 1024
+B1C2_RESIDENT_CACHE_WORKING_SET_BUDGET_BYTES = 2 * BYTES_PER_GB
 B1C1_WARMUP_CYCLES = 1
 B1C2_REQUIRED_SWAP_COUNT = 6
 B1C1_WALL_CLOCK_GAP_FACTOR = 3.0
@@ -996,6 +997,11 @@ def _b1b_rollup(
 def _b1c1_max_drift_bytes(profile: MachineMemoryProfile) -> int:
     host_budget_bytes = int(profile.serving_budget_gb * BYTES_PER_GB * 0.005)
     return min(B1C1_DRIFT_BUDGET_BYTES, host_budget_bytes)
+
+
+def _b1c2_resident_cache_budget_bytes(profile: MachineMemoryProfile) -> int:
+    host_budget_bytes = int(profile.serving_budget_gb * BYTES_PER_GB * 0.02)
+    return min(B1C2_RESIDENT_CACHE_WORKING_SET_BUDGET_BYTES, host_budget_bytes)
 
 
 def _b1c1_default_session_cache_ttl_s(
@@ -2104,6 +2110,7 @@ def _b1c2_rollup(
     required_duration_s: float,
     required_swap_count: int,
     drift_budget_bytes: int,
+    resident_cache_budget_bytes: int,
     initial_load: Any,
     cleanup_unload: Any | None,
     cleanup_settle: SettleResult | None,
@@ -2253,8 +2260,36 @@ def _b1c2_rollup(
         and all(record.get("sample_verdict") == "passed" for record in sample_records)
         and all_swaps_clean
     )
-    drift_ok = max_drift_bytes is not None and max_drift_bytes <= drift_budget_bytes
-    cleanup_ok = bool(cleanup_unload.ok) if cleanup_unload is not None else not bool(initial_load.ok)
+    raw_drift_ok = max_drift_bytes is not None and max_drift_bytes <= drift_budget_bytes
+    unaccounted_drift_ok = (
+        max_unaccounted_session_kv_drift_bytes is not None
+        and max_unaccounted_session_kv_drift_bytes <= drift_budget_bytes
+    )
+    resident_cache_ok = (
+        max_session_cache_resident_bytes is not None
+        and max_session_cache_resident_bytes <= resident_cache_budget_bytes
+    )
+    resident_accounted_drift_ok = (
+        max_drift_bytes is not None
+        and resident_estimate_kind == "cache_object_nbytes"
+        and unaccounted_drift_ok
+        and resident_cache_ok
+    )
+    drift_ok = raw_drift_ok or resident_accounted_drift_ok
+    if raw_drift_ok:
+        drift_gate_mode = "raw_same_model_active_memory"
+        drift_gate_reason = "raw_same_model_load_epoch_drift_within_budget"
+    elif resident_accounted_drift_ok:
+        drift_gate_mode = "cache_object_resident_accounted"
+        drift_gate_reason = (
+            "raw_drift_explained_by_direct_session_kv_cache_object_nbytes"
+        )
+    else:
+        drift_gate_mode = "failed"
+        drift_gate_reason = "raw_or_resident_accounted_drift_gate_not_satisfied"
+    cleanup_ok = (
+        bool(cleanup_unload.ok) if cleanup_unload is not None else not bool(initial_load.ok)
+    )
     hard_failure = (
         bool(records)
         and (
@@ -2333,13 +2368,24 @@ def _b1c2_rollup(
         "max_drift_bytes": max_drift_bytes,
         "drift_budget_bytes": drift_budget_bytes,
         "max_drift_within_budget": drift_ok,
+        "drift_gate": {
+            "ok": drift_ok,
+            "mode": drift_gate_mode,
+            "reason": drift_gate_reason,
+            "raw_same_model_load_epoch_drift_within_budget": raw_drift_ok,
+            "resident_accounted_drift_within_budget": resident_accounted_drift_ok,
+            "unaccounted_session_kv_drift_within_budget": unaccounted_drift_ok,
+            "resident_cache_working_set_within_budget": resident_cache_ok,
+            "drift_budget_bytes": drift_budget_bytes,
+            "resident_cache_working_set_budget_bytes": resident_cache_budget_bytes,
+        },
         "active_memory_drift_accounting": {
             **active_memory_drift_accounting,
             "legacy_global_measurement_start_max_drift_bytes": (
                 legacy_global_max_drift_bytes
             ),
-            "same_model_load_epoch_drift_within_budget": drift_ok,
-            "used_for_segment_gate": True,
+            "same_model_load_epoch_drift_within_budget": raw_drift_ok,
+            "used_for_segment_gate": drift_gate_mode == "raw_same_model_active_memory",
         },
         "session_kv_drift_accounting": {
             "mode": (
@@ -2352,9 +2398,11 @@ def _b1c2_rollup(
             "max_unaccounted_session_kv_drift_bytes": (
                 max_unaccounted_session_kv_drift_bytes
             ),
-            "unaccounted_drift_within_budget": (
-                max_unaccounted_session_kv_drift_bytes is not None
-                and max_unaccounted_session_kv_drift_bytes <= drift_budget_bytes
+            "resident_cache_working_set_budget_bytes": resident_cache_budget_bytes,
+            "resident_cache_working_set_within_budget": resident_cache_ok,
+            "unaccounted_drift_within_budget": unaccounted_drift_ok,
+            "used_for_segment_gate": (
+                drift_gate_mode == "cache_object_resident_accounted"
             ),
             "used_for_promotion_gate": False,
         },
@@ -2445,6 +2493,7 @@ def run_b1c2_soak_plus_swap(
         warning_threshold_gb=max(profile_memory_gb - 10.0, 1.0),
     )
     drift_budget_bytes = _b1c1_max_drift_bytes(profile)
+    resident_cache_budget_bytes = _b1c2_resident_cache_budget_bytes(profile)
     timestamp = _now_compact_utc()
     run_id = f"{timestamp}-{runtime}-{backend}-{B1C2_GATE}"
     output_path = output_dir / _b1c2_filename(timestamp, rotation_label=rotation_label)
@@ -2864,6 +2913,7 @@ def run_b1c2_soak_plus_swap(
         required_duration_s=required_duration_s,
         required_swap_count=required_swap_count,
         drift_budget_bytes=drift_budget_bytes,
+        resident_cache_budget_bytes=resident_cache_budget_bytes,
         initial_load=initial_load,
         cleanup_unload=cleanup_unload,
         cleanup_settle=cleanup_settle,

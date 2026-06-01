@@ -384,6 +384,7 @@ def audit_b1c2_segment_rollup(path: Path) -> dict[str, Any]:
         ),
         "max_drift_bytes": record.get("max_drift_bytes"),
         "max_drift_within_budget": record.get("max_drift_within_budget"),
+        "drift_gate": record.get("drift_gate"),
         "session_kv_drift_accounting": record.get("session_kv_drift_accounting"),
         "swap_boundaries_clean": record.get("swap_boundaries_clean"),
         "graduates": record.get("graduates", {}),

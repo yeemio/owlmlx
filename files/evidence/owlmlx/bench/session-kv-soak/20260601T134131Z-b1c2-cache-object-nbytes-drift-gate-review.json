@@ -1,0 +1,40 @@
+{
+  "canonical_aggregate_status": "blocked_volume_only",
+  "canonical_blockers": [
+    "duration_requirement_met=false",
+    "swap_requirement_met=false"
+  ],
+  "canonical_required_duration_s": 86400,
+  "canonical_required_swap_count": 6,
+  "claim_ceiling": "Does not claim B-1c section 2 graduation or supported session KV cache; it only reclassifies the short 5-minute-swap canary drift finding under direct cache-object resident accounting.",
+  "max_session_cache_resident_bytes": 1054965760,
+  "max_unaccounted_session_kv_drift_bytes": 0,
+  "measurement_duration_s": 638.257,
+  "raw_same_model_load_epoch_drift_bytes": 751370240,
+  "resident_estimate_kind_from_ledger": "cache_object_nbytes",
+  "resident_estimate_modes_from_ledger": [
+    "cache_object_nbytes"
+  ],
+  "reviewed_at_utc": "2026-06-01T14:30:00Z",
+  "reviewed_drift_gate": {
+    "drift_budget_bytes": 209715200,
+    "mode": "cache_object_resident_accounted",
+    "ok": true,
+    "raw_same_model_load_epoch_drift_within_budget": false,
+    "resident_accounted_drift_within_budget": true,
+    "resident_cache_working_set_budget_bytes": 2147483648,
+    "resident_cache_working_set_within_budget": true,
+    "unaccounted_session_kv_drift_within_budget": true
+  },
+  "reviewed_functional_boundary_status": "clean_short_canary_drift_gate_under_reviewed_resident_accounting",
+  "schema_version": "b1c2.cache_object_resident_drift_gate_review.v1",
+  "source_conclusion": "failed",
+  "source_ledger": "files/evidence/owlmlx/bench/session-kv-soak/20260601T134131Z-b1c2-qwen-gemma-qwen35-cache-nbytes-5min-soak-swap.jsonl",
+  "source_required_duration_s": 600.0,
+  "source_required_swap_count": 2,
+  "source_rollup": "files/evidence/owlmlx/bench/session-kv-soak/20260601T134131Z-b1c2-qwen-gemma-qwen35-cache-nbytes-5min-soak-swap-rollup.jsonl",
+  "source_rollup_estimate_kind": "positive_active_memory_delta_upper_bound",
+  "source_run_id": "20260601T134131Z-owlmlx-native-b1c2-soak-plus-swap",
+  "source_was_short_canary_not_aggregate": true,
+  "swap_count": 2
+}

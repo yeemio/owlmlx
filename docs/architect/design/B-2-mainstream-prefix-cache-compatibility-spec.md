@@ -1,6 +1,6 @@
 # B-2 Mainstream Prefix-Cache Compatibility Spec
 
-> Status: design-grade spec; B-2.1 classifier and B-2.2 metadata plumbing landed; B-2.3 blocked on B-1c section 2 fast-swap same-model drift triage
+> Status: design-grade spec; B-2.1 classifier and B-2.2 metadata plumbing landed; B-2.3 blocked on B-1c section 2 aggregate volume / policy after fast-swap drift-gate closure
 > Updated: 2026-06-01
 > Campaign: B-2
 > Parent goal:
@@ -62,8 +62,9 @@ Current verified truth:
   used `resident_bytes_estimate_mode=cache_object_nbytes`; Gemma still had raw
   same-model drift `751370240` bytes, but direct cache-object resident bytes
   reached `1054965760` and same-model unaccounted drift remained `0`. B-2.3 is
-  therefore blocked on the B-1c §2 drift-gate decision, not on missing runtime
-  cache metadata.
+  therefore no longer blocked on missing metadata or a raw-RSS false-fail. It
+  remains blocked until B-1c §2 has enough high-frequency swap evidence under
+  the reviewed resident-accounted drift gate.
 
 ## 3. Design Goal
 
@@ -318,21 +319,21 @@ No stage in this spec independently promotes B-1 to `supported`.
 ## 12. Next Handoff
 
 The next round is not B-2.3 code-grade yet. B-2.3 is blocked until B-1c
-section 2 resolves the fast-swap same-model drift blocker and then provides
-sufficient aggregate stability for real cache-handle reuse.
+section 2 provides sufficient aggregate / policy evidence under the reviewed
+fast-swap resident-accounted drift gate.
 
 Immediate handoff:
 
-1. Triage the `20260601T125751Z` fast-swap drift failure before any longer
-   aggregate run. The boundary was clean; the legacy 46.8GB global drift is a
-   cross-model baseline artifact, while the actionable same-model load-epoch
-   blocker is 751370240 bytes on Gemma.
-2. Decide whether raw same-model drift should remain the promotion gate, or
-   whether direct `cache_object_nbytes` resident working-set accounting with
-   zero unaccounted same-model drift is the correct gate before any B-2.3 reuse
-   can consume this evidence.
-3. Keep the 5-minute forced-swap canary as the boundary-stress shape until the
-   drift root cause is closed.
+1. Preserve the `20260601T125751Z` / `20260601T134131Z` finding: the boundary is
+   clean; the legacy 46.8GB global drift is a cross-model baseline artifact; the
+   Gemma raw same-model load-epoch drift is real but explained by direct
+   cache-object resident bytes.
+2. Keep the reviewed B-1c §2 drift gate narrow: raw drift can be accepted only
+   when `drift_gate.mode=cache_object_resident_accounted`, the estimate kind is
+   `cache_object_nbytes`, resident working set is within budget, and
+   unaccounted same-model drift is within budget.
+3. Keep the 5-minute forced-swap canary as the boundary-stress shape. Do not
+   replace it with passive long runs that perform only one switch.
 4. Treat forced canaries as boundary diagnostics only, not as 24h/6-swap
    aggregate promotion evidence.
 5. Aggregate only completed segments with `measurement_wall_clock_gap_free=true`
@@ -377,5 +378,7 @@ compatibility usage counters match real per-request runtime metadata.
   canary. Runtime status now reports direct upstream cache-object `nbytes` when
   available; the canary shows all measurement rows using `cache_object_nbytes`,
   Gemma raw same-model drift `751370240`, resident cache bytes `1054965760`,
-  and same-model unaccounted drift `0`. Automatic reuse remains blocked until
-  the B-1c §2 gate decision is reviewed.
+  and same-model unaccounted drift `0`.
+- 2026-06-01: Closed the B-1c §2 raw-drift false-fail with a reviewed
+  `cache_object_resident_accounted` drift gate. Automatic reuse remains blocked
+  until aggregate / policy evidence exists under the 5-minute swap cadence.

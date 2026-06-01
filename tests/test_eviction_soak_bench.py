@@ -856,6 +856,107 @@ def test_b1c2_fake_soak_plus_swap_writes_swap_phase_and_blocked_rollup(tmp_path)
     assert rollup[0]["soak_plus_swap_stability"] == "blocked"
 
 
+def _b1c2_rollup_measurement(
+    sample_index,
+    *,
+    model_id,
+    prompt_id,
+    active_bytes,
+    resident_bytes,
+    estimate_mode="cache_object_nbytes",
+):
+    return {
+        "schema_version": "b1c2.v1",
+        "gate": "B-1c section 2",
+        "phase": "measurement",
+        "sample_index": sample_index,
+        "timestamp_utc": f"2026-06-01T00:00:{sample_index:02d}Z",
+        "model": {"id": model_id},
+        "config": {"sample_interval_s": 0.0},
+        "prompt_id": prompt_id,
+        "sample_verdict": "passed",
+        "memory": {
+            "active_memory_after_generation_bytes": active_bytes,
+            "drift_from_measurement_start_bytes": abs(active_bytes - 1_000),
+            "watermark_after_generation": "GREEN",
+        },
+        "session_cache": {
+            "resident_bytes_estimate_after": resident_bytes,
+            "resident_bytes_estimate_mode": estimate_mode,
+            "counter_delta": {},
+        },
+        "reclaim_barrier_stats_after_sample": {
+            "summary": {
+                "failure_measurement_count": 0,
+                "unresolved_event_count": 0,
+            }
+        },
+    }
+
+
+def _b1c2_rollup_swap(sample_index, *, from_model="model-a", to_model="model-b"):
+    return {
+        "schema_version": "b1c2.v1",
+        "gate": "B-1c section 2",
+        "phase": "swap",
+        "sample_index": sample_index,
+        "timestamp_utc": f"2026-06-01T00:00:{sample_index:02d}Z",
+        "config": {"sample_interval_s": 0.0},
+        "swap": {
+            "index": 1,
+            "from_model": from_model,
+            "to_model": to_model,
+            "unload_ok": True,
+            "settle_barrier_state": "clean",
+            "load_ok": True,
+        },
+    }
+
+
+def _b1c2_rollup_for_test(
+    tmp_path,
+    *,
+    records,
+    drift_budget_bytes=256,
+    resident_cache_budget_bytes=512,
+):
+    now = time.monotonic()
+    return eviction_soak._b1c2_rollup(
+        run_id="b1c2-test",
+        rotation=(
+            eviction_soak.ModelSpec("model-a", 1.0),
+            eviction_soak.ModelSpec("model-b", 1.0),
+            eviction_soak.ModelSpec("model-c", 1.0),
+        ),
+        rotation_label="test-rotation",
+        backend="native",
+        measurement_mode=eviction_soak.MlxMemorySampler.measurement_mode,
+        output_path=tmp_path / "ledger.jsonl",
+        records=records,
+        started_monotonic_s=now - 10.0,
+        measurement_started_monotonic_s=now - 10.0,
+        measurement_finished_monotonic_s=now,
+        required_duration_s=0.0,
+        required_swap_count=1,
+        drift_budget_bytes=drift_budget_bytes,
+        resident_cache_budget_bytes=resident_cache_budget_bytes,
+        initial_load=SimpleNamespace(ok=True, message="loaded", error_code=None, model_id=None),
+        cleanup_unload=SimpleNamespace(
+            ok=True,
+            message="unloaded",
+            error_code=None,
+            model_id="model-b",
+            freed_gb=1.0,
+        ),
+        cleanup_settle=eviction_soak.SettleResult(
+            active_memory_bytes=0,
+            iterations=1,
+            duration_ms=0.0,
+        ),
+        b1c1_prerequisite_satisfied=True,
+    )
+
+
 def test_b1c2_rollup_uses_same_load_epoch_drift_not_model_size_delta(tmp_path):
     now = time.monotonic()
 
@@ -931,6 +1032,7 @@ def test_b1c2_rollup_uses_same_load_epoch_drift_not_model_size_delta(tmp_path):
         required_duration_s=0.0,
         required_swap_count=1,
         drift_budget_bytes=256,
+        resident_cache_budget_bytes=512,
         initial_load=SimpleNamespace(ok=True, message="loaded", error_code=None, model_id=None),
         cleanup_unload=SimpleNamespace(
             ok=True,
@@ -952,6 +1054,7 @@ def test_b1c2_rollup_uses_same_load_epoch_drift_not_model_size_delta(tmp_path):
     ] == 49200
     assert rollup["max_drift_bytes"] == 200
     assert rollup["max_drift_within_budget"] is True
+    assert rollup["drift_gate"]["mode"] == "raw_same_model_active_memory"
     assert rollup["active_memory_drift_accounting"][
         "max_same_model_load_epoch_drift_bytes"
     ] == 200
@@ -966,6 +1069,165 @@ def test_b1c2_rollup_uses_same_load_epoch_drift_not_model_size_delta(tmp_path):
         "cache_object_nbytes"
     ]
     assert rollup["soak_plus_swap_stability"] == "passed"
+
+
+def test_b1c2_rollup_accepts_direct_cache_object_resident_accounted_drift(tmp_path):
+    records = [
+        _b1c2_rollup_measurement(
+            1, model_id="model-a", prompt_id="short", active_bytes=1_000, resident_bytes=0
+        ),
+        _b1c2_rollup_measurement(
+            2, model_id="model-a", prompt_id="medium", active_bytes=1_320, resident_bytes=320
+        ),
+        _b1c2_rollup_measurement(
+            3, model_id="model-a", prompt_id="long", active_bytes=1_400, resident_bytes=400
+        ),
+        _b1c2_rollup_swap(4),
+        _b1c2_rollup_measurement(
+            5, model_id="model-b", prompt_id="short", active_bytes=50_000, resident_bytes=0
+        ),
+        _b1c2_rollup_measurement(
+            6, model_id="model-b", prompt_id="medium", active_bytes=50_320, resident_bytes=320
+        ),
+        _b1c2_rollup_measurement(
+            7, model_id="model-b", prompt_id="long", active_bytes=50_400, resident_bytes=400
+        ),
+    ]
+
+    rollup = _b1c2_rollup_for_test(tmp_path, records=records)
+
+    assert rollup["max_drift_bytes"] == 400
+    assert rollup["active_memory_drift_accounting"][
+        "same_model_load_epoch_drift_within_budget"
+    ] is False
+    assert rollup["max_drift_within_budget"] is True
+    assert rollup["drift_gate"]["mode"] == "cache_object_resident_accounted"
+    assert rollup["drift_gate"]["resident_accounted_drift_within_budget"] is True
+    assert rollup["session_kv_drift_accounting"]["used_for_segment_gate"] is True
+    assert rollup["session_kv_drift_accounting"]["unaccounted_drift_within_budget"] is True
+    assert rollup["soak_plus_swap_stability"] == "passed"
+
+
+def test_b1c2_rollup_rejects_resident_accounting_without_direct_cache_object_mode(tmp_path):
+    records = [
+        _b1c2_rollup_measurement(
+            1,
+            model_id="model-a",
+            prompt_id="short",
+            active_bytes=1_000,
+            resident_bytes=0,
+            estimate_mode="positive_active_memory_delta_upper_bound",
+        ),
+        _b1c2_rollup_measurement(
+            2,
+            model_id="model-a",
+            prompt_id="medium",
+            active_bytes=1_400,
+            resident_bytes=400,
+            estimate_mode="positive_active_memory_delta_upper_bound",
+        ),
+        _b1c2_rollup_measurement(
+            3,
+            model_id="model-a",
+            prompt_id="long",
+            active_bytes=1_420,
+            resident_bytes=420,
+            estimate_mode="positive_active_memory_delta_upper_bound",
+        ),
+        _b1c2_rollup_swap(4),
+        _b1c2_rollup_measurement(
+            5,
+            model_id="model-b",
+            prompt_id="short",
+            active_bytes=50_000,
+            resident_bytes=0,
+            estimate_mode="positive_active_memory_delta_upper_bound",
+        ),
+        _b1c2_rollup_measurement(
+            6,
+            model_id="model-b",
+            prompt_id="medium",
+            active_bytes=50_400,
+            resident_bytes=400,
+            estimate_mode="positive_active_memory_delta_upper_bound",
+        ),
+        _b1c2_rollup_measurement(
+            7,
+            model_id="model-b",
+            prompt_id="long",
+            active_bytes=50_420,
+            resident_bytes=420,
+            estimate_mode="positive_active_memory_delta_upper_bound",
+        ),
+    ]
+
+    rollup = _b1c2_rollup_for_test(tmp_path, records=records)
+
+    assert rollup["max_drift_within_budget"] is False
+    assert rollup["drift_gate"]["mode"] == "failed"
+    assert rollup["session_kv_drift_accounting"]["estimate_kind"] == (
+        "positive_active_memory_delta_upper_bound"
+    )
+    assert rollup["soak_plus_swap_stability"] == "failed"
+
+
+def test_b1c2_rollup_rejects_unaccounted_or_oversized_resident_drift(tmp_path):
+    unaccounted_records = [
+        _b1c2_rollup_measurement(
+            1, model_id="model-a", prompt_id="short", active_bytes=1_000, resident_bytes=0
+        ),
+        _b1c2_rollup_measurement(
+            2, model_id="model-a", prompt_id="medium", active_bytes=1_800, resident_bytes=100
+        ),
+        _b1c2_rollup_measurement(
+            3, model_id="model-a", prompt_id="long", active_bytes=1_820, resident_bytes=100
+        ),
+        _b1c2_rollup_swap(4),
+        _b1c2_rollup_measurement(
+            5, model_id="model-b", prompt_id="short", active_bytes=50_000, resident_bytes=0
+        ),
+        _b1c2_rollup_measurement(
+            6, model_id="model-b", prompt_id="medium", active_bytes=50_800, resident_bytes=100
+        ),
+        _b1c2_rollup_measurement(
+            7, model_id="model-b", prompt_id="long", active_bytes=50_820, resident_bytes=100
+        ),
+    ]
+    oversized_resident_records = [
+        _b1c2_rollup_measurement(
+            1, model_id="model-a", prompt_id="short", active_bytes=1_000, resident_bytes=0
+        ),
+        _b1c2_rollup_measurement(
+            2, model_id="model-a", prompt_id="medium", active_bytes=1_400, resident_bytes=400
+        ),
+        _b1c2_rollup_measurement(
+            3, model_id="model-a", prompt_id="long", active_bytes=1_420, resident_bytes=420
+        ),
+        _b1c2_rollup_swap(4),
+        _b1c2_rollup_measurement(
+            5, model_id="model-b", prompt_id="short", active_bytes=50_000, resident_bytes=0
+        ),
+        _b1c2_rollup_measurement(
+            6, model_id="model-b", prompt_id="medium", active_bytes=50_400, resident_bytes=400
+        ),
+        _b1c2_rollup_measurement(
+            7, model_id="model-b", prompt_id="long", active_bytes=50_420, resident_bytes=420
+        ),
+    ]
+
+    unaccounted_rollup = _b1c2_rollup_for_test(
+        tmp_path, records=unaccounted_records, resident_cache_budget_bytes=512
+    )
+    oversized_rollup = _b1c2_rollup_for_test(
+        tmp_path, records=oversized_resident_records, resident_cache_budget_bytes=128
+    )
+
+    assert unaccounted_rollup["max_drift_within_budget"] is False
+    assert unaccounted_rollup["drift_gate"][
+        "unaccounted_session_kv_drift_within_budget"
+    ] is False
+    assert oversized_rollup["max_drift_within_budget"] is False
+    assert oversized_rollup["drift_gate"]["resident_cache_working_set_within_budget"] is False
 
 
 def test_b1c2_prompt_growth_window_resets_at_max_chars() -> None:

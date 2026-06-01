@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed and prompt-reset bounded windows produced one aggregate-eligible 4h / 1-swap segment (`20260601T025321Z`). The later 5-minute-cadence forced-swap canaries proved swap boundaries stay clean, but they exposed a raw same-model load-epoch drift gate blocker: Gemma reaches `751370240` bytes raw drift while direct cache-object resident accounting (`cache_object_nbytes`) reports `1054965760` bytes and same-model unaccounted drift `0`. §2 is blocked on drift-gate closure plus aggregate volume, not on another passive wait. See §11 Blocker Taxonomy (2026-06-01)
+> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed and prompt-reset bounded windows produced one aggregate-eligible 4h / 1-swap segment (`20260601T025321Z`). The later 5-minute-cadence forced-swap canaries proved swap boundaries stay clean. Direct cache-object resident accounting (`cache_object_nbytes`) now explains the Gemma raw same-model load-epoch drift (`751370240` bytes raw drift; `1054965760` resident bytes; same-model unaccounted drift `0`), so §2 is no longer blocked on the raw-RSS drift false-fail. It remains blocked on aggregate volume / policy: future evidence must keep the 5-minute swap cadence rather than passively waiting. See §11 Blocker Taxonomy (2026-06-01)
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -568,12 +568,15 @@ must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
   recording upstream cache-object bytes when available. It completed both swap
   boundaries cleanly, had drops / expirations / rejects all 0, and every
   measurement row reported `resident_bytes_estimate_mode=cache_object_nbytes`.
-  The segment still failed the current raw drift gate
+  The original rollup failed the then-current raw drift gate
   (`max_same_model_load_epoch_drift_bytes=751370240` on Gemma, budget
   `209715200`), but direct resident-cache accounting reported
   `max_session_cache_resident_bytes=1054965760` and same-model unaccounted drift
-  `0`. This is diagnostic only; it proves the drift is explained by a real held
-  cache working set, not that §2 has passed.
+  `0`. The follow-up review
+  (`20260601T134131Z-b1c2-cache-object-nbytes-drift-gate-review.json`) records
+  the selected functional drift gate as `cache_object_resident_accounted`. This
+  proves the raw drift is a real held cache working set, not a leak; it still
+  does not pass §2 because the canary is only 10 minutes / 2 swaps.
 
 The landed smoke-only slice covers:
 
@@ -586,10 +589,10 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-Do not resume passive aggregate evidence until the fast-swap drift gate is
-settled. The next step is not another 4h wait; it is a metric/root-cause closure
-for same-model load-epoch drift under high-frequency swaps now that direct
-cache-object resident bytes are available.
+Do not resume passive single-swap aggregate evidence. The raw drift false-fail
+has been closed by direct cache-object resident accounting; the next evidence
+shape must keep high-frequency boundary stress (5-minute swaps) and use
+duration only as additional confidence, not as a substitute for switches.
 
 1. Keep the safe trim-unavailable bypass semantics: pre-generation reuse trim
    refusal may fall back to a fresh request cache and must be counted as
@@ -598,14 +601,15 @@ cache-object resident bytes are available.
    prompt-window candidate; it passes the focused Qwen-only 720-sample
    drift/drop criteria and now has one gap-free swap-bearing aggregate input
    segment (`20260601T025321Z`).
-3. Keep the 5-minute forced-swap canary as the fast boundary-stress shape while
-   triaging whether raw same-model active-memory drift or a stricter resident
-   working-set metric is the correct promotion gate.
+3. Keep the 5-minute forced-swap canary as the boundary-stress shape. One swap
+   after 2h/4h is less informative for this blocker than repeated 5-minute
+   unload / settle / load cycles.
 4. Any new focused or swap-bearing probe must report `session_cache_drops_total=0`,
    `session_cache_expirations_total=0`, `session_cache_rejects_total=0`, and
-   either the existing raw drift gate (`max_drift_bytes <= 209715200`) or an
-   explicitly reviewed replacement gate based on direct cache-object resident
-   bytes before §2 aggregate resumes.
+   either the existing raw drift gate (`max_drift_bytes <= 209715200`) or the
+   reviewed direct cache-object resident gate
+   (`drift_gate.mode=cache_object_resident_accounted`) before §2 aggregate
+   resumes.
 5. Aggregate only gap-free, hard-failure-free segment rollups.
 6. Require cumulative duration >= 24h and aggregate swap count >= 6 before
    `soak_plus_swap_stability=passed`.
@@ -660,23 +664,26 @@ gap violations. That closes the single-segment measurement-continuity proof gap
 for the current policy, while preserving the rule that future sleeping segments
 must be excluded from aggregate evidence.
 
-### B3 — Raw drift gate under direct cache-object accounting: BLOCKED
+### B3 — Raw drift gate under direct cache-object accounting: RESOLVED
 
 The 2026-06-01 cache-object resident canary (`20260601T134131Z`) records direct
 cache-object bytes for every measurement row (`cache_object_nbytes`). It proves
 the Gemma same-model raw drift (`751370240` bytes) is fully covered by a real
 session-cache working set (`1054965760` bytes, unaccounted drift `0`). That is
-not a cache drop and not a 46GB leak, but the current §7 pass criterion still
-uses raw `max_drift_bytes <= 209715200`. Until the source-of-truth review
-decides whether raw drift remains the hard gate or is replaced by a
-cache-object-accounted resident working-set gate, §2 remains blocked.
+not a cache drop and not a 46GB leak. The reviewed gate now allows
+`cache_object_resident_accounted` only when direct cache-object bytes are
+available, the resident working set is within budget, and unaccounted same-model
+drift is within the raw drift budget. Estimate modes such as
+`positive_active_memory_delta_upper_bound` still fail the resident-accounted
+gate.
 
 ### B4 — Aggregate volume: BLOCKED
 
 §7 #3 (≥24h aggregate) and #4 (≥6 swaps) are unmet (latest aggregate-eligible
-input: ~4h, 1 swap). This is now the independent remaining blocker: repeat the
-same policy in five more gap-free segments only after B3 is closed, then
-aggregate only the clean rollups.
+input: ~4h, 1 swap; latest fast-swap drift-gate canary: 10 minutes, 2 swaps).
+This is now the independent remaining blocker. Future evidence should not be
+"one swap after a long idle wait"; it should retain a short swap cadence
+(currently 5 minutes) so duration and boundary count grow together.
 
 ### Route forward
 
@@ -684,12 +691,12 @@ aggregate only the clean rollups.
    lid open; or `sudo pmset` to disable sleep for the window; keep the machine
    unused during a segment. On the current host, `caffeinate -m` is unsupported
    and `-u` exits quickly outside a user-idle assertion context.
-2. **Close the drift-gate decision before aggregate resumes**: preserve the
-   current raw gate unless a reviewed replacement gate explicitly uses direct
-   cache-object resident bytes and keeps unaccounted same-model drift at 0.
+2. **Keep the reviewed drift-gate decision**: direct cache-object resident bytes
+   may explain raw RSS drift only with `cache_object_nbytes`, resident working
+   set within budget, and unaccounted same-model drift within budget.
 3. **Run segments only in confirmed-awake windows**, aggregate via the §2
    interrupted route (each segment internally gap-free; segment *boundaries* are
-   allowed). Recommended `6 × 4h`, one swap per segment (§5, §10).
+   allowed). Prefer 5-minute swap cadence over long single-swap waits.
 4. **Dedicated always-on host** is the clean long-term route; a shared personal
    Mac is not a reliable 24h-soak measurement environment.
 5. Do **not** relax §7 #5 — the gap-free requirement is correct; the fix is
@@ -706,15 +713,16 @@ criteria — not a promotion, and not a cross-runtime or readiness claim.
 The 5-minute-cadence forced canary changed the immediate closure order. It
 proved boundary mechanics are not the current fault, but it also showed that the
 old global `max_drift_bytes` metric is not valid for multi-model measurement
-epochs. Future B-1c §2 rollups must separate:
+epochs. Future B-1c §2 rollups separate:
 
 - legacy/global measurement-start drift, useful only for explaining old ledgers;
 - same-model load-epoch active-memory drift, the raw gate candidate;
-- same-model resident-cache-accounted drift, diagnostic only until a stricter
-  working-set metric exists.
+- same-model resident-cache-accounted drift, now usable as the selected
+  functional gate only when direct cache-object bytes exist and unaccounted
+  drift stays within budget.
 
-The current actionable blocker is not "run longer". It is deciding and proving
-the correct drift gate for high-frequency multi-model cache reuse.
+The current actionable blocker is not "run longer". It is collecting enough
+high-frequency, gap-free switch evidence under the reviewed drift gate.
 
 ### 2026-06-01 cache-object resident addendum
 
@@ -729,6 +737,7 @@ from a positive active-memory delta upper bound to direct upstream cache-object
 - `max_same_model_load_epoch_session_cache_resident_bytes=1054965760`
 - `max_same_model_load_epoch_unaccounted_session_kv_drift_bytes=0`
 
-This does not pass §2 because the raw gate remains active. It narrows the
-blocker to a policy/gate decision: raw active-memory drift versus direct
-cache-object resident working set.
+This does not pass §2 because the run is a short canary, not aggregate evidence.
+It closes the raw drift false-fail: the selected functional gate is direct
+cache-object resident working set, while the remaining blocker is aggregate
+volume / policy under a high-frequency swap cadence.
