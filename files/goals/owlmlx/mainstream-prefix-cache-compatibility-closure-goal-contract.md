@@ -117,10 +117,11 @@ missing primitive precisely. Do not reframe the private header as the solution.
 - The 2026-06-01 `20260601T125751Z` forced canary used that shape: 20 minutes,
   4 swaps, 5-minute cadence. It met duration and swap requirements, had clean
   swap boundaries, `measurement_wall_clock_gap_free=true`, and zero session
-  cache drops / expirations / rejects. It failed on drift:
-  `max_drift_bytes=46801784452`,
-  `max_unaccounted_session_kv_drift_bytes=45745465112`, max-drift record on
-  Gemma at sample 61.
+  cache drops / expirations / rejects. The old rollup failed on global drift
+  (`max_drift_bytes=46801784452`), but re-audit shows that number compares
+  Gemma active memory against the first Qwen27 measurement. Same-model load
+  epoch accounting narrows the actionable blocker to Gemma drift of
+  `751370240` bytes, with `max_same_model_load_epoch_unaccounted_session_kv_drift_bytes=0`.
 
 ## remaining_gaps
 
@@ -129,9 +130,9 @@ missing primitive precisely. Do not reframe the private header as the solution.
    can be considered. The operator-paused `20260601T074541Z` ledger does not
    reduce this gap because it ended before any swap boundary.
 2. The immediate executable gap is no longer passive duration. It is fast-swap
-   drift triage: decide whether the 46.8GB drift is accounting/baseline error
-   around large-model load, real allocator leak, or missing resident-cache
-   accounting.
+   same-model drift triage: decide whether the raw 751MB Gemma drift remains a
+   hard promotion blocker, or whether the runner needs a stricter resident-cache
+   working-set metric before B-2.3 consumes this evidence.
 3. B-2.3 automatic safe prefix reuse is not implemented and must remain blocked
    until B-1c section 2 aggregate stability passes.
 4. The explicit `X-Owlmlx-Session-Id` lane is still the only runtime path that
@@ -143,13 +144,14 @@ missing primitive precisely. Do not reframe the private header as the solution.
 
 ## dominant_next_gap
 
-`B-1c-section-2-fast-swap-drift-triage-for-B-2.3`
+`B-1c-section-2-fast-swap-same-model-drift-triage-for-B-2.3`
 
 The next executable closure is not another consumer-side adapter and not F-3
 runtime work. B-2.1 and B-2.2 are already landed; the dominant blocker is the
 B-1c section 2 fast-swap drift failure that B-2.3 explicitly depends on. Do not
 run another passive 4h topoff to answer this question. First triage the
-`20260601T125751Z` 5-minute-cadence canary: boundaries were clean, but active
-memory drift reached 46.8GB. Keep B-2.3 automatic reuse blocked as a capability
-claim until this blocker is closed and the 24h / 6-swap prerequisite is
-honestly met.
+`20260601T125751Z` 5-minute-cadence canary: boundaries were clean, the legacy
+46.8GB number was a cross-model baseline artifact, and the actionable raw
+same-model drift is 751MB on Gemma. Keep B-2.3 automatic reuse blocked as a
+capability claim until this blocker is closed and the 24h / 6-swap prerequisite
+is honestly met.

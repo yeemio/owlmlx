@@ -551,6 +551,17 @@ must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
   `clean_for_interrupted_aggregate=true`. The segment rollup still correctly
   remains `blocked` because it is only 4h / 1 swap against the §7 24h / 6-swap
   requirement; it is aggregate input, not a pass.
+- fast forced-swap canary:
+  `20260601T125751Z-b1c2-qwen-gemma-qwen35-forced-swap-5min-soak-swap-rollup.jsonl`
+  ran 20 minutes with 4 swaps at a 5-minute cadence. It completed all swap
+  boundaries cleanly (`swap_boundaries_clean=true`), remained
+  `measurement_wall_clock_gap_free=true`, and had drops / expirations / rejects
+  all 0. The original rollup reported `max_drift_bytes=46801784452`, but this
+  is a legacy global-baseline artifact: it compares Gemma active memory against
+  the first Qwen27 measurement. Same-model load-epoch re-audit reports
+  `max_same_model_load_epoch_drift_bytes=751370240` on Gemma and
+  `max_same_model_load_epoch_unaccounted_session_kv_drift_bytes=0`. This canary
+  is diagnostic only; it is not aggregate input and it does not promote §2.
 
 The landed smoke-only slice covers:
 
@@ -563,7 +574,9 @@ Only after schema tests pass should native execution be attempted.
 
 ## 10. Next Step
 
-Resume aggregate evidence using only gap-free swap-bearing segments:
+Do not resume passive aggregate evidence until the fast-swap drift metric is
+settled. The next step is not another 4h wait; it is a metric/root-cause closure
+for same-model load-epoch drift under high-frequency swaps.
 
 1. Keep the safe trim-unavailable bypass semantics: pre-generation reuse trim
    refusal may fall back to a fresh request cache and must be counted as
@@ -572,8 +585,9 @@ Resume aggregate evidence using only gap-free swap-bearing segments:
    prompt-window candidate; it passes the focused Qwen-only 720-sample
    drift/drop criteria and now has one gap-free swap-bearing aggregate input
    segment (`20260601T025321Z`).
-3. Repeat five more gap-free swap-bearing §2 fail-fast segments with the same
-   prompt-reset policy before a 24h aggregate pass review.
+3. Keep the 5-minute forced-swap canary as the fast boundary-stress shape while
+   triaging whether raw same-model active-memory drift or a stricter resident
+   working-set metric is the correct promotion gate.
 4. Any new focused or swap-bearing probe must report `session_cache_drops_total=0`,
    `session_cache_expirations_total=0`, `session_cache_rejects_total=0`, and
    `max_drift_bytes <= 209715200` before §2 aggregate resumes.
@@ -657,3 +671,18 @@ rollups.
 Session KV cache stays `experimental`; `session_kv_supported = false`; the bench
 never auto-promotes. B1 passing is a functional observation of the §7 functional
 criteria — not a promotion, and not a cross-runtime or readiness claim.
+
+### 2026-06-01 fast-swap addendum
+
+The 5-minute-cadence forced canary changed the immediate closure order. It
+proved boundary mechanics are not the current fault, but it also showed that the
+old global `max_drift_bytes` metric is not valid for multi-model measurement
+epochs. Future B-1c §2 rollups must separate:
+
+- legacy/global measurement-start drift, useful only for explaining old ledgers;
+- same-model load-epoch active-memory drift, the raw gate candidate;
+- same-model resident-cache-accounted drift, diagnostic only until a stricter
+  working-set metric exists.
+
+The current actionable blocker is not "run longer". It is deciding and proving
+the correct drift gate for high-frequency multi-model cache reuse.

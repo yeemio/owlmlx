@@ -288,8 +288,11 @@ whether to continue. The discipline is frozen in
   bypass=3、drift 171,704,320 bytes 且 `swap_boundaries_clean=true`；但该段
   `measurement_wall_clock_gap_free=false`（6 个 measurement gap，最大
   7064.873s），所以 `clean_for_interrupted_aggregate=false`，不得计入
-  aggregate 或 promotion claim。下一步是 gap-free repeat of same policy，
-  而不是恢复 24h aggregate。
+  aggregate 或 promotion claim。2026-06-01 gap-free repeat
+  (`20260601T025321Z`) 已成为 clean aggregate input（仍只有 4h/1 swap）；
+  同日 5min-cadence forced-swap canary (`20260601T125751Z`) 证明边界仍 clean，
+  但暴露 same-model load-epoch Gemma drift 751,370,240 bytes。下一步是
+  drift metric/root-cause triage，而不是继续被动凑 4h。
 
 - **`native_backend_promote_path_g2_closure`**：§VI 4-gate 中 G1（Cache
   Parity）已通过 B-1a 闭合；G2（Reclaim Verified）通过 B-1b + B-1c §1
@@ -321,9 +324,10 @@ whether to continue. The discipline is frozen in
   压到 171,704,320 bytes；swap-bearing 4h segment
   (`20260525T061019Z`) 也保持 drop/expiration/reject=0、drift within budget
   与 clean swap boundary，但因 wall-clock continuity gap 正确保持
-  `blocked` 且不进入 clean aggregate。下一 round 是 gap-free repeat of
-  same prompt-reset swap-bearing policy；完成前不恢复 24h §2 aggregate
-  segment
+  `blocked` 且不进入 clean aggregate。gap-free repeat (`20260601T025321Z`)
+  已补足单段 aggregate input；fast forced-swap canary (`20260601T125751Z`)
+  将下一 gap 收窄为 high-frequency multi-model same-load drift metric/root
+  cause closure
 - **Track 2 · Campaign F-1 state contract**: runtime-owned
   `speculative_execution_status` 状态契约已落地（endpoint +
   kernel observe APIs + fixture evidence `20260525T142617Z`）· 不依赖

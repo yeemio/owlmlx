@@ -216,6 +216,7 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
         if drift is None or resident_estimate is None:
             continue
         unaccounted_drift_values.append(max(_as_int(drift) - _as_int(resident_estimate), 0))
+    same_model_epoch_drift = eviction_soak._b1c2_same_model_load_epoch_drift(records)
 
     return {
         "kind": "b1c2_ledger",
@@ -313,6 +314,15 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
         ),
         "max_unaccounted_session_kv_drift_bytes": (
             max(unaccounted_drift_values) if unaccounted_drift_values else None
+        ),
+        "same_model_load_epoch_drift_accounting": same_model_epoch_drift,
+        "max_same_model_load_epoch_drift_bytes": same_model_epoch_drift[
+            "max_same_model_load_epoch_drift_bytes"
+        ],
+        "max_same_model_load_epoch_unaccounted_session_kv_drift_bytes": (
+            same_model_epoch_drift[
+                "max_same_model_load_epoch_unaccounted_session_kv_drift_bytes"
+            ]
         ),
         "errors": errors,
     }

@@ -856,6 +856,111 @@ def test_b1c2_fake_soak_plus_swap_writes_swap_phase_and_blocked_rollup(tmp_path)
     assert rollup[0]["soak_plus_swap_stability"] == "blocked"
 
 
+def test_b1c2_rollup_uses_same_load_epoch_drift_not_model_size_delta(tmp_path):
+    now = time.monotonic()
+
+    def measurement(sample_index, *, model_id, prompt_id, active_bytes, resident_bytes):
+        return {
+            "schema_version": "b1c2.v1",
+            "gate": "B-1c section 2",
+            "phase": "measurement",
+            "sample_index": sample_index,
+            "timestamp_utc": f"2026-06-01T00:00:{sample_index:02d}Z",
+            "model": {"id": model_id},
+            "config": {"sample_interval_s": 0.0},
+            "prompt_id": prompt_id,
+            "sample_verdict": "passed",
+            "memory": {
+                "active_memory_after_generation_bytes": active_bytes,
+                "drift_from_measurement_start_bytes": abs(active_bytes - 1_000),
+                "watermark_after_generation": "GREEN",
+            },
+            "session_cache": {
+                "resident_bytes_estimate_after": resident_bytes,
+                "counter_delta": {},
+            },
+            "reclaim_barrier_stats_after_sample": {
+                "summary": {
+                    "failure_measurement_count": 0,
+                    "unresolved_event_count": 0,
+                }
+            },
+        }
+
+    records = [
+        measurement(1, model_id="model-a", prompt_id="short", active_bytes=1_000, resident_bytes=0),
+        measurement(2, model_id="model-a", prompt_id="medium", active_bytes=1_120, resident_bytes=120),
+        measurement(3, model_id="model-a", prompt_id="long", active_bytes=1_180, resident_bytes=180),
+        {
+            "schema_version": "b1c2.v1",
+            "gate": "B-1c section 2",
+            "phase": "swap",
+            "sample_index": 4,
+            "timestamp_utc": "2026-06-01T00:00:04Z",
+            "config": {"sample_interval_s": 0.0},
+            "swap": {
+                "index": 1,
+                "from_model": "model-a",
+                "to_model": "model-b",
+                "unload_ok": True,
+                "settle_barrier_state": "clean",
+                "load_ok": True,
+            },
+        },
+        measurement(5, model_id="model-b", prompt_id="short", active_bytes=50_000, resident_bytes=0),
+        measurement(6, model_id="model-b", prompt_id="medium", active_bytes=50_150, resident_bytes=150),
+        measurement(7, model_id="model-b", prompt_id="long", active_bytes=50_200, resident_bytes=200),
+    ]
+
+    rollup = eviction_soak._b1c2_rollup(
+        run_id="b1c2-same-load-drift",
+        rotation=(
+            eviction_soak.ModelSpec("model-a", 1.0),
+            eviction_soak.ModelSpec("model-b", 1.0),
+            eviction_soak.ModelSpec("model-c", 1.0),
+        ),
+        rotation_label="test-rotation",
+        backend="native",
+        measurement_mode=eviction_soak.MlxMemorySampler.measurement_mode,
+        output_path=tmp_path / "ledger.jsonl",
+        records=records,
+        started_monotonic_s=now - 10.0,
+        measurement_started_monotonic_s=now - 10.0,
+        measurement_finished_monotonic_s=now,
+        required_duration_s=0.0,
+        required_swap_count=1,
+        drift_budget_bytes=256,
+        initial_load=SimpleNamespace(ok=True, message="loaded", error_code=None, model_id=None),
+        cleanup_unload=SimpleNamespace(
+            ok=True,
+            message="unloaded",
+            error_code=None,
+            model_id="model-b",
+            freed_gb=1.0,
+        ),
+        cleanup_settle=eviction_soak.SettleResult(
+            active_memory_bytes=0,
+            iterations=1,
+            duration_ms=0.0,
+        ),
+        b1c1_prerequisite_satisfied=True,
+    )
+
+    assert rollup["active_memory_drift_accounting"][
+        "legacy_global_measurement_start_max_drift_bytes"
+    ] == 49200
+    assert rollup["max_drift_bytes"] == 200
+    assert rollup["max_drift_within_budget"] is True
+    assert rollup["active_memory_drift_accounting"][
+        "max_same_model_load_epoch_drift_bytes"
+    ] == 200
+    assert rollup["active_memory_drift_accounting"]["used_for_segment_gate"] is True
+    assert rollup["session_kv_drift_accounting"][
+        "max_unaccounted_session_kv_drift_bytes"
+    ] == 0
+    assert rollup["soak_plus_swap_stability"] == "passed"
+
+
 def test_b1c2_prompt_growth_window_resets_at_max_chars() -> None:
     original = dict(eviction_soak.B1C1_PROMPTS)["short"]
     grown = original + " " + ("x" * 200)

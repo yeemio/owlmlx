@@ -13,7 +13,7 @@
     "sample_interval_s": 30
   },
   "verdict": "failed",
-  "failure_class": "fast_swap_active_memory_drift",
+  "failure_class": "fast_swap_same_model_epoch_active_memory_drift",
   "observed": {
     "measurement_duration_s": 1216.753,
     "total_duration_s": 1224.687,
@@ -31,8 +31,10 @@
     "session_cache_rejects_total": 0,
     "session_cache_trim_bypasses_total": 0,
     "session_cache_trim_evictions_total": 0,
-    "max_drift_bytes": 46801784452,
-    "max_unaccounted_session_kv_drift_bytes": 45745465112,
+    "legacy_global_measurement_start_max_drift_bytes": 46801784452,
+    "legacy_global_unaccounted_session_kv_drift_bytes": 45745465112,
+    "max_same_model_load_epoch_drift_bytes": 751370240,
+    "max_same_model_load_epoch_unaccounted_session_kv_drift_bytes": 0,
     "max_session_cache_resident_bytes": 1068377964,
     "max_drift_record": {
       "sample_index": 61,
@@ -41,9 +43,40 @@
       "active_memory_after_generation_gb": 58.161547
     }
   },
+  "same_model_load_epoch_drift_accounting": {
+    "mode": "same_model_load_epoch_active_memory_delta",
+    "max_same_model_load_epoch_drift_bytes": 751370240,
+    "max_same_model_load_epoch_unaccounted_session_kv_drift_bytes": 0,
+    "epochs": [
+      {
+        "model": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B-4bit",
+        "sample_count": 33,
+        "max_positive_active_memory_delta_bytes": 0,
+        "max_unaccounted_positive_delta_bytes": 0
+      },
+      {
+        "model": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+        "sample_count": 24,
+        "max_positive_active_memory_delta_bytes": 751370240,
+        "max_unaccounted_positive_delta_bytes": 0
+      },
+      {
+        "model": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B-4bit",
+        "sample_count": 30,
+        "max_positive_active_memory_delta_bytes": 140247040,
+        "max_unaccounted_positive_delta_bytes": 0
+      },
+      {
+        "model": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B-4bit",
+        "sample_count": 27,
+        "max_positive_active_memory_delta_bytes": 393740288,
+        "max_unaccounted_positive_delta_bytes": 0
+      }
+    ]
+  },
   "interpretation": {
     "boundary_value": "Useful. Four 5-minute-cadence swap boundaries completed cleanly with unload_ok/load_ok/settle_barrier clean.",
     "aggregate_value": "None. This is a forced boundary canary, not 24h/6-swap aggregate promotion evidence.",
-    "b2_value": "B-2.3 remains blocked. The next blocker is fast-swap active-memory drift triage, not passive soak duration or consumer-side header adaptation."
+    "b2_value": "B-2.3 remains blocked. The legacy 46.8GB global drift is an inter-model baseline artifact; the actionable blocker is same-model load-epoch drift of 751370240 bytes under Gemma, fully covered by diagnostic resident-cache upper-bound accounting but still over the raw 200MiB B-1c section 2 gate."
   }
 }

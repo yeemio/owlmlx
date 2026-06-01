@@ -724,6 +724,105 @@ def _b1c1_wall_clock_continuity(records: list[dict[str, Any]]) -> dict[str, Any]
     }
 
 
+def _b1c2_same_model_load_epoch_drift(records: list[dict[str, Any]]) -> dict[str, Any]:
+    epochs: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+
+    for record in records:
+        phase = record.get("phase")
+        if phase == "swap":
+            current = None
+            continue
+        if phase != "measurement":
+            continue
+
+        model_id = record.get("model", {}).get("id")
+        active_bytes = record.get("memory", {}).get(
+            "active_memory_after_generation_bytes"
+        )
+        if model_id is None or active_bytes is None:
+            continue
+
+        active_bytes = int(active_bytes)
+        if current is None or current.get("model_id") != model_id:
+            current = {
+                "epoch_index": len(epochs),
+                "model_id": model_id,
+                "first_sample_index": record.get("sample_index"),
+                "last_sample_index": record.get("sample_index"),
+                "sample_count": 0,
+                "baseline_active_memory_bytes": active_bytes,
+                "max_positive_active_memory_delta_bytes": 0,
+                "max_abs_active_memory_delta_bytes": 0,
+                "max_session_cache_resident_bytes": 0,
+                "max_unaccounted_positive_delta_bytes": 0,
+            }
+            epochs.append(current)
+
+        current["last_sample_index"] = record.get("sample_index")
+        current["sample_count"] = int(current.get("sample_count", 0)) + 1
+        delta = active_bytes - int(current["baseline_active_memory_bytes"])
+        positive_delta = max(delta, 0)
+        abs_delta = abs(delta)
+        current["max_positive_active_memory_delta_bytes"] = max(
+            int(current["max_positive_active_memory_delta_bytes"]),
+            positive_delta,
+        )
+        current["max_abs_active_memory_delta_bytes"] = max(
+            int(current["max_abs_active_memory_delta_bytes"]),
+            abs_delta,
+        )
+        resident_estimate = record.get("session_cache", {}).get(
+            "resident_bytes_estimate_after"
+        )
+        if resident_estimate is not None:
+            resident_estimate = int(resident_estimate)
+            current["max_session_cache_resident_bytes"] = max(
+                int(current["max_session_cache_resident_bytes"]),
+                resident_estimate,
+            )
+            current["max_unaccounted_positive_delta_bytes"] = max(
+                int(current["max_unaccounted_positive_delta_bytes"]),
+                max(positive_delta - resident_estimate, 0),
+            )
+
+    max_same_model_load_epoch_drift_bytes = (
+        max(
+            int(epoch["max_positive_active_memory_delta_bytes"])
+            for epoch in epochs
+        )
+        if epochs
+        else None
+    )
+    max_same_model_load_epoch_unaccounted_bytes = (
+        max(
+            int(epoch["max_unaccounted_positive_delta_bytes"])
+            for epoch in epochs
+        )
+        if epochs
+        else None
+    )
+    max_same_model_load_epoch_resident_bytes = (
+        max(int(epoch["max_session_cache_resident_bytes"]) for epoch in epochs)
+        if epochs
+        else None
+    )
+    return {
+        "mode": "same_model_load_epoch_active_memory_delta",
+        "epoch_count": len(epochs),
+        "epochs": epochs,
+        "max_same_model_load_epoch_drift_bytes": (
+            max_same_model_load_epoch_drift_bytes
+        ),
+        "max_same_model_load_epoch_unaccounted_session_kv_drift_bytes": (
+            max_same_model_load_epoch_unaccounted_bytes
+        ),
+        "max_same_model_load_epoch_session_cache_resident_bytes": (
+            max_same_model_load_epoch_resident_bytes
+        ),
+    }
+
+
 def _read_first_jsonl_record(path: Path) -> dict[str, Any]:
     with Path(path).open("r", encoding="utf-8") as stream:
         for line in stream:
@@ -2013,12 +2112,18 @@ def _b1c2_rollup(
     session_mix_complete = bool(mix_values) and all(value > 0 for value in mix_values)
     session_mix_balanced = bool(mix_values) and max(mix_values) - min(mix_values) <= 1
     wall_clock_continuity = _b1c1_wall_clock_continuity(records)
-    drift_values = [
+    legacy_global_drift_values = [
         int(record["memory"]["drift_from_measurement_start_bytes"])
         for record in measurement_records
         if record.get("memory", {}).get("drift_from_measurement_start_bytes") is not None
     ]
-    max_drift_bytes = max(drift_values) if drift_values else None
+    legacy_global_max_drift_bytes = (
+        max(legacy_global_drift_values) if legacy_global_drift_values else None
+    )
+    active_memory_drift_accounting = _b1c2_same_model_load_epoch_drift(records)
+    max_drift_bytes = active_memory_drift_accounting[
+        "max_same_model_load_epoch_drift_bytes"
+    ]
     fatal_watermark_count = sum(
         1
         for record in records
@@ -2085,18 +2190,9 @@ def _b1c2_rollup(
     max_session_cache_resident_bytes = (
         max(resident_estimate_values) if resident_estimate_values else None
     )
-    unaccounted_drift_values = []
-    for record in measurement_records:
-        drift = record.get("memory", {}).get("drift_from_measurement_start_bytes")
-        resident_estimate = record.get("session_cache", {}).get(
-            "resident_bytes_estimate_after"
-        )
-        if drift is None or resident_estimate is None:
-            continue
-        unaccounted_drift_values.append(max(int(drift) - int(resident_estimate), 0))
-    max_unaccounted_session_kv_drift_bytes = (
-        max(unaccounted_drift_values) if unaccounted_drift_values else None
-    )
+    max_unaccounted_session_kv_drift_bytes = active_memory_drift_accounting[
+        "max_same_model_load_epoch_unaccounted_session_kv_drift_bytes"
+    ]
     final_reclaim_stats = {}
     for record in reversed(records):
         stats = record.get("reclaim_barrier_stats_after_sample") or record.get(
@@ -2208,8 +2304,19 @@ def _b1c2_rollup(
         "max_drift_bytes": max_drift_bytes,
         "drift_budget_bytes": drift_budget_bytes,
         "max_drift_within_budget": drift_ok,
+        "active_memory_drift_accounting": {
+            **active_memory_drift_accounting,
+            "legacy_global_measurement_start_max_drift_bytes": (
+                legacy_global_max_drift_bytes
+            ),
+            "same_model_load_epoch_drift_within_budget": drift_ok,
+            "used_for_segment_gate": True,
+        },
         "session_kv_drift_accounting": {
-            "mode": "active_memory_minus_session_kv_positive_delta_upper_bound",
+            "mode": (
+                "same_model_load_epoch_active_memory_minus_session_kv_"
+                "positive_delta_upper_bound"
+            ),
             "estimate_kind": "positive_active_memory_delta_upper_bound",
             "max_session_cache_resident_bytes": max_session_cache_resident_bytes,
             "max_unaccounted_session_kv_drift_bytes": (

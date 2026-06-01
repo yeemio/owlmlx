@@ -132,6 +132,89 @@ def test_b1c2_ledger_audit_reports_live_health(tmp_path):
     assert result["errors"] == []
 
 
+def test_b1c2_ledger_audit_separates_global_and_same_model_epoch_drift(tmp_path):
+    ledger = tmp_path / "segment.jsonl"
+    _write_jsonl(
+        ledger,
+        {
+            "schema_version": "b1c2.v1",
+            "phase": "measurement",
+            "sample_index": 1,
+            "prompt_id": "short",
+            "elapsed_s": 1.0,
+            "sample_verdict": "passed",
+            "model": {"id": "model-a"},
+            "session_cache": {
+                "counter_delta": {},
+                "resident_bytes_estimate_after": 0,
+            },
+            "memory": {
+                "active_memory_after_generation_bytes": 1_000,
+                "drift_from_measurement_start_bytes": 0,
+                "watermark_after_generation": "GREEN",
+            },
+        },
+        {
+            "schema_version": "b1c2.v1",
+            "phase": "swap",
+            "sample_index": 2,
+            "elapsed_s": 2.0,
+            "session_cache": {"counter_delta": {}},
+            "swap": {
+                "unload_ok": True,
+                "settle_barrier_state": "clean",
+                "load_ok": True,
+            },
+        },
+        {
+            "schema_version": "b1c2.v1",
+            "phase": "measurement",
+            "sample_index": 3,
+            "prompt_id": "medium",
+            "elapsed_s": 3.0,
+            "sample_verdict": "passed",
+            "model": {"id": "model-b"},
+            "session_cache": {
+                "counter_delta": {},
+                "resident_bytes_estimate_after": 0,
+            },
+            "memory": {
+                "active_memory_after_generation_bytes": 50_000,
+                "drift_from_measurement_start_bytes": 49_000,
+                "watermark_after_generation": "GREEN",
+            },
+        },
+        {
+            "schema_version": "b1c2.v1",
+            "phase": "measurement",
+            "sample_index": 4,
+            "prompt_id": "long",
+            "elapsed_s": 4.0,
+            "sample_verdict": "passed",
+            "model": {"id": "model-b"},
+            "session_cache": {
+                "counter_delta": {},
+                "resident_bytes_estimate_after": 250,
+            },
+            "memory": {
+                "active_memory_after_generation_bytes": 50_200,
+                "drift_from_measurement_start_bytes": 49_200,
+                "watermark_after_generation": "GREEN",
+            },
+        },
+    )
+
+    result = session_kv_soak_audit.audit_b1c2_ledger(ledger)
+
+    assert result["max_measurement_drift_bytes"] == 49_200
+    assert result["max_same_model_load_epoch_drift_bytes"] == 200
+    assert (
+        result["max_same_model_load_epoch_unaccounted_session_kv_drift_bytes"]
+        == 0
+    )
+    assert result["same_model_load_epoch_drift_accounting"]["epoch_count"] == 2
+
+
 def test_b1c2_segment_rollup_audit_allows_clean_blocked_segment(tmp_path):
     rollup = tmp_path / "segment-rollup.jsonl"
     _write_jsonl(rollup, _clean_blocked_b1c2_rollup())

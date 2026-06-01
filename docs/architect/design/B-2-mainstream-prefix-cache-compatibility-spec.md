@@ -1,6 +1,6 @@
 # B-2 Mainstream Prefix-Cache Compatibility Spec
 
-> Status: design-grade spec; B-2.1 classifier and B-2.2 metadata plumbing landed; B-2.3 blocked on B-1c section 2 fast-swap drift triage
+> Status: design-grade spec; B-2.1 classifier and B-2.2 metadata plumbing landed; B-2.3 blocked on B-1c section 2 fast-swap same-model drift triage
 > Updated: 2026-06-01
 > Campaign: B-2
 > Parent goal:
@@ -46,12 +46,15 @@ Current verified truth:
   the right next step is a short forced-swap canary with high-frequency swaps
   such as one swap every 5 minutes, not another passive 4h wait.
 - The `20260601T125751Z` 20-minute / 4-swap forced canary exercised a
-  5-minute swap cadence and found the real blocker: all four swap boundaries
-  were clean and session-cache drops / expirations / rejects stayed zero, but
-  the segment failed because `max_drift_bytes=46801784452` and
-  `max_unaccounted_session_kv_drift_bytes=45745465112`, with the max-drift
-  record on Gemma at sample 61. This is a fast-swap drift triage blocker, not a
-  consumer-header problem.
+  5-minute swap cadence and found the useful blocker: all four swap boundaries
+  were clean and session-cache drops / expirations / rejects stayed zero. The
+  old rollup reported `max_drift_bytes=46801784452`, but that was a legacy
+  global-baseline artifact caused by comparing Gemma active memory against the
+  first Qwen27 measurement. Re-audit with same-model load-epoch accounting
+  reports `max_same_model_load_epoch_drift_bytes=751370240` on Gemma and
+  `max_same_model_load_epoch_unaccounted_session_kv_drift_bytes=0`. The
+  actionable blocker is therefore same-model fast-swap drift over the raw 200MiB
+  B-1c section 2 gate, not a 46GB leak and not a consumer-header problem.
 
 ## 3. Design Goal
 
@@ -306,16 +309,18 @@ No stage in this spec independently promotes B-1 to `supported`.
 ## 12. Next Handoff
 
 The next round is not B-2.3 code-grade yet. B-2.3 is blocked until B-1c
-section 2 resolves the fast-swap drift blocker and then provides sufficient
-aggregate stability for real cache-handle reuse.
+section 2 resolves the fast-swap same-model drift blocker and then provides
+sufficient aggregate stability for real cache-handle reuse.
 
 Immediate handoff:
 
 1. Triage the `20260601T125751Z` fast-swap drift failure before any longer
-   aggregate run. The boundary was clean; the blocker is the 46.8GB active
-   memory drift under 5-minute swap cadence.
-2. Determine whether the drift is accounting/baseline error around large-model
-   load, real allocator leak, or prompt/session-cache resident accounting gap.
+   aggregate run. The boundary was clean; the legacy 46.8GB global drift is a
+   cross-model baseline artifact, while the actionable same-model load-epoch
+   blocker is 751370240 bytes on Gemma.
+2. Decide whether raw same-model drift should remain the promotion gate, or
+   whether a stricter resident-cache working-set metric is needed before any
+   B-2.3 reuse can consume this evidence.
 3. Keep the 5-minute forced-swap canary as the boundary-stress shape until the
    drift root cause is closed.
 4. Treat forced canaries as boundary diagnostics only, not as 24h/6-swap
@@ -353,6 +358,8 @@ compatibility usage counters match real per-request runtime metadata.
   use a short forced-swap canary with a 5-minute swap cadence instead of
   passively waiting for another 4h segment.
 - 2026-06-01: Recorded `20260601T125751Z` 20-minute / 4-swap forced canary.
-  It proved swap boundaries can be clean under 5-minute cadence, but failed on
-  `max_drift_bytes=46801784452`; B-2.3 is therefore blocked on fast-swap drift
-  triage, not on another passive soak duration.
+  It proved swap boundaries can be clean under 5-minute cadence. Follow-up
+  re-audit split the legacy global 46.8GB inter-model baseline artifact from the
+  actionable same-model Gemma drift (`751370240` bytes, unaccounted upper bound
+  `0`). B-2.3 is blocked on this metric decision/root cause, not on another
+  passive soak duration.
