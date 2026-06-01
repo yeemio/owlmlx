@@ -165,9 +165,11 @@ against the 2026-05-27 release surface.
   原因 `measurement_wall_clock_gap_free=false`（6 个 wall-clock gaps，max 7064.873s）
 - **F-2** C0/C1 passed (n-gram suffix decoding 路径正确性 + serving cache prerequisites)；
   **C2 trim 路径被 mlx-lm #980 hybrid model trim 缺陷阻塞**（详见 `competitor-capability-matrix-20260527.md §4.3` upstream watch）
-- **F-4 plan-grade + design-grade landed** (2026-05-27)；code-grade prompt
-  (`docs/phase-prompts/owlmlx-f4-structured-output-invariance-codegrade-20260527.md`)
-  已 self-contained handoff，等待 fresh-session execution
+- **F-4 grammar-constrained structured-output lane landed**: the Qwen grammar-on
+  lane (`json_schema_flat` / `enum_constrained` / `function_call_arguments` /
+  `nested_object`) is `partial` as a feature-lane only; F-4 overall remains
+  `experimental`, with Gemma and `thinking_tag_closed` residuals isolated in
+  `structured-output-grammar-lane.md`
 
 ### 0.1.4 关键 surface-shift summary
 
@@ -418,7 +420,8 @@ More accurate statements are:
   B-1b cache-on N=20 no-regress passed / B-1c §1 prerequisite met (24.69h cumulative clean) /
   B-1c §2 prompt-reset 子指标 clean (drops/drift/swap-boundary 0) but **wall-clock continuity gap-blocked** /
   F-2 C0/C1 passed, C2 trim **blocked on mlx-lm #980 upstream** /
-  F-4 plan + design landed 2026-05-27
+  F-4 grammar-constrained Qwen structured-output lane registered as feature-lane
+  `partial` while F-4 overall remains `experimental`
 - **oMLX side** (9 releases v0.3.5 → v0.3.12):
   native MTP across Qwen3.5/3.6 + Gemma 4 + DSV4 / DeepSeek V4 Pro/Flash full port /
   **memory governance overhaul** (phys_footprint + adaptive throttle + 3-tier reclaim + hard ceiling) /

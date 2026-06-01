@@ -146,8 +146,9 @@ product readiness remains parked behind the npm local-model learning-loop
 gate. Session KV cache remains experimental: B-1a passed (Gemma 4-31B-it
 2.246× warm TTFT), B-1b passed (cache-on no-regress N=20), B-1c §1
 current-Mac `interrupted_no_swap_rehearsal=passed` @ ≈24.69h cumulative
-clean native segments, B-1c §2 (soak plus swap) is currently in drift
-triage (2026-05-22 boundary-safe 4h segment recorded `max_drift_bytes=352MB
+clean native segments, B-1c §2 (soak plus swap) has closed the drop / drift /
+swap-boundary subcriteria and is now in measurement-continuity closure
+(2026-05-22 boundary-safe 4h segment recorded `max_drift_bytes=352MB
 > 200MB budget`; 2026-05-24 Qwen-only no-swap probe reproduced the same
 352MB drift with cache drops/expirations/rejects all 0; 2026-05-25 accounting
 probe showed positive-delta upper-bound accounting can explain the drift but is

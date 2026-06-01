@@ -24,7 +24,7 @@
 - `docs/architect/**` 仍是 **plan-grade / architecture intent**，不进入 `docs/source-of-truth/master-outline.md`，除非经 runtime evidence + §1a Promotion Gate 晋级。
 - Wave / Campaign 结束时必须反推刷新：主规划结论、对应 companion、README 阅读顺序；不得只在聊天或临时 plan 文件里留下新事实。
 
-当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。B-1 Session KV cache `supported` 四条 gate 仍有 B-1c §2 待闭环；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`；Campaign D 的 DeepSeek D1-D4 experimental lane 已收口；2026-05-26 performance lane 复盘显示 raw TPS / n-gram serving / prompt cache / prefill chunking 短期不再是最大杠杆，下一条 replacement-grade gap 转为 Campaign F-4 Structured-Output Invariance。
+当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。B-1 Session KV cache `supported` 四条 gate 仍有 B-1c §2 待闭环；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`；Campaign D 的 DeepSeek D1-D4 experimental lane 已收口；2026-05-26 performance lane 复盘显示 raw TPS / n-gram serving / prompt cache / prefill chunking 短期不再是最大杠杆；F-4 structured-output 已赢得窄 grammar lane `partial`，整体仍 `experimental`。当前执行主线回到 B-1c §2 measurement-continuity closure。
 
 | 最新落点（2026-05-27） | 状态 | 证据边界 |
 |---|---|---|
@@ -38,10 +38,10 @@
 | D4 DeepSeek MTP pre-load reject | passed · clean failure isolation | `20260517T-d4-mtp-clean-preload-reject.jsonl` records `decision=rejected_pre_load`, `reason_code=mtp_weights_absent_or_stripped`, `load_attempted=false`, `child_process_started=false`, and stable 8066 health before/after |
 | H1 compat route split | landed | `server_routes_openai.py` 拆出 OpenAI / Anthropic compat routes |
 | F-2 / perf lane | C0/C1 passed · serving integration paused | n-gram C2 and prompt-cache reuse are blocked/paused on mlx-lm hybrid trim; B prefill chunking configuration/progress surfaces are supported, but wall-clock acceleration is not promised |
-| F-4 Structured-Output Invariance | selected · plan/design draft | next replacement-grade gap targets roadmap #10: JSON / tool-call / nested-object / enum / thinking-tag breakage measurement; no source-of-truth promotion or supported claim before evidence |
+| F-4 Structured-Output Invariance | narrow grammar lane partial · overall experimental | `structured-output-grammar-lane.md` freezes the Qwen grammar-on lane (`json_schema_flat` / `enum_constrained` / `function_call_arguments` / `nested_object`) as feature-lane `partial`; Gemma and `thinking_tag_closed` remain residual; no F-4-wide or supported claim |
 | Targeted tests | passed | B-1c/D1/session-cache focused suite = 39 passed；subprocess backend = 64 passed（上一轮） |
 
-下一条真实执行线：**F-4.0 structured-output validator + F-4.1 smoke matrix**（先量化可靠性，不宣告 supported）。B-1c §2 仍是重要 infrastructure gap，但不是当前最高杠杆的外显差异化主线；只有新 DS4 artifact / adapter fork 改变 D3 checkpoint inspection 结果时，才启动 D5。
+下一条真实执行线：**B-1c §2 measurement-continuity closure**（同一 prompt-reset swap-bearing policy 的 gap-free 4h segment；先证明单段 aggregate-eligible，再累计 6 × 4h）。F-4 已归档窄 lane，后续 F-4 residual 不阻塞当前 runtime stability 主线；只有新 DS4 artifact / adapter fork 改变 D3 checkpoint inspection 结果时，才启动 D5。
 
 ---
 
@@ -159,7 +159,7 @@
 | #7 Failure Cleanliness | partial（recovery_supervisor / settle_barrier supported） |
 | #8 Multi-Model Lifecycle | partial（pin/TTL/eviction supported；hot-swap 缺） |
 | #9 Speculative Path Safety | **scaffold-only**（gemma4_mtp_drafter probe） |
-| #10 Structured-Output Invariance | **缺**（runtime 不主动验证 schema 不变性） |
+| #10 Structured-Output Invariance | partial lane / overall experimental（Qwen grammar-on JSON / enum / function_call / nested-object lane 已过；Gemma 与 thinking-tag residual） |
 | #11 OwlOps Consumption | **strong**（27 行 ledger live） |
 | #12 Heterogeneous Compute | **not in scope**（远期预留） |
 
@@ -330,7 +330,7 @@
 ### Campaign F — Speculative Path Safety + Structured-Output Invariance（第 6 子战役）
 
 - **目标**：在不破坏 capability honesty 前提下建立 runtime-owned `speculative_execution_status` surface 与正交测试矩阵；证明 spec 路径下 tool calling / structured output / thinking-tag 闭合 bit-for-bit 不变
-- **当前**：F1 `speculative_execution_status` diagnostic surface 已落地（F-1.2 endpoint + F-1.3 kernel observe APIs + fixture evidence `20260525T142617Z`），endpoint self-promotion 仍未执行；F2 n-gram/suffix C0/C1 已过但 C2 serving integration paused on mlx-lm hybrid trim；F4 Structured-Output Invariance 已选为下一条 replacement-grade gap（plan/design 起草中）；`assistant_drafter` 仍为 experimental，正交矩阵尚无 code-grade evidence
+- **当前**：F1 `speculative_execution_status` diagnostic surface 已落地（F-1.2 endpoint + F-1.3 kernel observe APIs + fixture evidence `20260525T142617Z`），endpoint self-promotion 仍未执行；F2 n-gram/suffix C0/C1 已过但 C2 serving integration paused on mlx-lm hybrid trim；F4 Structured-Output Invariance 已归档窄 grammar lane `partial`（Qwen × JSON/enum/function_call/nested-object），F-4 整体仍 `experimental`；`assistant_drafter` 仍为 experimental，MTP serving 正交矩阵尚无 promotion evidence
 - **近期闭环（0–3 月）**：F1 `speculative_execution_status` runtime-owned contract + F2 n-gram/suffix probe (Round 0) + F4.0 validator / F4.1 smoke matrix + F3 Gemma 4 resident MTP A/B（待 drafter / trim blocker 解除后恢复）
 - **中期（3–6 月）**：F4 正交矩阵 ≥20 case + F5 draft constraint checker + F6 MTP+session KV combo
 - **远期（6–12 月）**：F7 DS4 native MTP path + F8 主 serving 受控启用 + F9 RC2 强支撑
