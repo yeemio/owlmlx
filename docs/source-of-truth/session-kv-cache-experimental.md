@@ -1,7 +1,7 @@
 # Session KV Cache Experimental Contract
 
 > Status: authoritative
-> Updated: 2026-05-12
+> Updated: 2026-06-01
 > Implementation: `owlmlx/session_kv_cache.py`,
 > `owlmlx/runtime/mlx_native_backend.py`
 
@@ -79,7 +79,59 @@ possess pressure truth.
 No body schema changes are required. HTTP compatibility routes use the
 `X-Owlmlx-Session-Id` header.
 
-## 5. Status Surface
+## 5. Compatibility Boundary And OwlMLX-Owned Gap
+
+This section is the current OwlMLX-owned answer for upper-layer consumers such
+as OwlCoda.
+
+`X-Owlmlx-Session-Id` is a narrow experimental control for OwlMLX native-backend
+diagnostics and internal dogfood. It is **not** the target mainstream consumer
+contract. Upper-layer products such as OwlCoda, Codex, or other OpenAI /
+Anthropic-compatible clients should not have to learn an OwlMLX-specific session
+header to get normal prefix-cache behavior.
+
+The replacement-grade target is OwlMLX-owned mainstream compatibility:
+
+- OpenAI / Anthropic compatibility routes should eventually benefit from safe
+  automatic prefix reuse without product-specific session-header plumbing.
+- Cache observability should eventually appear in the appropriate compatibility
+  usage or documented runtime status fields instead of forcing consumers to
+  scrape an experimental diagnostic route.
+- The compatibility path must remain isolation-safe: reuse may only occur when
+  OwlMLX can prove token-prefix equivalence for the same model/runtime profile,
+  and it must not merge unrelated conversations by hidden session id.
+
+Until that target exists, OwlMLX must honestly report this as a local runtime
+gap, not as an OwlCoda integration requirement.
+
+This surface does **not** imply any of the following:
+
+- automatic cross-request prefix cache without an explicit session id
+- subprocess/default serving prefix reuse
+- non-stream `generate` cross-request reuse
+- paged KV
+- continuous batching
+- OpenAI `usage.prompt_tokens_details.cached_tokens`
+- Anthropic `cache_read_input_tokens`
+
+The current experimental observability source is:
+
+```text
+GET /v1/runtime/session-kv-cache
+/v1/runtime/status -> backend.detail.session_kv_cache
+```
+
+OpenAI/Anthropic compatibility usage payloads currently do not carry OwlMLX
+session-cache hit/miss counters. That is an OwlMLX compatibility gap to close,
+not something upper layers should normalize as their permanent integration
+burden.
+
+Session lifetime and cleanup are currently runtime-side TTL / unload / pressure
+behaviors, not a stable external clear-session API. If a future release adds an
+explicit clear-session endpoint, or promotes automatic prefix reuse, it must be
+documented here before upper layers rely on it.
+
+## 6. Status Surface
 
 `GET /v1/runtime/session-kv-cache` returns the backend-exposed
 `owlmlx.session_kv_cache` diagnostic payload when the backend supports it.
@@ -97,17 +149,17 @@ The same payload is also visible at:
 /v1/runtime/status -> backend.detail.session_kv_cache
 ```
 
-## 6. Promotion Gate
+## 7. Promotion Gate
 
 > **⚠️ Gate superseded (flagged 2026-05-30 audit).** The flat gate below predates
 > the B-1c framework. The live promotion gate is **B-1a + B-1b + B-1c §1 + B-1c §2**
 > together (the §1a Promotion Gate). B-1c §2 (≥24h aggregate soak + ≥6 model
 > swaps, every segment wall-clock-gap-free) is currently **`blocked` on
-> measurement continuity** (host-sleep wall-clock gaps), with the
-> runtime/allocator functionally passing. See `runtime-capability-matrix.md`
-> (session-KV row) + `docs/architect/design/B-1c-section-2-spec.md` §11. The
-> `experimental` label below is still correct; the *criteria* below are not the
-> current ones.
+> aggregate volume**: the 2026-06-01 repeat produced one gap-free 4h / 1-swap
+> aggregate-clean segment, but 24h / 6 swaps are still unmet. See
+> `runtime-capability-matrix.md` (session-KV row) +
+> `docs/architect/design/B-1c-section-2-spec.md` §11. The `experimental` label
+> below is still correct; the *criteria* below are not the current ones.
 
 The capability remains `experimental` until all of the following are true:
 

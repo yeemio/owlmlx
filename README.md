@@ -78,6 +78,12 @@ won't.
 backend reuse an explicit session prefix on stream requests. This is TTFT /
 prefill evidence, not a decode-TPS claim.
 
+This explicit header path is the current experimental control plane, not the
+target mainstream consumer contract. OwlMLX still owns the compatibility gap for
+automatic safe prefix reuse and protocol-visible cache observability on
+OpenAI/Anthropic-compatible routes; upper layers such as OwlCoda should not have
+to normalize an OwlMLX-specific session header as a product default.
+
 | Model | Backend | Prompt shape | Warm TTFT off | Warm TTFT on | Improvement |
 |---|---|---|---:|---:|---:|
 | Qwen3.6-27B-4bit | native | ~4.2k chars, append-only, 4 rounds | 3397.977 / 4026.099 / 4419.626 ms | 536.325 / 543.389 / 652.471 ms | 7.409x |
