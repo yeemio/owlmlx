@@ -49,7 +49,7 @@ Canonical command shape:
 ```zsh
 cd /Users/yeemio/AI/gitrep/owlmlx
 export OWLMLX_SESSION_CACHE_ENABLED=1
-caffeinate -disu uv run python scripts/bench/eviction_soak.py \
+caffeinate -dis uv run python scripts/bench/eviction_soak.py \
   --gate b1c2-soak-plus-swap \
   --runtime owlmlx \
   --backend native \
@@ -78,7 +78,7 @@ Avoid tmux inspection. Use process and files:
 
 ```zsh
 pgrep -af 'eviction_soak.py.*b1c2-soak-plus-swap'
-pgrep -af 'caffeinate -disu'
+pgrep -af 'caffeinate -dis'
 ls -t files/evidence/owlmlx/bench/session-kv-soak/*prompt-reset-3000-4h-soak-swap.jsonl | head -1
 wc -l files/evidence/owlmlx/bench/session-kv-soak/<ledger>.jsonl
 tail -n 1 files/evidence/owlmlx/bench/session-kv-soak/<ledger>.jsonl
@@ -99,9 +99,10 @@ uv run python scripts/bench/session_kv_soak_audit.py \
 - Lid open.
 - Do not manually sleep the host.
 - Keep the machine unused during the segment if possible.
-- `caffeinate -disu` is required on the current macOS host (`caffeinate -h`
-  exposes `[-disu]`, not `-m`); prior `tmux + caffeinate -i` did not prevent
-  the wall-clock gap.
+- `caffeinate -dis` is required on the current macOS host (`caffeinate -h`
+  exposes `[-disu]`, not `-m`). If the runner is started first, attach with
+  `caffeinate -dis -w <python_pid>`; prior `tmux + caffeinate -i` did not
+  prevent the wall-clock gap.
 
 ## Change Log
 

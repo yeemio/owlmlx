@@ -18,5 +18,5 @@
   "prompt_growth_max_chars": 3000,
   "focused_prerequisite": "20260525T055831Z prompt-reset Qwen-only probe clean for drop/expiration/reject and drift budget",
   "previous_swap_bearing_gap_blocked_segment": "20260525T061019Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-soak-swap-rollup.jsonl",
-  "host_requirements": ["AC power", "lid open", "no manual sleep", "caffeinate -disu"]
+  "host_requirements": ["AC power", "lid open", "no manual sleep", "caffeinate -dis or caffeinate -dis -w <python_pid>"]
 }
