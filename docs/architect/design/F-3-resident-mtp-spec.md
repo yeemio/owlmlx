@@ -3,7 +3,7 @@
 > **Gate**: Campaign F · F-3 — Gemma 4 resident MTP A/B (assistant-drafter speculative decoding promoted from `deferred_cli_per_request` to a resident, parent-supervised runner with pure-decode A/B evidence)
 > **Layer**: design-grade, downstream of [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Part V · Campaign F · F-3, upstream of code-grade (resident MTP runner + A/B harness)
 > **Plan-grade source**: [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) line 335 ("F3 Gemma 4 resident MTP A/B（待 drafter / trim blocker 解除后恢复）") + [`../07-perf-optimization-proposal-20260526.md`](../07-perf-optimization-proposal-20260526.md)
-> **Status**: design-grade draft — **BLOCKED ON LOCAL PREREQUISITE** (the upstream `mlx-lm #980` issue is closed, but the installed `mlx-lm` / `mlx-vlm` pin has not yet been proven to satisfy §2.1 route 1 for this Gemma4 resident-MTP lane; see §9). Spec lands now to freeze the verification contract + harness shape; code-grade does **not** start until the §2 prerequisite gate clears.
+> **Status**: design-grade — **F-3.1 local prerequisite failed** (the upstream `mlx-lm #980` issue is closed, but the 2026-06-01 local `mlx-lm` / `mlx-vlm` pin failed the §2.2 resident-MTP feasibility probe; see §2.4 and §9). Code-grade does **not** start until a later local prerequisite probe reaches `resident_viable_*`.
 > **Non-goal**: this spec does not promote `assistant_drafter` to `supported`. It defines the resident-runner A/B that produces the evidence a later §1a Promotion Gate round would consume. It also does not touch the `mlx-lm` text line, DS4, or continuous batching.
 
 ## 1. Purpose
@@ -41,7 +41,38 @@ Before full F-3 code-grade, a minimal feasibility probe SHOULD answer one questi
 
 A `passed` probe satisfies §2.1 route 2 and unblocks F-3. A `failed`/`blocked` probe keeps F-3 blocked and feeds the upstream-watch ledger (§9). This probe is plan-grade feasibility-probe discipline applied to the gate's single riskiest assumption.
 
-### 2.3 Soft prerequisites (must hold, not blocking by themselves)
+### 2.4 2026-06-01 F-3.1 local probe result (FAILED)
+
+The first local F-3.1 probe ran after the B-1c memory-sensitive soak released
+the host:
+
+```text
+files/evidence/owlmlx/bench/f3-resident-mtp/20260601T124448Z-f3-1-resident-feasibility.jsonl
+```
+
+Result:
+
+- `schema_version=f3.resident_feasibility.v1`
+- `verdict=failed`
+- `failure_reasons=["non_trivial_speculative_summary_missing_after_first_request"]`
+- `capability_label=experimental`
+- `used_for_promotion_gate=false`
+- versions: `mlx-vlm 0.5.0`, `mlx-lm 0.31.3`, `mlx 0.31.2`
+- target + drafter loaded once: `target_load_count=1`, `draft_load_count=1`
+- resident process served 3 requests: `requests_served=3`, `reloads_observed=0`
+- speculative summaries: request 0 `mean_accepted_tokens=1.0`, requests 1-2
+  `mean_accepted_tokens=0.0`, `rounds=0`
+- `trim_attempted=true`, with 180 observed `KVCache` / `RotatingKVCache`
+  `trim` calls
+
+Interpretation: the local runtime can load target + drafter once and keep a
+resident process alive across requests, but it did **not** satisfy the F-3.1
+resident-viable gate because request 2+ did not produce non-trivial speculative
+acceptance and the run entered a trim regime. This does not prove Gemma4 MTP is
+impossible in principle; it proves this local pin + prompt/cache path does not
+clear the prerequisite. F-3.2/F-3.3 remain blocked.
+
+### 2.5 Soft prerequisites (must hold, not blocking by themselves)
 
 - F-1 design + code-grade landed and green (the `speculative_execution_status` surface F-3 will drive into the `loaded` shape) — **met** (F-1.2/F-1.3 landed, evidence `20260525T142617Z`)
 - this F-3 design-grade spec reviewed + signed off (architect + user, per [`README.md`](README.md) two-gate rule)
@@ -125,7 +156,7 @@ Independent conclusions emitted:
 
 ### 5.3 What F-3 does NOT claim from this evidence
 
-- not `supported`, not `partial` — the label stays `experimental` (§2.3); promotion is a separate round
+- not `supported`, not `partial` — the label stays `experimental` (§2.5); promotion is a separate round
 - not parity with oMLX cross-family native MTP — F-3 is Gemma4-only
 - not a text-line (Qwen/gpt-oss) MTP claim
 - a favorable `pure_decode_ratio` is **necessary but not sufficient** for promotion; the §1a gate additionally requires N≥20 repeatability + clean reclaim, per the live promotion framework
@@ -258,6 +289,11 @@ open-issue watch. Per the competitor-matrix upstream-watch discipline
 
 ### Blocker
 - [`mlx-lm #980`](https://github.com/ml-explore/mlx-lm/issues/980) — RotatingKVCache / SSM caches not trimmable; **closed on GitHub as of 2026-06-01 live check**, but F-3 remains blocked until the local `mlx-lm` / `mlx-vlm` pin or the §2.2 append-only probe proves resident viability for this lane
+- 2026-06-01 local F-3.1 probe:
+  [`20260601T124448Z-f3-1-resident-feasibility.jsonl`](../../../files/evidence/owlmlx/bench/f3-resident-mtp/20260601T124448Z-f3-1-resident-feasibility.jsonl)
+  records `verdict=failed`; resident load was proven (`reloads_observed=0`,
+  `requests_served=3`), but request 2+ had `mean_accepted_tokens=0.0` and the
+  run observed 180 trim calls
 - 2026-05-06 whole-process A/B reference (the number F-3 must NOT conflate with decode speedup): [`gemma4-mtp-drafter-probe-20260506.md`](../../source-of-truth/gemma4-mtp-drafter-probe-20260506.md) §"A/B Timing Return"
 
 ## 12. Change Log
@@ -267,3 +303,4 @@ open-issue watch. Per the competitor-matrix upstream-watch discipline
 | 2026-06-01 | design-grade draft (fresh-context derivation from plan-grade roadmap F-3); landed BLOCKED on `mlx-lm #980` prerequisite gate with owlmlx-owned non-trimmable feasibility route as the unblock path | architect session (this round) |
 | 2026-06-01 | live upstream re-check: `mlx-lm #980` is closed, so the gate wording was narrowed from "open issue blocker" to "local prerequisite verification blocker"; F-3.1 remains required before code-grade starts | goal loop F-3.1 |
 | 2026-06-01 | added `blocked_on_local_runtime` as a first-class F-3.1 verdict because an unusable isolated probe venv is a different blocker from an upstream #980 defect | goal loop F-3.1 |
+| 2026-06-01 | recorded first F-3.1 local resident probe result: `verdict=failed`; target/drafter loaded once and served 3 requests, but request 2+ reported no non-trivial speculative acceptance and the run observed 180 trim calls; F-3.2 remains blocked | goal loop F-3.1 |

@@ -52,13 +52,13 @@
 
 ## Current Dominant Gap
 
-`f3-1-real-resident-probe-run`
+`f3-1-resident-mtp-failed-followup`
 
-The local runtime can now import the relevant `mlx-vlm` stack and exposes a
-candidate programmatic resident surface, and owlmlx now has a reproducible
-operator probe that can emit the F-3.1 verdict ledger. The next round should
-run the minimal Gemma4 target + assistant drafter probe only when host state is
-safe for a large model load, then emit the F-3.1 JSONL verdict.
+The F-3.1 JSONL verdict now exists. The local runtime can load target + drafter
+once and serve multiple requests in one resident process, but the first real
+probe did not meet the resident-viable gate because request 2+ had no
+non-trivial speculative acceptance and the run entered a trim regime. F-3.2
+must not start from this evidence.
 
 ## Honest Claim Ceiling
 
@@ -87,3 +87,27 @@ F-3 remains `experimental`. No F-3.2 resident backend, F-3.3 A/B benchmark, or
   `caffeinate`). Its latest ledger sample at `2026-06-01T08:42Z` shows
   `elapsed_s=3353.233` of a `14400` second segment. The F-3 heavy resident
   probe therefore remains queued behind the host-safety gate.
+
+## F-3.1 Verdict: 2026-06-01T12:44Z
+
+Evidence:
+`files/evidence/owlmlx/bench/f3-resident-mtp/20260601T124448Z-f3-1-resident-feasibility.jsonl`
+
+- `verdict=failed`
+- `failure_reasons=["non_trivial_speculative_summary_missing_after_first_request"]`
+- `capability_label=experimental`
+- `used_for_promotion_gate=false`
+- `reloads_observed=0`, `requests_served=3`
+- target + drafter loaded once: `target_load_count=1`, `draft_load_count=1`
+- request speculative summaries:
+  - request 0: `mean_accepted_tokens=1.0`, `rounds=4`
+  - request 1: `mean_accepted_tokens=0.0`, `rounds=0`
+  - request 2: `mean_accepted_tokens=0.0`, `rounds=0`
+- `trim_attempted=true`, with 180 observed `KVCache` / `RotatingKVCache`
+  `trim` calls
+- versions: `mlx-vlm 0.5.0`, `mlx-lm 0.31.3`, `mlx 0.31.2`
+
+Interpretation: F-3.1 produced an evidence-backed verdict, but it is a negative
+verdict. The installed local pin does not clear the resident-viable
+prerequisite for Gemma4 assistant-drafter MTP. F-3 remains design-ready and
+code-grade-blocked; `assistant_drafter` remains `experimental`.
