@@ -26,6 +26,7 @@ _PRESSURE_WATERMARKS = {"yellow", "red", "fatal"}
 _DEFAULT_TTL_S = 60.0
 _DEFAULT_MAX_ENTRIES = 64
 _DEFAULT_MAX_PROMPT_TOKENS = 0
+_DEFAULT_MAX_RESIDENT_BYTES = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,11 +235,13 @@ class SessionKVCacheStore:
         ttl_s: float = _DEFAULT_TTL_S,
         max_entries: int = _DEFAULT_MAX_ENTRIES,
         max_prompt_tokens: int = _DEFAULT_MAX_PROMPT_TOKENS,
+        max_resident_bytes: int = _DEFAULT_MAX_RESIDENT_BYTES,
     ) -> None:
         self.enabled = bool(enabled)
         self.ttl_s = max(float(ttl_s), 0.0)
         self.max_entries = max(int(max_entries), 1)
         self.max_prompt_tokens = max(int(max_prompt_tokens), 0)
+        self.max_resident_bytes = max(int(max_resident_bytes), 0)
         self._entries: dict[tuple[str, str], _SessionKVCacheEntry] = {}
         self._counters = SessionKVCacheCounters()
         self._last_drop_event: dict[str, Any] | None = None
@@ -255,6 +258,10 @@ class SessionKVCacheStore:
             max_prompt_tokens=_env_int(
                 "OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS",
                 _DEFAULT_MAX_PROMPT_TOKENS,
+            ),
+            max_resident_bytes=_env_int(
+                "OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES",
+                _DEFAULT_MAX_RESIDENT_BYTES,
             ),
         )
 
@@ -407,10 +414,12 @@ class SessionKVCacheStore:
                 ),
             )
             evicted_for_count = self._evict_to_max_entries_locked()
+            evicted_for_resident = self._evict_to_max_resident_locked()
+            evicted_total = evicted_for_count + evicted_for_resident
             self._counters = _replace_counter(
                 self._counters,
                 entries_created=self._counters.entries_created + 1,
-                evictions=self._counters.evictions + evicted_for_count,
+                evictions=self._counters.evictions + evicted_total,
             )
         return SessionKVCacheDecision(
             decision="new",
@@ -419,7 +428,7 @@ class SessionKVCacheStore:
             cache_object_id=cache_object_id,
             suffix_tokens=requested_prompt_tokens if requested_prompt_tokens else None,
             created=True,
-            evicted_count=evicted_for_count,
+            evicted_count=evicted_total,
         )
 
     def remember_prompt(
@@ -482,6 +491,12 @@ class SessionKVCacheStore:
                     entry.byte_estimate_mode = (
                         "positive_active_memory_delta_upper_bound"
                     )
+            evicted_for_resident = self._evict_to_max_resident_locked()
+            if evicted_for_resident:
+                self._counters = _replace_counter(
+                    self._counters,
+                    evictions=self._counters.evictions + evicted_for_resident,
+                )
             return True
 
     def drop_for_session_model(
@@ -625,9 +640,15 @@ class SessionKVCacheStore:
             "ttl_s": self.ttl_s,
             "max_entries": self.max_entries,
             "max_prompt_tokens": self.max_prompt_tokens,
+            "max_resident_bytes": self.max_resident_bytes,
             "prompt_window_policy": (
                 "bypass_and_evict_over_limit"
                 if self.max_prompt_tokens > 0
+                else "unbounded"
+            ),
+            "resident_pressure_policy": (
+                "lru_evict_over_limit"
+                if self.max_resident_bytes > 0
                 else "unbounded"
             ),
             "active_entries": len(entries),
@@ -667,6 +688,19 @@ class SessionKVCacheStore:
     def _evict_to_max_entries_locked(self) -> int:
         evicted = 0
         while len(self._entries) > self.max_entries:
+            key = min(
+                self._entries,
+                key=lambda candidate: self._entries[candidate].last_used_at_s,
+            )
+            self._entries.pop(key, None)
+            evicted += 1
+        return evicted
+
+    def _evict_to_max_resident_locked(self) -> int:
+        if self.max_resident_bytes <= 0:
+            return 0
+        evicted = 0
+        while self._entries and self._resident_bytes_locked() > self.max_resident_bytes:
             key = min(
                 self._entries,
                 key=lambda candidate: self._entries[candidate].last_used_at_s,

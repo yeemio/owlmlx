@@ -129,6 +129,18 @@ missing primitive precisely. Do not reframe the private header as the solution.
   row used `resident_bytes_estimate_mode=cache_object_nbytes`; Gemma raw
   same-model drift remained `751370240` bytes, but direct cache-object resident
   bytes reached `1054965760` and same-model unaccounted drift stayed `0`.
+- The 2026-06-01 `20260601T141659Z` 2h / 24-swap high-frequency run proved the
+  user point: 5-minute switching finds real issues. It kept swap boundaries,
+  drops, expirations, rejects, and wall-clock continuity clean, but failed the
+  reviewed resident gate because Gemma resident bytes reached `2768240640`
+  against the `2147483648` budget.
+- The follow-up `20260601T162203Z` 40m / 8-swap validation after adding
+  `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES` LRU cap support stayed clean:
+  `drift_gate.mode=cache_object_resident_accounted`, `hard_failure=false`,
+  `clean_for_interrupted_aggregate=true`, drops / expirations / rejects all 0,
+  4 LRU evictions, and `max_session_cache_resident_bytes=2144829440` within the
+  `2147483648` budget. It remains `blocked` only because it is not the canonical
+  aggregate duration.
 
 ## remaining_gaps
 
@@ -141,12 +153,15 @@ missing primitive precisely. Do not reframe the private header as the solution.
    accounting is available, resident cache bytes stay within budget, and
    unaccounted same-model drift stays within the raw drift budget. Do not carry
    this forward as a generic raw-RSS leak claim.
-3. B-2.3 automatic safe prefix reuse is not implemented and must remain blocked
+3. Resident pressure now has a runtime control and first validation, but B-2.3
+   still needs an explicit aggregate / policy decision before automatic reuse
+   can consume it.
+4. B-2.3 automatic safe prefix reuse is not implemented and must remain blocked
    until B-1c section 2 aggregate stability passes.
-4. The explicit `X-Owlmlx-Session-Id` lane is still the only runtime path that
+5. The explicit `X-Owlmlx-Session-Id` lane is still the only runtime path that
    can physically reuse a cache handle today; it remains experimental and must
    not be presented as the mainstream consumer contract.
-5. Source-of-truth docs must continue to distinguish three separate facts:
+6. Source-of-truth docs must continue to distinguish three separate facts:
    classifier diagnostics, compatibility-visible real cached-token accounting,
    and actual automatic reuse.
 
@@ -155,10 +170,9 @@ missing primitive precisely. Do not reframe the private header as the solution.
 `B-1c-section-2-high-frequency-swap-aggregate-policy-for-B-2.3`
 
 The next executable closure is not another consumer-side adapter and not F-3
-runtime work. B-2.1 and B-2.2 are already landed; the dominant blocker is B-1c
-section 2 aggregate / policy evidence under high-frequency swap stress. Do not
-run another passive 4h topoff with one switch. Keep the 5-minute cadence as the
-stress shape: boundaries were clean, the legacy 46.8GB number was a cross-model
-baseline artifact, and the raw 751MB Gemma same-model drift is fully accounted
-for by direct cache-object resident bytes. Keep B-2.3 automatic reuse blocked as
-a capability claim until the aggregate / policy prerequisite is honestly met.
+runtime work. B-2.1 and B-2.2 are already landed; the dominant blocker is the
+B-1c section 2 aggregate / policy decision under high-frequency swap stress.
+Do not run another passive 4h topoff with one switch. Keep the 5-minute cadence:
+it already found the resident-pressure issue, and the first LRU resident-cap
+validation is clean. Keep B-2.3 automatic reuse blocked as a capability claim
+until the aggregate / policy prerequisite is honestly met.

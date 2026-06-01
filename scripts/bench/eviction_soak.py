@@ -353,11 +353,15 @@ def _session_cache_env(
     ttl_s: float | None = None,
     max_entries: int | None = None,
     max_prompt_tokens: int | None = None,
+    max_resident_bytes: int | None = None,
 ) -> Iterator[None]:
     previous_enabled = os.environ.get("OWLMLX_SESSION_CACHE_ENABLED")
     previous_ttl = os.environ.get("OWLMLX_SESSION_CACHE_TTL_S")
     previous_max_entries = os.environ.get("OWLMLX_SESSION_CACHE_MAX_ENTRIES")
     previous_max_prompt_tokens = os.environ.get("OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS")
+    previous_max_resident_bytes = os.environ.get(
+        "OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES"
+    )
     os.environ["OWLMLX_SESSION_CACHE_ENABLED"] = "1" if enabled else "0"
     if ttl_s is not None:
         os.environ["OWLMLX_SESSION_CACHE_TTL_S"] = str(float(ttl_s))
@@ -366,6 +370,10 @@ def _session_cache_env(
     if max_prompt_tokens is not None:
         os.environ["OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS"] = str(
             int(max_prompt_tokens)
+        )
+    if max_resident_bytes is not None:
+        os.environ["OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES"] = str(
+            int(max_resident_bytes)
         )
     try:
         yield
@@ -387,6 +395,12 @@ def _session_cache_env(
         else:
             os.environ["OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS"] = (
                 previous_max_prompt_tokens
+            )
+        if previous_max_resident_bytes is None:
+            os.environ.pop("OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES", None)
+        else:
+            os.environ["OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES"] = (
+                previous_max_resident_bytes
             )
 
 
@@ -2176,6 +2190,10 @@ def _b1c2_rollup(
         int(record.get("session_cache", {}).get("counter_delta", {}).get("rejects", 0) or 0)
         for record in records
     )
+    evictions_total = sum(
+        int(record.get("session_cache", {}).get("counter_delta", {}).get("evictions", 0) or 0)
+        for record in records
+    )
     window_bypasses_total = sum(
         int(
             record.get("session_cache", {})
@@ -2410,6 +2428,7 @@ def _b1c2_rollup(
         "failure_measurement_count": failure_measurement_count,
         "unresolved_reclaim_barrier_events": unresolved_reclaim_barrier_events,
         "session_cache_drops_total": drops_total,
+        "session_cache_evictions_total": evictions_total,
         "session_cache_expirations_total": expirations_total,
         "session_cache_rejects_total": rejects_total,
         "session_cache_window_bypasses_total": window_bypasses_total,
@@ -2509,6 +2528,7 @@ def run_b1c2_soak_plus_swap(
         True,
         ttl_s=effective_session_cache_ttl_s,
         max_prompt_tokens=session_cache_max_prompt_tokens,
+        max_resident_bytes=resident_cache_budget_bytes,
     ):
         kernel, sampler = _make_kernel(backend=backend, profile=profile)
         evidence_strength = _b1c2_evidence_strength(backend=backend)
@@ -2650,6 +2670,9 @@ def run_b1c2_soak_plus_swap(
                     "OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS": (
                         session_cache_max_prompt_tokens
                     ),
+                    "OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES": (
+                        resident_cache_budget_bytes
+                    ),
                     "session_id": session_id,
                     "prompt_chars_before_generation": len(prompt),
                     "prompt_chars_after_generation": len(next_prompt),
@@ -2691,7 +2714,11 @@ def run_b1c2_soak_plus_swap(
                         "resident_bytes_estimate_modes"
                     ),
                     "max_prompt_tokens": cache_after.get("max_prompt_tokens"),
+                    "max_resident_bytes": cache_after.get("max_resident_bytes"),
                     "prompt_window_policy": cache_after.get("prompt_window_policy"),
+                    "resident_pressure_policy": cache_after.get(
+                        "resident_pressure_policy"
+                    ),
                     "last_drop_event_before": cache_before.get("last_drop_event"),
                     "last_drop_event_after": cache_after.get("last_drop_event"),
                     "last_bypass_event_before": cache_before.get("last_bypass_event"),

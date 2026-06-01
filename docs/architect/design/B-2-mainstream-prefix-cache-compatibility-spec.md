@@ -65,6 +65,14 @@ Current verified truth:
   therefore no longer blocked on missing metadata or a raw-RSS false-fail. It
   remains blocked until B-1c §2 has enough high-frequency swap evidence under
   the reviewed resident-accounted drift gate.
+- The `20260601T141659Z` 2h / 24-swap high-frequency run found a real resident
+  pressure blocker: boundaries and drops stayed clean, but Gemma resident bytes
+  grew to `2768240640`, over the reviewed `2147483648` working-set budget.
+  OwlMLX then added `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES` LRU cap support;
+  the `20260601T162203Z` 40m / 8-swap validation stayed within budget
+  (`2144829440 <= 2147483648`) with 4 LRU evictions and no drops / expirations /
+  rejects. B-2.3 is still blocked until this is accepted as enough aggregate /
+  policy evidence for automatic reuse.
 
 ## 3. Design Goal
 
@@ -334,15 +342,18 @@ Immediate handoff:
    unaccounted same-model drift is within budget.
 3. Keep the 5-minute forced-swap canary as the boundary-stress shape. Do not
    replace it with passive long runs that perform only one switch.
-4. Treat forced canaries as boundary diagnostics only, not as 24h/6-swap
-   aggregate promotion evidence.
-5. Aggregate only completed segments with `measurement_wall_clock_gap_free=true`
+4. Keep resident pressure capped with
+   `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES`; count LRU evictions separately
+   from drops.
+5. Treat forced canaries as boundary diagnostics only, not as 24h/6-swap
+   aggregate promotion evidence unless the B-1c §2 policy is explicitly revised.
+6. Aggregate only completed segments with `measurement_wall_clock_gap_free=true`
    and clean
    cache/drop/swap-boundary audit results.
-6. Keep automatic prefix reuse disabled and unimplemented.
-7. Do not treat partial measurement-only ledgers as B-1c section 2 aggregate
+7. Keep automatic prefix reuse disabled and unimplemented.
+8. Do not treat partial measurement-only ledgers as B-1c section 2 aggregate
    input. The segment must reach its planned swap boundary and produce a rollup.
-8. Refresh this spec only when B-1c section 2 either passes the aggregate gate
+9. Refresh this spec only when B-1c section 2 either passes the aggregate gate
    or produces a new blocker that changes B-2.3 feasibility.
 
 When the prerequisite is met, the first B-2.3 code-grade round may wire
@@ -382,3 +393,8 @@ compatibility usage counters match real per-request runtime metadata.
 - 2026-06-01: Closed the B-1c §2 raw-drift false-fail with a reviewed
   `cache_object_resident_accounted` drift gate. Automatic reuse remains blocked
   until aggregate / policy evidence exists under the 5-minute swap cadence.
+- 2026-06-01: Recorded the 2h / 24-swap high-frequency resident-pressure
+  failure (`20260601T141659Z`) and the follow-up resident-cap validation
+  (`20260601T162203Z`). The runtime now has opt-in LRU resident cap support via
+  `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES`; B-2.3 remains blocked pending
+  aggregate / policy review.

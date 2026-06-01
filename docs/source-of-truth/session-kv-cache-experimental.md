@@ -139,6 +139,12 @@ gate only when the estimate kind is `cache_object_nbytes`, resident cache bytes
 stay within budget, and unaccounted same-model drift stays within the raw drift
 budget. It does not relax the aggregate / supported promotion gate by itself.
 
+The 2026-06-01 high-frequency swap tests also added an experimental resident
+pressure control: `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES`. When set, the
+session cache uses LRU eviction to keep the held cache working set under the
+configured byte budget. Evictions are counted as `evictions`, not `drops`; they
+may reduce reuse but should not be treated as correctness failures.
+
 Session lifetime and cleanup are currently runtime-side TTL / unload / pressure
 behaviors, not a stable external clear-session API. If a future release adds an
 explicit clear-session endpoint, or promotes automatic prefix reuse, it must be

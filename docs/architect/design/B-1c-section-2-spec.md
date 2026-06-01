@@ -577,6 +577,23 @@ must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
   the selected functional drift gate as `cache_object_resident_accounted`. This
   proves the raw drift is a real held cache working set, not a leak; it still
   does not pass §2 because the canary is only 10 minutes / 2 swaps.
+- high-frequency resident-pressure finding:
+  `20260601T141659Z-b1c2-qwen-gemma-qwen35-cache-nbytes-5min-2h-soak-swap-rollup.jsonl`
+  ran 2h / 24 swaps at the 5-minute cadence. It proved the boundary behavior
+  stayed clean (`swap_boundaries_clean=true`, wall-clock gap-free, drops /
+  expirations / rejects all 0), but it failed the reviewed resident gate because
+  Gemma cache-object resident bytes grew to `2768240640`, above the
+  `2147483648` resident working-set budget. This is the reason 5-minute cadence
+  is the right stressor: it found a real capacity problem that passive waiting
+  would hide.
+- resident-cap validation:
+  `20260601T162203Z-b1c2-qwen-gemma-qwen35-resident-cap-5min-40m-soak-swap-rollup.jsonl`
+  reran 40 minutes / 8 swaps after adding an LRU resident cap
+  (`OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES=2147483648`). It remained
+  wall-clock-gap-free, had drops / expirations / rejects all 0, exercised 4 LRU
+  evictions, and kept `max_session_cache_resident_bytes=2144829440` within the
+  budget. The rollup is `blocked` only because this is not 24h aggregate
+  evidence; audit reports `clean_for_interrupted_aggregate=true`.
 
 The landed smoke-only slice covers:
 
@@ -590,7 +607,8 @@ Only after schema tests pass should native execution be attempted.
 ## 10. Next Step
 
 Do not resume passive single-swap aggregate evidence. The raw drift false-fail
-has been closed by direct cache-object resident accounting; the next evidence
+has been closed by direct cache-object resident accounting, and the resident
+working-set cap has a first clean high-frequency validation. The next evidence
 shape must keep high-frequency boundary stress (5-minute swaps) and use
 duration only as additional confidence, not as a substitute for switches.
 
@@ -677,13 +695,25 @@ drift is within the raw drift budget. Estimate modes such as
 `positive_active_memory_delta_upper_bound` still fail the resident-accounted
 gate.
 
+### B3a — Resident working-set cap under high-frequency swaps: RESOLVED FOR FIRST VALIDATION
+
+The 2h / 24-swap run (`20260601T141659Z`) found the next real problem:
+resident cache bytes exceeded the reviewed 2GiB working-set budget even though
+all boundaries, drops, expirations, rejects, and unaccounted drift stayed clean.
+The follow-up runtime cap adds `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES` and LRU
+eviction over the resident budget. The 40m / 8-swap validation
+(`20260601T162203Z`) stayed under budget (`2144829440 <= 2147483648`), recorded
+4 evictions, and remained clean for interrupted aggregate. This is a functional
+fix, not a promotion.
+
 ### B4 — Aggregate volume: BLOCKED
 
 §7 #3 (≥24h aggregate) and #4 (≥6 swaps) are unmet (latest aggregate-eligible
-input: ~4h, 1 swap; latest fast-swap drift-gate canary: 10 minutes, 2 swaps).
-This is now the independent remaining blocker. Future evidence should not be
-"one swap after a long idle wait"; it should retain a short swap cadence
-(currently 5 minutes) so duration and boundary count grow together.
+input: ~4h, 1 swap; latest high-frequency clean validation: 40 minutes, 8
+swaps). This is now the independent remaining blocker / policy question. Future
+evidence should not be "one swap after a long idle wait"; it should retain a
+short swap cadence (currently 5 minutes) so duration and boundary count grow
+together.
 
 ### Route forward
 
@@ -694,12 +724,15 @@ This is now the independent remaining blocker. Future evidence should not be
 2. **Keep the reviewed drift-gate decision**: direct cache-object resident bytes
    may explain raw RSS drift only with `cache_object_nbytes`, resident working
    set within budget, and unaccounted same-model drift within budget.
-3. **Run segments only in confirmed-awake windows**, aggregate via the §2
+3. **Keep resident pressure bounded**: B-1c §2 evidence should set
+   `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES` to the reviewed resident working-set
+   budget and record evictions separately from drops.
+4. **Run segments only in confirmed-awake windows**, aggregate via the §2
    interrupted route (each segment internally gap-free; segment *boundaries* are
    allowed). Prefer 5-minute swap cadence over long single-swap waits.
-4. **Dedicated always-on host** is the clean long-term route; a shared personal
+5. **Dedicated always-on host** is the clean long-term route; a shared personal
    Mac is not a reliable 24h-soak measurement environment.
-5. Do **not** relax §7 #5 — the gap-free requirement is correct; the fix is
+6. Do **not** relax §7 #5 — the gap-free requirement is correct; the fix is
    keeping the machine awake, not tolerating gaps.
 
 ### What this does NOT change

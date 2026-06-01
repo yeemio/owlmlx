@@ -268,6 +268,71 @@ def test_session_kv_cache_prefers_absolute_cache_object_byte_estimate() -> None:
     assert status["entries"][0]["byte_estimate_mode"] == "cache_object_nbytes"
 
 
+def test_session_kv_cache_evicts_lru_over_resident_budget() -> None:
+    store = SessionKVCacheStore(enabled=True, ttl_s=60.0, max_resident_bytes=150)
+    first = store.acquire_for_request(
+        session_id="s1",
+        model_id="m",
+        make_cache=object,
+        byte_estimate=100,
+        byte_estimate_mode="cache_object_nbytes",
+        now_s=1.0,
+    )
+    second = store.acquire_for_request(
+        session_id="s2",
+        model_id="m",
+        make_cache=object,
+        byte_estimate=100,
+        byte_estimate_mode="cache_object_nbytes",
+        now_s=2.0,
+    )
+
+    status = store.status_dict()
+    assert first.evicted_count == 0
+    assert second.evicted_count == 1
+    assert status["active_entries"] == 1
+    assert status["active_sessions"] == 1
+    assert status["resident_bytes_estimate"] == 100
+    assert status["max_resident_bytes"] == 150
+    assert status["resident_pressure_policy"] == "lru_evict_over_limit"
+    assert status["counters"]["evictions"] == 1
+    assert status["entries"][0]["session_id"] == "s2"
+
+
+def test_session_kv_cache_remember_prompt_enforces_resident_budget() -> None:
+    store = SessionKVCacheStore(enabled=True, ttl_s=60.0, max_resident_bytes=150)
+    store.acquire_for_request(
+        session_id="s1",
+        model_id="m",
+        make_cache=object,
+        byte_estimate=60,
+        byte_estimate_mode="cache_object_nbytes",
+        now_s=1.0,
+    )
+    store.acquire_for_request(
+        session_id="s2",
+        model_id="m",
+        make_cache=object,
+        byte_estimate=60,
+        byte_estimate_mode="cache_object_nbytes",
+        now_s=2.0,
+    )
+
+    remembered = store.remember_prompt(
+        session_id="s2",
+        model_id="m",
+        prompt_tokens=(1, 2, 3),
+        byte_estimate=180,
+        byte_estimate_mode="cache_object_nbytes",
+    )
+
+    status = store.status_dict()
+    assert remembered is True
+    assert status["active_entries"] == 0
+    assert status["resident_bytes_estimate"] == 0
+    assert status["counters"]["evictions"] == 2
+
+
 def test_session_kv_cache_bypasses_and_evicts_over_prompt_window() -> None:
     store = SessionKVCacheStore(enabled=True, ttl_s=60.0, max_prompt_tokens=3)
     first = store.acquire_for_request(

@@ -370,6 +370,7 @@ def audit_b1c2_segment_rollup(path: Path) -> dict[str, Any]:
             record
         ),
         "session_cache_drops_total": record.get("session_cache_drops_total"),
+        "session_cache_evictions_total": record.get("session_cache_evictions_total"),
         "session_cache_window_bypasses_total": record.get(
             "session_cache_window_bypasses_total"
         ),
