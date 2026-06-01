@@ -3,7 +3,7 @@
 > **Gate**: Campaign F · F-3 — Gemma 4 resident MTP A/B (assistant-drafter speculative decoding promoted from `deferred_cli_per_request` to a resident, parent-supervised runner with pure-decode A/B evidence)
 > **Layer**: design-grade, downstream of [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Part V · Campaign F · F-3, upstream of code-grade (resident MTP runner + A/B harness)
 > **Plan-grade source**: [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) line 335 ("F3 Gemma 4 resident MTP A/B（待 drafter / trim blocker 解除后恢复）") + [`../07-perf-optimization-proposal-20260526.md`](../07-perf-optimization-proposal-20260526.md)
-> **Status**: design-grade draft — **BLOCKED ON PREREQUISITE** (`mlx-lm #980` hybrid-model trim defect, see §2.1). Spec lands now to freeze the verification contract + harness shape; code-grade does **not** start until the §2 prerequisite gate clears.
+> **Status**: design-grade draft — **BLOCKED ON LOCAL PREREQUISITE** (the upstream `mlx-lm #980` issue is closed, but the installed `mlx-lm` / `mlx-vlm` pin has not yet been proven to satisfy §2.1 route 1 for this Gemma4 resident-MTP lane; see §9). Spec lands now to freeze the verification contract + harness shape; code-grade does **not** start until the §2 prerequisite gate clears.
 > **Non-goal**: this spec does not promote `assistant_drafter` to `supported`. It defines the resident-runner A/B that produces the evidence a later §1a Promotion Gate round would consume. It also does not touch the `mlx-lm` text line, DS4, or continuous batching.
 
 ## 1. Purpose
@@ -22,11 +22,11 @@ This gate fills the holes F-1 explicitly pre-cut for it:
 
 ## 2. Prerequisites
 
-### 2.1 Hard prerequisite gate — `mlx-lm #980` (BLOCKING)
+### 2.1 Hard prerequisite gate — hybrid-cache resident viability (BLOCKING)
 
 F-3 code-grade **MUST NOT start** until one of the following holds:
 
-1. **Upstream fix**: [`mlx-lm #980`](https://github.com/ml-explore/mlx-lm/issues/980) (RotatingKVCache / SSM caches not trimmable) is merged and the installed `mlx-lm` / `mlx-vlm` pin picks it up, **OR**
+1. **Upstream fix reaches the local runtime**: [`mlx-lm #980`](https://github.com/ml-explore/mlx-lm/issues/980) (RotatingKVCache / SSM caches not trimmable) is closed/merged **and** the installed `mlx-lm` / `mlx-vlm` pin is locally proven to pick up the relevant behavior for this Gemma4 resident-MTP lane, **OR**
 2. **Owlmlx non-trimmable resident path proven viable**: a feasibility probe (§2.2) proves a resident Gemma4 MTP runner can hold the target+drafter resident across requests in **append-only / non-trimmable** mode (no `trim_prompt_cache` dependency on the hybrid Gemma4 cache), reusing the same defensive pattern `MlxNativeBackend._trim_prompt_cache_with_reason` already encodes for #980.
 
 **Why this blocks**: Gemma4 is a hybrid (multimodal, `gemma4_text` + `gemma4_vision`) architecture. Resident serving means holding a KV cache across requests; trimming that cache is exactly what #980 says is unsupported for RotatingKVCache / SSM-class caches. A resident runner that silently recomputes the full prompt every request would defeat the purpose (and would measure *slower*, not faster). Route 2 is the owlmlx-owned escape: prove resident reuse works in append-only mode without needing trim, matching the session-KV-cache append-only precedent already shipped.
@@ -94,9 +94,11 @@ F-3 produces **bench evidence** (unlike F-1's contract-shape conformance). Indep
 - the 2nd+ requests report a non-null `speculative_summary` with `mean_accepted_tokens > 0`
 - no `trim_prompt_cache` call is made on the Gemma4 cache (append-only regime), OR if trim is attempted it is caught by the `_trim_prompt_cache_with_reason` defensive layer with a recorded reason code (never a crash)
 - post-run 8066 `/healthz` clean idle (`active_model_id=null`, `model_count=0`, `backend_error=null`), no residual `mlx_vlm` processes
-- verdict ∈ { `resident_viable_append_only`, `resident_viable_with_trim`, `blocked_on_980`, `failed` }
+- verdict ∈ { `resident_viable_append_only`, `resident_viable_with_trim`, `blocked_on_local_runtime`, `blocked_on_980`, `failed` }
 
-`resident_viable_*` unblocks F-3.2/F-3.3. `blocked_on_980` / `failed` keeps the gate blocked and writes the upstream-watch row (§9).
+`resident_viable_*` unblocks F-3.2/F-3.3. `blocked_on_local_runtime` /
+`blocked_on_980` / `failed` keeps the gate blocked and writes the
+upstream-watch row (§9).
 
 ### 5.2 `f3_3_pure_decode_ab` (F-3.3 A/B pass criteria)
 
@@ -178,7 +180,7 @@ trim_attempted: true | false
 trim_reason_code: <code | null>
 cache_regime: append_only | trim | fresh_per_request
 health_clean_pre_post: true | false
-verdict: resident_viable_append_only | resident_viable_with_trim | blocked_on_980 | failed
+verdict: resident_viable_append_only | resident_viable_with_trim | blocked_on_local_runtime | blocked_on_980 | failed
 ```
 
 A/B rollup row:
@@ -219,10 +221,13 @@ used_for_promotion_gate: false
 
 ## 9. Upstream Watch Linkage
 
-F-3's blocker is an external dependency. Per the competitor-matrix upstream-watch discipline ([`competitor-capability-matrix-20260527.md` §4.3](../../source-of-truth/competitor-capability-matrix-20260527.md)):
+F-3's blocker is now a **local prerequisite verification** problem, not merely an
+open-issue watch. Per the competitor-matrix upstream-watch discipline
+([`competitor-capability-matrix-20260527.md` §4.3](../../source-of-truth/competitor-capability-matrix-20260527.md)):
 
-- F-3 is added to the owlmlx-side upstream-watch ledger keyed on [`mlx-lm #980`](https://github.com/ml-explore/mlx-lm/issues/980)
-- monthly check: if #980 merges, re-evaluate §2.1 route 1 (trim-based resident becomes viable)
+- F-3 remains keyed to [`mlx-lm #980`](https://github.com/ml-explore/mlx-lm/issues/980), but the live issue state must be checked before each F-3.1/F-3.2 attempt
+- as of 2026-06-01, the GitHub issue is **closed**; that does not by itself unblock F-3 because route 1 additionally requires the local installed `mlx-lm` / `mlx-vlm` pin to demonstrate the needed behavior on this Gemma4 resident-MTP lane
+- if local pin verification passes, re-evaluate §2.1 route 1 (trim-based resident becomes viable)
 - the §2.2 feasibility probe is the owlmlx-owned way to unblock **without** waiting for upstream (route 2)
 - shared blocker with F-2 C2 (n-gram serving) and prefix-cache reuse — a single #980 resolution unblocks all three; the watch row should note the shared dependency
 
@@ -252,7 +257,7 @@ F-3's blocker is an external dependency. Per the competitor-matrix upstream-watc
 - #980 defensive layer reference: [`owlmlx/runtime/mlx_native_backend.py`](../../../owlmlx/runtime/mlx_native_backend.py) `_trim_prompt_cache_with_reason`
 
 ### Blocker
-- [`mlx-lm #980`](https://github.com/ml-explore/mlx-lm/issues/980) — RotatingKVCache / SSM caches not trimmable (OPEN as of 2026-05-27 per competitor matrix)
+- [`mlx-lm #980`](https://github.com/ml-explore/mlx-lm/issues/980) — RotatingKVCache / SSM caches not trimmable; **closed on GitHub as of 2026-06-01 live check**, but F-3 remains blocked until the local `mlx-lm` / `mlx-vlm` pin or the §2.2 append-only probe proves resident viability for this lane
 - 2026-05-06 whole-process A/B reference (the number F-3 must NOT conflate with decode speedup): [`gemma4-mtp-drafter-probe-20260506.md`](../../source-of-truth/gemma4-mtp-drafter-probe-20260506.md) §"A/B Timing Return"
 
 ## 12. Change Log
@@ -260,3 +265,5 @@ F-3's blocker is an external dependency. Per the competitor-matrix upstream-watc
 | Date | Change | By |
 |---|---|---|
 | 2026-06-01 | design-grade draft (fresh-context derivation from plan-grade roadmap F-3); landed BLOCKED on `mlx-lm #980` prerequisite gate with owlmlx-owned non-trimmable feasibility route as the unblock path | architect session (this round) |
+| 2026-06-01 | live upstream re-check: `mlx-lm #980` is closed, so the gate wording was narrowed from "open issue blocker" to "local prerequisite verification blocker"; F-3.1 remains required before code-grade starts | goal loop F-3.1 |
+| 2026-06-01 | added `blocked_on_local_runtime` as a first-class F-3.1 verdict because an unusable isolated probe venv is a different blocker from an upstream #980 defect | goal loop F-3.1 |
