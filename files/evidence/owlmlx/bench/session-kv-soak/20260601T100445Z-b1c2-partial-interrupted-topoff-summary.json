@@ -1,0 +1,39 @@
+{
+  "schema_version": "b1c2.partial_interrupted_topoff_summary.v1",
+  "gate": "B-1c section 2",
+  "created_at_utc": "2026-06-01T12:47:54Z",
+  "source_launch_id": "20260601T074541Z",
+  "source_ledger": "files/evidence/owlmlx/bench/session-kv-soak/20260601T074627Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-soak-swap.jsonl",
+  "source_rollup": null,
+  "operator_pause_requested": true,
+  "automation_id": "monitor-b2-b1c2-topoff",
+  "automation_status_after_pause": "PAUSED",
+  "run_complete": false,
+  "eligible_for_b1c2_interrupted_aggregate": false,
+  "eligible_for_b2_automatic_prefix_reuse_gate": false,
+  "reason": "operator paused before any swap boundary; no swap record and no segment rollup exist",
+  "corrected_next_action": "Run a short forced-swap canary with a 5-minute swap cadence when the question is swap-boundary mechanics; do not wait passively for another 4h segment just to exercise one boundary.",
+  "observed": {
+    "record_count": 414,
+    "last_elapsed_s": 8298.33,
+    "last_phase": "measurement",
+    "last_sample_index": 414,
+    "last_timestamp_utc": "2026-06-01T10:04:45.369113Z",
+    "ledger_gap_free": true,
+    "swap_count": 0,
+    "failed_sample_count": 0,
+    "fatal_watermark_count": 0,
+    "session_cache_drops_total": 0,
+    "session_cache_expirations_total": 0,
+    "session_cache_rejects_total": 0,
+    "session_cache_trim_bypasses_total": 3,
+    "session_cache_trim_evictions_total": 3,
+    "max_measurement_drift_bytes": 171704320,
+    "max_session_cache_resident_bytes": 852508674
+  },
+  "interpretation": {
+    "diagnostic_value": "The partial ledger supports that the prompt-reset policy stayed cache-clean for about 2h18m before operator pause.",
+    "aggregate_value": "None. B-1c section 2 aggregate input requires a completed clean segment rollup with a recorded swap boundary.",
+    "b2_value": "None for automatic prefix reuse. B-2.3 remains blocked as a capability claim; the immediate executable step is a short forced-swap boundary canary."
+  }
+}

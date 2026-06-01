@@ -1,6 +1,6 @@
 # B-2 Mainstream Prefix-Cache Compatibility Spec
 
-> Status: design-grade spec; B-2.1 classifier and B-2.2 metadata plumbing landed; B-2.3 blocked on B-1c section 2 aggregate stability
+> Status: design-grade spec; B-2.1 classifier and B-2.2 metadata plumbing landed; B-2.3 blocked on B-1c section 2 fast-swap drift triage
 > Updated: 2026-06-01
 > Campaign: B-2
 > Parent goal:
@@ -36,8 +36,22 @@ Current verified truth:
 - B-2.2 now maps OpenAI `prompt_tokens_details.cached_tokens` and Anthropic
   `cache_read_input_tokens` only when backend event/result detail carries real
   `session_kv_cache.cached_prompt_tokens` metadata for the current request.
-- B-1c section 2 remains aggregate-blocked: one clean 4h/one-swap segment is
-  not a 24h/6-swap pass.
+- B-1c section 2 remains aggregate-blocked: a short clean forced-swap canary can
+  validate unload / settle / load boundaries, but it is not a 24h/6-swap pass.
+- The operator-paused `20260601T074541Z` topoff is not aggregate input: its
+  partial ledger reached about 2h18m with zero drops / expirations / rejects,
+  but `swap_count=0` and no rollup exists. It cannot unlock B-2.3 because the
+  required unload / settle / load boundary was not exercised.
+- Correction: when the question is whether the swap boundary itself is clean,
+  the right next step is a short forced-swap canary with high-frequency swaps
+  such as one swap every 5 minutes, not another passive 4h wait.
+- The `20260601T125751Z` 20-minute / 4-swap forced canary exercised a
+  5-minute swap cadence and found the real blocker: all four swap boundaries
+  were clean and session-cache drops / expirations / rejects stayed zero, but
+  the segment failed because `max_drift_bytes=46801784452` and
+  `max_unaccounted_session_kv_drift_bytes=45745465112`, with the max-drift
+  record on Gemma at sample 61. This is a fast-swap drift triage blocker, not a
+  consumer-header problem.
 
 ## 3. Design Goal
 
@@ -292,15 +306,27 @@ No stage in this spec independently promotes B-1 to `supported`.
 ## 12. Next Handoff
 
 The next round is not B-2.3 code-grade yet. B-2.3 is blocked until B-1c
-section 2 provides sufficient aggregate stability for real cache-handle reuse.
+section 2 resolves the fast-swap drift blocker and then provides sufficient
+aggregate stability for real cache-handle reuse.
 
 Immediate handoff:
 
-1. Continue B-1c section 2 gap-free prompt-reset swap segments.
-2. Aggregate only segments with `measurement_wall_clock_gap_free=true` and clean
+1. Triage the `20260601T125751Z` fast-swap drift failure before any longer
+   aggregate run. The boundary was clean; the blocker is the 46.8GB active
+   memory drift under 5-minute swap cadence.
+2. Determine whether the drift is accounting/baseline error around large-model
+   load, real allocator leak, or prompt/session-cache resident accounting gap.
+3. Keep the 5-minute forced-swap canary as the boundary-stress shape until the
+   drift root cause is closed.
+4. Treat forced canaries as boundary diagnostics only, not as 24h/6-swap
+   aggregate promotion evidence.
+5. Aggregate only completed segments with `measurement_wall_clock_gap_free=true`
+   and clean
    cache/drop/swap-boundary audit results.
-3. Keep automatic prefix reuse disabled and unimplemented.
-4. Refresh this spec only when B-1c section 2 either passes the aggregate gate
+6. Keep automatic prefix reuse disabled and unimplemented.
+7. Do not treat partial measurement-only ledgers as B-1c section 2 aggregate
+   input. The segment must reach its planned swap boundary and produce a rollup.
+8. Refresh this spec only when B-1c section 2 either passes the aggregate gate
    or produces a new blocker that changes B-2.3 feasibility.
 
 When the prerequisite is met, the first B-2.3 code-grade round may wire
@@ -320,3 +346,13 @@ compatibility usage counters match real per-request runtime metadata.
 - 2026-06-01: Updated next handoff after B-2.1/B-2.2 landed. B-2.3 automatic
   reuse remains blocked on B-1c section 2 aggregate stability, so the dominant
   execution path returns to clean gap-free prompt-reset swap segments.
+- 2026-06-01: Recorded operator-paused `20260601T074541Z` topoff as partial
+  diagnostic evidence only. It was cache-clean through `8298.33s`, but had
+  `swap_count=0` and no segment rollup, so it does not change the B-2.3 blocker.
+- 2026-06-01: Corrected the next executable step: for swap-boundary mechanics,
+  use a short forced-swap canary with a 5-minute swap cadence instead of
+  passively waiting for another 4h segment.
+- 2026-06-01: Recorded `20260601T125751Z` 20-minute / 4-swap forced canary.
+  It proved swap boundaries can be clean under 5-minute cadence, but failed on
+  `max_drift_bytes=46801784452`; B-2.3 is therefore blocked on fast-swap drift
+  triage, not on another passive soak duration.

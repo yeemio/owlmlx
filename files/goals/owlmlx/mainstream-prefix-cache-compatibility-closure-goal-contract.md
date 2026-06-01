@@ -1,7 +1,7 @@
 # owlmlx Goal Contract: Mainstream Prefix-Cache Compatibility Closure
 
 > Status: active goal contract
-> Updated: 2026-06-01 after B-2.1/B-2.2 landed
+> Updated: 2026-06-01 after operator-paused B-1c section 2 topoff
 
 ## goal_id
 
@@ -104,28 +104,52 @@ missing primitive precisely. Do not reframe the private header as the solution.
 - B-1c section 2 has one recent gap-free swap-bearing segment, but the
   aggregate requirement remains 24h / 6 swaps / zero cache drops, expirations,
   and rejects.
+- The 2026-06-01 `20260601T074541Z` topoff was operator-paused before the
+  planned 4h / 1-swap boundary. Its ledger reached `last_elapsed_s=8298.33`
+  with zero drops / expirations / rejects and `max_drift_bytes=171704320`, but
+  `swap_count=0` and no segment rollup exists. It is useful diagnostic evidence
+  only, not clean B-1c section 2 aggregate input. See
+  `files/evidence/owlmlx/bench/session-kv-soak/20260601T100445Z-b1c2-partial-interrupted-topoff-summary.json`.
+- Correction: the immediate way to test the remaining boundary question is a
+  short forced-swap canary with a 5-minute swap cadence. A 4h wall-clock wait is
+  not intrinsically valuable when the specific question is whether unload /
+  settle / load boundaries are cache-clean.
+- The 2026-06-01 `20260601T125751Z` forced canary used that shape: 20 minutes,
+  4 swaps, 5-minute cadence. It met duration and swap requirements, had clean
+  swap boundaries, `measurement_wall_clock_gap_free=true`, and zero session
+  cache drops / expirations / rejects. It failed on drift:
+  `max_drift_bytes=46801784452`,
+  `max_unaccounted_session_kv_drift_bytes=45745465112`, max-drift record on
+  Gemma at sample 61.
 
 ## remaining_gaps
 
 1. B-1c section 2 still needs aggregate stability: the current clean evidence
    volume is below the 24h / 6-swap gate required before real cache-handle reuse
-   can be considered.
-2. B-2.3 automatic safe prefix reuse is not implemented and must remain blocked
+   can be considered. The operator-paused `20260601T074541Z` ledger does not
+   reduce this gap because it ended before any swap boundary.
+2. The immediate executable gap is no longer passive duration. It is fast-swap
+   drift triage: decide whether the 46.8GB drift is accounting/baseline error
+   around large-model load, real allocator leak, or missing resident-cache
+   accounting.
+3. B-2.3 automatic safe prefix reuse is not implemented and must remain blocked
    until B-1c section 2 aggregate stability passes.
-3. The explicit `X-Owlmlx-Session-Id` lane is still the only runtime path that
+4. The explicit `X-Owlmlx-Session-Id` lane is still the only runtime path that
    can physically reuse a cache handle today; it remains experimental and must
    not be presented as the mainstream consumer contract.
-4. Source-of-truth docs must continue to distinguish three separate facts:
+5. Source-of-truth docs must continue to distinguish three separate facts:
    classifier diagnostics, compatibility-visible real cached-token accounting,
    and actual automatic reuse.
 
 ## dominant_next_gap
 
-`B-1c-section-2-aggregate-stability-for-B-2.3`
+`B-1c-section-2-fast-swap-drift-triage-for-B-2.3`
 
 The next executable closure is not another consumer-side adapter and not F-3
 runtime work. B-2.1 and B-2.2 are already landed; the dominant blocker is the
-B-1c section 2 aggregate gate that B-2.3 explicitly depends on. Continue
-gap-free 4h/one-swap prompt-reset segments, aggregate only clean
-`measurement_wall_clock_gap_free=true` segments, and keep B-2.3 automatic reuse
-blocked until the 24h / 6-swap prerequisite is honestly met.
+B-1c section 2 fast-swap drift failure that B-2.3 explicitly depends on. Do not
+run another passive 4h topoff to answer this question. First triage the
+`20260601T125751Z` 5-minute-cadence canary: boundaries were clean, but active
+memory drift reached 46.8GB. Keep B-2.3 automatic reuse blocked as a capability
+claim until this blocker is closed and the 24h / 6-swap prerequisite is
+honestly met.
