@@ -128,6 +128,98 @@ class SessionKVCacheDecision:
     evicted_count: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class PrefixCacheCandidateDecision:
+    """Read-only decision for future automatic prefix-cache reuse.
+
+    This decision intentionally carries no cache object. B-2.1 only answers
+    whether a request is safe to consider for prefix reuse in a later stage.
+    """
+
+    eligible: bool
+    reason_code: str
+    common_prefix_token_count: int = 0
+    previous_prompt_token_count: int = 0
+    requested_prompt_token_count: int = 0
+    suffix_token_count: int = 0
+    needs_trim: bool = False
+
+
+def classify_prefix_cache_candidate(
+    *,
+    existing_model_id: str,
+    requested_model_id: str,
+    existing_prompt_tokens: tuple[int, ...],
+    requested_prompt_tokens: tuple[int, ...],
+    existing_runtime_profile_id: str | None = None,
+    requested_runtime_profile_id: str | None = None,
+    existing_isolation_scope: str | None = None,
+    requested_isolation_scope: str | None = None,
+    trim_available: bool = False,
+) -> PrefixCacheCandidateDecision:
+    """Classify prefix-cache eligibility without exposing a cache handle."""
+
+    previous_count = len(existing_prompt_tokens)
+    requested_count = len(requested_prompt_tokens)
+    if existing_model_id != requested_model_id:
+        return PrefixCacheCandidateDecision(
+            eligible=False,
+            reason_code="different_model",
+            previous_prompt_token_count=previous_count,
+            requested_prompt_token_count=requested_count,
+        )
+    if existing_runtime_profile_id != requested_runtime_profile_id:
+        return PrefixCacheCandidateDecision(
+            eligible=False,
+            reason_code="different_runtime_profile",
+            previous_prompt_token_count=previous_count,
+            requested_prompt_token_count=requested_count,
+        )
+    if existing_isolation_scope != requested_isolation_scope:
+        return PrefixCacheCandidateDecision(
+            eligible=False,
+            reason_code="unsafe_isolation_scope",
+            previous_prompt_token_count=previous_count,
+            requested_prompt_token_count=requested_count,
+        )
+
+    common_prefix_count = _common_prefix_len(
+        existing_prompt_tokens,
+        requested_prompt_tokens,
+    )
+    needs_trim = common_prefix_count < previous_count
+    suffix_count = max(requested_count - common_prefix_count, 0)
+    if common_prefix_count == 0 and (previous_count > 0 or requested_count > 0):
+        return PrefixCacheCandidateDecision(
+            eligible=False,
+            reason_code="not_token_prefix",
+            common_prefix_token_count=common_prefix_count,
+            previous_prompt_token_count=previous_count,
+            requested_prompt_token_count=requested_count,
+            suffix_token_count=suffix_count,
+            needs_trim=needs_trim,
+        )
+    if needs_trim and not trim_available:
+        return PrefixCacheCandidateDecision(
+            eligible=False,
+            reason_code="trim_unavailable_for_edit",
+            common_prefix_token_count=common_prefix_count,
+            previous_prompt_token_count=previous_count,
+            requested_prompt_token_count=requested_count,
+            suffix_token_count=suffix_count,
+            needs_trim=True,
+        )
+    return PrefixCacheCandidateDecision(
+        eligible=True,
+        reason_code="same_model_token_prefix",
+        common_prefix_token_count=common_prefix_count,
+        previous_prompt_token_count=previous_count,
+        requested_prompt_token_count=requested_count,
+        suffix_token_count=suffix_count,
+        needs_trim=needs_trim,
+    )
+
+
 class SessionKVCacheStore:
     """LRU + TTL store for explicit session-scoped native KV cache handles."""
 
@@ -249,9 +341,16 @@ class SessionKVCacheStore:
             expired = self._expire_locked(now)
             entry = self._entries.get(key)
             if entry is not None:
-                common_prefix_count = _common_prefix_len(
-                    entry.prompt_tokens,
-                    requested_prompt_tokens,
+                candidate = classify_prefix_cache_candidate(
+                    existing_model_id=model_id,
+                    requested_model_id=model_id,
+                    existing_prompt_tokens=entry.prompt_tokens,
+                    requested_prompt_tokens=requested_prompt_tokens,
+                    existing_runtime_profile_id="explicit_session",
+                    requested_runtime_profile_id="explicit_session",
+                    existing_isolation_scope=normalized_session_id,
+                    requested_isolation_scope=normalized_session_id,
+                    trim_available=True,
                 )
                 entry.last_used_at_s = now
                 entry.hit_count += 1
@@ -266,12 +365,14 @@ class SessionKVCacheStore:
                     cache_object=entry.cache_object,
                     cache_object_id=entry.cache_object_id,
                     suffix_tokens=(
-                        requested_prompt_tokens[common_prefix_count:]
+                        requested_prompt_tokens[candidate.common_prefix_token_count:]
                         if requested_prompt_tokens
                         else None
                     ),
-                    common_prefix_token_count=common_prefix_count,
-                    previous_prompt_token_count=len(entry.prompt_tokens),
+                    common_prefix_token_count=candidate.common_prefix_token_count,
+                    previous_prompt_token_count=(
+                        candidate.previous_prompt_token_count
+                    ),
                     reused=True,
                 )
             counters_after_expiry = _replace_counter(

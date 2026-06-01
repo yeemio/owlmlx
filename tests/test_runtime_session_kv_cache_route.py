@@ -84,3 +84,21 @@ def test_session_kv_cache_status_fallback_for_non_native_backend() -> None:
     assert payload["capability_label"] == "experimental"
     assert payload["enabled"] is False
     assert payload["reason_code"] == "backend_does_not_expose_session_kv_cache"
+
+
+def test_openai_chat_usage_does_not_fabricate_cached_tokens() -> None:
+    client, _backend = _client_with_recording_backend()
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-model",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 2,
+        },
+    )
+
+    assert response.status_code == 200
+    usage = response.json()["usage"]
+    assert usage["prompt_tokens"] >= 1
+    assert "prompt_tokens_details" not in usage

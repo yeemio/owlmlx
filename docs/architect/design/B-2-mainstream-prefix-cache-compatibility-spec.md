@@ -1,6 +1,6 @@
 # B-2 Mainstream Prefix-Cache Compatibility Spec
 
-> Status: design-grade spec
+> Status: design-grade spec; B-2.1 classifier landed
 > Updated: 2026-06-01
 > Campaign: B-2
 > Parent goal:
@@ -301,3 +301,5 @@ The next code-grade round should implement B-2.1 only:
 
 - 2026-06-01: Initial design-grade spec for B-2 mainstream prefix-cache
   compatibility closure.
+- 2026-06-01: B-2.1 read-only prefix-candidate classifier landed with focused
+  tests; automatic reuse and cached-token usage fields remain future stages.

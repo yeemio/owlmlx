@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from owlmlx.session_kv_cache import SessionKVCacheStore
+from owlmlx.session_kv_cache import (
+    SessionKVCacheStore,
+    classify_prefix_cache_candidate,
+)
 
 
 def test_session_kv_cache_disabled_does_not_call_factory() -> None:
@@ -84,6 +87,132 @@ def test_session_kv_cache_reports_common_prefix_suffix_for_reuse() -> None:
     assert second.common_prefix_token_count == 2
     assert second.previous_prompt_token_count == 3
     assert second.suffix_tokens == (4, 5)
+
+
+def test_prefix_cache_candidate_accepts_same_model_token_prefix() -> None:
+    decision = classify_prefix_cache_candidate(
+        existing_model_id="model-a",
+        requested_model_id="model-a",
+        existing_prompt_tokens=(1, 2, 3),
+        requested_prompt_tokens=(1, 2, 3, 4, 5),
+        existing_runtime_profile_id="profile-a",
+        requested_runtime_profile_id="profile-a",
+        existing_isolation_scope="tenant-a",
+        requested_isolation_scope="tenant-a",
+    )
+
+    assert decision.eligible is True
+    assert decision.reason_code == "same_model_token_prefix"
+    assert decision.common_prefix_token_count == 3
+    assert decision.previous_prompt_token_count == 3
+    assert decision.requested_prompt_token_count == 5
+    assert decision.suffix_token_count == 2
+    assert decision.needs_trim is False
+    assert not hasattr(decision, "cache_object")
+
+
+def test_prefix_cache_candidate_rejects_different_model() -> None:
+    decision = classify_prefix_cache_candidate(
+        existing_model_id="model-a",
+        requested_model_id="model-b",
+        existing_prompt_tokens=(1, 2, 3),
+        requested_prompt_tokens=(1, 2, 3),
+        existing_runtime_profile_id="profile-a",
+        requested_runtime_profile_id="profile-a",
+        existing_isolation_scope="tenant-a",
+        requested_isolation_scope="tenant-a",
+    )
+
+    assert decision.eligible is False
+    assert decision.reason_code == "different_model"
+
+
+def test_prefix_cache_candidate_rejects_different_runtime_profile() -> None:
+    decision = classify_prefix_cache_candidate(
+        existing_model_id="model-a",
+        requested_model_id="model-a",
+        existing_prompt_tokens=(1, 2, 3),
+        requested_prompt_tokens=(1, 2, 3),
+        existing_runtime_profile_id="tokenizer-v1/template-a",
+        requested_runtime_profile_id="tokenizer-v2/template-a",
+        existing_isolation_scope="tenant-a",
+        requested_isolation_scope="tenant-a",
+    )
+
+    assert decision.eligible is False
+    assert decision.reason_code == "different_runtime_profile"
+
+
+def test_prefix_cache_candidate_rejects_unsafe_isolation_scope() -> None:
+    decision = classify_prefix_cache_candidate(
+        existing_model_id="model-a",
+        requested_model_id="model-a",
+        existing_prompt_tokens=(1, 2, 3),
+        requested_prompt_tokens=(1, 2, 3, 4),
+        existing_runtime_profile_id="profile-a",
+        requested_runtime_profile_id="profile-a",
+        existing_isolation_scope="tenant-a",
+        requested_isolation_scope="tenant-b",
+    )
+
+    assert decision.eligible is False
+    assert decision.reason_code == "unsafe_isolation_scope"
+
+
+def test_prefix_cache_candidate_rejects_non_prefix_tokens() -> None:
+    decision = classify_prefix_cache_candidate(
+        existing_model_id="model-a",
+        requested_model_id="model-a",
+        existing_prompt_tokens=(1, 2, 3),
+        requested_prompt_tokens=(9, 2, 3),
+        existing_runtime_profile_id="profile-a",
+        requested_runtime_profile_id="profile-a",
+        existing_isolation_scope="tenant-a",
+        requested_isolation_scope="tenant-a",
+        trim_available=True,
+    )
+
+    assert decision.eligible is False
+    assert decision.reason_code == "not_token_prefix"
+
+
+def test_prefix_cache_candidate_rejects_edited_prefix_without_trim() -> None:
+    decision = classify_prefix_cache_candidate(
+        existing_model_id="model-a",
+        requested_model_id="model-a",
+        existing_prompt_tokens=(1, 2, 3),
+        requested_prompt_tokens=(1, 2, 9),
+        existing_runtime_profile_id="profile-a",
+        requested_runtime_profile_id="profile-a",
+        existing_isolation_scope="tenant-a",
+        requested_isolation_scope="tenant-a",
+        trim_available=False,
+    )
+
+    assert decision.eligible is False
+    assert decision.reason_code == "trim_unavailable_for_edit"
+    assert decision.common_prefix_token_count == 2
+    assert decision.needs_trim is True
+
+
+def test_prefix_cache_candidate_allows_edited_prefix_when_trim_available() -> None:
+    decision = classify_prefix_cache_candidate(
+        existing_model_id="model-a",
+        requested_model_id="model-a",
+        existing_prompt_tokens=(1, 2, 3),
+        requested_prompt_tokens=(1, 2, 9),
+        existing_runtime_profile_id="profile-a",
+        requested_runtime_profile_id="profile-a",
+        existing_isolation_scope="tenant-a",
+        requested_isolation_scope="tenant-a",
+        trim_available=True,
+    )
+
+    assert decision.eligible is True
+    assert decision.reason_code == "same_model_token_prefix"
+    assert decision.common_prefix_token_count == 2
+    assert decision.suffix_token_count == 1
+    assert decision.needs_trim is True
 
 
 def test_session_kv_cache_accumulates_byte_estimate_delta() -> None:
