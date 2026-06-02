@@ -108,6 +108,28 @@ def _unique_bypass_events(records: list[dict[str, Any]]) -> list[dict[str, Any]]
     return events
 
 
+def _auto_prefix_hit_verdict(
+    *,
+    load_ok: bool,
+    cleanup_unload_ok: bool,
+    usable_hit_count: int,
+    terminal_fallback_count: int,
+    auto_prefix_ineligible_count: int,
+    all_generations_ok: bool,
+    drops_total: int,
+) -> str:
+    if (
+        load_ok
+        and cleanup_unload_ok
+        and usable_hit_count >= 1
+        and (terminal_fallback_count >= 1 or auto_prefix_ineligible_count >= 1)
+        and all_generations_ok
+        and drops_total == 0
+    ):
+        return "passed"
+    return "failed"
+
+
 def run_auto_prefix_hit_probe(
     *,
     model_id: str,
@@ -260,19 +282,14 @@ def run_auto_prefix_hit_probe(
         "load_ok": bool(load.ok),
         "cleanup_unload_ok": bool(cleanup.ok if cleanup is not None else False),
         "known_blocker": known_blocker,
-        "verdict": (
-            "passed"
-            if load.ok
-            and cleanup is not None
-            and cleanup.ok
-            and len(hit_records) >= 1
-            and (
-                len(fallback_records) >= 1
-                or len(auto_prefix_ineligible_records) >= 1
-            )
-            and all(record["generation"]["ok"] for record in records)
-            and int(last_counters.get("drops", 0)) == 0
-            else "failed"
+        "verdict": _auto_prefix_hit_verdict(
+            load_ok=bool(load.ok),
+            cleanup_unload_ok=bool(cleanup.ok if cleanup is not None else False),
+            usable_hit_count=len(hit_records),
+            terminal_fallback_count=len(fallback_records),
+            auto_prefix_ineligible_count=auto_prefix_ineligible_count,
+            all_generations_ok=all(record["generation"]["ok"] for record in records),
+            drops_total=int(last_counters.get("drops", 0)),
         ),
     }
     summary_path.write_text(
