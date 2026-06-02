@@ -41,8 +41,10 @@ Current verified truth:
   scope only when no explicit session header is present, reuses only classifier
   eligible token-prefix candidates, and falls back to fresh cache with an
   ineligible reason instead of merging unrelated prompts.
-- B-1c section 2 remains aggregate-blocked: a short clean forced-swap canary can
-  validate unload / settle / load boundaries, but it is not a 24h/6-swap pass.
+- B-1c section 2 remains blocked: short clean forced-swap canaries validate
+  unload / settle / load boundaries, but the base gate now requires four
+  count-based axes and still under-measures throughput decay and concurrency
+  breadth.
 - The operator-paused `20260601T074541Z` topoff is not aggregate input: its
   partial ledger reached about 2h18m with zero drops / expirations / rejects,
   but `swap_count=0` and no rollup exists. It cannot unlock B-2.3 because the
@@ -102,8 +104,9 @@ Current verified truth:
   `measurement_wall_clock_gap_free=true`, drops / expirations / rejects all `0`,
   `max_same_model_load_epoch_drift_bytes=60620800`,
   `max_session_cache_resident_bytes=364216320`), and audit reports
-  `clean_for_interrupted_aggregate=true`; it remains `blocked` only because it
-  is not the canonical 24h / 6-swap aggregate.
+  `clean_for_interrupted_aggregate=true`; it remains `blocked` because the base
+  B-1c §2 gate now requires four count-based axes and still under-measures
+  throughput decay and concurrency breadth.
 - Route-level tests now cover the no-header compatibility surface: ordinary
   OpenAI `/v1/chat/completions` SSE and Anthropic `/v1/messages` SSE requests do
   not pass `session_id`, and when backend stream events carry real
@@ -407,8 +410,8 @@ Immediate handoff:
 4. Keep resident pressure capped with
    `OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES`; count LRU evictions separately
    from drops.
-5. Treat forced canaries as boundary diagnostics only, not as 24h/6-swap
-   aggregate promotion evidence unless the B-1c §2 policy is explicitly revised.
+5. Treat forced canaries as boundary diagnostics only, not as B-1c §2 promotion
+   evidence unless they satisfy the current four-axis gate.
 6. Aggregate only completed segments with `measurement_wall_clock_gap_free=true`
    and clean
    cache/drop/swap-boundary audit results.
@@ -484,7 +487,8 @@ B-2 coverage.
   non-prefix fallbacks, and zero drops / expirations / rejects. The
   `20260602T002448Z` 20-minute / 4-swap current-code validation stayed
   cache-clean and boundary-clean under 5-minute cadence, but remains blocked for
-  canonical graduation because it is not 24h / 6 swaps.
+  canonical graduation because throughput/concurrency axes are still
+  under-measured.
 - 2026-06-02: Added route-level no-header compatibility tests for OpenAI SSE
   `cached_tokens` and Anthropic SSE `cache_read_input_tokens`. These tests prove
   metadata propagation through compatibility surfaces when the backend supplies

@@ -133,6 +133,19 @@ def _claim_errors(record: dict[str, Any]) -> list[str]:
 
     duration_met = record.get("duration_requirement_met") is True
     swap_met = record.get("swap_requirement_met") is True
+    axis_verdicts = record.get("axis_verdicts", {})
+    if not isinstance(axis_verdicts, dict):
+        axis_verdicts = {}
+    required_axes = (
+        "load_stability",
+        "throughput_stability",
+        "switch_stability",
+        "concurrency_stability",
+    )
+    axes_met = all(
+        axis_verdicts.get(axis, {}).get("status") == "passed"
+        for axis in required_axes
+    )
     prerequisite_met = record.get("prerequisite_satisfied") is True
     allocator_truth = record.get("allocator_truth_claimable") is True
     clean_segment = eviction_soak._b1c2_segment_ok_for_rehearsal(record)
@@ -142,11 +155,11 @@ def _claim_errors(record: dict[str, Any]) -> list[str]:
         or graduates.get("soak_plus_swap_stability") is True
     )
     if passed_claim and not (
-        duration_met and swap_met and prerequisite_met and allocator_truth and clean_segment
+        axes_met and swap_met and prerequisite_met and allocator_truth and clean_segment
     ):
         errors.append("unsafe_claim:soak_plus_swap_passed_without_all_gates")
-    if not duration_met and record.get("conclusion") == "passed":
-        errors.append("unsafe_claim:passed_without_duration_requirement")
+    if record.get("conclusion") == "passed" and not axes_met:
+        errors.append("unsafe_claim:passed_without_axis_verdicts")
     if not swap_met and record.get("conclusion") == "passed":
         errors.append("unsafe_claim:passed_without_swap_requirement")
     return errors
@@ -414,6 +427,19 @@ def audit_b1c2_aggregate_rollup(path: Path) -> dict[str, Any]:
     aggregate = record.get("interrupted_soak_plus_swap", {})
     if not isinstance(aggregate, dict):
         aggregate = {}
+    axis_verdicts = aggregate.get("axis_verdicts", {})
+    if not isinstance(axis_verdicts, dict):
+        axis_verdicts = {}
+    required_axes = (
+        "load_stability",
+        "throughput_stability",
+        "switch_stability",
+        "concurrency_stability",
+    )
+    axes_met = all(
+        axis_verdicts.get(axis, {}).get("status") == "passed"
+        for axis in required_axes
+    )
     passed_claim = (
         record.get("conclusion") == "passed"
         or record.get("soak_plus_swap_stability") == "passed"
@@ -422,9 +448,9 @@ def audit_b1c2_aggregate_rollup(path: Path) -> dict[str, Any]:
     aggregate_gates_met = (
         aggregate.get("all_segments_ok_for_rehearsal") is True
         and aggregate.get("prerequisite_satisfied") is True
-        and aggregate.get("duration_requirement_met") is True
         and aggregate.get("swap_requirement_met") is True
         and aggregate.get("allocator_truth_claimable") is True
+        and axes_met
     )
     if passed_claim and not aggregate_gates_met:
         errors.append("unsafe_claim:aggregate_passed_without_all_gates")

@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed and prompt-reset bounded windows produced one aggregate-eligible 4h / 1-swap segment (`20260601T025321Z`). The later 5-minute-cadence forced-swap canaries proved swap boundaries stay clean. Direct cache-object resident accounting (`cache_object_nbytes`) now explains the Gemma raw same-model load-epoch drift (`751370240` bytes raw drift; `1054965760` resident bytes; same-model unaccounted drift `0`), so §2 is no longer blocked on the raw-RSS drift false-fail. It remains blocked on aggregate volume / policy: future evidence must keep the 5-minute swap cadence rather than passively waiting. See §11 Blocker Taxonomy (2026-06-01)
+> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed and prompt-reset bounded windows produced one aggregate-eligible 4h / 1-swap segment (`20260601T025321Z`). The later 5-minute-cadence forced-swap canaries proved swap boundaries stay clean. Direct cache-object resident accounting (`cache_object_nbytes`) now explains the Gemma raw same-model load-epoch drift (`751370240` bytes raw drift; `1054965760` resident bytes; same-model unaccounted drift `0`), so §2 is no longer blocked on the raw-RSS drift false-fail. On 2026-06-02 the base §7 bar was re-founded on counts across four independent axes: load, throughput, switch, concurrency. Duration is now a reported byproduct, not a pass gate. The current runner satisfies load/switch evidence shape but reports throughput/concurrency as `blocked: under-measured`; see §7 and §11.
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -76,13 +76,22 @@ to a two-model swap ladder.
 ## 5. Segment Shape
 
 Original D3 shape was one continuous 24h run with six swaps every four hours.
-On the current Mac route, use operator-interruptible segments instead:
+That shape is now historical. It over-measured passive duration while
+under-measuring two of the properties §2 actually needs: in-run throughput
+decay and cache breadth / entry interleaving.
 
-- target aggregate duration: >= 24h
-- target aggregate swap count: >= 6
-- recommended shape: `6 x 4h`, each segment contains one planned swap boundary
-- acceptable shape: fewer longer segments, if each segment remains wall-clock
-  continuous and records the exact swap boundaries
+The current count-based base shape is:
+
+- target switch count: `swap_count >= 24`
+- target load count: `load_count >= swap_count + 1`
+- recommended cadence: `swap_cadence_s = 300` (5-minute model switches)
+- reported duration byproduct: about `7200s` for 24 swaps at 5-minute cadence
+- required segment rule: each segment remains wall-clock continuous and records
+  exact swap boundaries
+
+Duration still appears in ledgers because it helps interpret host conditions and
+swap cadence. It no longer makes a clean run pass by itself, and it no longer
+blocks a run that has enough counted load/switch/throughput/concurrency evidence.
 
 Each segment starts from a clean process state and writes a separate ledger and
 rollup. Segment rollups are then aggregated into the §2 conclusion. Do not
@@ -133,7 +142,17 @@ Segment rollups must include:
 ```yaml
 soak_plus_swap_stability: passed | failed | blocked
 measurement_duration_s: <float>
+duration_gate_role: reported_byproduct_not_pass_gate
 swap_count: <int>
+axis_verdicts:
+  load_stability:
+    status: passed | failed | blocked
+  throughput_stability:
+    status: passed | failed | blocked
+  switch_stability:
+    status: passed | failed | blocked
+  concurrency_stability:
+    status: passed | failed | blocked
 measurement_wall_clock_gap_free: true | false
 ledger_gap_free: true | false
 max_drift_bytes: <int | null>
@@ -155,6 +174,16 @@ interrupted_soak_plus_swap:
   aggregate_swap_count: <int>
   segment_count: <int>
   all_segments_ok_for_rehearsal: true | false
+  duration_gate_role: reported_byproduct_not_pass_gate
+  axis_verdicts:
+    load_stability:
+      status: passed | failed | blocked
+    throughput_stability:
+      status: passed | failed | blocked
+    switch_stability:
+      status: passed | failed | blocked
+    concurrency_stability:
+      status: passed | failed | blocked
 soak_plus_swap_stability: passed | failed | blocked
 graduates:
   soak_plus_swap_stability: true | false
@@ -166,29 +195,74 @@ source-of-truth update after B-1a, B-1b, B-1c §1, and B-1c §2 are all reviewed
 
 ## 7. Pass Criteria
 
-`soak_plus_swap_stability = passed` requires all of:
+`soak_plus_swap_stability = passed` requires all four independent axis verdicts
+to be `passed`. Duration is reported but not used as a pass gate.
+
+### 7.1 Load Stability
+
+`load_stability = passed` requires:
 
 - B-1c §1 prerequisite is already satisfied
 - native backend with `measurement_mode = mlx_core_active_memory`
-- aggregate measurement duration >= 24h
-- aggregate swap count >= 6
-- every segment has `measurement_wall_clock_gap_free = true`
-- every segment has `ledger_gap_free = true`
-- short / medium / long session mix appears in every segment
-- `max_drift_bytes <= min(200 MiB, 0.5% host serving budget)`
-- every unload succeeds
-- every settle barrier reports clean
+- observed load count >= observed swap count + 1
 - every load succeeds
+- every cleanup unload succeeds
+- same-model drift passes either the raw 200 MiB gate or the reviewed
+  `cache_object_resident_accounted` gate:
+  - direct cache-object `nbytes` mode when resident-accounted
+  - resident working set within the reviewed budget
+  - unaccounted same-model drift within budget
 - `fatal_watermark_count = 0`
 - `failure_measurement_count = 0`
 - `unresolved_reclaim_barrier_events = 0`
+
+Current evidence: measured and countable.
+
+### 7.2 Switch Stability
+
+`switch_stability = passed` requires:
+
+- aggregate swap count >= 24
+- every unload succeeds
+- every settle barrier reports clean
+- every load succeeds
+- every segment has `measurement_wall_clock_gap_free = true`
+- every segment has `ledger_gap_free = true`
 - `session_cache_drops_total = 0`
 - `session_cache_expirations_total = 0`
 - `session_cache_rejects_total = 0`
-- final cleanup unload succeeds
 
-If total duration or swap count is short but all samples are clean, the result
-is `blocked`, not `passed`.
+Current evidence: strongest existing axis. The 5-minute cadence found the
+resident-pressure defect that slow 4h switches would have hidden.
+
+### 7.3 Throughput Stability
+
+`throughput_stability = passed` requires a run-internal throughput/TTFT decay
+measurement, not a standalone historical TTFT ratio. The exact pass band is
+`calibration-pending`: first measure same-run jitter, then set a band.
+
+Current evidence: `blocked: under-measured`. Existing §2 ledgers do not record
+TTFT/tok-s monotonic decay over the run.
+
+### 7.4 Concurrency Stability
+
+`concurrency_stability = passed` requires real cache breadth and isolation under
+entry pressure:
+
+- entry breadth high enough to exercise more than the current 3 prompt ids
+- count-LRU and byte-LRU pressure both exercised
+- no cross-entry merge, cache drop, expiration, or reject
+- no hidden coupling between short / medium / long / additional entries
+
+The exact breadth floor is `calibration-pending`; it must be set by a harness
+extension that actually drives the cache near its entry/count limits.
+
+Current evidence: `blocked: under-measured`. The current §2 runner uses only
+three prompt ids and `max_generation_concurrency = 1`, so it does not measure
+multi-entry breadth or interleaving.
+
+If load/switch are clean but throughput or concurrency remain under-measured,
+the result is `blocked`, not `passed`.
 
 If any generation, unload, settle, load, watermark, reclaim, cache, or cleanup
 condition fails, the result is `failed`.
@@ -198,10 +272,10 @@ condition fails, the result is `failed`.
 | Condition | Verdict | Meaning |
 |---|---|---|
 | §1 prerequisite missing | `blocked` | Do not run or aggregate §2 as promotion evidence |
-| Segment shorter than target but clean | `blocked` | Useful segment only |
+| Load / switch clean but throughput or concurrency unmeasured | `blocked` | Useful evidence, not a four-axis pass |
 | Segment has host sleep / power gap | `blocked` | Operational interruption inside segment; not hard runtime failure |
-| Aggregate duration < 24h | `blocked` | More clean segments required |
-| Aggregate swap count < 6 | `blocked` | More clean swap boundaries required |
+| Aggregate swap count < 24 | `blocked` | More clean switch evidence required |
+| Duration short but count axes measured | reported only | Duration is no longer a pass gate |
 | Unload / settle / load failure | `failed` | Swap boundary failed |
 | FATAL watermark | `failed` | Memory discipline failed |
 | Reclaim-barrier unresolved failure | `failed` | Reclaim discipline failed |
@@ -400,8 +474,8 @@ is clean but intentionally `blocked`:
 - `graduates.session_kv_supported=false`
 
 This closes the token-boundary canary and reopens the 4h fail-fast §2 segment
-route. It still does not claim `soak_plus_swap_stability=passed`; the 24h / six
-swap aggregate remains open.
+route. It still does not claim `soak_plus_swap_stability=passed`; the four-axis
+§2 gate remains open.
 
 The boundary-safe 4h segment:
 
@@ -523,8 +597,8 @@ must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
   bounded-window candidate: reset a session back to its base prompt when the
   prompt-growth cap is exceeded instead of repeatedly issuing capped prompts
   that require upstream trims. The rollup correctly remains `blocked` because
-  it is Qwen-only focused evidence with `swap_count=0`, not a 24h / 6-swap §2
-  segment.
+  it is Qwen-only focused evidence with `swap_count=0`, not four-axis §2
+  stability evidence.
 - prompt-reset swap-bearing segment:
   `20260525T061019Z-b1c2-qwen-gemma-qwen35-prompt-reset-3000-4h-soak-swap-rollup.jsonl`
   ran warmup 3 + measurement 714 + swap 1 with drops / expirations / rejects
@@ -549,8 +623,8 @@ must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
   reclaim barrier 0, cleanup unload OK, and cleanup settle active memory 18
   bytes. `scripts/bench/session_kv_soak_audit.py` reports
   `clean_for_interrupted_aggregate=true`. The segment rollup still correctly
-  remains `blocked` because it is only 4h / 1 swap against the §7 24h / 6-swap
-  requirement; it is aggregate input, not a pass.
+  remains `blocked` because it exercises only one switch and does not measure
+  throughput decay or concurrency breadth; it is aggregate input, not a pass.
 - fast forced-swap canary:
   `20260601T125751Z-b1c2-qwen-gemma-qwen35-forced-swap-5min-soak-swap-rollup.jsonl`
   ran 20 minutes with 4 swaps at a 5-minute cadence. It completed all swap
@@ -592,8 +666,9 @@ must not be used to pass B-1c §2 or promote Session KV cache to `supported`.
   (`OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES=2147483648`). It remained
   wall-clock-gap-free, had drops / expirations / rejects all 0, exercised 4 LRU
   evictions, and kept `max_session_cache_resident_bytes=2144829440` within the
-  budget. The rollup is `blocked` only because this is not 24h aggregate
-  evidence; audit reports `clean_for_interrupted_aggregate=true`.
+  budget. The rollup is `blocked` because it validates load/switch pressure but
+  does not measure throughput decay or concurrency breadth; audit reports
+  `clean_for_interrupted_aggregate=true`.
 
 The landed smoke-only slice covers:
 
@@ -609,8 +684,10 @@ Only after schema tests pass should native execution be attempted.
 Do not resume passive single-swap aggregate evidence. The raw drift false-fail
 has been closed by direct cache-object resident accounting, and the resident
 working-set cap has a first clean high-frequency validation. The next evidence
-shape must keep high-frequency boundary stress (5-minute swaps) and use
-duration only as additional confidence, not as a substitute for switches.
+shape must keep high-frequency boundary stress (5-minute swaps), but duration is
+only a reported byproduct. The next real closure is to instrument the two axes
+the old soak never measured: in-run throughput decay and cache breadth /
+entry-interleaving concurrency.
 
 1. Keep the safe trim-unavailable bypass semantics: pre-generation reuse trim
    refusal may fall back to a fresh request cache and must be counted as
@@ -629,16 +706,18 @@ duration only as additional confidence, not as a substitute for switches.
    (`drift_gate.mode=cache_object_resident_accounted`) before §2 aggregate
    resumes.
 5. Aggregate only gap-free, hard-failure-free segment rollups.
-6. Require cumulative duration >= 24h and aggregate swap count >= 6 before
-   `soak_plus_swap_stability=passed`.
+6. Require all four `axis_verdicts` (`load_stability`,
+   `throughput_stability`, `switch_stability`, `concurrency_stability`) to be
+   `passed` before `soak_plus_swap_stability=passed`.
 
 ## 11. Blocker Taxonomy (2026-06-01)
 
-Closeout review after the first gap-free prompt-reset repeat. Maps the current
-state to the §7 pass criteria and classifies what blocks
-`soak_plus_swap_stability = passed`. The runtime / allocator layer is
-functionally clean, and the current segment no longer has a measurement
-continuity blocker. The remaining blocker is aggregate volume.
+Closeout review after the first gap-free prompt-reset repeat and the 2026-06-02
+count-based reset. Maps the current state to the §7 four-axis pass criteria and
+classifies what blocks `soak_plus_swap_stability = passed`. The runtime /
+allocator layer is functionally clean, and the current segment no longer has a
+measurement-continuity blocker. The remaining blockers are measurement gaps:
+throughput decay and concurrency breadth.
 
 ### B1 — Runtime / allocator stability: PASS (functional)
 
@@ -656,8 +735,8 @@ swap):
   session mix balanced (238 / 238 / 238) ✓
 - audit reports `clean_for_interrupted_aggregate = true` ✓
 
-§7 criteria #2, #5, #6, #7, #8, #9 satisfied for this segment. No open runtime /
-allocator defect.
+The load axis is functionally clean for the measured rows. No open runtime /
+allocator defect is known on this axis.
 
 ### B2 — Measurement continuity: CLOSED for latest segment
 
@@ -706,14 +785,29 @@ eviction over the resident budget. The 40m / 8-swap validation
 4 evictions, and remained clean for interrupted aggregate. This is a functional
 fix, not a promotion.
 
-### B4 — Aggregate volume: BLOCKED
+### B4 — Switch count: PARTIAL / NEEDS COUNTED COMPLETION
 
-§7 #3 (≥24h aggregate) and #4 (≥6 swaps) are unmet (latest aggregate-eligible
-input: ~4h, 1 swap; latest high-frequency clean validation: 40 minutes, 8
-swaps). This is now the independent remaining blocker / policy question. Future
-evidence should not be "one swap after a long idle wait"; it should retain a
-short swap cadence (currently 5 minutes) so duration and boundary count grow
-together.
+The old aggregate-volume blocker is replaced by a counted switch axis. Latest
+high-frequency clean validation is 40 minutes / 8 swaps; the count-based floor is
+24 swaps. Future evidence should not be "one swap after a long idle wait"; it
+should retain a short swap cadence (currently 5 minutes) so switch count grows.
+Duration is recorded for context only.
+
+### B5 — Throughput stability: BLOCKED / UNDER-MEASURED
+
+The §2 runner does not record run-internal TTFT or decode throughput decay. The
+old 24h soak shape could run for a long time without detecting monotonic
+slowdown. This axis requires a calibration slice: measure same-run throughput
+jitter, then set a pass band.
+
+### B6 — Concurrency breadth: BLOCKED / UNDER-MEASURED
+
+The §2 runner keys sessions by `prompt_id`, so the canonical workload has only
+three live entries (`short`, `medium`, `long`) against the default `MAX_ENTRIES =
+64`, with `max_generation_concurrency = 1`. That is sequential breadth-3
+interleaving, not a concurrency/entry-pressure proof. This axis requires a
+harness extension that increases entry breadth and exercises both count-LRU and
+byte-LRU without cross-entry merge.
 
 ### Route forward
 
@@ -732,8 +826,10 @@ together.
    allowed). Prefer 5-minute swap cadence over long single-swap waits.
 5. **Dedicated always-on host** is the clean long-term route; a shared personal
    Mac is not a reliable 24h-soak measurement environment.
-6. Do **not** relax §7 #5 — the gap-free requirement is correct; the fix is
-   keeping the machine awake, not tolerating gaps.
+6. Do **not** relax the per-segment gap-free requirement; the fix is keeping the
+   machine awake during measured windows, not tolerating hidden gaps.
+7. Extend the harness before claiming §2 pass: add throughput-decay sampling and
+   a breadth/concurrency mode that drives more than three entries.
 
 ### What this does NOT change
 
@@ -770,7 +866,25 @@ from a positive active-memory delta upper bound to direct upstream cache-object
 - `max_same_model_load_epoch_session_cache_resident_bytes=1054965760`
 - `max_same_model_load_epoch_unaccounted_session_kv_drift_bytes=0`
 
-This does not pass §2 because the run is a short canary, not aggregate evidence.
-It closes the raw drift false-fail: the selected functional gate is direct
-cache-object resident working set, while the remaining blocker is aggregate
-volume / policy under a high-frequency swap cadence.
+This does not pass §2 because it exercises only load/switch mechanics. It closes
+the raw drift false-fail: the selected functional gate is direct cache-object
+resident working set, while the remaining blockers are throughput decay and
+concurrency breadth under the four-axis count-based §7.
+
+### 2026-06-02 count-based §7 reset
+
+User review rejected the old duration-first base: 24h wall-clock with a small
+number of switches repeatedly measured load/switch while leaving throughput
+decay and concurrency breadth empty. The base §7 pass bar is now four
+independent count-based axes:
+
+- `load_stability`
+- `throughput_stability`
+- `switch_stability`
+- `concurrency_stability`
+
+`duration_gate_role = reported_byproduct_not_pass_gate`. The runner now emits
+`axis_verdicts`; current evidence can pass load/switch sub-gates, but
+throughput/concurrency are intentionally `blocked` until the harness measures
+them. This is stricter than the old composite duration verdict because missing
+axes are visible instead of being hidden by a long wall-clock run.

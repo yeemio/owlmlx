@@ -110,9 +110,9 @@ missing primitive precisely. Do not reframe the private header as the solution.
   `session_kv_cache.cached_prompt_tokens` metadata for the current request.
 - `/v1/runtime/session-kv-cache` remains the diagnostic truth surface for the
   explicit session lane.
-- B-1c section 2 has one recent gap-free swap-bearing segment, but the
-  aggregate requirement remains 24h / 6 swaps / zero cache drops, expirations,
-  and rejects.
+- B-1c section 2 has clean load/switch evidence, but the base gate has been
+  re-founded on four count-based axes: load, throughput, switch, concurrency.
+  Duration is now a reported byproduct, not the pass bar.
 - The 2026-06-01 `20260601T074541Z` topoff was operator-paused before the
   planned 4h / 1-swap boundary. Its ledger reached `last_elapsed_s=8298.33`
   with zero drops / expirations / rejects and `max_drift_bytes=171704320`, but
@@ -174,8 +174,9 @@ missing primitive precisely. Do not reframe the private header as the solution.
   `measurement_wall_clock_gap_free=true`, drops / expirations / rejects all `0`,
   `max_same_model_load_epoch_drift_bytes=60620800`,
   `max_session_cache_resident_bytes=364216320`) and audit reports
-  `clean_for_interrupted_aggregate=true`; it remains `blocked` only because it
-  is not the canonical 24h / 6-swap aggregate.
+  `clean_for_interrupted_aggregate=true`; it remains `blocked` because the
+  current §2 runner still under-measures throughput decay and concurrency
+  breadth.
 - Route-level OpenAI and Anthropic streaming tests now prove that ordinary
   no-header compatibility requests can receive cached-token usage when backend
   stream events carry real per-request `session_kv_cache.cached_prompt_tokens`
@@ -193,10 +194,10 @@ missing primitive precisely. Do not reframe the private header as the solution.
 
 ## remaining_gaps
 
-1. B-1c section 2 still needs aggregate / policy evidence: the current clean
-   evidence volume is below the 24h / 6-swap gate required before real
-   cache-handle reuse can be considered. The operator-paused `20260601T074541Z`
-   ledger does not reduce this gap because it ended before any swap boundary.
+1. B-1c section 2 still needs four-axis evidence: load/switch are countable, but
+   throughput decay and concurrency breadth are under-measured. The operator-
+   paused `20260601T074541Z` ledger does not reduce this gap because it ended
+   before any swap boundary and measured neither missing axis.
 2. The immediate false blocker is closed: raw 751MB Gemma same-model drift is
    accepted only when direct `cache_object_nbytes` resident working-set
    accounting is available, resident cache bytes stay within budget, and
@@ -226,10 +227,10 @@ The next executable closure is not another consumer-side adapter and not F-3
 runtime work. B-2.1, B-2.2, and the first B-2.3 automatic slice are already
 landed. The remaining closure has two concrete blockers:
 
-1. B-1c section 2 aggregate / policy evidence under high-frequency swap stress
-   is still required for any broader stability claim. Do not run another
-   passive 4h topoff with one switch. Keep the 5-minute cadence: it already
-   found the resident-pressure issue, and current-code validation is clean.
+1. B-1c section 2 count-based evidence is still required for any broader
+   stability claim. Do not run another passive 4h topoff with one switch. Keep
+   the 5-minute cadence for switch stress, but add throughput-decay sampling and
+   breadth/concurrency pressure so the two previously empty axes are measured.
 2. The prior real-hit blocker
    (`auto_prefix_completion_trim_unavailable` on Qwen27) is resolved by
    prompt-only refresh. Route-level tests now cover OpenAI/Anthropic streaming

@@ -66,7 +66,9 @@ B1C1_SAMPLE_INTERVAL_S = 60.0
 B1C1_DRIFT_BUDGET_BYTES = 200 * 1024 * 1024
 B1C2_RESIDENT_CACHE_WORKING_SET_BUDGET_BYTES = 2 * BYTES_PER_GB
 B1C1_WARMUP_CYCLES = 1
-B1C2_REQUIRED_SWAP_COUNT = 6
+B1C2_REQUIRED_SWAP_COUNT = 24
+B1C2_SWAP_CADENCE_S = 300.0
+B1C2_COUNT_BASED_DURATION_S = B1C2_REQUIRED_SWAP_COUNT * B1C2_SWAP_CADENCE_S
 B1C1_WALL_CLOCK_GAP_FACTOR = 3.0
 B1C1_MIN_WALL_CLOCK_GAP_BUDGET_S = 10.0
 B1C1_INTERRUPTION_REASONS = {
@@ -2319,6 +2321,83 @@ def _b1c2_rollup(
     cleanup_ok = (
         bool(cleanup_unload.ok) if cleanup_unload is not None else not bool(initial_load.ok)
     )
+    observed_load_count = int(bool(initial_load.ok)) + sum(
+        1 for record in swap_records if bool(record.get("swap", {}).get("load_ok"))
+    )
+    required_load_count = len(swap_records) + 1
+    load_stability_ok = (
+        b1c1_prerequisite_satisfied
+        and allocator_truth_claimable
+        and observed_load_count >= required_load_count
+        and bool(initial_load.ok)
+        and all_swaps_clean
+        and cleanup_ok
+        and drift_ok
+        and fatal_watermark_count == 0
+        and failure_measurement_count == 0
+        and unresolved_reclaim_barrier_events == 0
+    )
+    switch_stability_ok = (
+        swap_requirement_met
+        and all_swaps_clean
+        and ledger_gap_free
+        and bool(wall_clock_continuity["measurement_wall_clock_gap_free"])
+        and drops_total == 0
+        and expirations_total == 0
+        and rejects_total == 0
+    )
+    throughput_stability_ok = False
+    concurrency_stability_ok = False
+    axis_verdicts = {
+        "load_stability": {
+            "status": "passed" if load_stability_ok else "blocked",
+            "required_load_count": required_load_count,
+            "observed_load_count": observed_load_count,
+            "allocator_truth_claimable": allocator_truth_claimable,
+            "drift_gate_ok": drift_ok,
+            "cleanup_unload_ok": cleanup_ok,
+            "reason": (
+                "load_count_and_drift_gate_satisfied"
+                if load_stability_ok
+                else "load_count_or_drift_gate_not_satisfied"
+            ),
+        },
+        "switch_stability": {
+            "status": "passed" if switch_stability_ok else "blocked",
+            "required_swap_count": required_swap_count,
+            "observed_swap_count": len(swap_records),
+            "swap_boundaries_clean": all_swaps_clean,
+            "measurement_wall_clock_gap_free": wall_clock_continuity[
+                "measurement_wall_clock_gap_free"
+            ],
+            "reason": (
+                "switch_count_and_boundaries_satisfied"
+                if switch_stability_ok
+                else "switch_count_or_boundary_gate_not_satisfied"
+            ),
+        },
+        "throughput_stability": {
+            "status": "passed" if throughput_stability_ok else "blocked",
+            "calibration_status": "pending",
+            "observed_throughput_decay_samples": 0,
+            "reason": "throughput_decay_not_measured_by_current_b1c2_runner",
+        },
+        "concurrency_stability": {
+            "status": "passed" if concurrency_stability_ok else "blocked",
+            "calibration_status": "pending",
+            "observed_entry_breadth": len(
+                {record.get("prompt_id") for record in sample_records if record.get("prompt_id")}
+            ),
+            "observed_max_generation_concurrency": max(
+                (
+                    int(record.get("config", {}).get("max_generation_concurrency", 1) or 1)
+                    for record in sample_records
+                ),
+                default=1,
+            ),
+            "reason": "multi_entry_breadth_and_interleaving_not_measured_by_current_b1c2_runner",
+        },
+    }
     hard_failure = (
         bool(records)
         and (
@@ -2337,8 +2416,10 @@ def _b1c2_rollup(
         bool(measurement_records)
         and b1c1_prerequisite_satisfied
         and allocator_truth_claimable
-        and duration_requirement_met
-        and swap_requirement_met
+        and load_stability_ok
+        and switch_stability_ok
+        and throughput_stability_ok
+        and concurrency_stability_ok
         and ledger_gap_free
         and bool(wall_clock_continuity["measurement_wall_clock_gap_free"])
         and session_mix_complete
@@ -2373,9 +2454,11 @@ def _b1c2_rollup(
         "required_duration_s": required_duration_s,
         "measurement_duration_s": measurement_duration_s,
         "duration_requirement_met": duration_requirement_met,
+        "duration_gate_role": "reported_byproduct_not_pass_gate",
         "required_swap_count": required_swap_count,
         "swap_count": len(swap_records),
         "swap_requirement_met": swap_requirement_met,
+        "axis_verdicts": axis_verdicts,
         "ledger_gap_free": ledger_gap_free,
         "wall_clock_continuity": wall_clock_continuity,
         "measurement_wall_clock_gap_free": wall_clock_continuity[
@@ -3066,12 +3149,47 @@ def run_b1c2_interrupted_soak_plus_swap(
         and segment.get("measurement_mode") == MlxMemorySampler.measurement_mode
         for segment in segments
     )
+    source_records = [_read_first_jsonl_record(path) for path in segment_rollups]
+    segment_axis_verdicts = [
+        record.get("axis_verdicts") if isinstance(record.get("axis_verdicts"), dict) else {}
+        for record in source_records
+    ]
+    axis_names = (
+        "load_stability",
+        "switch_stability",
+        "throughput_stability",
+        "concurrency_stability",
+    )
+    aggregate_axis_verdicts: dict[str, dict[str, Any]] = {}
+    for axis_name in axis_names:
+        statuses = [
+            str(verdicts.get(axis_name, {}).get("status", "missing"))
+            for verdicts in segment_axis_verdicts
+        ]
+        aggregate_axis_verdicts[axis_name] = {
+            "status": "passed" if statuses and all(status == "passed" for status in statuses) else "blocked",
+            "segment_statuses": statuses,
+        }
+    aggregate_axis_verdicts["switch_stability"].update(
+        {
+            "required_swap_count": required_swap_count,
+            "observed_swap_count": aggregate_swap_count,
+            "count_requirement_met": swap_requirement_met,
+            "status": (
+                "passed"
+                if all_segments_ok and swap_requirement_met
+                else "blocked"
+            ),
+        }
+    )
     ok = (
         b1c1_prerequisite_satisfied
         and all_segments_allocator_truth
         and all_segments_ok
-        and duration_requirement_met
-        and swap_requirement_met
+        and all(
+            verdict.get("status") == "passed"
+            for verdict in aggregate_axis_verdicts.values()
+        )
     )
     if ok:
         conclusion = "passed"
@@ -3093,8 +3211,10 @@ def run_b1c2_interrupted_soak_plus_swap(
             "all_segments_ok_for_rehearsal": all_segments_ok,
             "prerequisite_satisfied": b1c1_prerequisite_satisfied,
             "duration_requirement_met": duration_requirement_met,
+            "duration_gate_role": "reported_byproduct_not_pass_gate",
             "swap_requirement_met": swap_requirement_met,
             "allocator_truth_claimable": all_segments_allocator_truth,
+            "axis_verdicts": aggregate_axis_verdicts,
         },
         "soak_plus_swap_stability": conclusion,
         "conclusion": conclusion,

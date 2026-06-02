@@ -250,7 +250,7 @@ def test_b1c2_segment_rollup_audit_rejects_unsafe_pass_claim(tmp_path):
     result = session_kv_soak_audit.audit_b1c2_segment_rollup(rollup)
 
     assert "unsafe_claim:soak_plus_swap_passed_without_all_gates" in result["errors"]
-    assert "unsafe_claim:passed_without_duration_requirement" in result["errors"]
+    assert "unsafe_claim:passed_without_axis_verdicts" in result["errors"]
     assert "unsafe_claim:passed_without_swap_requirement" in result["errors"]
 
 

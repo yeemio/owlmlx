@@ -606,6 +606,47 @@ def _write_b1c1_segment_rollup(
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _write_b1c2_segment_rollup(path, *, run_id, swap_count=8):
+    payload = {
+        "schema_version": "b1c2.rollup.v1",
+        "gate": "B-1c section 2",
+        "run_id": run_id,
+        "backend": "native",
+        "measurement_mode": eviction_soak.MlxMemorySampler.measurement_mode,
+        "measurement_duration_s": float(swap_count * 300),
+        "ledger_gap_free": True,
+        "measurement_wall_clock_gap_free": True,
+        "session_mix_complete": True,
+        "session_mix_balanced": True,
+        "max_drift_within_budget": True,
+        "swap_boundaries_clean": True,
+        "fatal_watermark_count": 0,
+        "session_cache_drops_total": 0,
+        "session_cache_expirations_total": 0,
+        "session_cache_rejects_total": 0,
+        "failure_measurement_count": 0,
+        "unresolved_reclaim_barrier_events": 0,
+        "hard_failure": False,
+        "swap_count": swap_count,
+        "soak_plus_swap_stability": "blocked",
+        "axis_verdicts": {
+            "load_stability": {
+                "status": "passed",
+                "observed_load_count": swap_count + 1,
+                "required_load_count": swap_count + 1,
+            },
+            "switch_stability": {
+                "status": "blocked",
+                "observed_swap_count": swap_count,
+                "required_swap_count": eviction_soak.B1C2_REQUIRED_SWAP_COUNT,
+            },
+            "throughput_stability": {"status": "blocked"},
+            "concurrency_stability": {"status": "blocked"},
+        },
+    }
+    path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def test_b1c1_interrupted_rehearsal_aggregates_segments_without_graduating(tmp_path):
     rollups = []
     for index in range(1, 4):
@@ -748,6 +789,33 @@ def test_b1c1_interrupted_rehearsal_rejects_empty_segment_list(tmp_path):
             segment_rollups=[],
             output_dir=tmp_path,
         )
+
+
+def test_b1c2_interrupted_aggregate_separates_switch_count_from_missing_axes(tmp_path):
+    rollups = []
+    for index in range(1, 4):
+        path = tmp_path / f"b1c2-segment-{index}-rollup.jsonl"
+        _write_b1c2_segment_rollup(path, run_id=f"b1c2-segment-{index}", swap_count=8)
+        rollups.append(path)
+
+    summary = eviction_soak.run_b1c2_interrupted_soak_plus_swap(
+        segment_rollups=rollups,
+        output_dir=tmp_path,
+        run_id="b1c2-aggregate",
+        required_total_duration_s=0.0,
+        required_swap_count=24,
+        b1c1_prerequisite_satisfied=True,
+    )
+
+    aggregate = summary["interrupted_soak_plus_swap"]
+    assert aggregate["aggregate_swap_count"] == 24
+    assert aggregate["duration_gate_role"] == "reported_byproduct_not_pass_gate"
+    assert aggregate["axis_verdicts"]["load_stability"]["status"] == "passed"
+    assert aggregate["axis_verdicts"]["switch_stability"]["status"] == "passed"
+    assert aggregate["axis_verdicts"]["throughput_stability"]["status"] == "blocked"
+    assert aggregate["axis_verdicts"]["concurrency_stability"]["status"] == "blocked"
+    assert summary["soak_plus_swap_stability"] == "blocked"
+    assert summary["graduates"]["soak_plus_swap_stability"] is False
 
 
 def test_cli_b1c1_interrupted_rehearsal_writes_aggregate_rollup(tmp_path):
@@ -1068,7 +1136,12 @@ def test_b1c2_rollup_uses_same_load_epoch_drift_not_model_size_delta(tmp_path):
     assert rollup["session_kv_drift_accounting"]["resident_estimate_modes"] == [
         "cache_object_nbytes"
     ]
-    assert rollup["soak_plus_swap_stability"] == "passed"
+    assert rollup["axis_verdicts"]["load_stability"]["status"] == "passed"
+    assert rollup["axis_verdicts"]["switch_stability"]["status"] == "passed"
+    assert rollup["axis_verdicts"]["throughput_stability"]["status"] == "blocked"
+    assert rollup["axis_verdicts"]["concurrency_stability"]["status"] == "blocked"
+    assert rollup["duration_gate_role"] == "reported_byproduct_not_pass_gate"
+    assert rollup["soak_plus_swap_stability"] == "blocked"
 
 
 def test_b1c2_rollup_accepts_direct_cache_object_resident_accounted_drift(tmp_path):
@@ -1105,7 +1178,11 @@ def test_b1c2_rollup_accepts_direct_cache_object_resident_accounted_drift(tmp_pa
     assert rollup["drift_gate"]["resident_accounted_drift_within_budget"] is True
     assert rollup["session_kv_drift_accounting"]["used_for_segment_gate"] is True
     assert rollup["session_kv_drift_accounting"]["unaccounted_drift_within_budget"] is True
-    assert rollup["soak_plus_swap_stability"] == "passed"
+    assert rollup["axis_verdicts"]["load_stability"]["status"] == "passed"
+    assert rollup["axis_verdicts"]["switch_stability"]["status"] == "passed"
+    assert rollup["axis_verdicts"]["throughput_stability"]["status"] == "blocked"
+    assert rollup["axis_verdicts"]["concurrency_stability"]["status"] == "blocked"
+    assert rollup["soak_plus_swap_stability"] == "blocked"
 
 
 def test_b1c2_rollup_rejects_resident_accounting_without_direct_cache_object_mode(tmp_path):
