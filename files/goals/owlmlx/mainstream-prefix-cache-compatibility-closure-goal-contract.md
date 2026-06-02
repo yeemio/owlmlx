@@ -181,6 +181,11 @@ missing primitive precisely. Do not reframe the private header as the solution.
   stream events carry real per-request `session_kv_cache.cached_prompt_tokens`
   metadata. The tests also assert the route does not pass a private `session_id`
   kwarg.
+- The `20260602T015245Z` real Qwen27 compat-route probe passed through
+  no-header OpenAI SSE and Anthropic SSE with cached-token usage surfaced from
+  runtime metadata (`openai_cached_tokens=26`,
+  `anthropic_cache_read_input_tokens=26`), `hits_total=2`, and drops /
+  expirations / rejects all `0`.
 
 ## remaining_gaps
 
@@ -224,9 +229,9 @@ landed. The remaining closure has two concrete blockers:
 2. The prior real-hit blocker
    (`auto_prefix_completion_trim_unavailable` on Qwen27) is resolved by
    prompt-only refresh. Route-level tests now cover OpenAI/Anthropic streaming
-   metadata propagation without a private session header. The remaining
-   implementation/evidence gap is wider real-model/surface coverage under the
-   same narrow safety contract, not another consumer-side private-header
-   adapter.
+   metadata propagation without a private session header, and Qwen27 real-model
+   route evidence now passes for OpenAI SSE and Anthropic SSE. The remaining
+   implementation/evidence gap is broader model/policy coverage under the same
+   narrow safety contract, not another consumer-side private-header adapter.
 
 Keep B-2.3 broader promotion blocked until both blockers are honestly resolved.

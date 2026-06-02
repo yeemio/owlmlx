@@ -142,9 +142,12 @@ with prompt-only refresh. The `20260602T011000Z` Qwen27 hit probe passed with
 two safe non-prefix fallbacks. The `20260602T002448Z` 20-minute / 4-swap
 current-code validation stayed cache-clean and boundary-clean under the same
 5-minute cadence, with audit `clean_for_interrupted_aggregate=true`, but remains
-blocked for canonical graduation because it is not 24h / 6 swaps. OwlMLX must
-not claim default-on mainstream prefix cache, subprocess cache reuse, or B-1c §2
-pass from this narrow evidence.
+blocked for canonical graduation because it is not 24h / 6 swaps. The
+`20260602T015245Z` Qwen27 compat-route probe passed through no-header OpenAI SSE
+and Anthropic SSE, surfacing `cached_tokens=26` and
+`cache_read_input_tokens=26` from runtime metadata with drops / expirations /
+rejects all `0`. OwlMLX must not claim default-on mainstream prefix cache,
+subprocess cache reuse, or B-1c §2 pass from this narrow evidence.
 | Runtime model visibility contract | supported | `owlmlx/runtime_model_visibility.py` now freezes owlmlx-owned rule `runtime_gate_required_before_visible`: `GET /v1/openai/models` is the formal visibility list, `GET /v1/runtime/model-visibility` is the diagnostic contract surface, and `GET /v1/models` remains loaded inventory with an embedded `visibility_contract` block; the gate is owlmlx registry plus `$MODELS_ROOT/{model-id}/config.json` presence rather than router lifecycle curation; see `runtime-model-visibility-contract.md` |
 | Degraded local routing now fails closed | supported | Runtime-11 blocks `localRuntimeProtocol=auto` when only `/healthz` is reachable; it no longer silently falls through to `/v1/chat/completions` for local models |
 | Replacement readiness verdict surface | supported | Runtime-12 promotes replacement readiness into explicit `doctor` output with a blocker list; launch readiness and replacement readiness are now distinct control-plane truths |

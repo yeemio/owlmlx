@@ -110,6 +110,11 @@ Current verified truth:
   `session_kv_cache.cached_prompt_tokens`, the routes emit
   `usage.prompt_tokens_details.cached_tokens` and `usage.cache_read_input_tokens`
   respectively. This is route-contract proof, not a real-model route benchmark.
+- Real Qwen27 route evidence now covers that same surface through the native
+  backend: `20260602T015245Z` ran no-header OpenAI SSE and Anthropic SSE requests
+  through FastAPI `TestClient`, with one cached-token hit on each surface
+  (`openai_cached_tokens=26`, `anthropic_cache_read_input_tokens=26`),
+  `hits_total=2`, drops / expirations / rejects all `0`, and verdict `passed`.
 
 ## 3. Design Goal
 
@@ -342,6 +347,7 @@ Expected row families:
 - `b2.prefix_candidate_classifier.v1`
 - `b2.compat_usage_accounting.v1`
 - `b2.automatic_prefix_reuse.v1`
+- `b2.compat_route_automatic_prefix_reuse.v1`
 
 No evidence file in this design round promotes the capability.
 
@@ -481,3 +487,8 @@ B-2 coverage.
   metadata propagation through compatibility surfaces when the backend supplies
   real per-request cache metadata; they do not replace real-model route evidence
   or B-1c aggregate / policy gates.
+- 2026-06-02: Added and ran the real-model `compat-route-hit` probe. The
+  `20260602T015245Z` Qwen27 route run passed on both OpenAI SSE and Anthropic
+  SSE without `X-Owlmlx-Session-Id`, with cached-token counts surfaced from
+  runtime metadata and zero drops / expirations / rejects. This closes the
+  Qwen27 route-evidence gap, not the B-1c aggregate / policy gate.

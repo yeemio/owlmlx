@@ -149,6 +149,12 @@ receive cached-token usage from backend stream-event detail without sending
 appear only when the current backend event carries real
 `session_kv_cache.cached_prompt_tokens` metadata.
 
+Real Qwen27 route evidence extends that proof beyond a fake backend:
+`files/evidence/owlmlx/bench/prefix-cache-compatibility/20260602T015245Z-b2-compat-route-qwen27-real-hit-summary.json`
+passed with one no-header cached-token hit on OpenAI SSE and one on Anthropic
+SSE (`openai_cached_tokens=26`, `anthropic_cache_read_input_tokens=26`),
+`hits_total=2`, and drops / expirations / rejects all `0`.
+
 This surface does **not** imply any of the following:
 
 - default-on or supported automatic cross-request prefix cache
