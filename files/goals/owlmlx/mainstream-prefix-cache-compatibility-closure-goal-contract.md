@@ -186,6 +186,10 @@ missing primitive precisely. Do not reframe the private header as the solution.
   runtime metadata (`openai_cached_tokens=26`,
   `anthropic_cache_read_input_tokens=26`), `hits_total=2`, and drops /
   expirations / rejects all `0`.
+- The `20260602T015559Z` Qwen35 and Gemma31 compat-route probes passed the same
+  no-header OpenAI/Anthropic surface gate. Qwen35 surfaced `26` cached/read
+  tokens; Gemma31 surfaced `25`; both had `hits_total=2` and drops /
+  expirations / rejects all `0`.
 
 ## remaining_gaps
 
@@ -229,9 +233,10 @@ landed. The remaining closure has two concrete blockers:
 2. The prior real-hit blocker
    (`auto_prefix_completion_trim_unavailable` on Qwen27) is resolved by
    prompt-only refresh. Route-level tests now cover OpenAI/Anthropic streaming
-   metadata propagation without a private session header, and Qwen27 real-model
-   route evidence now passes for OpenAI SSE and Anthropic SSE. The remaining
-   implementation/evidence gap is broader model/policy coverage under the same
-   narrow safety contract, not another consumer-side private-header adapter.
+   metadata propagation without a private session header, and real-model route
+   evidence now passes for Qwen27, Qwen35, and Gemma31 on OpenAI SSE and
+   Anthropic SSE. The remaining implementation/evidence gap is B-1c aggregate /
+   policy coverage under the same narrow safety contract, not another
+   consumer-side private-header adapter.
 
 Keep B-2.3 broader promotion blocked until both blockers are honestly resolved.

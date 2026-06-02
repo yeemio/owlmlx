@@ -1,0 +1,23 @@
+{
+  "anthropic_cache_read_hit_count": 1,
+  "anthropic_cache_read_input_tokens": 26,
+  "cleanup_unload_ok": true,
+  "drops_total": 0,
+  "expirations_total": 0,
+  "hits_total": 2,
+  "ledger": "files/evidence/owlmlx/bench/prefix-cache-compatibility/20260602T015559Z-b2-compat-route-qwen35-real-hit.jsonl",
+  "load_ok": true,
+  "misses_total": 2,
+  "model_gb": 35.0,
+  "model_id": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B-4bit",
+  "openai_cached_token_hit_count": 1,
+  "openai_cached_tokens": 26,
+  "rejects_total": 0,
+  "run_id": "20260602T015559Z-b2-compat-route-qwen35-real-hit",
+  "sample_count": 4,
+  "schema_version": "b2.compat_route_automatic_prefix_reuse.summary.v1",
+  "timestamp_utc": "2026-06-02T01:56:09Z",
+  "trim_bypasses_total": 1,
+  "trim_evictions_total": 1,
+  "verdict": "passed"
+}
