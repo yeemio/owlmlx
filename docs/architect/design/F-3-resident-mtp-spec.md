@@ -104,7 +104,35 @@ surfaces are hybrid or trim-sensitive (`linear_attention` / `sliding_window`).
 That means they are **not** the "full-attention resident MTP candidate" needed
 to bypass the current blocker. Do not start F-3.2/F-3.3 from this inventory.
 
-### 2.6 Soft prerequisites (must hold, not blocking by themselves)
+### 2.6 Next handoff: MTP is blocked differently from prefix cache
+
+F-3's blocker is related to the same hybrid-cache family as B-2 / F-2 C2, but
+the failure mode is not symmetric:
+
+- **Prefix cache can degrade monotonically**. When trim is unavailable, the
+  automatic prefix lane can keep only prompt-owned cache state, count bypasses,
+  and fall back to fresh cache without changing output correctness.
+- **MTP cannot assume that escape hatch**. Speculative decoding may need to
+  reject draft tokens and roll back their KV effects. If a hybrid cache cannot
+  trim / roll back safely, accepting a speedup claim risks changing the output
+  path. That is why F-3.1's `trim_attempted=true` plus request 2+ `rounds=0`
+  keeps the gate closed.
+
+The only MTP probe worth running before a new model appears is therefore a
+**Gemma4 root-cause probe**, not a broad "Qwen / DeepSeek MTP works?" probe. It
+should separate:
+
+1. **intra-request reject / rollback failure** — if this is the cause, hybrid
+   MTP stays parked until a full-attention target or upstream cache fix exists;
+2. **cross-request resident-state contamination** — if this is the cause, a
+   fresh-per-request cache inside a resident process may still be a narrow
+   load-amortization experiment, but it must not claim cache-depth reuse.
+
+This root-cause probe is optional and lower priority than B-1c/B-2 throughput /
+concurrency closure. Do not let it displace the current prefix-cache stability
+mainline.
+
+### 2.7 Soft prerequisites (must hold, not blocking by themselves)
 
 - F-1 design + code-grade landed and green (the `speculative_execution_status` surface F-3 will drive into the `loaded` shape) — **met** (F-1.2/F-1.3 landed, evidence `20260525T142617Z`)
 - this F-3 design-grade spec reviewed + signed off (architect + user, per [`README.md`](README.md) two-gate rule)
@@ -342,3 +370,4 @@ open-issue watch. Per the competitor-matrix upstream-watch discipline
 | 2026-06-01 | added `blocked_on_local_runtime` as a first-class F-3.1 verdict because an unusable isolated probe venv is a different blocker from an upstream #980 defect | goal loop F-3.1 |
 | 2026-06-01 | recorded first F-3.1 local resident probe result: `verdict=failed`; target/drafter loaded once and served 3 requests, but request 2+ reported no non-trivial speculative acceptance and the run observed 180 trim calls; F-3.2 remains blocked | goal loop F-3.1 |
 | 2026-06-02 | recorded local MTP candidate inventory: 14 model dirs, 11 with MTP/assistant signals, but 0 full-attention native-MTP candidates; F-3 remains blocked rather than switching to an unproven hybrid target | MTP follow-up |
+| 2026-06-02 | clarified next handoff: prefix-cache and MTP share the hybrid-cache family but not the same failure mode; MTP root-cause probing is lower priority than B-1c/B-2 throughput and concurrency closure | MTP follow-up |
