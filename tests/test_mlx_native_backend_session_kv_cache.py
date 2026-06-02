@@ -67,8 +67,19 @@ def _build_fake_mlx_lm_with_observable_cache(
         trim_calls.append(trimmed)
         return trimmed
 
+    class FakeModel:
+        def __call__(self, input_tokens, *, cache=None):
+            if cache is not None:
+                tokens = cache["tokens"]
+                assert isinstance(tokens, list)
+                if isinstance(input_tokens, list):
+                    tokens.extend(input_tokens)
+                else:
+                    tokens.extend(list(input_tokens))
+            return None
+
     def fake_load(model_id: str) -> tuple[object, object]:
-        return (object(), FakeTokenizer())
+        return (FakeModel(), FakeTokenizer())
 
     def fake_generate(
         model,
@@ -294,12 +305,12 @@ def test_native_session_kv_cache_auto_prefix_rejects_partial_common_prefix(
         importlib.reload(mod)
 
 
-def test_native_session_kv_cache_auto_prefix_does_not_keep_untrimmed_completion(
+def test_native_session_kv_cache_auto_prefix_refreshes_prompt_only_cache_when_trim_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
     monkeypatch.setenv("OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED", "1")
-    mod, _fake = _reload_native_backend_with_fake_mlx_lm(
+    mod, fake = _reload_native_backend_with_fake_mlx_lm(
         monkeypatch,
         trim_supported=False,
     )
@@ -307,20 +318,23 @@ def test_native_session_kv_cache_auto_prefix_does_not_keep_untrimmed_completion(
         backend = mod.MlxNativeBackend()
         assert backend.load("fake-model").ok is True
 
-        events = list(backend.stream_generate("fake-model", "prefix A"))
+        first = list(backend.stream_generate("fake-model", "prefix A"))
+        second = list(backend.stream_generate("fake-model", "prefix A suffix"))
 
-        assert events[-1].event == "done"
+        assert first[-1].event == "done"
+        assert second[-1].event == "done"
+        detail = second[-1].detail["session_kv_cache"]
+        assert detail["cache_decision"] == "reuse"
+        assert detail["cache_reason_code"] == "session_cache_hit"
+        assert detail["cached_prompt_tokens"] == len("prefix A")
+        assert fake._seen_stream_prompts[1] == [ord(ch) for ch in " suffix"]
         status = backend.status().detail["session_kv_cache"]
-        assert status["active_entries"] == 0
-        assert status["counters"]["hits"] == 0
-        assert status["counters"]["trim_bypasses"] == 1
-        assert status["counters"]["trim_evictions"] == 1
-        assert status["last_bypass_event"]["reason_code"] == (
-            "auto_prefix_completion_trim_unavailable"
-        )
-        assert status["last_bypass_event"]["detail"]["prompt_token_count"] == len(
-            "prefix A"
-        )
+        assert status["active_entries"] == 1
+        assert status["entries"][0]["token_count"] == len("prefix A suffix")
+        assert status["counters"]["hits"] == 1
+        assert status["counters"]["trim_bypasses"] == 0
+        assert status["counters"]["trim_evictions"] == 0
+        assert status["last_bypass_event"] is None
     finally:
         importlib.reload(mod)
 

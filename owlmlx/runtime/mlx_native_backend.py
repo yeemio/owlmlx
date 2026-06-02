@@ -327,6 +327,21 @@ def _prompt_cache_nbytes(prompt_cache: Any) -> int | None:
     return None
 
 
+def _materialize_prompt_cache_state(prompt_cache: Any) -> None:
+    try:
+        import mlx.core as mx  # type: ignore[import-not-found]
+    except Exception:
+        return
+    try:
+        mx.eval([cache.state for cache in prompt_cache])
+    except Exception:
+        return
+    try:
+        mx.clear_cache()
+    except Exception:
+        return
+
+
 def _non_empty_string(value: object) -> str | None:
     if value is None:
         return None
@@ -614,6 +629,56 @@ class MlxNativeBackend:
             automatic_prefix_scope=automatic_prefix_scope,
         )
 
+    def _build_prompt_only_cache_for_tokens(
+        self,
+        mlx_lm_module: Any,
+        session: _NativeSession,
+        prompt_tokens: tuple[int, ...],
+    ) -> Any | None:
+        make_cache = _resolve_make_prompt_cache(mlx_lm_module)
+        if make_cache is None or not prompt_tokens:
+            return None
+        try:
+            prompt_cache = make_cache(session.model)
+        except Exception as exc:
+            session.last_error = f"prompt-only cache allocation failed: {exc}"
+            return None
+
+        def _fallback_prefill() -> Any | None:
+            if not callable(session.model):
+                return None
+            try:
+                session.model(list(prompt_tokens), cache=prompt_cache)
+            except Exception as exc:
+                session.last_error = f"prompt-only cache prefill failed: {exc}"
+                return None
+            _materialize_prompt_cache_state(prompt_cache)
+            session.prompt_cache_call_count += 1
+            return prompt_cache
+
+        try:
+            import mlx.core as mx  # type: ignore[import-not-found]
+        except Exception:
+            return _fallback_prefill()
+
+        try:
+            tokens = mx.array(list(prompt_tokens))
+            prefill_step_size = 2048
+            for start in range(0, len(prompt_tokens), prefill_step_size):
+                chunk = tokens[start : start + prefill_step_size]
+                session.model(chunk[None], cache=prompt_cache)
+                mx.eval([cache.state for cache in prompt_cache])
+                try:
+                    mx.clear_cache()
+                except Exception:
+                    pass
+        except Exception as exc:
+            session.last_error = f"prompt-only cache prefill failed: {exc}"
+            return _fallback_prefill()
+
+        session.prompt_cache_call_count += 1
+        return prompt_cache
+
     def _finalize_session_prompt_cache_after_stream(
         self,
         mlx_lm_module: Any,
@@ -664,10 +729,31 @@ class MlxNativeBackend:
                 and len(generated_token_ids) >= completion_tokens
             ):
                 if prepared.automatic_prefix_scope:
+                    prompt_only_cache = self._build_prompt_only_cache_for_tokens(
+                        mlx_lm_module,
+                        session,
+                        prepared.prompt_tokens,
+                    )
+                    if prompt_only_cache is not None:
+                        prompt_only_nbytes = _prompt_cache_nbytes(prompt_only_cache)
+                        prompt_only_kwargs: dict[str, object] = {}
+                        if prompt_only_nbytes is not None:
+                            prompt_only_kwargs = {
+                                "byte_estimate": prompt_only_nbytes,
+                                "byte_estimate_mode": "cache_object_nbytes",
+                            }
+                        return self._session_kv_cache.remember_prompt(
+                            session_id=prepared.session_id,
+                            model_id=session.info.model_id,
+                            prompt_tokens=prepared.prompt_tokens,
+                            cache_object=prompt_only_cache,
+                            token_count=len(prepared.prompt_tokens),
+                            **prompt_only_kwargs,
+                        )
                     self._session_kv_cache.bypass_for_session_model(
                         session_id=prepared.session_id,
                         model_id=session.info.model_id,
-                        reason_code="auto_prefix_completion_trim_unavailable",
+                        reason_code="auto_prefix_prompt_only_refresh_unavailable",
                         detail={
                             "trim_reason_code": trim_result.reason_code,
                             "requested_trim_tokens": completion_tokens,

@@ -1,6 +1,6 @@
 # B-2 Mainstream Prefix-Cache Compatibility Spec
 
-> Status: design-grade spec; B-2.1 classifier, B-2.2 metadata plumbing, and first B-2.3 opt-in automatic prefix slice landed; real no-header hits are blocked by completion-trim unavailability on the current Qwen27 path
+> Status: design-grade spec; B-2.1 classifier, B-2.2 metadata plumbing, and first B-2.3 opt-in automatic prefix slice landed; prompt-only refresh now produces real no-header Qwen27 hits, while broader promotion remains blocked on B-1c aggregate / policy evidence
 > Updated: 2026-06-02
 > Campaign: B-2
 > Parent goal:
@@ -85,12 +85,25 @@ Current verified truth:
   `358481920 <= 2147483648`. This validates the safety/fallback side of the
   opt-in automatic lane under boundary stress, not a cache-hit claim.
 - The `20260602T004000Z` B-2 automatic-prefix hit probe used Qwen3.6-27B-4bit
-  on the no-header native streaming path. Load/unload and generation all
-  completed, but `usable_hit_count=0` and `known_blocker` is
-  `auto_prefix_completion_trim_unavailable`. OwlMLX now refuses to persist
-  generated-token-extended entries for the automatic no-header scope when the
-  upstream cache cannot be trimmed back to prompt-only state. This is the
-  current blocker for real mainstream no-header cache hits.
+  on the no-header native streaming path and exposed the old real-hit blocker:
+  `usable_hit_count=0` with
+  `known_blocker=auto_prefix_completion_trim_unavailable`.
+- OwlMLX then added a prompt-only refresh primitive for the automatic no-header
+  scope. Instead of retaining a generated-token-extended cache entry when
+  completion trim is unavailable, the backend rebuilds a prompt-only cache for
+  the remembered prompt and stores that object for later eligible prefix reuse.
+- The `20260602T011000Z` Qwen3.6-27B-4bit no-header hit probe passed with
+  `usable_hit_count=1`, `hits_total=1`, drops / expirations / rejects all `0`,
+  `completion_trim_unavailable_count=0`, and two safe non-prefix fallbacks
+  recorded as `auto_prefix_ineligible_not_token_prefix`.
+- The `20260602T002448Z` current-code 20-minute / 4-swap safety validation used
+  the same 5-minute cadence under `--session-cache-auto-prefix`. It was
+  functionally clean (`swap_boundaries_clean=true`,
+  `measurement_wall_clock_gap_free=true`, drops / expirations / rejects all `0`,
+  `max_same_model_load_epoch_drift_bytes=60620800`,
+  `max_session_cache_resident_bytes=364216320`), and audit reports
+  `clean_for_interrupted_aggregate=true`; it remains `blocked` only because it
+  is not the canonical 24h / 6-swap aggregate.
 
 ## 3. Design Goal
 
@@ -236,8 +249,10 @@ Pass:
 - It does not merge unrelated conversations.
 - It emits real cache metadata.
 - On the automatic no-header lane, a generated-token-extended cache entry is
-  not retained unless the backend can trim the concrete upstream cache back to
-  prompt-only state after generation.
+  not retained as the reusable entry. If completion trim cannot return the
+  concrete upstream cache to prompt-only state, OwlMLX must either rebuild and
+  persist a prompt-only cache for the remembered prompt or evict/fallback with
+  an explicit blocker reason.
 
 ## 6. Safety Contract
 
@@ -343,20 +358,22 @@ After B-2.2:
 After B-2.3:
 
 - OwlMLX may claim a narrow, opt-in automatic prefix-cache implementation
-  exists for native streaming, but current Qwen27 evidence shows it is a safe
-  fallback/blocker path rather than a real no-header hit path because
-  completion trim is unavailable. It may claim a broader automatic prefix-cache
-  lane only if B-1c section 2 aggregate stability and B-2 evidence both pass.
+  exists for native streaming. Current Qwen27 evidence shows a real no-header
+  hit is possible through prompt-only refresh, with safe fallback for non-prefix
+  prompts. It may claim a broader automatic prefix-cache lane only if B-1c
+  section 2 aggregate stability / policy and wider B-2 compatibility evidence
+  both pass.
 
 No stage in this spec independently promotes B-1 to `supported`.
 
 ## 12. Next Handoff
 
-The first B-2.3 code-grade slice has landed and the first no-header evidence row
-has produced a concrete blocker. The next round should not run longer passive
-soaks hoping for a different result; it should either add a prompt-only
-retention primitive or track an upstream trim fix that makes prompt-only
-retention possible on the admitted model path.
+The first B-2.3 code-grade slice has landed, and the first Qwen27 no-header
+real-hit blocker has been resolved by prompt-only refresh. The next round should
+not run longer passive soaks hoping for a different result; it should decide the
+B-1c aggregate / policy evidence needed for the already-working narrow
+automatic prefix lane, then expand coverage only where the same safety contract
+can be measured.
 
 Immediate handoff:
 
@@ -382,19 +399,21 @@ Immediate handoff:
    `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`.
 8. Do not treat partial measurement-only ledgers as B-1c section 2 aggregate
    input. The segment must reach its planned swap boundary and produce a rollup.
-9. Refresh this spec only when B-1c section 2 either passes the aggregate gate
-   or produces a new blocker that changes B-2.3 feasibility.
-10. Preserve the `20260602T004000Z` blocker: automatic no-header reuse cannot
-    produce real `cached_tokens` on Qwen27 while completion trim returns `0`.
-    The safe behavior is to evict the automatic entry and fall back to fresh
-    cache with no hit claim.
+9. Refresh this spec when B-1c section 2 either passes the aggregate gate,
+   accepts a revised high-frequency aggregate policy, or produces a new blocker
+   that changes B-2.3 feasibility.
+10. Preserve the `20260602T004000Z` blocker as historical evidence only:
+    automatic no-header reuse could not produce real `cached_tokens` while
+    completion trim returned `0`. The `20260602T011000Z` prompt-only-refresh
+    probe supersedes it for current code.
 
-The implemented B-2.3 slice proves the key software boundary in unit tests:
-enabled no-header requests reuse only full-prefix candidates when prompt-only
-retention is available, disabled requests keep fresh-cache behavior, ineligible
-requests fall back to fresh cache with an explicit reason, and trim-unavailable
-automatic requests do not retain generated-token-extended entries. Broader
-claims still require B-2 hit evidence and B-1c policy acceptance.
+The implemented B-2.3 slice proves the key software boundary in unit tests and
+real Qwen27 evidence: enabled no-header requests reuse only full-prefix
+candidates after prompt-only refresh, disabled requests keep fresh-cache
+behavior, ineligible requests fall back to fresh cache with an explicit reason,
+and trim-unavailable automatic requests do not retain generated-token-extended
+entries. Broader claims still require aggregate / policy acceptance and wider
+B-2 coverage.
 
 ## 13. Change Log
 
@@ -441,5 +460,11 @@ claims still require B-2 hit evidence and B-1c policy acceptance.
   requires the existing prompt tokens to be the full prefix of the requested
   prompt, does not count a reuse as a hit when trim later fails, and evicts
   automatic entries when completion trim is unavailable after generation. The
-  `20260602T004000Z` Qwen27 probe documents the current real-hit blocker:
+  `20260602T004000Z` Qwen27 probe documents the first real-hit blocker:
   `auto_prefix_completion_trim_unavailable`.
+- 2026-06-02: Added prompt-only refresh for the automatic no-header scope. The
+  `20260602T011000Z` Qwen27 probe passed with one usable no-header hit, safe
+  non-prefix fallbacks, and zero drops / expirations / rejects. The
+  `20260602T002448Z` 20-minute / 4-swap current-code validation stayed
+  cache-clean and boundary-clean under 5-minute cadence, but remains blocked for
+  canonical graduation because it is not 24h / 6 swaps.

@@ -1,7 +1,7 @@
 # owlmlx Goal Contract: Mainstream Prefix-Cache Compatibility Closure
 
 > Status: active goal contract
-> Updated: 2026-06-02 after B-2.3 no-header blocker probe
+> Updated: 2026-06-02 after B-2.3 prompt-only refresh real-hit probe
 
 ## goal_id
 
@@ -96,7 +96,9 @@ missing primitive precisely. Do not reframe the private header as the solution.
 - The automatic no-header lane is stricter than the explicit session lane:
   edited-prefix reuse is rejected unless the existing prompt is a full token
   prefix of the requested prompt, and generated-token-extended entries are not
-  retained when completion trim is unavailable.
+  retained as reusable automatic state. When completion trim is unavailable,
+  current code attempts a prompt-only refresh for the remembered prompt; if that
+  refresh is unavailable, it evicts/falls back.
 - Non-stream `generate` remains fresh single-request cache today.
 - The current OpenAI / Anthropic compatibility routes can forward the explicit
   header, but they do not derive a mainstream cache scope by themselves.
@@ -158,9 +160,22 @@ missing primitive precisely. Do not reframe the private header as the solution.
 - The `20260602T004000Z` Qwen3.6-27B-4bit no-header hit probe loaded, generated,
   and unloaded successfully, but failed the real-hit gate with
   `usable_hit_count=0`, `hits_total=0`, and
-  `known_blocker=auto_prefix_completion_trim_unavailable`. That is now the
-  precise missing primitive for mainstream automatic cached-token hits on the
-  current native path.
+  `known_blocker=auto_prefix_completion_trim_unavailable`. That blocker is now
+  historical evidence: current code adds prompt-only refresh for the automatic
+  scope.
+- The `20260602T011000Z` Qwen3.6-27B-4bit no-header hit probe passed under
+  current code with `usable_hit_count=1`, `hits_total=1`, drops / expirations /
+  rejects all `0`, `completion_trim_unavailable_count=0`, and two safe
+  non-prefix fallbacks recorded as
+  `auto_prefix_ineligible_not_token_prefix`.
+- The `20260602T002448Z` current-code 20-minute / 4-swap validation used the
+  5-minute switch cadence with `--session-cache-auto-prefix`. It was
+  boundary-clean and cache-clean (`swap_boundaries_clean=true`,
+  `measurement_wall_clock_gap_free=true`, drops / expirations / rejects all `0`,
+  `max_same_model_load_epoch_drift_bytes=60620800`,
+  `max_session_cache_resident_bytes=364216320`) and audit reports
+  `clean_for_interrupted_aggregate=true`; it remains `blocked` only because it
+  is not the canonical 24h / 6-swap aggregate.
 
 ## remaining_gaps
 
@@ -177,10 +192,11 @@ missing primitive precisely. Do not reframe the private header as the solution.
    B-2.3 opt-in implementation can consume it, but any broader claim still
    needs an explicit aggregate / policy decision.
 4. B-2.3 automatic safe prefix reuse is implemented only as a narrow
-   native-streaming, no-header, default-off slice. It currently proves safe
-   fallback and strict admission, not real automatic cached-token hits. It must
-   remain an `experimental` capability claim until B-1c section 2 aggregate
-   stability passes and the B-2 no-header hit blocker is resolved.
+   native-streaming, no-header, default-off slice. It now proves strict admission,
+   safe fallback, and one real Qwen27 no-header cached-token hit via prompt-only
+   refresh. It must remain an `experimental` capability claim until B-1c section
+   2 aggregate / policy evidence and broader B-2 coverage justify anything
+   wider.
 5. The explicit `X-Owlmlx-Session-Id` lane is no longer the only physical reuse
    path, but it remains the dogfood/control lane and must not be presented as
    the mainstream consumer contract.
@@ -199,12 +215,11 @@ landed. The remaining closure has two concrete blockers:
 1. B-1c section 2 aggregate / policy evidence under high-frequency swap stress
    is still required for any broader stability claim. Do not run another
    passive 4h topoff with one switch. Keep the 5-minute cadence: it already
-   found the resident-pressure issue, and the first LRU resident-cap validation
-   is clean.
-2. Real no-header cached-token hits are blocked by
-   `auto_prefix_completion_trim_unavailable` on the current Qwen27 native path.
-   The next implementation step must provide a prompt-only retention primitive
-   or wait for an upstream cache-trim path that can trim generated tokens after
-   stream completion.
+   found the resident-pressure issue, and current-code validation is clean.
+2. The prior real-hit blocker
+   (`auto_prefix_completion_trim_unavailable` on Qwen27) is resolved by
+   prompt-only refresh. The remaining implementation/evidence gap is wider
+   coverage and compatibility-surface proof under the same narrow safety
+   contract, not another consumer-side private-header adapter.
 
 Keep B-2.3 broader promotion blocked until both blockers are honestly resolved.

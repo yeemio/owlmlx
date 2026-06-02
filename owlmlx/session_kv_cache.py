@@ -499,6 +499,7 @@ class SessionKVCacheStore:
         session_id: str | None,
         model_id: str,
         prompt_tokens: tuple[int, ...],
+        cache_object: Any | None = None,
         token_count: int | None = None,
         byte_estimate: int | None = None,
         byte_estimate_delta: int | None = None,
@@ -535,6 +536,10 @@ class SessionKVCacheStore:
                     window_evictions=self._counters.window_evictions + 1,
                 )
                 return True
+            if cache_object is not None:
+                self._next_cache_object_id += 1
+                entry.cache_object = cache_object
+                entry.cache_object_id = self._next_cache_object_id
             entry.prompt_tokens = normalized_prompt_tokens
             if token_count is not None:
                 entry.token_count = max(int(token_count), 0)
