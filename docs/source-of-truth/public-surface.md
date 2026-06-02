@@ -137,11 +137,15 @@ documented in its source-of-truth file.
   truth surface for the explicit session lane; it is not a mainstream
   OpenAI/Anthropic prefix-cache contract. B-2.2 allows OpenAI `cached_tokens`
   and Anthropic cache-read usage fields only when the backend event/result
-  carries real per-request cache metadata; automatic safe prefix reuse without
-  the private header remains unimplemented. B-1c §2 fast-swap triage now records
-  direct cache-object resident bytes (`cache_object_nbytes`) when upstream cache
-  objects expose `nbytes`; this is still diagnostic/operator truth, not a
-  mainstream consumer cache contract.
+  carries real per-request cache metadata. B-2.3 adds a first opt-in no-header
+  automatic prefix slice behind `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`;
+  real route evidence now shows OpenAI SSE `cached_tokens` and Anthropic SSE
+  cache-read usage on Qwen27, Qwen35, and Gemma31. That is still
+  experimental/default-off native-streaming evidence, not a default-on public
+  cache contract. B-1c §2 fast-swap triage now records direct cache-object
+  resident bytes (`cache_object_nbytes`) when upstream cache objects expose
+  `nbytes`; this is still diagnostic/operator truth, not a mainstream consumer
+  cache contract.
 
 ## 4. Supported Runtime Modules / Python APIs
 

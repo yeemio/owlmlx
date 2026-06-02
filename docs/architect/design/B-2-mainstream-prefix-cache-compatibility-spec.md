@@ -160,7 +160,7 @@ Pass:
 
 - `native-mlx-backend-capability-matrix.md` distinguishes explicit
   session-scoped reuse (`experimental`) from mainstream implicit prefix reuse
-  (not implemented).
+  (not implemented in B-2.0; later B-2.3 updates are tracked below).
 - `public-surface.md` distinguishes the experimental diagnostic route from
   compatibility usage fields that remain absent.
 - `01-mainline-roadmap.md` introduces B-2 as a near-term Campaign B goal, while
@@ -357,7 +357,7 @@ No evidence file in this design round promotes the capability.
 After B-2.0:
 
 - explicit session KV remains `experimental`;
-- mainstream automatic prefix cache remains not implemented;
+- mainstream automatic prefix cache was not yet implemented in that stage;
 - compatibility cache usage remains absent.
 
 After B-2.1:
@@ -375,20 +375,22 @@ After B-2.3:
 - OwlMLX may claim a narrow, opt-in automatic prefix-cache implementation
   exists for native streaming. Current Qwen27 evidence shows a real no-header
   hit is possible through prompt-only refresh, with safe fallback for non-prefix
-  prompts. It may claim a broader automatic prefix-cache lane only if B-1c
-  section 2 aggregate stability / policy and wider B-2 compatibility evidence
-  both pass.
+  prompts; route evidence now extends the no-header OpenAI/Anthropic metadata
+  path to Qwen27, Qwen35, and Gemma31. It may claim a broader automatic
+  prefix-cache lane only if B-1c section 2 aggregate stability / policy and
+  wider B-2 compatibility evidence both pass.
 
 No stage in this spec independently promotes B-1 to `supported`.
 
 ## 12. Next Handoff
 
-The first B-2.3 code-grade slice has landed, and the first Qwen27 no-header
-real-hit blocker has been resolved by prompt-only refresh. The next round should
+The first B-2.3 code-grade slice has landed, the first Qwen27 no-header real-hit
+blocker has been resolved by prompt-only refresh, and no-header OpenAI/Anthropic
+route evidence now passes on Qwen27, Qwen35, and Gemma31. The next round should
 not run longer passive soaks hoping for a different result; it should decide the
-B-1c aggregate / policy evidence needed for the already-working narrow
-automatic prefix lane, then expand coverage only where the same safety contract
-can be measured.
+B-1c aggregate / policy evidence needed for the already-working narrow automatic
+prefix lane, then expand coverage only where the same safety contract can be
+measured.
 
 Immediate handoff:
 
