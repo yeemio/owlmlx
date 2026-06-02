@@ -142,6 +142,13 @@ all `0`, and two safe non-prefix fallbacks. This proves a narrow opt-in
 no-header cached-token hit on the Qwen27 native streaming path; it does not make
 automatic prefix reuse default-on or supported.
 
+Focused compatibility-route tests cover the consumer-facing metadata boundary:
+OpenAI `/v1/chat/completions` SSE and Anthropic `/v1/messages` SSE requests can
+receive cached-token usage from backend stream-event detail without sending
+`X-Owlmlx-Session-Id`. The routes still must not fabricate these fields; they
+appear only when the current backend event carries real
+`session_kv_cache.cached_prompt_tokens` metadata.
+
 This surface does **not** imply any of the following:
 
 - default-on or supported automatic cross-request prefix cache

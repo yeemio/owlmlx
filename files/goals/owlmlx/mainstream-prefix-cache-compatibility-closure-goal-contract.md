@@ -176,6 +176,11 @@ missing primitive precisely. Do not reframe the private header as the solution.
   `max_session_cache_resident_bytes=364216320`) and audit reports
   `clean_for_interrupted_aggregate=true`; it remains `blocked` only because it
   is not the canonical 24h / 6-swap aggregate.
+- Route-level OpenAI and Anthropic streaming tests now prove that ordinary
+  no-header compatibility requests can receive cached-token usage when backend
+  stream events carry real per-request `session_kv_cache.cached_prompt_tokens`
+  metadata. The tests also assert the route does not pass a private `session_id`
+  kwarg.
 
 ## remaining_gaps
 
@@ -218,8 +223,10 @@ landed. The remaining closure has two concrete blockers:
    found the resident-pressure issue, and current-code validation is clean.
 2. The prior real-hit blocker
    (`auto_prefix_completion_trim_unavailable` on Qwen27) is resolved by
-   prompt-only refresh. The remaining implementation/evidence gap is wider
-   coverage and compatibility-surface proof under the same narrow safety
-   contract, not another consumer-side private-header adapter.
+   prompt-only refresh. Route-level tests now cover OpenAI/Anthropic streaming
+   metadata propagation without a private session header. The remaining
+   implementation/evidence gap is wider real-model/surface coverage under the
+   same narrow safety contract, not another consumer-side private-header
+   adapter.
 
 Keep B-2.3 broader promotion blocked until both blockers are honestly resolved.

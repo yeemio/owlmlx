@@ -104,6 +104,12 @@ Current verified truth:
   `max_session_cache_resident_bytes=364216320`), and audit reports
   `clean_for_interrupted_aggregate=true`; it remains `blocked` only because it
   is not the canonical 24h / 6-swap aggregate.
+- Route-level tests now cover the no-header compatibility surface: ordinary
+  OpenAI `/v1/chat/completions` SSE and Anthropic `/v1/messages` SSE requests do
+  not pass `session_id`, and when backend stream events carry real
+  `session_kv_cache.cached_prompt_tokens`, the routes emit
+  `usage.prompt_tokens_details.cached_tokens` and `usage.cache_read_input_tokens`
+  respectively. This is route-contract proof, not a real-model route benchmark.
 
 ## 3. Design Goal
 
@@ -322,6 +328,8 @@ B-2.3 tests:
 - enabled path reuses only eligible prefix candidates;
 - ineligible cases fall back to fresh cache and emit an ineligible reason;
 - runtime status counters match compatibility usage counters.
+- OpenAI and Anthropic streaming compatibility routes map real no-header backend
+  cache metadata without requiring `X-Owlmlx-Session-Id`.
 
 ## 10. Evidence Paths
 
@@ -468,3 +476,8 @@ B-2 coverage.
   `20260602T002448Z` 20-minute / 4-swap current-code validation stayed
   cache-clean and boundary-clean under 5-minute cadence, but remains blocked for
   canonical graduation because it is not 24h / 6 swaps.
+- 2026-06-02: Added route-level no-header compatibility tests for OpenAI SSE
+  `cached_tokens` and Anthropic SSE `cache_read_input_tokens`. These tests prove
+  metadata propagation through compatibility surfaces when the backend supplies
+  real per-request cache metadata; they do not replace real-model route evidence
+  or B-1c aggregate / policy gates.
