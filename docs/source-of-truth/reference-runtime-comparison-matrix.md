@@ -170,6 +170,15 @@ against the 2026-05-27 release surface.
   `nested_object`) is `partial` as a feature-lane only; F-4 overall remains
   `experimental`, with Gemma and `thinking_tag_closed` residuals isolated in
   `structured-output-grammar-lane.md`
+- **OpenAI tool-calling compatibility lane landed (experimental)**:
+  2026-06-02 Route A adds Qwen3.6/native-preview tool-call support on the
+  OpenAI chat surface. It accepts OwlCoda-style `content:null` / assistant
+  `tool_calls` / `role:tool` history, injects `tools` into tokenizer chat
+  templates, parses Qwen XML tool calls through `mlx_lm`, and returns non-stream
+  plus buffered-stream OpenAI `tool_calls`. This narrows the prior "no tool
+  calling infrastructure" gap but does not claim forced `tool_choice`, true
+  incremental streaming, MCP auto-discovery, Gemma/DeepSeek parser breadth, or
+  broad OpenAI parity.
 
 ### 0.1.4 关键 surface-shift summary
 
@@ -179,7 +188,7 @@ against the 2026-05-27 release surface.
 | Native MTP | 业界普遍缺；oMLX 提及但未跨 family | **oMLX 已跨 Qwen3.5/3.6 + Gemma 4 + DSV4**；**vMLX 已 native Qwen3.6 with tuning JSON** | **owlmlx F-1 endpoint surface 仍是 capability-honesty 独有的抽象**，但 owlmlx 在 "MTP 实装能力" 上已 lag；F-1 防止 method 仓促升级是 thesis 正确做法 |
 | DeepSeek V4 / hybrid attention 模型 | oMLX/vMLX 均不直接支持；owlmlx 2026-05-06 measured comparison 也是 reject | **oMLX v0.3.9.dev1 full port**；**vMLX v1.5.49 SWA+CSA/HCA composite cache**；owlmlx Campaign D 已有 `.runtime-deepseek-experimental` technical-preview `partial` lane | **owlmlx 不再是单纯 clean pre-load reject**，但仍未达到 stock/default/full-port/composite-cache parity；gap 仍显著，且 technical-preview lane 不等于 measured reference parity |
 | Continuous batching / chunked prefill | oMLX/vMLX 均有 CB 主线，未来路线已知 | **oMLX v0.3.9 chunked prefill 已落**；**vMLX TurboQuant KV for hybrid SSM 已落** | owlmlx **明确不追**（单 worker by design 已定），与 02-state-vs-market-gap.md §3.3 一致；gap 是 deliberate 不是 missing |
-| Structured tool calling | 业界普遍未 invariance-validate | **vMLX v1.5.45 MCP auto-discovery + multi-round structured `tool_calls` 已落** | **owlmlx F-4 仍占据 "byte-for-byte invariance under spec/quant" 这一细分轴**，但 "structured tool calling 基础设施" 这条 broader 轴上 vMLX 已 ahead；F-4 thesis 应明确**只**主张 invariance 这条窄 axis，不主张 structured tool calling 广义 capability |
+| Structured tool calling | 业界普遍未 invariance-validate | **vMLX v1.5.45 MCP auto-discovery + multi-round structured `tool_calls` 已落** | **owlmlx F-4 仍占据 "byte-for-byte invariance under spec/quant" 这一细分轴**；2026-06-02 Route A 也新增 Qwen3.6/native-preview OpenAI `tool_calls` experimental lane，解决 OwlCoda 基础工具循环入口问题。但 vMLX 在 MCP auto-discovery、multi-round breadth、parser registry 广度和 true streaming 上仍 ahead；owlmlx 不主张 structured tool calling 广义 parity |
 | 模型家族广度（parser registry / format） | 已知 owlmlx 选择窄；vMLX 已广 | **vMLX 再次扩展 Mistral Small 4 / MiniMax M2.x / Hy3 / ZAYA / DSV4 parser**；oMLX 加 DFlash Gemma 4 | owlmlx 选择窄是 deliberate boundary，未变；但**当 reviewer 评估 "broader productized family surface" 时，owlmlx 离 reference 更远** |
 | Repeatability / capability honesty 纪律 | owlmlx 独有 | **未变** —— oMLX / vMLX release notes 未出现 promotion gate / experimental→supported 分级 / N≥20 byte-exact 测试承诺 | **owlmlx 在该轴 still 业界唯一**，是 thesis 核心 anchor |
 

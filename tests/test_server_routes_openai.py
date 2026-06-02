@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from owlmlx.runtime.backends import FakeBackend
 from owlmlx.runtime.kernel import RuntimeKernel
 from owlmlx.runtime.server import create_app
+from owlmlx.runtime.types import GenerateResult
 
 
 def _client_with_loaded_fake_model() -> TestClient:
@@ -165,3 +166,236 @@ def test_openai_chat_completion_auto_loads_visible_cold_model(tmp_path) -> None:
     body = response.json()
     assert body["choices"][0]["message"]["content"]
     assert kernel.active_model_id == model_id
+
+
+def test_openai_chat_completion_accepts_tool_history_shape_without_422() -> None:
+    client = _client_with_loaded_fake_model()
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-model",
+            "messages": [
+                {"role": "user", "content": "List this directory."},
+                {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "Read",
+                                "arguments": "{\"path\":\"/tmp\"}",
+                            },
+                        }
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "tool_call_id": "call_1",
+                    "content": "Error: /tmp is a directory, not a file",
+                },
+            ],
+            "max_tokens": 4,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["choices"][0]["message"]["role"] == "assistant"
+
+
+def test_openai_chat_completion_forwards_tools_tool_choice_and_top_p_to_backend() -> None:
+    captured: dict[str, object] = {}
+
+    class _CapturingBackend(FakeBackend):
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            captured["kwargs"] = dict(kwargs)
+            captured["messages"] = list(messages)
+            return super().generate_messages(model_id, messages, **kwargs)
+
+    kernel = RuntimeKernel(_CapturingBackend())
+    assert kernel.load_model("fake-model").ok is True
+    client = TestClient(create_app(kernel))
+
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "Bash",
+                "description": "Run shell commands",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"command": {"type": "string"}},
+                    "required": ["command"],
+                },
+            },
+        }
+    ]
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-model",
+            "messages": [{"role": "user", "content": "Use Bash to run pwd"}],
+            "tools": tools,
+            "tool_choice": "auto",
+            "top_p": 0.9,
+        },
+    )
+
+    assert response.status_code == 200
+    kwargs = captured["kwargs"]
+    assert isinstance(kwargs, dict)
+    assert kwargs["tools"] == tools
+    assert kwargs["tool_choice"] == "auto"
+    assert kwargs["top_p"] == 0.9
+
+
+def test_openai_chat_completion_returns_openai_tool_calls_from_backend_detail() -> None:
+    class _ToolCallBackend(FakeBackend):
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return GenerateResult(
+                ok=True,
+                message="generated tool calls",
+                model_id=model_id,
+                text="",
+                finish_reason="tool_calls",
+                detail={
+                    "tool_calls": [
+                        {
+                            "id": "call_test",
+                            "type": "function",
+                            "function": {
+                                "name": "Bash",
+                                "arguments": "{\"command\":\"pwd\"}",
+                            },
+                        }
+                    ]
+                },
+            )
+
+    kernel = RuntimeKernel(_ToolCallBackend())
+    assert kernel.load_model("fake-model").ok is True
+    client = TestClient(create_app(kernel))
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-model",
+            "messages": [{"role": "user", "content": "Use Bash to run pwd"}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "Bash",
+                        "parameters": {"type": "object"},
+                    },
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    choice = response.json()["choices"][0]
+    assert choice["finish_reason"] == "tool_calls"
+    assert choice["message"]["content"] is None
+    assert choice["message"]["tool_calls"][0]["id"] == "call_test"
+    assert choice["message"]["tool_calls"][0]["function"]["name"] == "Bash"
+
+
+def test_openai_chat_completion_converts_backend_tool_uses_to_tool_calls() -> None:
+    client = _client_with_loaded_fake_model()
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-model",
+            "messages": [{"role": "user", "content": "Use Bash to run pwd"}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "Bash",
+                        "parameters": {"type": "object"},
+                    },
+                }
+            ],
+            "tool_choice": "auto",
+        },
+    )
+
+    assert response.status_code == 200
+    choice = response.json()["choices"][0]
+    assert choice["finish_reason"] == "tool_calls"
+    assert choice["message"]["tool_calls"][0]["id"].startswith("call_")
+    assert choice["message"]["tool_calls"][0]["function"]["name"] == "Bash"
+
+
+def test_openai_chat_completion_stream_buffers_tool_generation_into_single_delta() -> None:
+    class _StreamToolBackend(FakeBackend):
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return GenerateResult(
+                ok=True,
+                message="generated tool calls",
+                model_id=model_id,
+                finish_reason="tool_calls",
+                detail={
+                    "tool_calls": [
+                        {
+                            "id": "call_stream",
+                            "type": "function",
+                            "function": {
+                                "name": "Bash",
+                                "arguments": "{\"command\":\"pwd\"}",
+                            },
+                        }
+                    ]
+                },
+            )
+
+        def stream_generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            raise AssertionError("tool streaming must use buffered non-stream generation")
+
+    kernel = RuntimeKernel(_StreamToolBackend())
+    assert kernel.load_model("fake-model").ok is True
+    client = TestClient(create_app(kernel))
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-model",
+            "messages": [{"role": "user", "content": "Use Bash to run pwd"}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "Bash",
+                        "parameters": {"type": "object"},
+                    },
+                }
+            ],
+            "stream": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert '"finish_reason": "tool_calls"' in response.text
+    assert '"tool_calls": [{"index": 0, "id": "call_stream"' in response.text
+
+
+def test_openai_reasoning_policy_defaults_to_profile_declared_trace_policy() -> None:
+    from owlmlx.model_profile import resolve_model_profile
+    from owlmlx.runtime.server_routes_openai import (
+        ChatCompletionRequest,
+        _openai_reasoning_trace_policy,
+    )
+
+    payload = ChatCompletionRequest(
+        model="Qwen3.6-35B-A3B",
+        messages=[{"role": "user", "content": "hi"}],
+    )
+
+    assert _openai_reasoning_trace_policy(
+        payload,
+        profile=resolve_model_profile("Qwen3.6-35B-A3B"),
+    ) == "final_answer_content"

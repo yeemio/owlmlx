@@ -25,10 +25,12 @@ both backends can be swapped behind the same runtime kernel contract.
 
 from __future__ import annotations
 
+import json
 import os
 import queue
 import threading
 import time
+import uuid
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -247,6 +249,164 @@ def _encode_prompt_tokens(tokenizer: Any, prompt: str) -> tuple[int, ...] | None
         return tuple(int(token) for token in encoded)
     except Exception:
         return None
+
+
+def _chat_turn_to_template_message(turn: ChatTurn) -> dict[str, Any]:
+    message: dict[str, Any] = {"role": turn.role}
+    if isinstance(turn.content, list):
+        text_fragments: list[str] = []
+        for fragment in turn.content:
+            if isinstance(fragment, dict) and fragment.get("type") == "text":
+                text_fragments.append(str(fragment.get("text") or ""))
+        message["content"] = "".join(text_fragments)
+    else:
+        message["content"] = turn.content or ""
+    if turn.tool_calls:
+        tool_calls: list[dict[str, Any]] = []
+        for raw_tool_call in turn.tool_calls:
+            tool_call = dict(raw_tool_call)
+            function = tool_call.get("function")
+            if isinstance(function, dict):
+                function = dict(function)
+                arguments = function.get("arguments")
+                if isinstance(arguments, str):
+                    try:
+                        function["arguments"] = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        function["arguments"] = arguments
+                tool_call["function"] = function
+            tool_calls.append(tool_call)
+        message["tool_calls"] = tool_calls
+    if turn.tool_call_id:
+        message["tool_call_id"] = turn.tool_call_id
+    if turn.name:
+        message["name"] = turn.name
+    if turn.reasoning_content:
+        message["reasoning_content"] = turn.reasoning_content
+    return message
+
+
+def _render_chat_messages_with_template(
+    tokenizer: Any,
+    messages: list[ChatTurn],
+    *,
+    tools: object | None = None,
+    chat_template_kwargs: dict[str, Any] | None = None,
+) -> str:
+    template_messages = [_chat_turn_to_template_message(turn) for turn in messages]
+    apply_chat_template = getattr(tokenizer, "apply_chat_template", None)
+    if callable(apply_chat_template):
+        kwargs: dict[str, Any] = {
+            "tokenize": False,
+            "add_generation_prompt": True,
+        }
+        if isinstance(chat_template_kwargs, dict):
+            kwargs.update(chat_template_kwargs)
+        if isinstance(tools, list) and tools:
+            kwargs["tools"] = tools
+        try:
+            return str(apply_chat_template(template_messages, **kwargs))
+        except Exception:
+            pass
+    rendered: list[str] = []
+    for message in template_messages:
+        rendered.append(f"{message.get('role')}: {message.get('content')}")
+        if message.get("tool_calls"):
+            rendered.append(
+                f"tool_calls: {json.dumps(message['tool_calls'], ensure_ascii=False)}"
+            )
+        if message.get("tool_call_id"):
+            rendered.append(f"tool_call_id: {message['tool_call_id']}")
+    return "\n".join(rendered)
+
+
+def _visible_text_after_think_boundary(text: str) -> str:
+    close_marker = "</think>"
+    if close_marker not in text:
+        return text
+    return text.split(close_marker)[-1]
+
+
+def _extract_tool_call_texts(
+    text: str,
+    *,
+    start_marker: str | None,
+    end_marker: str | None,
+) -> tuple[str, ...]:
+    if not start_marker:
+        return ()
+    end_marker = end_marker or ""
+    calls: list[str] = []
+    search_from = 0
+    while True:
+        start_index = text.find(start_marker, search_from)
+        if start_index < 0:
+            break
+        body_start = start_index + len(start_marker)
+        if end_marker:
+            end_index = text.find(end_marker, body_start)
+            if end_index < 0:
+                break
+            calls.append(text[body_start:end_index])
+            search_from = end_index + len(end_marker)
+        else:
+            calls.append(text[body_start:])
+            break
+    return tuple(calls)
+
+
+def _parse_native_tool_calls(
+    tokenizer: Any,
+    text: str,
+    *,
+    tools: object | None = None,
+) -> tuple[list[dict[str, Any]], str]:
+    tool_parser = getattr(tokenizer, "tool_parser", None)
+    if not callable(tool_parser):
+        return [], text
+    visible_text = _visible_text_after_think_boundary(text)
+    start_marker = getattr(tokenizer, "tool_call_start", None)
+    end_marker = getattr(tokenizer, "tool_call_end", None)
+    tool_texts = _extract_tool_call_texts(
+        visible_text,
+        start_marker=start_marker if isinstance(start_marker, str) else None,
+        end_marker=end_marker if isinstance(end_marker, str) else None,
+    )
+    if not tool_texts:
+        return [], text
+    tool_calls: list[dict[str, Any]] = []
+    for tool_text in tool_texts:
+        try:
+            parsed = tool_parser(tool_text, tools)
+        except Exception:
+            continue
+        parsed_items = parsed if isinstance(parsed, list) else [parsed]
+        for item in parsed_items:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "")
+            if not name:
+                continue
+            arguments = item.get("arguments")
+            if not isinstance(arguments, str):
+                arguments = json.dumps(arguments or {}, ensure_ascii=False)
+            tool_calls.append(
+                {
+                    "id": f"call_{uuid.uuid4().hex[:24]}",
+                    "type": "function",
+                    "function": {
+                        "name": name,
+                        "arguments": arguments,
+                    },
+                }
+            )
+    if not tool_calls:
+        return [], text
+    remainder = visible_text
+    for tool_text in tool_texts:
+        wrapped = f"{start_marker}{tool_text}{end_marker or ''}"
+        remainder = remainder.replace(wrapped, "", 1)
+    return tool_calls, remainder.strip()
 
 
 def _trim_prompt_cache(
@@ -1161,11 +1321,23 @@ class MlxNativeBackend:
                 self._run_on_worker(lambda: self._release_active_cache(session))
             finally:
                 self._admission.release()
+        tool_calls, visible_text = _parse_native_tool_calls(
+            session.tokenizer,
+            str(text),
+            tools=kwargs.get("tools"),
+        )
+        detail: dict[str, Any] = {}
+        finish_reason: str | None = None
+        if tool_calls:
+            detail["tool_calls"] = tool_calls
+            finish_reason = "tool_calls"
         return GenerateResult(
             ok=True,
             message="generated",
             model_id=model_id,
-            text=str(text),
+            text=visible_text,
+            finish_reason=finish_reason,
+            detail=detail,
             execution_time_s=time.time() - started,
             wait_time_s=wait_time_s,
             was_queued=was_queued,
@@ -1177,7 +1349,24 @@ class MlxNativeBackend:
         messages: list[ChatTurn],
         **kwargs: object,
     ) -> GenerateResult:
-        prompt = "\n".join(f"{turn.role}: {turn.content}" for turn in messages)
+        session = self._sessions.get(model_id)
+        if session is None:
+            return GenerateResult(
+                ok=False,
+                message=f"model not loaded: {model_id}",
+                error_code=RuntimeErrorCode.model_not_loaded,
+                model_id=model_id,
+            )
+        prompt = _render_chat_messages_with_template(
+            session.tokenizer,
+            messages,
+            tools=kwargs.get("tools"),
+            chat_template_kwargs=(
+                kwargs.get("chat_template_kwargs")
+                if isinstance(kwargs.get("chat_template_kwargs"), dict)
+                else None
+            ),
+        )
         return self.generate(model_id, prompt, **kwargs)
 
     def generate_cohort(

@@ -234,6 +234,133 @@ def test_native_backend_generate_succeeds_with_fake_mlx_lm(
         importlib.reload(mod)
 
 
+def test_native_backend_generate_messages_applies_chat_template_with_tools(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = types.ModuleType("mlx_lm")
+    captured: dict[str, object] = {}
+
+    class _FakeTokenizer:
+        chat_template = "<tool_call>\n<function="
+        tool_parser = None
+        tool_call_start = None
+        tool_call_end = None
+
+        def apply_chat_template(self, messages, **kwargs):  # type: ignore[no-untyped-def]
+            captured["messages"] = messages
+            captured["kwargs"] = kwargs
+            return "templated prompt"
+
+    def fake_load(model_id: str) -> tuple[object, object]:
+        return (object(), _FakeTokenizer())
+
+    def fake_generate(model, tokenizer, *, prompt, max_tokens):
+        captured["prompt"] = prompt
+        return "done"
+
+    fake.load = fake_load  # type: ignore[attr-defined]
+    fake.generate = fake_generate  # type: ignore[attr-defined]
+    previous_mlx_lm = sys.modules.get("mlx_lm")
+    monkeypatch.setitem(sys.modules, "mlx_lm", fake)
+    import owlmlx.runtime.mlx_native_backend as mod
+    importlib.reload(mod)
+    try:
+        backend = mod.MlxNativeBackend()
+        backend.load("fake-model")
+        tools = [
+            {
+                "type": "function",
+                "function": {"name": "Bash", "parameters": {"type": "object"}},
+            }
+        ]
+        result = backend.generate_messages(
+            "fake-model",
+            [ChatTurn(role="user", content="Use Bash")],
+            tools=tools,
+        )
+        assert result.ok is True
+        assert captured["prompt"] == "templated prompt"
+        assert captured["kwargs"]["tools"] == tools  # type: ignore[index]
+        assert captured["messages"] == [{"role": "user", "content": "Use Bash"}]
+    finally:
+        if previous_mlx_lm is None:
+            sys.modules.pop("mlx_lm", None)
+        else:
+            sys.modules["mlx_lm"] = previous_mlx_lm
+        importlib.reload(mod)
+
+
+def test_native_backend_generate_messages_parses_qwen_tool_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = types.ModuleType("mlx_lm")
+
+    from mlx_lm.tool_parsers import qwen3_coder
+
+    class _FakeTokenizer:
+        chat_template = "<tool_call>\n<function="
+        tool_parser = staticmethod(qwen3_coder.parse_tool_call)
+        tool_call_start = qwen3_coder.tool_call_start
+        tool_call_end = qwen3_coder.tool_call_end
+
+        def apply_chat_template(self, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return "templated prompt"
+
+    def fake_load(model_id: str) -> tuple[object, object]:
+        return (object(), _FakeTokenizer())
+
+    def fake_generate(model, tokenizer, *, prompt, max_tokens):
+        return (
+            "short plan</think>\n"
+            "<tool_call>\n"
+            "<function=Bash>\n"
+            "<parameter=command>\n"
+            "pwd\n"
+            "</parameter>\n"
+            "</function>\n"
+            "</tool_call>"
+        )
+
+    fake.load = fake_load  # type: ignore[attr-defined]
+    fake.generate = fake_generate  # type: ignore[attr-defined]
+    previous_mlx_lm = sys.modules.get("mlx_lm")
+    monkeypatch.setitem(sys.modules, "mlx_lm", fake)
+    import owlmlx.runtime.mlx_native_backend as mod
+    importlib.reload(mod)
+    try:
+        backend = mod.MlxNativeBackend()
+        backend.load("fake-model")
+        result = backend.generate_messages(
+            "fake-model",
+            [ChatTurn(role="user", content="Use Bash")],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "Bash",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"command": {"type": "string"}},
+                        },
+                    },
+                }
+            ],
+        )
+        assert result.ok is True
+        assert result.finish_reason == "tool_calls"
+        assert result.text == ""
+        tool_call = result.detail["tool_calls"][0]
+        assert tool_call["type"] == "function"
+        assert tool_call["function"]["name"] == "Bash"
+        assert tool_call["function"]["arguments"] == "{\"command\": \"pwd\"}"
+    finally:
+        if previous_mlx_lm is None:
+            sys.modules.pop("mlx_lm", None)
+        else:
+            sys.modules["mlx_lm"] = previous_mlx_lm
+        importlib.reload(mod)
+
+
 def test_native_backend_module_has_no_subprocess_or_sentinel_chain_ties() -> None:
     """The native adapter must not import subprocess machinery or sentinel parsers."""
 

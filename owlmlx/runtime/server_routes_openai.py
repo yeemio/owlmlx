@@ -27,7 +27,11 @@ _BYTES_PER_GB = 1_000_000_000
 
 class ChatMessage(BaseModel):
     role: str
-    content: str
+    content: str | list[Any] | None = None
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    tool_call_id: str | None = None
+    name: str | None = None
+    reasoning_content: str | None = None
 
 
 class AnthropicTextBlock(BaseModel):
@@ -75,10 +79,13 @@ class ChatCompletionRequest(BaseModel):
     messages: list[ChatMessage]
     max_tokens: int | None = Field(default=None, ge=1)
     temperature: float | None = None
+    top_p: float | None = None
     stop: str | list[str] | None = None
     chat_template_kwargs: dict[str, Any] | None = None
     response_format: dict[str, Any] | None = None
     extra_body: dict[str, Any] | None = None
+    tools: list[dict[str, Any]] = Field(default_factory=list)
+    tool_choice: str | dict[str, Any] | None = None
     stream: bool = False
 
 
@@ -94,7 +101,17 @@ class AnthropicMessagesRequest(BaseModel):
 
 
 def _messages_to_turns(messages: list[ChatMessage]) -> list[ChatTurn]:
-    return [ChatTurn(role=message.role, content=message.content) for message in messages]
+    return [
+        ChatTurn(
+            role=message.role,
+            content=message.content,
+            tool_calls=tuple(message.tool_calls or ()),
+            tool_call_id=message.tool_call_id,
+            name=message.name,
+            reasoning_content=message.reasoning_content,
+        )
+        for message in messages
+    ]
 
 
 def _chat_template_kwargs_from_openai_payload(
@@ -173,6 +190,12 @@ def _openai_reasoning_trace_policy(
     if (
         profile is not None
         and profile.thinking_policy.get("default_mode") == "parser_cleanup_required"
+    ):
+        return "final_answer_content"
+    if (
+        profile is not None
+        and profile.thinking_policy.get("reasoning_trace_policy")
+        == "owlmlx.reasoning_trace_policy:v1"
     ):
         return "final_answer_content"
     return None
@@ -264,6 +287,7 @@ def _openai_response_dict(
     completion_tokens: int | None = None,
     cached_prompt_tokens: int | None = None,
     reasoning_trace_policy: dict[str, object] | None = None,
+    tool_calls: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     usage = None
     if prompt_tokens is not None or completion_tokens is not None:
@@ -278,7 +302,12 @@ def _openai_response_dict(
             usage["prompt_tokens_details"] = {
                 "cached_tokens": max(int(cached_prompt_tokens), 0),
             }
-    message: dict[str, Any] = {"role": "assistant", "content": text}
+    message: dict[str, Any] = {
+        "role": "assistant",
+        "content": None if tool_calls else text,
+    }
+    if tool_calls:
+        message["tool_calls"] = tool_calls
     if reasoning_trace_policy is not None:
         message["owlmlx_reasoning_trace_policy"] = reasoning_trace_policy
     payload = {
@@ -297,6 +326,106 @@ def _openai_response_dict(
     if usage is not None:
         payload["usage"] = usage
     return payload
+
+
+def _openai_tool_calls_from_detail(detail: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(detail, dict):
+        return []
+    raw_tool_calls = detail.get("tool_calls")
+    if isinstance(raw_tool_calls, list):
+        calls: list[dict[str, Any]] = []
+        for index, raw in enumerate(raw_tool_calls):
+            normalized = _normalize_openai_tool_call(raw, index=index)
+            if normalized is not None:
+                calls.append(normalized)
+        if calls:
+            return calls
+    raw_tool_uses = detail.get("tool_uses")
+    if isinstance(raw_tool_uses, list):
+        calls = []
+        for index, raw in enumerate(raw_tool_uses):
+            normalized = _tool_use_to_openai_tool_call(raw, index=index)
+            if normalized is not None:
+                calls.append(normalized)
+        return calls
+    raw_tool_use = detail.get("tool_use")
+    normalized = _tool_use_to_openai_tool_call(raw_tool_use, index=0)
+    return [normalized] if normalized is not None else []
+
+
+def _normalize_openai_tool_call(
+    raw: object,
+    *,
+    index: int,
+) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    function = raw.get("function")
+    if not isinstance(function, dict):
+        return None
+    name = str(function.get("name") or "")
+    if not name:
+        return None
+    arguments = function.get("arguments")
+    if not isinstance(arguments, str):
+        arguments = json.dumps(arguments or {}, ensure_ascii=False)
+    call_id = str(raw.get("id") or f"call_{uuid.uuid4().hex[:24]}")
+    return {
+        "id": call_id,
+        "type": "function",
+        "function": {
+            "name": name,
+            "arguments": arguments,
+        },
+    }
+
+
+def _tool_use_to_openai_tool_call(
+    raw: object,
+    *,
+    index: int,
+) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    name = str(raw.get("name") or "")
+    if not name:
+        return None
+    call_id = str(raw.get("id") or "")
+    if not call_id.startswith("call_"):
+        call_id = f"call_{call_id or uuid.uuid4().hex[:24]}"
+    tool_input = raw.get("input")
+    if not isinstance(tool_input, dict):
+        tool_input = {}
+    return {
+        "id": call_id,
+        "type": "function",
+        "function": {
+            "name": name,
+            "arguments": json.dumps(tool_input, ensure_ascii=False),
+        },
+    }
+
+
+def _openai_tool_call_delta(
+    tool_calls: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    deltas: list[dict[str, Any]] = []
+    for index, tool_call in enumerate(tool_calls):
+        function = tool_call.get("function")
+        if not isinstance(function, dict):
+            continue
+        deltas.append(
+            {
+                "index": index,
+                "id": tool_call.get("id"),
+                "type": tool_call.get("type", "function"),
+                "function": {
+                    "name": function.get("name"),
+                    "arguments": function.get("arguments", ""),
+                },
+            }
+        )
+    return deltas
 
 
 def _compat_error_response(
@@ -508,7 +637,19 @@ def _anthropic_message_dict(
 
 
 def _estimate_input_tokens_from_turns(turns: list[ChatTurn]) -> int:
-    return max(1, sum(len(turn.content) for turn in turns) // 4) if turns else 0
+    if not turns:
+        return 0
+    total_chars = 0
+    for turn in turns:
+        if isinstance(turn.content, str):
+            total_chars += len(turn.content)
+        elif turn.content is not None:
+            total_chars += len(json.dumps(turn.content, ensure_ascii=False))
+        if turn.tool_calls:
+            total_chars += len(json.dumps(list(turn.tool_calls), ensure_ascii=False))
+        if turn.tool_call_id:
+            total_chars += len(turn.tool_call_id)
+    return max(1, total_chars // 4)
 
 
 def register_openai_compat_routes(
@@ -536,6 +677,8 @@ def register_openai_compat_routes(
             params["max_tokens"] = payload.max_tokens
         if payload.temperature is not None:
             params["temperature"] = payload.temperature
+        if payload.top_p is not None:
+            params["top_p"] = payload.top_p
         if payload.stop is not None:
             params["stop"] = payload.stop
         elif profile is not None and profile.stop_token_strings:
@@ -549,6 +692,10 @@ def register_openai_compat_routes(
         grammar_spec = _grammar_from_openai_payload(payload)
         if grammar_spec is not None:
             params["grammar"] = grammar_spec
+        if payload.tools and payload.tool_choice != "none":
+            params["tools"] = payload.tools
+        if payload.tool_choice is not None:
+            params["tool_choice"] = payload.tool_choice
         reasoning_policy = _openai_reasoning_trace_policy(payload, profile=profile)
         session_id = session_id_from_request(request)
         if session_id is not None:
@@ -590,27 +737,118 @@ def register_openai_compat_routes(
                 finish_reason=result.finish_reason,
                 policy=reasoning_policy,
             )
+            tool_calls = _openai_tool_calls_from_detail(result.detail)
+            finish_reason = result.finish_reason or "stop"
+            if tool_calls:
+                finish_reason = "tool_calls"
             return JSONResponse(
                 headers={"x-request-id": request_id},
                 content=_openai_response_dict(
                     completion_id=completion_id,
                     model=target_model or "unknown",
                     text=visible_text,
-                    finish_reason=result.finish_reason or "stop",
+                    finish_reason=finish_reason,
                     prompt_tokens=result.prompt_tokens,
                     completion_tokens=result.completion_tokens,
                     cached_prompt_tokens=_compat_cached_prompt_tokens(result.detail),
                     reasoning_trace_policy=reasoning_policy_payload,
+                    tool_calls=tool_calls,
                 ),
             )
 
         async def sse_source():
+            if payload.tools and payload.tool_choice != "none":
+                result = await runtime.generate_messages(
+                    messages,
+                    model_id=target_model,
+                    **params,
+                )
+                if not result.ok:
+                    chunk = {
+                        "id": completion_id,
+                        "object": "error",
+                        "error": {
+                            "message": result.message,
+                            "code": (
+                                result.error_code.value
+                                if result.error_code is not None
+                                else "backend_error"
+                            ),
+                        },
+                    }
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+                visible_text, policy_payload = _openai_visible_text_for_policy(
+                    result.text,
+                    finish_reason=result.finish_reason,
+                    policy=reasoning_policy,
+                )
+                tool_calls = _openai_tool_calls_from_detail(result.detail)
+                if visible_text and not tool_calls:
+                    content_chunk = {
+                        "id": completion_id,
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": target_model or "unknown",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {"content": visible_text},
+                                "finish_reason": None,
+                            }
+                        ],
+                    }
+                    yield f"data: {json.dumps(content_chunk)}\n\n"
+                if tool_calls:
+                    tool_chunk = {
+                        "id": completion_id,
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": target_model or "unknown",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {
+                                    "tool_calls": _openai_tool_call_delta(tool_calls)
+                                },
+                                "finish_reason": None,
+                            }
+                        ],
+                    }
+                    yield f"data: {json.dumps(tool_chunk)}\n\n"
+                done_chunk = {
+                    "id": completion_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": target_model or "unknown",
+                    "choices": [
+                        {
+                            "index": 0,
+                            "delta": {},
+                            "finish_reason": "tool_calls" if tool_calls else result.finish_reason or "stop",
+                        }
+                    ],
+                }
+                if policy_payload is not None:
+                    done_chunk["owlmlx_reasoning_trace_policy"] = policy_payload
+                if result.prompt_tokens is not None or result.completion_tokens is not None:
+                    done_chunk["usage"] = _openai_usage_dict(
+                        prompt_tokens=result.prompt_tokens,
+                        completion_tokens=result.completion_tokens,
+                        cached_prompt_tokens=_compat_cached_prompt_tokens(result.detail),
+                    )
+                yield f"data: {json.dumps(done_chunk)}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
             if reasoning_policy == "final_answer_content":
                 buffered_text: list[str] = []
                 finish_reason = "stop"
                 prompt_tokens: int | None = None
                 completion_tokens: int | None = None
                 cached_prompt_tokens: int | None = None
+                tool_calls: list[dict[str, Any]] = []
                 async for event in runtime.generate_stream_messages(
                     messages,
                     model_id=target_model,
@@ -627,6 +865,10 @@ def register_openai_compat_routes(
                         cached_prompt_tokens = event_cached_prompt_tokens
                     if event.finish_reason:
                         finish_reason = event.finish_reason
+                    event_tool_calls = _openai_tool_calls_from_detail(event.detail)
+                    if event_tool_calls:
+                        tool_calls = event_tool_calls
+                        finish_reason = "tool_calls"
                     if event.event == "token":
                         buffered_text.append(event.text)
                     elif event.event == "done":
@@ -651,6 +893,23 @@ def register_openai_compat_routes(
                                 ],
                             }
                             yield f"data: {json.dumps(content_chunk)}\n\n"
+                        if tool_calls:
+                            tool_chunk = {
+                                "id": completion_id,
+                                "object": "chat.completion.chunk",
+                                "created": int(time.time()),
+                                "model": target_model or "unknown",
+                                "choices": [
+                                    {
+                                        "index": 0,
+                                        "delta": {
+                                            "tool_calls": _openai_tool_call_delta(tool_calls)
+                                        },
+                                        "finish_reason": None,
+                                    }
+                                ],
+                            }
+                            yield f"data: {json.dumps(tool_chunk)}\n\n"
                         done_chunk = {
                             "id": completion_id,
                             "object": "chat.completion.chunk",
@@ -694,6 +953,7 @@ def register_openai_compat_routes(
                 model_id=target_model,
                 **params,
             ):
+                event_tool_calls = _openai_tool_calls_from_detail(event.detail)
                 if event.event == "token":
                     chunk = {
                         "id": completion_id,
@@ -709,7 +969,45 @@ def register_openai_compat_routes(
                         ],
                     }
                     yield f"data: {json.dumps(chunk)}\n\n"
+                elif event.event == "tool_use":
+                    tool_calls = event_tool_calls
+                    if not tool_calls:
+                        continue
+                    chunk = {
+                        "id": completion_id,
+                        "object": "chat.completion.chunk",
+                        "created": int(time.time()),
+                        "model": target_model or "unknown",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {
+                                    "tool_calls": _openai_tool_call_delta(tool_calls)
+                                },
+                                "finish_reason": None,
+                            }
+                        ],
+                    }
+                    yield f"data: {json.dumps(chunk)}\n\n"
                 elif event.event == "done":
+                    tool_calls = event_tool_calls
+                    if tool_calls:
+                        chunk = {
+                            "id": completion_id,
+                            "object": "chat.completion.chunk",
+                            "created": int(time.time()),
+                            "model": target_model or "unknown",
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "delta": {
+                                        "tool_calls": _openai_tool_call_delta(tool_calls)
+                                    },
+                                    "finish_reason": None,
+                                }
+                            ],
+                        }
+                        yield f"data: {json.dumps(chunk)}\n\n"
                     chunk = {
                         "id": completion_id,
                         "object": "chat.completion.chunk",
@@ -719,7 +1017,9 @@ def register_openai_compat_routes(
                             {
                                 "index": 0,
                                 "delta": {},
-                                "finish_reason": event.finish_reason or "stop",
+                                "finish_reason": (
+                                    "tool_calls" if tool_calls else event.finish_reason or "stop"
+                                ),
                             }
                         ],
                     }

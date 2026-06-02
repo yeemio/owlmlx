@@ -1,7 +1,7 @@
 # Runtime-5 Entrypoint And Compat Closure
 
 > Status: complete
-> Updated: 2026-04-11
+> Updated: 2026-06-02
 > Scope: Runtime-5 entrypoint handling, fuller compatibility semantics, and migration-closure groundwork
 
 ## 1. Position
@@ -18,6 +18,13 @@ Runtime-5 moves beyond a thin seam. The key transition is:
 - structured messages now pass through `RuntimeKernel` and backend adapters
 - backend execution layers own message rendering / chat templating decisions
 - compat surface expands to include `POST /v1/completions`
+
+> 2026-06-02 addendum: OpenAI tool-calling is no longer pure future work on the
+> native preview path. A narrow `experimental` lane now accepts OpenAI tool
+> history shapes and returns structured `tool_calls` for Qwen3.6/native-preview
+> OpenAI chat requests. This addendum does not promote full OpenAI parity, forced
+> `tool_choice`, true incremental tool streaming, or cross-family tool parser
+> coverage.
 
 This is still not full OpenAI parity. It is the first stage where upper layers
 can treat `owlmlx` as a serious runtime entrypoint rather than a demo-shaped
@@ -67,6 +74,25 @@ Both chat and text completion endpoints support:
 - structured error objects
 - request-id headers
 
+### 2.4 Experimental Tool-Calling Lane
+
+The OpenAI chat route now has an `experimental` tool-calling lane for
+OwlCoda-style clients on the native preview path:
+
+- accepts `content:null`, assistant `tool_calls`, `role:tool`, and
+  `tool_call_id` without rejecting the request at schema validation;
+- accepts top-level `tools`, `tool_choice`, and `top_p`;
+- preserves tool-call history into backend-native chat templates instead of
+  flattening it away;
+- injects `tools` into the native backend tokenizer chat template;
+- parses Qwen3.6 XML tool calls through the installed `mlx_lm` parser;
+- returns OpenAI-shaped `message.tool_calls` plus `finish_reason="tool_calls"`;
+- for streaming tool requests, buffers generation and emits one complete
+  `delta.tool_calls[]` entry before the terminal chunk.
+
+This lane is intentionally narrow. It is current evidence for Qwen3.6 on the
+native preview/OpenAI chat surface, not a full OpenAI function-calling claim.
+
 ## 3. Why This Matters
 
 Runtime-4 proved that a migration seam existed.
@@ -102,7 +128,8 @@ without forcing all prompt construction policy to live outside `owlmlx`.
 Runtime-5 does not claim:
 
 - full OpenAI API parity
-- tools / function calling
+- broad tools / function calling parity beyond the current `experimental`
+  Qwen3.6/native-preview lane
 - JSON schema constrained decoding
 - full responses API parity
 - production control-plane integration

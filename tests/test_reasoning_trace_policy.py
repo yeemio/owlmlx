@@ -100,6 +100,20 @@ def test_closed_think_trace_can_yield_post_think_candidate() -> None:
     assert result.output_sanity_label == "reasoning_trace_visible"
 
 
+def test_hanging_think_close_can_yield_post_think_candidate() -> None:
+    result = apply_reasoning_trace_policy(
+        "short plan</think>\nFinal answer.",
+        finish_reason="stop",
+    )
+
+    assert result.visible_reasoning_trace is True
+    assert result.trace_marker_family == "think_tag"
+    assert result.trace_status == "visible"
+    assert result.final_text == "Final answer."
+    assert result.final_text_source == "post_hanging_think_close_text"
+    assert result.output_sanity_label == "reasoning_trace_visible"
+
+
 def test_closed_think_trace_with_length_keeps_final_candidate_with_caveat() -> None:
     result = apply_reasoning_trace_policy(
         "\n\n<think>\n\n</think>\n\nLocal AI runs on your own hardware,",

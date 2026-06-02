@@ -78,7 +78,21 @@ class CohortGenerateBackend(Protocol):
 def render_chat_messages(messages: list[ChatTurn]) -> str:
     """Fallback chat rendering for backends without tokenizer templating."""
 
-    return "\n".join(f"{message.role}: {message.content}" for message in messages)
+    rendered: list[str] = []
+    for message in messages:
+        if message.tool_calls:
+            rendered.append(
+                f"{message.role}: {message.content or ''}\n"
+                f"tool_calls: {message.tool_calls}"
+            )
+            continue
+        if message.role == "tool" and message.tool_call_id:
+            rendered.append(
+                f"{message.role}({message.tool_call_id}): {message.content or ''}"
+            )
+            continue
+        rendered.append(f"{message.role}: {message.content}")
+    return "\n".join(rendered)
 
 
 class FakeBackend:
@@ -193,13 +207,14 @@ class FakeBackend:
 
     def _build_tool_use(self, tools: list[object], prompt: str) -> dict[str, object]:
         for tool in tools:
-            if isinstance(tool, dict) and str(tool.get("name") or "") == "Bash":
+            name = self._tool_name(tool)
+            if name == "Bash":
                 return {
                     "id": "toolu_fake_001",
                     "name": "Bash",
                     "input": {"command": self._extract_shell_command(prompt)},
                 }
-            if isinstance(tool, dict) and str(tool.get("name") or "") == "Sleep":
+            if name == "Sleep":
                 return {
                     "id": "toolu_fake_001",
                     "name": "Sleep",
@@ -207,9 +222,10 @@ class FakeBackend:
                 }
         first = tools[0]
         if isinstance(first, dict):
+            name = self._tool_name(first)
             return {
                 "id": "toolu_fake_001",
-                "name": str(first.get("name") or "tool"),
+                "name": name or "tool",
                 "input": {"prompt": prompt},
             }
         return {
@@ -217,6 +233,19 @@ class FakeBackend:
             "name": "tool",
             "input": {"prompt": prompt},
         }
+
+    def _tool_name(self, tool: object) -> str:
+        if not isinstance(tool, dict):
+            return ""
+        name = tool.get("name")
+        if isinstance(name, str) and name:
+            return name
+        function = tool.get("function")
+        if isinstance(function, dict):
+            nested_name = function.get("name")
+            if isinstance(nested_name, str):
+                return nested_name
+        return ""
 
     def _extract_shell_command(self, prompt: str) -> str:
         lowered = prompt.lower()

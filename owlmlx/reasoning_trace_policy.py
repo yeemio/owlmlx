@@ -228,7 +228,45 @@ def _analyze_think_trace(
 ) -> ReasoningTracePolicyResult | None:
     open_match = _THINK_OPEN_RE.search(text)
     if open_match is None:
-        return None
+        hanging_close_match = _THINK_CLOSE_RE.search(text)
+        if hanging_close_match is None:
+            return None
+        final_text = _clean_candidate(text[hanging_close_match.end() :])
+        if final_text is None:
+            return _result(
+                visible_reasoning_trace=True,
+                trace_marker_family="think_tag",
+                trace_status="visible",
+                final_text=None,
+                final_text_source=None,
+                output_sanity_label="reasoning_trace_visible",
+                caveats=(
+                    "hanging think close marker was present but final text was empty",
+                ),
+            )
+        if finish_reason == "length":
+            return _result(
+                visible_reasoning_trace=True,
+                trace_marker_family="think_tag",
+                trace_status="final_candidate_maybe_truncated",
+                final_text=final_text,
+                final_text_source="post_hanging_think_close_text_maybe_truncated",
+                output_sanity_label="reasoning_trace_final_length",
+                caveats=(
+                    "hanging think close marker left final text but finish_reason=length may be incomplete",
+                ),
+            )
+        return _result(
+            visible_reasoning_trace=True,
+            trace_marker_family="think_tag",
+            trace_status="visible",
+            final_text=final_text,
+            final_text_source="post_hanging_think_close_text",
+            output_sanity_label="reasoning_trace_visible",
+            caveats=(
+                "hanging think close marker was treated as a prompt-opened reasoning trace boundary",
+            ),
+        )
 
     close_match = _THINK_CLOSE_RE.search(text, open_match.end())
     if close_match is None:

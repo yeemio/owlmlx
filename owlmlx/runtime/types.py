@@ -17,13 +17,17 @@ class ChatTurn:
     """A structured chat message passed through runtime layers."""
 
     role: str
-    content: str
+    content: str | list[Any] | None = None
+    tool_calls: tuple[dict[str, Any], ...] = ()
+    tool_call_id: str | None = None
+    name: str | None = None
+    reasoning_content: str | None = None
 
     def __post_init__(self) -> None:
         if not self.role:
             raise ValueError("role must be non-empty")
-        if not self.content:
-            raise ValueError("content must be non-empty")
+        if self.content in ("", [], None) and not self.tool_calls and self.role != "tool":
+            raise ValueError("content must be non-empty unless tool structure is present")
 
 
 class RuntimeErrorCode(str, Enum):
