@@ -141,3 +141,27 @@ def test_openai_chat_completion_forwards_grammar_to_backend() -> None:
     )
     assert response.status_code == 200
     assert captured["kwargs"].get("grammar") == {"kind": "json_schema", "schema": schema}
+
+
+def test_openai_chat_completion_auto_loads_visible_cold_model(tmp_path) -> None:
+    model_id = "Qwen3.6-27B"
+    model_dir = tmp_path / model_id
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
+    (model_dir / "weights.safetensors").write_bytes(b"x" * 16)
+    kernel = RuntimeKernel(FakeBackend())
+    client = TestClient(create_app(kernel, visibility_models_root=str(tmp_path)))
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": model_id,
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 4,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["choices"][0]["message"]["content"]
+    assert kernel.active_model_id == model_id

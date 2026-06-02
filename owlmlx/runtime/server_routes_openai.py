@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import uuid
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -18,6 +20,9 @@ from owlmlx.runtime_model_visibility import derive_runtime_model_visibility_cont
 
 from .kernel import RuntimeKernel
 from .types import ChatTurn
+
+
+_BYTES_PER_GB = 1_000_000_000
 
 
 class ChatMessage(BaseModel):
@@ -372,6 +377,76 @@ def _compat_cached_prompt_tokens(detail: dict[str, Any] | None) -> int | None:
         return None
 
 
+def _compat_visible_model_entry(
+    *,
+    runtime: RuntimeKernel,
+    model_id: str,
+    visibility_models_root: str | None,
+    visibility_registry: list[Any] | tuple[Any, ...] | None,
+) -> dict[str, Any] | None:
+    visibility_contract = derive_runtime_model_visibility_contract(
+        runtime.inventory_snapshot(),
+        models_root=visibility_models_root,
+        registry=visibility_registry,
+    )
+    for entry in visibility_contract.get("entries", []):
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("model_id") == model_id and entry.get("visible") is True:
+            return entry
+    return None
+
+
+def _compat_estimated_load_memory_gb(entry: dict[str, Any]) -> float:
+    model_dir = Path(str(entry.get("local_model_dir") or ""))
+    total_bytes = 0
+    try:
+        for item in model_dir.rglob("*"):
+            if item.is_file():
+                total_bytes += item.stat().st_size
+    except OSError:
+        total_bytes = 0
+    if total_bytes <= 0:
+        return 1.0
+    return max(round(total_bytes / _BYTES_PER_GB, 3), 1.0)
+
+
+async def _ensure_compat_model_loaded(
+    *,
+    runtime: RuntimeKernel,
+    model_id: str | None,
+    visibility_models_root: str | None,
+    visibility_registry: list[Any] | tuple[Any, ...] | None,
+):
+    if not model_id:
+        return None
+    loaded_model_ids = {entry.model_id for entry in runtime.inventory_snapshot().entries}
+    if model_id in loaded_model_ids:
+        return None
+    entry = _compat_visible_model_entry(
+        runtime=runtime,
+        model_id=model_id,
+        visibility_models_root=visibility_models_root,
+        visibility_registry=visibility_registry,
+    )
+    if entry is None:
+        return None
+    memory_gb = _compat_estimated_load_memory_gb(entry)
+    result = await asyncio.to_thread(
+        runtime.load_model,
+        model_id,
+        memory_gb=memory_gb,
+        post_load_warmup=False,
+    )
+    if (
+        not result.ok
+        and result.error_code is not None
+        and result.error_code.value == "model_already_loaded"
+    ):
+        return None
+    return result
+
+
 def _openai_usage_dict(
     *,
     prompt_tokens: int | None,
@@ -478,6 +553,27 @@ def register_openai_compat_routes(
         session_id = session_id_from_request(request)
         if session_id is not None:
             params["session_id"] = session_id
+
+        load_result = await _ensure_compat_model_loaded(
+            runtime=runtime,
+            model_id=target_model,
+            visibility_models_root=visibility_models_root,
+            visibility_registry=visibility_registry,
+        )
+        if load_result is not None and not load_result.ok:
+            status_code = 404 if (
+                load_result.error_code and load_result.error_code.value == "model_not_found"
+            ) else 503
+            return _compat_error_response(
+                request_id=request_id,
+                message=load_result.message,
+                code=(
+                    load_result.error_code.value
+                    if load_result.error_code is not None
+                    else "backend_error"
+                ),
+                status_code=status_code,
+            )
 
         if not payload.stream:
             result = await runtime.generate_messages(messages, model_id=target_model, **params)
@@ -677,6 +773,27 @@ def register_openai_compat_routes(
         if session_id is not None:
             params["session_id"] = session_id
 
+        load_result = await _ensure_compat_model_loaded(
+            runtime=runtime,
+            model_id=target_model,
+            visibility_models_root=visibility_models_root,
+            visibility_registry=visibility_registry,
+        )
+        if load_result is not None and not load_result.ok:
+            status_code = 404 if (
+                load_result.error_code and load_result.error_code.value == "model_not_found"
+            ) else 503
+            return _anthropic_error_response(
+                request_id=request_id,
+                message=load_result.message,
+                code=(
+                    load_result.error_code.value
+                    if load_result.error_code is not None
+                    else "backend_error"
+                ),
+                status_code=status_code,
+            )
+
         if not payload.stream:
             result = await runtime.generate_messages(turns, model_id=target_model, **params)
             if not result.ok:
@@ -829,6 +946,27 @@ def register_openai_compat_routes(
         session_id = session_id_from_request(request)
         if session_id is not None:
             params["session_id"] = session_id
+
+        load_result = await _ensure_compat_model_loaded(
+            runtime=runtime,
+            model_id=target_model,
+            visibility_models_root=visibility_models_root,
+            visibility_registry=visibility_registry,
+        )
+        if load_result is not None and not load_result.ok:
+            status_code = 404 if (
+                load_result.error_code and load_result.error_code.value == "model_not_found"
+            ) else 503
+            return _compat_error_response(
+                request_id=request_id,
+                message=load_result.message,
+                code=(
+                    load_result.error_code.value
+                    if load_result.error_code is not None
+                    else "backend_error"
+                ),
+                status_code=status_code,
+            )
 
         if not payload.stream:
             result = await runtime.generate(payload.prompt, model_id=target_model, **params)
