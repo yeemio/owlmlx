@@ -1,6 +1,6 @@
 # B-2 Mainstream Prefix-Cache Compatibility Spec
 
-> Status: design-grade spec; B-2.1 classifier, B-2.2 metadata plumbing, and first B-2.3 opt-in automatic prefix slice landed; prompt-only refresh now produces real no-header Qwen27 hits, while broader promotion remains blocked on B-1c aggregate / policy evidence
+> Status: design-grade spec; B-2.1 classifier, B-2.2 metadata plumbing, and first B-2.3 opt-in automatic prefix slice landed; prompt-only refresh now produces real no-header Qwen27 hits and route-level Qwen27/Qwen35/Gemma31 metadata hits, while broader promotion remains blocked on B-1c §2 canonical 24-swap evidence
 > Updated: 2026-06-02
 > Campaign: B-2
 > Parent goal:
@@ -41,10 +41,13 @@ Current verified truth:
   scope only when no explicit session header is present, reuses only classifier
   eligible token-prefix candidates, and falls back to fresh cache with an
   ineligible reason instead of merging unrelated prompts.
-- B-1c section 2 remains blocked: short clean forced-swap canaries validate
-  unload / settle / load boundaries, but the base gate now requires four
-  count-based axes and still under-measures throughput decay and concurrency
-  breadth.
+- B-1c section 2 remains blocked for graduation, but not for missing
+  instrumentation. The base gate now requires four count-based axes; the
+  `20260602T095334Z` native threshold smoke passed load, switch, throughput,
+  and cache-breadth/concurrency at 3 swaps with 18 throughput samples and
+  6 cache-breadth entries. It is local threshold evidence only:
+  `canonical_gate.canonical_switch_requirement_met=false` and
+  `graduates.soak_plus_swap_stability=false`.
 - The operator-paused `20260601T074541Z` topoff is not aggregate input: its
   partial ledger reached about 2h18m with zero drops / expirations / rejects,
   but `swap_count=0` and no rollup exists. It cannot unlock B-2.3 because the
@@ -105,8 +108,8 @@ Current verified truth:
   `max_same_model_load_epoch_drift_bytes=60620800`,
   `max_session_cache_resident_bytes=364216320`), and audit reports
   `clean_for_interrupted_aggregate=true`; it remains `blocked` because the base
-  B-1c §2 gate now requires four count-based axes and still under-measures
-  throughput decay and concurrency breadth.
+  B-1c §2 gate now requires four count-based axes and this older segment did not
+  carry the new threshold-configured throughput / breadth measurements.
 - Route-level tests now cover the no-header compatibility surface: ordinary
   OpenAI `/v1/chat/completions` SSE and Anthropic `/v1/messages` SSE requests do
   not pass `session_id`, and when backend stream events carry real
@@ -339,6 +342,17 @@ B-2.3 tests:
 - runtime status counters match compatibility usage counters.
 - OpenAI and Anthropic streaming compatibility routes map real no-header backend
   cache metadata without requiring `X-Owlmlx-Session-Id`.
+- route-level verdicts require HTTP 200 + `text/event-stream` responses on the
+  exercised compatibility requests; cached-token parsers alone are not enough to
+  pass the route harness.
+- route-level verdicts require the strict-prefix extension case on each
+  compatibility surface to carry the positive cached/read token count. A cached
+  token observed only on the seed request is not route-hit proof.
+- existing route ledgers can be re-audited without starting MLX by running
+  `scripts/bench/prefix_cache_compatibility.py audit-compat-route-ledger`.
+- existing native-streaming auto-prefix hit ledgers can be re-audited without
+  starting MLX by running
+  `scripts/bench/prefix_cache_compatibility.py audit-auto-prefix-ledger`.
 
 ## 10. Evidence Paths
 
@@ -351,7 +365,9 @@ Expected row families:
 - `b2.prefix_candidate_classifier.v1`
 - `b2.compat_usage_accounting.v1`
 - `b2.automatic_prefix_reuse.v1`
+- `b2.automatic_prefix_reuse.audit.v1`
 - `b2.compat_route_automatic_prefix_reuse.v1`
+- `b2.compat_route_automatic_prefix_reuse.audit.v1`
 
 No evidence file in this design round promotes the capability.
 
@@ -432,8 +448,10 @@ real Qwen27 evidence: enabled no-header requests reuse only full-prefix
 candidates after prompt-only refresh, disabled requests keep fresh-cache
 behavior, ineligible requests fall back to fresh cache with an explicit reason,
 and trim-unavailable automatic requests do not retain generated-token-extended
-entries. Broader claims still require aggregate / policy acceptance and wider
-B-2 coverage.
+entries. Route-level Qwen27/Qwen35/Gemma31 evidence proves no-header OpenAI SSE
+and Anthropic SSE metadata hits only when real runtime cache events carry cached
+token counts. Broader claims still require B-1c §2 canonical 24-swap acceptance
+and policy review.
 
 ## 13. Change Log
 
@@ -487,8 +505,8 @@ B-2 coverage.
   non-prefix fallbacks, and zero drops / expirations / rejects. The
   `20260602T002448Z` 20-minute / 4-swap current-code validation stayed
   cache-clean and boundary-clean under 5-minute cadence, but remains blocked for
-  canonical graduation because throughput/concurrency axes are still
-  under-measured.
+  canonical graduation because it predates the threshold-configured throughput /
+  breadth harness and therefore does not pass all four axes.
 - 2026-06-02: Added route-level no-header compatibility tests for OpenAI SSE
   `cached_tokens` and Anthropic SSE `cache_read_input_tokens`. These tests prove
   metadata propagation through compatibility surfaces when the backend supplies
@@ -503,3 +521,30 @@ B-2 coverage.
   `X-Owlmlx-Session-Id`, with one cached-token hit per surface and drops /
   expirations / rejects all `0`. This closes the three-primary-model route
   evidence gap, not the B-1c aggregate / policy gate.
+- 2026-06-02: Added B-1c §2 throughput / cache-breadth harness support in
+  `scripts/bench/eviction_soak.py`. The runner can now record per-sample
+  throughput and expanded prompt-entry breadth, and it can judge those axes only
+  when explicit thresholds are supplied. This opens the next native evidence
+  path for B-2.3 policy closure; it does not promote automatic prefix cache
+  beyond `experimental`.
+- 2026-06-02: Hardened the `compat-route-hit` verdict so a pass now requires
+  every exercised OpenAI/Anthropic route response to be HTTP 200 and SSE
+  (`text/event-stream`) in addition to real cached/read token metadata and clean
+  session-cache counters.
+- 2026-06-02: Tightened `compat-route-hit` again so OpenAI and Anthropic pass
+  only when their `strict_prefix_extension` cases, not merely any route row,
+  surface positive cached/read token counts.
+- 2026-06-02: Added offline
+  `audit-compat-route-ledger` verification for existing
+  `b2.compat_route_automatic_prefix_reuse.v1` ledgers. The audit enforces HTTP
+  200 + SSE, strict-prefix extension hits on both compatibility surfaces, and
+  clean drop / reject / expiration counters without loading a model.
+- 2026-06-02: Added offline `audit-auto-prefix-ledger` verification for
+  existing `b2.automatic_prefix_reuse.v1` ledgers. The audit enforces a
+  strict-prefix reuse hit, at least one ineligible non-prefix fallback, clean
+  drop / reject / expiration counters, and absence of the old trim-unavailable
+  blockers.
+- 2026-06-02: Updated B-2 current truth after the B-1c §2
+  `20260602T095334Z` native threshold smoke. The smoke passed all four
+  configured axes at 3 swaps but remains below the canonical 24-swap floor, so
+  B-2.3 remains `experimental` and default-off.

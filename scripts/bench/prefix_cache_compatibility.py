@@ -29,6 +29,11 @@ DEFAULT_OUTPUT_DIR = Path("files/evidence/owlmlx/bench/prefix-cache-compatibilit
 DEFAULT_MODEL = "/Users/yeemio/AI/Agent/models/Qwen3.6-27B-4bit"
 DEFAULT_MODEL_GB = 27.0
 DEFAULT_MAX_RESIDENT_BYTES = 2 * 1024 * 1024 * 1024
+B2_COMPAT_REQUIRED_HIT_CASES = {
+    "openai_chat_completions_sse": "openai_strict_prefix_extension",
+    "anthropic_messages_sse": "anthropic_strict_prefix_extension",
+}
+B2_AUTO_PREFIX_REQUIRED_HIT_CASE = "strict_prefix_extension"
 
 
 @contextmanager
@@ -144,6 +149,304 @@ def _anthropic_cache_read_tokens(response_text: str) -> int | None:
     return None
 
 
+def _route_response_ok(record: dict[str, Any]) -> bool:
+    response = record.get("response")
+    if not isinstance(response, dict):
+        return False
+    content_type = str(response.get("content_type") or "")
+    return int(response.get("status_code") or 0) == 200 and "text/event-stream" in content_type
+
+
+def _route_cached_tokens(record: dict[str, Any]) -> int:
+    response = record.get("response")
+    if not isinstance(response, dict):
+        return 0
+    if record.get("surface") == "openai_chat_completions_sse":
+        value = response.get("openai_cached_tokens")
+    elif record.get("surface") == "anthropic_messages_sse":
+        value = response.get("anthropic_cache_read_input_tokens")
+    else:
+        value = None
+    try:
+        return max(int(value or 0), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _nonnegative_int(value: Any) -> int:
+    try:
+        return max(int(value or 0), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _required_route_hit_case_results(records: list[dict[str, Any]]) -> dict[str, Any]:
+    results: dict[str, Any] = {}
+    for surface, required_case in B2_COMPAT_REQUIRED_HIT_CASES.items():
+        matching_records = [
+            record
+            for record in records
+            if record.get("surface") == surface and record.get("case") == required_case
+        ]
+        cached_tokens = [
+            _route_cached_tokens(record)
+            for record in matching_records
+            if _route_response_ok(record)
+        ]
+        results[surface] = {
+            "required_case": required_case,
+            "observed_count": len(matching_records),
+            "route_response_ok_count": sum(
+                1 for record in matching_records if _route_response_ok(record)
+            ),
+            "max_cached_tokens": max(cached_tokens, default=0),
+            "hit_observed": bool(cached_tokens) and max(cached_tokens) > 0,
+        }
+    return results
+
+
+def _read_jsonl_records(path: Path) -> tuple[list[dict[str, Any]], list[str]]:
+    records: list[dict[str, Any]] = []
+    errors: list[str] = []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        return records, [f"read_error:{path}:{exc}"]
+    for line_number, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            errors.append(f"invalid_json:{path}:{line_number}:{exc.msg}")
+            continue
+        if not isinstance(record, dict):
+            errors.append(f"non_object_record:{path}:{line_number}")
+            continue
+        records.append(record)
+    return records, errors
+
+
+def _compat_route_failure_reasons(
+    *,
+    records: list[dict[str, Any]],
+    read_errors: list[str],
+    all_route_responses_ok: bool,
+    all_required_route_hits_observed: bool,
+    drops_total: int,
+    rejects_total: int,
+    expirations_total: int,
+) -> list[str]:
+    reasons: list[str] = []
+    if read_errors:
+        reasons.append("ledger_read_errors")
+    if not records:
+        reasons.append("no_records")
+    if not all_route_responses_ok:
+        reasons.append("route_response_not_http_200_sse")
+    if not all_required_route_hits_observed:
+        reasons.append("required_strict_prefix_extension_hit_missing")
+    if drops_total != 0:
+        reasons.append("session_cache_drops_nonzero")
+    if rejects_total != 0:
+        reasons.append("session_cache_rejects_nonzero")
+    if expirations_total != 0:
+        reasons.append("session_cache_expirations_nonzero")
+    return reasons
+
+
+def audit_compat_route_ledger(path: Path) -> dict[str, Any]:
+    records, read_errors = _read_jsonl_records(path)
+    route_response_ok_count = sum(1 for record in records if _route_response_ok(record))
+    all_route_responses_ok = bool(records) and route_response_ok_count == len(records)
+    required_route_hit_case_results = _required_route_hit_case_results(records)
+    all_required_route_hits_observed = all(
+        bool(result.get("hit_observed"))
+        for result in required_route_hit_case_results.values()
+    )
+    openai_hits = [
+        record
+        for record in records
+        if record.get("surface") == "openai_chat_completions_sse"
+        and _route_cached_tokens(record) > 0
+    ]
+    anthropic_hits = [
+        record
+        for record in records
+        if record.get("surface") == "anthropic_messages_sse"
+        and _route_cached_tokens(record) > 0
+    ]
+    last_counters = records[-1].get("status_after", {}).get("counters", {}) if records else {}
+    if not isinstance(last_counters, dict):
+        last_counters = {}
+    drops_total = _nonnegative_int(last_counters.get("drops"))
+    rejects_total = _nonnegative_int(last_counters.get("rejects"))
+    expirations_total = _nonnegative_int(last_counters.get("expirations"))
+    failure_reasons = _compat_route_failure_reasons(
+        records=records,
+        read_errors=read_errors,
+        all_route_responses_ok=all_route_responses_ok,
+        all_required_route_hits_observed=all_required_route_hits_observed,
+        drops_total=drops_total,
+        rejects_total=rejects_total,
+        expirations_total=expirations_total,
+    )
+    return {
+        "schema_version": "b2.compat_route_automatic_prefix_reuse.audit.v1",
+        "kind": "compat_route_ledger_audit",
+        "path": str(path),
+        "record_count": len(records),
+        "schema_versions": sorted(
+            {str(record.get("schema_version", "missing")) for record in records}
+        ),
+        "run_ids": sorted({str(record.get("run_id", "missing")) for record in records}),
+        "route_response_ok_count": route_response_ok_count,
+        "all_route_responses_ok": all_route_responses_ok,
+        "required_route_hit_cases": B2_COMPAT_REQUIRED_HIT_CASES,
+        "required_route_hit_case_results": required_route_hit_case_results,
+        "all_required_route_hits_observed": all_required_route_hits_observed,
+        "openai_cached_token_hit_count": len(openai_hits),
+        "anthropic_cache_read_hit_count": len(anthropic_hits),
+        "drops_total": drops_total,
+        "rejects_total": rejects_total,
+        "expirations_total": expirations_total,
+        "errors": read_errors,
+        "failure_reasons": failure_reasons,
+        "verdict": "passed" if not failure_reasons else "failed",
+    }
+
+
+def _auto_prefix_hit_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        record
+        for record in records
+        if record.get("session_kv_cache", {}).get("cache_decision") == "reuse"
+        and _nonnegative_int(
+            record.get("session_kv_cache", {}).get("cached_prompt_tokens")
+        )
+        > 0
+    ]
+
+
+def _auto_prefix_ineligible_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        record
+        for record in records
+        if str(
+            record.get("session_kv_cache", {}).get("cache_reason_code", "")
+        ).startswith("auto_prefix_ineligible_")
+    ]
+
+
+def _auto_prefix_bypass_reason_counts(records: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for event in _unique_bypass_events(records):
+        reason = str(event.get("reason_code", "unknown"))
+        counts[reason] = counts.get(reason, 0) + 1
+    return counts
+
+
+def _auto_prefix_failure_reasons(
+    *,
+    records: list[dict[str, Any]],
+    read_errors: list[str],
+    strict_prefix_hit_observed: bool,
+    auto_prefix_ineligible_count: int,
+    all_generations_ok: bool,
+    drops_total: int,
+    rejects_total: int,
+    expirations_total: int,
+    bypass_reason_counts: dict[str, int],
+) -> list[str]:
+    reasons: list[str] = []
+    if read_errors:
+        reasons.append("ledger_read_errors")
+    if not records:
+        reasons.append("no_records")
+    if not all_generations_ok:
+        reasons.append("generation_not_ok")
+    if not strict_prefix_hit_observed:
+        reasons.append("required_strict_prefix_reuse_hit_missing")
+    if auto_prefix_ineligible_count < 1:
+        reasons.append("auto_prefix_ineligible_fallback_missing")
+    if drops_total != 0:
+        reasons.append("session_cache_drops_nonzero")
+    if rejects_total != 0:
+        reasons.append("session_cache_rejects_nonzero")
+    if expirations_total != 0:
+        reasons.append("session_cache_expirations_nonzero")
+    if bypass_reason_counts.get("auto_prefix_completion_trim_unavailable", 0) > 0:
+        reasons.append("auto_prefix_completion_trim_unavailable")
+    if bypass_reason_counts.get("reuse_trim_unavailable_fresh_cache", 0) > 0:
+        reasons.append("reuse_trim_unavailable_fresh_cache")
+    return reasons
+
+
+def audit_auto_prefix_ledger(path: Path) -> dict[str, Any]:
+    records, read_errors = _read_jsonl_records(path)
+    hit_records = _auto_prefix_hit_records(records)
+    ineligible_records = _auto_prefix_ineligible_records(records)
+    strict_prefix_hit_records = [
+        record
+        for record in hit_records
+        if record.get("case") == B2_AUTO_PREFIX_REQUIRED_HIT_CASE
+    ]
+    strict_prefix_cached_tokens = [
+        _nonnegative_int(
+            record.get("session_kv_cache", {}).get("cached_prompt_tokens")
+        )
+        for record in strict_prefix_hit_records
+    ]
+    all_generations_ok = bool(records) and all(
+        bool(record.get("generation", {}).get("ok")) for record in records
+    )
+    last_counters = records[-1].get("status_after", {}).get("counters", {}) if records else {}
+    if not isinstance(last_counters, dict):
+        last_counters = {}
+    drops_total = _nonnegative_int(last_counters.get("drops"))
+    rejects_total = _nonnegative_int(last_counters.get("rejects"))
+    expirations_total = _nonnegative_int(last_counters.get("expirations"))
+    bypass_reason_counts = _auto_prefix_bypass_reason_counts(records)
+    strict_prefix_hit_observed = bool(strict_prefix_cached_tokens) and max(
+        strict_prefix_cached_tokens
+    ) > 0
+    failure_reasons = _auto_prefix_failure_reasons(
+        records=records,
+        read_errors=read_errors,
+        strict_prefix_hit_observed=strict_prefix_hit_observed,
+        auto_prefix_ineligible_count=len(ineligible_records),
+        all_generations_ok=all_generations_ok,
+        drops_total=drops_total,
+        rejects_total=rejects_total,
+        expirations_total=expirations_total,
+        bypass_reason_counts=bypass_reason_counts,
+    )
+    return {
+        "schema_version": "b2.automatic_prefix_reuse.audit.v1",
+        "kind": "auto_prefix_ledger_audit",
+        "path": str(path),
+        "record_count": len(records),
+        "schema_versions": sorted(
+            {str(record.get("schema_version", "missing")) for record in records}
+        ),
+        "run_ids": sorted({str(record.get("run_id", "missing")) for record in records}),
+        "required_hit_case": B2_AUTO_PREFIX_REQUIRED_HIT_CASE,
+        "strict_prefix_hit_count": len(strict_prefix_hit_records),
+        "strict_prefix_cached_tokens": max(strict_prefix_cached_tokens, default=0),
+        "strict_prefix_hit_observed": strict_prefix_hit_observed,
+        "usable_hit_count": len(hit_records),
+        "auto_prefix_ineligible_count": len(ineligible_records),
+        "all_generations_ok": all_generations_ok,
+        "bypass_reason_counts": bypass_reason_counts,
+        "drops_total": drops_total,
+        "rejects_total": rejects_total,
+        "expirations_total": expirations_total,
+        "errors": read_errors,
+        "failure_reasons": failure_reasons,
+        "verdict": "passed" if not failure_reasons else "failed",
+    }
+
+
 def _unique_bypass_events(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     seen: set[tuple[str, object, object]] = set()
     events: list[dict[str, Any]] = []
@@ -167,6 +470,8 @@ def _route_hit_verdict(
     *,
     load_ok: bool,
     cleanup_unload_ok: bool,
+    all_route_responses_ok: bool,
+    all_required_route_hits_observed: bool,
     openai_cached_tokens: int | None,
     anthropic_cache_read_input_tokens: int | None,
     drops_total: int,
@@ -176,6 +481,8 @@ def _route_hit_verdict(
     if (
         load_ok
         and cleanup_unload_ok
+        and all_route_responses_ok
+        and all_required_route_hits_observed
         and int(openai_cached_tokens or 0) > 0
         and int(anthropic_cache_read_input_tokens or 0) > 0
         and drops_total == 0
@@ -532,6 +839,13 @@ def run_compat_route_hit_probe(
         for record in records
         if int(record["response"].get("anthropic_cache_read_input_tokens") or 0) > 0
     ]
+    route_response_ok_count = sum(1 for record in records if _route_response_ok(record))
+    all_route_responses_ok = bool(records) and route_response_ok_count == len(records)
+    required_route_hit_case_results = _required_route_hit_case_results(records)
+    all_required_route_hits_observed = all(
+        bool(result.get("hit_observed"))
+        for result in required_route_hit_case_results.values()
+    )
     last_counters = records[-1]["status_after"].get("counters", {}) if records else {}
     summary = {
         "schema_version": "b2.compat_route_automatic_prefix_reuse.summary.v1",
@@ -543,6 +857,11 @@ def run_compat_route_hit_probe(
         "sample_count": len(records),
         "openai_cached_token_hit_count": len(openai_hits),
         "anthropic_cache_read_hit_count": len(anthropic_hits),
+        "route_response_ok_count": route_response_ok_count,
+        "all_route_responses_ok": all_route_responses_ok,
+        "required_route_hit_cases": B2_COMPAT_REQUIRED_HIT_CASES,
+        "required_route_hit_case_results": required_route_hit_case_results,
+        "all_required_route_hits_observed": all_required_route_hits_observed,
         "openai_cached_tokens": (
             int(openai_hits[-1]["response"]["openai_cached_tokens"])
             if openai_hits
@@ -565,6 +884,8 @@ def run_compat_route_hit_probe(
         "verdict": _route_hit_verdict(
             load_ok=bool(load.ok),
             cleanup_unload_ok=bool(cleanup.ok if cleanup is not None else False),
+            all_route_responses_ok=all_route_responses_ok,
+            all_required_route_hits_observed=all_required_route_hits_observed,
             openai_cached_tokens=(
                 int(openai_hits[-1]["response"]["openai_cached_tokens"])
                 if openai_hits
@@ -611,6 +932,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_MAX_RESIDENT_BYTES,
     )
     compat.add_argument("--run-id", default=None)
+    auto_audit = subparsers.add_parser("audit-auto-prefix-ledger")
+    auto_audit.add_argument("--ledger", type=Path, action="append", required=True)
+    audit = subparsers.add_parser("audit-compat-route-ledger")
+    audit.add_argument("--ledger", type=Path, action="append", required=True)
     return parser.parse_args(argv)
 
 
@@ -637,6 +962,18 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 0 if summary.get("verdict") == "passed" else 1
+    if args.command == "audit-auto-prefix-ledger":
+        audits = [audit_auto_prefix_ledger(path) for path in args.ledger]
+        payload: dict[str, Any] | list[dict[str, Any]]
+        payload = audits[0] if len(audits) == 1 else audits
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0 if all(audit.get("verdict") == "passed" for audit in audits) else 1
+    if args.command == "audit-compat-route-ledger":
+        audits = [audit_compat_route_ledger(path) for path in args.ledger]
+        payload: dict[str, Any] | list[dict[str, Any]]
+        payload = audits[0] if len(audits) == 1 else audits
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0 if all(audit.get("verdict") == "passed" for audit in audits) else 1
     raise ValueError(f"unknown command: {args.command}")
 
 

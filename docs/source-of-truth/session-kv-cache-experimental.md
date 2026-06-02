@@ -141,6 +141,10 @@ passed with `usable_hit_count=1`, `hits_total=1`, drops / expirations / rejects
 all `0`, and two safe non-prefix fallbacks. This proves a narrow opt-in
 no-header cached-token hit on the Qwen27 native streaming path; it does not make
 automatic prefix reuse default-on or supported.
+The corresponding JSONL can be re-audited offline with
+`scripts/bench/prefix_cache_compatibility.py audit-auto-prefix-ledger`, which
+requires the `strict_prefix_extension` row to be the reuse hit, requires a
+non-prefix ineligible fallback, and rejects the old trim-unavailable blockers.
 
 Focused compatibility-route tests cover the consumer-facing metadata boundary:
 OpenAI `/v1/chat/completions` SSE and Anthropic `/v1/messages` SSE requests can
@@ -159,6 +163,12 @@ same cached-token counts; and
 `20260602T015559Z-b2-compat-route-gemma31-real-hit-summary.json` passed with
 `openai_cached_tokens=25` and `anthropic_cache_read_input_tokens=25`. All three
 runs report `hits_total=2` and drops / expirations / rejects all `0`.
+The current route harness accepts this evidence shape only when the
+strict-prefix extension row on each compatibility surface carries the positive
+cached/read token count. A cached-token parser hit on a seed row alone is
+diagnostic, not route-hit proof. Existing route ledgers can be re-audited with
+`scripts/bench/prefix_cache_compatibility.py audit-compat-route-ledger` without
+starting the native backend.
 
 This surface does **not** imply any of the following:
 
@@ -253,10 +263,13 @@ The same payload is also visible at:
 > the B-1c framework. The live promotion gate is **B-1a + B-1b + B-1c §1 + B-1c §2**
 > together (the §1a Promotion Gate). B-1c §2 has been re-founded on four
 > count-based axes: load, throughput, switch, and concurrency. It is currently
-> **`blocked` on under-measured throughput/concurrency axes**, not on duration and
-> not on the raw-RSS false-fail: the reviewed direct cache-object resident gate
-> closes the Gemma fast-swap drift false-fail, but the completed evidence still
-> lacks run-internal throughput decay and entry-breadth/concurrency proof. See
+> **`blocked` pending canonical 24-swap threshold evidence**, not on duration
+> and not on the raw-RSS false-fail: the reviewed direct cache-object resident
+> gate closes the Gemma fast-swap drift false-fail, and the short
+> `20260602T095334Z` native smoke passed all four configured axes at 3 swaps.
+> That smoke records `canonical_gate.canonical_switch_requirement_met=false`
+> and `graduates.soak_plus_swap_stability=false`, so it is threshold-path
+> evidence, not promotion evidence. See
 > `runtime-capability-matrix.md` (session-KV row) +
 > `docs/architect/design/B-1c-section-2-spec.md` §11. The `experimental` label
 > below is still correct; the *criteria* below are not the current ones.

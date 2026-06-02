@@ -54,6 +54,26 @@ def _clean_blocked_b1c2_rollup(**overrides: object) -> dict:
     return record
 
 
+def _b1c2_all_axes_passed() -> dict:
+    return {
+        "load_stability": {"status": "passed"},
+        "throughput_stability": {"status": "passed"},
+        "switch_stability": {"status": "passed"},
+        "concurrency_stability": {"status": "passed"},
+    }
+
+
+def _b1c2_all_axes_passed_with_eviction() -> dict:
+    axes = _b1c2_all_axes_passed()
+    axes["concurrency_stability"] = {
+        "status": "passed",
+        "cache_eviction_required": True,
+        "cache_eviction_observed": True,
+        "evictions_total": 1,
+    }
+    return axes
+
+
 def test_b1c2_ledger_audit_reports_live_health(tmp_path):
     ledger = tmp_path / "segment.jsonl"
     _write_jsonl(
@@ -129,6 +149,166 @@ def test_b1c2_ledger_audit_reports_live_health(tmp_path):
     ]
     assert result["session_cache_drops_total"] == 1
     assert result["max_measurement_drift_bytes"] == 512
+    assert result["expected_rollup_exists"] is False
+    assert result["ledger_acceptance_status"] == "diagnostic_partial_no_rollup"
+    assert result["errors"] == []
+
+
+def test_b1c2_ledger_audit_can_require_matching_rollup(tmp_path):
+    ledger = tmp_path / "20260602T100243Z-b1c2-fast-count-soak-swap.jsonl"
+    _write_jsonl(
+        ledger,
+        {
+            "schema_version": "b1c2.v1",
+            "phase": "measurement",
+            "sample_index": 1,
+            "sample_verdict": "passed",
+            "session_cache": {"counter_delta": {}},
+            "memory": {"watermark_after_generation": "GREEN"},
+        },
+    )
+
+    result = session_kv_soak_audit.audit_b1c2_ledger(
+        ledger,
+        require_rollup=True,
+    )
+
+    expected_rollup = (
+        tmp_path / "20260602T100243Z-b1c2-fast-count-soak-swap-rollup.jsonl"
+    )
+    assert result["expected_rollup_path"] == str(expected_rollup)
+    assert result["expected_rollup_exists"] is False
+    assert result["ledger_acceptance_status"] == "diagnostic_partial_no_rollup"
+    assert result["errors"] == [f"missing_segment_rollup:{expected_rollup}"]
+
+
+def test_b1c2_ledger_audit_accepts_matching_rollup_presence(tmp_path):
+    ledger = tmp_path / "20260602T100243Z-b1c2-fast-count-soak-swap.jsonl"
+    rollup = tmp_path / "20260602T100243Z-b1c2-fast-count-soak-swap-rollup.jsonl"
+    _write_jsonl(
+        ledger,
+        {
+            "schema_version": "b1c2.v1",
+            "phase": "measurement",
+            "sample_index": 1,
+            "sample_verdict": "passed",
+            "session_cache": {"counter_delta": {}},
+            "memory": {"watermark_after_generation": "GREEN"},
+        },
+    )
+    _write_jsonl(rollup, _clean_blocked_b1c2_rollup())
+
+    result = session_kv_soak_audit.audit_b1c2_ledger(
+        ledger,
+        require_rollup=True,
+    )
+
+    assert result["expected_rollup_exists"] is True
+    assert result["ledger_acceptance_status"] == "rollup_available"
+    assert result["errors"] == []
+
+
+def test_b1c2_ledger_audit_requires_expected_rollup_to_be_canonical(tmp_path):
+    ledger = tmp_path / "20260602T095334Z-b1c2-threshold-soak-swap.jsonl"
+    rollup = tmp_path / "20260602T095334Z-b1c2-threshold-soak-swap-rollup.jsonl"
+    _write_jsonl(
+        ledger,
+        {
+            "schema_version": "b1c2.v1",
+            "phase": "measurement",
+            "sample_index": 1,
+            "sample_verdict": "passed",
+            "session_cache": {"counter_delta": {}},
+            "memory": {"watermark_after_generation": "GREEN"},
+        },
+    )
+    _write_jsonl(
+        rollup,
+        _clean_blocked_b1c2_rollup(
+            conclusion="passed",
+            soak_plus_swap_stability="passed",
+            required_swap_count=3,
+            swap_count=3,
+            swap_requirement_met=True,
+            axis_verdicts=_b1c2_all_axes_passed(),
+            canonical_gate={
+                "required_swap_count": 24,
+                "observed_swap_count": 3,
+                "canonical_switch_requirement_met": False,
+                "soak_plus_swap_graduation_eligible": False,
+            },
+            graduates={
+                "soak_plus_swap_stability": False,
+                "session_kv_supported": False,
+            },
+        ),
+    )
+
+    result = session_kv_soak_audit.audit_b1c2_ledger(
+        ledger,
+        require_canonical=True,
+    )
+
+    assert result["expected_rollup_exists"] is True
+    assert result["expected_rollup_canonical_acceptance_status"] == "not_canonical"
+    assert "canonical_gate:canonical_switch_requirement_not_met" in (
+        result["expected_rollup_canonical_errors"]
+    )
+    assert "expected_rollup:canonical_gate:canonical_switch_requirement_not_met" in (
+        result["errors"]
+    )
+
+
+def test_b1c2_ledger_audit_accepts_expected_canonical_rollup(tmp_path):
+    ledger = tmp_path / "20260602T120000Z-b1c2-canonical-soak-swap.jsonl"
+    rollup = tmp_path / "20260602T120000Z-b1c2-canonical-soak-swap-rollup.jsonl"
+    _write_jsonl(
+        ledger,
+        {
+            "schema_version": "b1c2.v1",
+            "phase": "measurement",
+            "sample_index": 1,
+            "sample_verdict": "passed",
+            "session_cache": {"counter_delta": {}},
+            "memory": {"watermark_after_generation": "GREEN"},
+        },
+    )
+    _write_jsonl(
+        rollup,
+        _clean_blocked_b1c2_rollup(
+            conclusion="passed",
+            soak_plus_swap_stability="passed",
+            required_swap_count=24,
+            swap_count=24,
+            swap_requirement_met=True,
+            axis_verdicts=_b1c2_all_axes_passed(),
+            interrupted_soak_plus_swap={
+                "interrupted": False,
+                "observed_record_count": 72,
+                "observed_measurement_count": 48,
+                "observed_swap_count": 24,
+                "graduation_eligible": True,
+            },
+            canonical_gate={
+                "required_swap_count": 24,
+                "observed_swap_count": 24,
+                "canonical_switch_requirement_met": True,
+                "soak_plus_swap_graduation_eligible": True,
+            },
+            graduates={
+                "soak_plus_swap_stability": True,
+                "session_kv_supported": False,
+            },
+        ),
+    )
+
+    result = session_kv_soak_audit.audit_b1c2_ledger(
+        ledger,
+        require_canonical=True,
+    )
+
+    assert result["expected_rollup_canonical_acceptance_status"] == "canonical_passed"
+    assert result["expected_rollup_canonical_errors"] == []
     assert result["errors"] == []
 
 
@@ -254,6 +434,166 @@ def test_b1c2_segment_rollup_audit_rejects_unsafe_pass_claim(tmp_path):
     assert "unsafe_claim:passed_without_swap_requirement" in result["errors"]
 
 
+def test_b1c2_segment_rollup_audit_distinguishes_local_from_canonical_pass(tmp_path):
+    rollup = tmp_path / "local-threshold-rollup.jsonl"
+    _write_jsonl(
+        rollup,
+        _clean_blocked_b1c2_rollup(
+            conclusion="passed",
+            soak_plus_swap_stability="passed",
+            required_swap_count=3,
+            swap_count=3,
+            swap_requirement_met=True,
+            axis_verdicts=_b1c2_all_axes_passed(),
+            canonical_gate={
+                "required_swap_count": 24,
+                "observed_swap_count": 3,
+                "canonical_switch_requirement_met": False,
+                "soak_plus_swap_graduation_eligible": False,
+            },
+            graduates={
+                "soak_plus_swap_stability": False,
+                "session_kv_supported": False,
+            },
+        ),
+    )
+
+    local_result = session_kv_soak_audit.audit_b1c2_segment_rollup(rollup)
+    canonical_result = session_kv_soak_audit.audit_b1c2_segment_rollup(
+        rollup,
+        require_canonical=True,
+    )
+
+    assert local_result["errors"] == []
+    assert local_result["canonical_acceptance_status"] == "not_canonical"
+    assert "canonical_gate:canonical_switch_requirement_not_met" in (
+        canonical_result["errors"]
+    )
+    assert "canonical_gate:graduation_not_eligible" in canonical_result["errors"]
+    assert "canonical_gate:graduate_flag_not_true" in canonical_result["errors"]
+
+
+def test_b1c2_segment_rollup_audit_accepts_canonical_pass(tmp_path):
+    rollup = tmp_path / "canonical-rollup.jsonl"
+    _write_jsonl(
+        rollup,
+        _clean_blocked_b1c2_rollup(
+            conclusion="passed",
+            soak_plus_swap_stability="passed",
+            required_swap_count=24,
+            swap_count=24,
+            swap_requirement_met=True,
+            axis_verdicts=_b1c2_all_axes_passed(),
+            interrupted_soak_plus_swap={
+                "interrupted": False,
+                "observed_record_count": 72,
+                "observed_measurement_count": 48,
+                "observed_swap_count": 24,
+                "graduation_eligible": True,
+            },
+            canonical_gate={
+                "required_swap_count": 24,
+                "observed_swap_count": 24,
+                "canonical_switch_requirement_met": True,
+                "soak_plus_swap_graduation_eligible": True,
+            },
+            graduates={
+                "soak_plus_swap_stability": True,
+                "session_kv_supported": False,
+            },
+        ),
+    )
+
+    result = session_kv_soak_audit.audit_b1c2_segment_rollup(
+        rollup,
+        require_canonical=True,
+    )
+
+    assert result["errors"] == []
+    assert result["canonical_acceptance_status"] == "canonical_passed"
+
+
+def test_b1c2_segment_rollup_audit_can_require_cache_eviction(tmp_path):
+    rollup = tmp_path / "canonical-rollup.jsonl"
+    _write_jsonl(
+        rollup,
+        _clean_blocked_b1c2_rollup(
+            conclusion="passed",
+            soak_plus_swap_stability="passed",
+            required_swap_count=24,
+            swap_count=24,
+            swap_requirement_met=True,
+            axis_verdicts=_b1c2_all_axes_passed(),
+            interrupted_soak_plus_swap={
+                "interrupted": False,
+                "observed_record_count": 72,
+                "observed_measurement_count": 48,
+                "observed_swap_count": 24,
+                "graduation_eligible": True,
+            },
+            canonical_gate={
+                "required_swap_count": 24,
+                "observed_swap_count": 24,
+                "canonical_switch_requirement_met": True,
+                "soak_plus_swap_graduation_eligible": True,
+            },
+            graduates={
+                "soak_plus_swap_stability": True,
+                "session_kv_supported": False,
+            },
+        ),
+    )
+
+    result = session_kv_soak_audit.audit_b1c2_segment_rollup(
+        rollup,
+        require_canonical=True,
+        require_cache_eviction=True,
+    )
+
+    assert result["canonical_acceptance_status"] == "not_canonical"
+    assert "cache_eviction:requirement_flag_not_true" in result["errors"]
+    assert "cache_eviction:not_observed" in result["errors"]
+
+    evicting_rollup = tmp_path / "canonical-evicting-rollup.jsonl"
+    _write_jsonl(
+        evicting_rollup,
+        _clean_blocked_b1c2_rollup(
+            conclusion="passed",
+            soak_plus_swap_stability="passed",
+            required_swap_count=24,
+            swap_count=24,
+            swap_requirement_met=True,
+            axis_verdicts=_b1c2_all_axes_passed_with_eviction(),
+            interrupted_soak_plus_swap={
+                "interrupted": False,
+                "observed_record_count": 72,
+                "observed_measurement_count": 48,
+                "observed_swap_count": 24,
+                "graduation_eligible": True,
+            },
+            canonical_gate={
+                "required_swap_count": 24,
+                "observed_swap_count": 24,
+                "canonical_switch_requirement_met": True,
+                "soak_plus_swap_graduation_eligible": True,
+            },
+            graduates={
+                "soak_plus_swap_stability": True,
+                "session_kv_supported": False,
+            },
+        ),
+    )
+
+    evicting_result = session_kv_soak_audit.audit_b1c2_segment_rollup(
+        evicting_rollup,
+        require_canonical=True,
+        require_cache_eviction=True,
+    )
+
+    assert evicting_result["errors"] == []
+    assert evicting_result["canonical_acceptance_status"] == "canonical_passed"
+
+
 def test_b1c2_aggregate_rollup_audit_rejects_supported_claim(tmp_path):
     aggregate = tmp_path / "aggregate-rollup.jsonl"
     _write_jsonl(
@@ -282,6 +622,45 @@ def test_b1c2_aggregate_rollup_audit_rejects_supported_claim(tmp_path):
     assert result["errors"] == ["unsafe_claim:session_kv_supported=true"]
 
 
+def test_b1c2_aggregate_rollup_audit_accepts_canonical_axes(tmp_path):
+    aggregate = tmp_path / "aggregate-rollup.jsonl"
+    _write_jsonl(
+        aggregate,
+        {
+            "schema_version": "b1c2.aggregate.v1",
+            "run_id": "aggregate",
+            "conclusion": "passed",
+            "soak_plus_swap_stability": "passed",
+            "interrupted_soak_plus_swap": {
+                "all_segments_ok_for_rehearsal": True,
+                "prerequisite_satisfied": True,
+                "duration_requirement_met": False,
+                "swap_requirement_met": True,
+                "allocator_truth_claimable": True,
+                "axis_verdicts": _b1c2_all_axes_passed(),
+            },
+            "canonical_gate": {
+                "required_swap_count": 24,
+                "observed_swap_count": 24,
+                "canonical_switch_requirement_met": True,
+                "soak_plus_swap_graduation_eligible": True,
+            },
+            "graduates": {
+                "soak_plus_swap_stability": True,
+                "session_kv_supported": False,
+            },
+        },
+    )
+
+    result = session_kv_soak_audit.audit_b1c2_aggregate_rollup(
+        aggregate,
+        require_canonical=True,
+    )
+
+    assert result["errors"] == []
+    assert result["canonical_acceptance_status"] == "canonical_passed"
+
+
 def test_session_kv_soak_audit_cli_returns_nonzero_for_unsafe_claim(tmp_path, capsys):
     rollup = tmp_path / "unsafe-rollup.jsonl"
     _write_jsonl(
@@ -301,3 +680,111 @@ def test_session_kv_soak_audit_cli_returns_nonzero_for_unsafe_claim(tmp_path, ca
 
     assert code == 1
     assert "unsafe_claim" in captured.out
+
+
+def test_session_kv_soak_audit_cli_requires_rollup_for_ledger(tmp_path, capsys):
+    ledger = tmp_path / "20260602T100243Z-b1c2-fast-count-soak-swap.jsonl"
+    _write_jsonl(
+        ledger,
+        {
+            "schema_version": "b1c2.v1",
+            "phase": "measurement",
+            "sample_index": 1,
+            "sample_verdict": "passed",
+            "session_cache": {"counter_delta": {}},
+            "memory": {"watermark_after_generation": "GREEN"},
+        },
+    )
+
+    code = session_kv_soak_audit.main(
+        ["--ledger", str(ledger), "--require-rollup"]
+    )
+    captured = capsys.readouterr()
+
+    assert code == 1
+    assert "diagnostic_partial_no_rollup" in captured.out
+    assert "missing_segment_rollup" in captured.out
+
+
+def test_session_kv_soak_audit_cli_can_require_canonical_rollup(tmp_path, capsys):
+    rollup = tmp_path / "local-threshold-rollup.jsonl"
+    _write_jsonl(
+        rollup,
+        _clean_blocked_b1c2_rollup(
+            conclusion="passed",
+            soak_plus_swap_stability="passed",
+            required_swap_count=3,
+            swap_count=3,
+            swap_requirement_met=True,
+            axis_verdicts=_b1c2_all_axes_passed(),
+            canonical_gate={
+                "required_swap_count": 24,
+                "observed_swap_count": 3,
+                "canonical_switch_requirement_met": False,
+                "soak_plus_swap_graduation_eligible": False,
+            },
+            graduates={
+                "soak_plus_swap_stability": False,
+                "session_kv_supported": False,
+            },
+        ),
+    )
+
+    code = session_kv_soak_audit.main(
+        ["--segment-rollup", str(rollup), "--require-canonical"]
+    )
+    captured = capsys.readouterr()
+
+    assert code == 1
+    assert "canonical_gate:canonical_switch_requirement_not_met" in captured.out
+
+
+def test_session_kv_soak_audit_cli_can_require_canonical_from_ledger(
+    tmp_path,
+    capsys,
+):
+    ledger = tmp_path / "20260602T095334Z-b1c2-threshold-soak-swap.jsonl"
+    rollup = tmp_path / "20260602T095334Z-b1c2-threshold-soak-swap-rollup.jsonl"
+    _write_jsonl(
+        ledger,
+        {
+            "schema_version": "b1c2.v1",
+            "phase": "measurement",
+            "sample_index": 1,
+            "sample_verdict": "passed",
+            "session_cache": {"counter_delta": {}},
+            "memory": {"watermark_after_generation": "GREEN"},
+        },
+    )
+    _write_jsonl(
+        rollup,
+        _clean_blocked_b1c2_rollup(
+            conclusion="passed",
+            soak_plus_swap_stability="passed",
+            required_swap_count=3,
+            swap_count=3,
+            swap_requirement_met=True,
+            axis_verdicts=_b1c2_all_axes_passed(),
+            canonical_gate={
+                "required_swap_count": 24,
+                "observed_swap_count": 3,
+                "canonical_switch_requirement_met": False,
+                "soak_plus_swap_graduation_eligible": False,
+            },
+            graduates={
+                "soak_plus_swap_stability": False,
+                "session_kv_supported": False,
+            },
+        ),
+    )
+
+    code = session_kv_soak_audit.main(
+        ["--ledger", str(ledger), "--require-canonical"]
+    )
+    captured = capsys.readouterr()
+
+    assert code == 1
+    assert "expected_rollup_canonical_acceptance=not_canonical" in captured.out
+    assert "expected_rollup:canonical_gate:canonical_switch_requirement_not_met" in (
+        captured.out
+    )

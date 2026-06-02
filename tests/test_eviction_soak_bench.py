@@ -563,6 +563,70 @@ def test_cli_b1c1_sigterm_writes_blocked_segment_rollup(tmp_path):
     assert rollup["measurement_duration_s"] > 0
 
 
+def test_cli_b1c2_sigterm_writes_blocked_segment_rollup(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "scripts/bench/eviction_soak.py",
+            "--gate",
+            eviction_soak.B1C2_GATE,
+            "--backend",
+            "fake",
+            "--output",
+            str(tmp_path),
+            "--duration-s",
+            "60",
+            "--required-duration-s",
+            "60",
+            "--sample-interval-s",
+            "10",
+            "--swap-count",
+            "3",
+            "--required-swap-count",
+            "24",
+            "--max-tokens",
+            "1",
+            "--b1c1-prerequisite-satisfied",
+            "--interruption-reason",
+            "planned_stop",
+        ],
+        cwd=repo_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        ledger_path = None
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            ledgers = sorted(tmp_path.glob("*b1c2-*-soak-swap.jsonl"))
+            if ledgers:
+                ledger_path = ledgers[0]
+                break
+            time.sleep(0.05)
+        assert ledger_path is not None
+        time.sleep(0.5)
+        process.terminate()
+        stdout, stderr = process.communicate(timeout=10)
+    finally:
+        if process.poll() is None:
+            process.kill()
+
+    assert process.returncode == 1, (stdout, stderr)
+    rollups = sorted(tmp_path.glob("*b1c2-*-soak-swap-rollup.jsonl"))
+    assert len(rollups) == 1
+    rollup = _records(rollups[0])[0]
+    assert rollup["conclusion"] == "blocked"
+    assert rollup["soak_plus_swap_stability"] == "blocked"
+    assert rollup["interrupted_soak_plus_swap"]["interrupted"] is True
+    assert rollup["interrupted_soak_plus_swap"]["interruption_reason"] == "planned_stop"
+    assert rollup["interrupted_soak_plus_swap"]["observed_record_count"] >= 6
+    assert rollup["graduates"]["soak_plus_swap_stability"] is False
+    assert rollup["graduates"]["session_kv_supported"] is False
+    assert rollup["cleanup_unload_result"]["ok"] is True
+
+
 def _write_b1c1_segment_rollup(
     path,
     *,
@@ -606,7 +670,11 @@ def _write_b1c1_segment_rollup(
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def _write_b1c2_segment_rollup(path, *, run_id, swap_count=8):
+def _write_b1c2_segment_rollup(
+    path, *, run_id, swap_count=8, conclusion="blocked", all_axes_passed=False
+):
+    throughput_status = "passed" if all_axes_passed else "blocked"
+    concurrency_status = "passed" if all_axes_passed else "blocked"
     payload = {
         "schema_version": "b1c2.rollup.v1",
         "gate": "B-1c section 2",
@@ -628,7 +696,7 @@ def _write_b1c2_segment_rollup(path, *, run_id, swap_count=8):
         "unresolved_reclaim_barrier_events": 0,
         "hard_failure": False,
         "swap_count": swap_count,
-        "soak_plus_swap_stability": "blocked",
+        "soak_plus_swap_stability": conclusion,
         "axis_verdicts": {
             "load_stability": {
                 "status": "passed",
@@ -640,8 +708,8 @@ def _write_b1c2_segment_rollup(path, *, run_id, swap_count=8):
                 "observed_swap_count": swap_count,
                 "required_swap_count": eviction_soak.B1C2_REQUIRED_SWAP_COUNT,
             },
-            "throughput_stability": {"status": "blocked"},
-            "concurrency_stability": {"status": "blocked"},
+            "throughput_stability": {"status": throughput_status},
+            "concurrency_stability": {"status": concurrency_status},
         },
     }
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
@@ -818,6 +886,59 @@ def test_b1c2_interrupted_aggregate_separates_switch_count_from_missing_axes(tmp
     assert summary["graduates"]["soak_plus_swap_stability"] is False
 
 
+def test_b1c2_interrupted_aggregate_debug_count_passes_without_graduating(tmp_path):
+    segment = tmp_path / "b1c2-segment-debug-rollup.jsonl"
+    _write_b1c2_segment_rollup(
+        segment,
+        run_id="b1c2-segment-debug",
+        swap_count=1,
+        conclusion="passed",
+        all_axes_passed=True,
+    )
+
+    summary = eviction_soak.run_b1c2_interrupted_soak_plus_swap(
+        segment_rollups=[segment],
+        output_dir=tmp_path,
+        run_id="b1c2-aggregate-debug",
+        required_total_duration_s=0.0,
+        required_swap_count=1,
+        b1c1_prerequisite_satisfied=True,
+    )
+
+    assert summary["soak_plus_swap_stability"] == "passed"
+    assert summary["canonical_gate"]["observed_swap_count"] == 1
+    assert summary["canonical_gate"]["canonical_switch_requirement_met"] is False
+    assert summary["graduates"]["soak_plus_swap_stability"] is False
+
+
+def test_b1c2_interrupted_aggregate_graduates_at_canonical_swap_floor(tmp_path):
+    rollups = []
+    for index in range(1, 4):
+        path = tmp_path / f"b1c2-segment-pass-{index}-rollup.jsonl"
+        _write_b1c2_segment_rollup(
+            path,
+            run_id=f"b1c2-segment-pass-{index}",
+            swap_count=8,
+            conclusion="passed",
+            all_axes_passed=True,
+        )
+        rollups.append(path)
+
+    summary = eviction_soak.run_b1c2_interrupted_soak_plus_swap(
+        segment_rollups=rollups,
+        output_dir=tmp_path,
+        run_id="b1c2-aggregate-canonical",
+        required_total_duration_s=0.0,
+        required_swap_count=eviction_soak.B1C2_REQUIRED_SWAP_COUNT,
+        b1c1_prerequisite_satisfied=True,
+    )
+
+    assert summary["soak_plus_swap_stability"] == "passed"
+    assert summary["canonical_gate"]["observed_swap_count"] == 24
+    assert summary["canonical_gate"]["canonical_switch_requirement_met"] is True
+    assert summary["graduates"]["soak_plus_swap_stability"] is True
+
+
 def test_cli_b1c1_interrupted_rehearsal_writes_aggregate_rollup(tmp_path):
     segment = tmp_path / "segment-rollup.jsonl"
     output_dir = tmp_path / "out"
@@ -912,6 +1033,8 @@ def test_b1c2_fake_soak_plus_swap_writes_swap_phase_and_blocked_rollup(tmp_path)
         measurement_short["config"]["prompt_growth_strategy"]
         == "boundary_safe_generated_text_then_stable_suffix"
     )
+    assert "performance" in measurement_short
+    assert "generation_duration_s" in measurement_short["performance"]
     assert measurement_short["generate_result"]["text"]
     assert "fake completion" in measurement_short["generate_result"]["text"]
     swap = swap_records[0]["swap"]
@@ -924,6 +1047,39 @@ def test_b1c2_fake_soak_plus_swap_writes_swap_phase_and_blocked_rollup(tmp_path)
     assert rollup[0]["soak_plus_swap_stability"] == "blocked"
 
 
+def test_b1c2_runner_can_expand_cache_breadth_entries(tmp_path):
+    summary = eviction_soak.run_b1c2_soak_plus_swap(
+        runtime="owlmlx",
+        backend="fake",
+        output_dir=tmp_path,
+        swap_count=1,
+        required_swap_count=1,
+        required_duration_s=0.0,
+        sample_interval_s=0.0,
+        b1c1_prerequisite_satisfied=True,
+        cache_breadth_entry_count=6,
+        concurrency_min_entry_breadth=6,
+    )
+
+    ledger = _records(tmp_path / summary["ledger"].split("/")[-1])
+    measurement_prompt_ids = {
+        record["prompt_id"] for record in ledger if record["phase"] == "measurement"
+    }
+    assert measurement_prompt_ids == {
+        "short",
+        "medium",
+        "long",
+        "short.2",
+        "medium.2",
+        "long.2",
+    }
+    assert summary["prompt_mix_counts"] == {"short": 2, "medium": 2, "long": 2}
+    concurrency = summary["axis_verdicts"]["concurrency_stability"]
+    assert concurrency["observed_entry_breadth"] == 6
+    assert concurrency["status"] == "passed"
+    assert summary["axis_verdicts"]["throughput_stability"]["status"] == "blocked"
+
+
 def _b1c2_rollup_measurement(
     sample_index,
     *,
@@ -932,6 +1088,9 @@ def _b1c2_rollup_measurement(
     active_bytes,
     resident_bytes,
     estimate_mode="cache_object_nbytes",
+    throughput=None,
+    active_entries_after=None,
+    counter_delta=None,
 ):
     return {
         "schema_version": "b1c2.v1",
@@ -948,10 +1107,19 @@ def _b1c2_rollup_measurement(
             "drift_from_measurement_start_bytes": abs(active_bytes - 1_000),
             "watermark_after_generation": "GREEN",
         },
+        "performance": {
+            "generation_duration_s": 1.0,
+            "completion_tokens": 10,
+            "throughput_tokens_per_second": throughput,
+            "throughput_source": (
+                "stream_event_completion_tokens" if throughput is not None else "unavailable"
+            ),
+        },
         "session_cache": {
+            "active_entries_after": active_entries_after,
             "resident_bytes_estimate_after": resident_bytes,
             "resident_bytes_estimate_mode": estimate_mode,
-            "counter_delta": {},
+            "counter_delta": counter_delta or {},
         },
         "reclaim_barrier_stats_after_sample": {
             "summary": {
@@ -985,8 +1153,10 @@ def _b1c2_rollup_for_test(
     tmp_path,
     *,
     records,
+    required_swap_count=1,
     drift_budget_bytes=256,
     resident_cache_budget_bytes=512,
+    **overrides,
 ):
     now = time.monotonic()
     return eviction_soak._b1c2_rollup(
@@ -1005,7 +1175,7 @@ def _b1c2_rollup_for_test(
         measurement_started_monotonic_s=now - 10.0,
         measurement_finished_monotonic_s=now,
         required_duration_s=0.0,
-        required_swap_count=1,
+        required_swap_count=required_swap_count,
         drift_budget_bytes=drift_budget_bytes,
         resident_cache_budget_bytes=resident_cache_budget_bytes,
         initial_load=SimpleNamespace(ok=True, message="loaded", error_code=None, model_id=None),
@@ -1022,6 +1192,7 @@ def _b1c2_rollup_for_test(
             duration_ms=0.0,
         ),
         b1c1_prerequisite_satisfied=True,
+        **overrides,
     )
 
 
@@ -1183,6 +1354,183 @@ def test_b1c2_rollup_accepts_direct_cache_object_resident_accounted_drift(tmp_pa
     assert rollup["axis_verdicts"]["throughput_stability"]["status"] == "blocked"
     assert rollup["axis_verdicts"]["concurrency_stability"]["status"] == "blocked"
     assert rollup["soak_plus_swap_stability"] == "blocked"
+
+
+def test_b1c2_rollup_records_measured_throughput_without_configured_threshold(tmp_path):
+    records = [
+        _b1c2_rollup_measurement(
+            index,
+            model_id="model-a",
+            prompt_id=prompt_id,
+            active_bytes=1_000 + index,
+            resident_bytes=index,
+            throughput=10.0,
+            active_entries_after=index,
+        )
+        for index, prompt_id in enumerate(
+            ["short", "medium", "long", "short.2", "medium.2", "long.2"],
+            start=1,
+        )
+    ]
+    records.append(_b1c2_rollup_swap(7))
+
+    rollup = _b1c2_rollup_for_test(tmp_path, records=records)
+
+    throughput = rollup["axis_verdicts"]["throughput_stability"]
+    concurrency = rollup["axis_verdicts"]["concurrency_stability"]
+    assert throughput["status"] == "blocked"
+    assert throughput["observed_throughput_decay_samples"] == 6
+    assert throughput["reason"] == "throughput_decay_threshold_not_configured"
+    assert concurrency["status"] == "blocked"
+    assert concurrency["observed_entry_breadth"] == 6
+    assert concurrency["reason"] == "cache_breadth_floor_not_configured"
+
+
+def test_b1c2_rollup_can_pass_four_axes_when_thresholds_are_configured(tmp_path):
+    records = [
+        _b1c2_rollup_measurement(
+            index,
+            model_id="model-a",
+            prompt_id=prompt_id,
+            active_bytes=1_000 + index,
+            resident_bytes=index,
+            throughput=10.0 if index <= 3 else 9.5,
+            active_entries_after=index,
+        )
+        for index, prompt_id in enumerate(
+            ["short", "medium", "long", "short.2", "medium.2", "long.2"],
+            start=1,
+        )
+    ]
+    records.append(_b1c2_rollup_swap(7))
+
+    rollup = _b1c2_rollup_for_test(
+        tmp_path,
+        records=records,
+        throughput_decay_max_relative=0.10,
+        throughput_min_samples=6,
+        concurrency_min_entry_breadth=6,
+    )
+
+    assert rollup["axis_verdicts"]["load_stability"]["status"] == "passed"
+    assert rollup["axis_verdicts"]["switch_stability"]["status"] == "passed"
+    assert rollup["axis_verdicts"]["throughput_stability"]["status"] == "passed"
+    assert (
+        rollup["axis_verdicts"]["throughput_stability"]["relative_decay"]
+        == pytest.approx(0.05)
+    )
+    assert rollup["axis_verdicts"]["concurrency_stability"]["status"] == "passed"
+    assert rollup["axis_verdicts"]["concurrency_stability"][
+        "observed_entry_breadth"
+    ] == 6
+    assert rollup["soak_plus_swap_stability"] == "passed"
+    assert rollup["canonical_gate"]["observed_swap_count"] == 1
+    assert rollup["canonical_gate"]["canonical_switch_requirement_met"] is False
+    assert rollup["graduates"]["soak_plus_swap_stability"] is False
+    assert rollup["graduates"]["session_kv_supported"] is False
+
+
+def test_b1c2_rollup_requires_cache_eviction_when_configured(tmp_path):
+    records = [
+        _b1c2_rollup_measurement(
+            index,
+            model_id="model-a",
+            prompt_id=prompt_id,
+            active_bytes=1_000 + index,
+            resident_bytes=index,
+            throughput=10.0 if index <= 3 else 9.5,
+            active_entries_after=index,
+        )
+        for index, prompt_id in enumerate(
+            ["short", "medium", "long", "short.2", "medium.2", "long.2"],
+            start=1,
+        )
+    ]
+    records.append(_b1c2_rollup_swap(7))
+
+    blocked_rollup = _b1c2_rollup_for_test(
+        tmp_path,
+        records=records,
+        throughput_decay_max_relative=0.10,
+        throughput_min_samples=6,
+        concurrency_min_entry_breadth=6,
+        concurrency_require_cache_eviction=True,
+    )
+
+    blocked_concurrency = blocked_rollup["axis_verdicts"]["concurrency_stability"]
+    assert blocked_concurrency["status"] == "blocked"
+    assert blocked_concurrency["cache_eviction_required"] is True
+    assert blocked_concurrency["cache_eviction_observed"] is False
+    assert blocked_concurrency["reason"] == "cache_lru_pressure_not_observed"
+    assert blocked_rollup["soak_plus_swap_stability"] == "blocked"
+
+    records_with_eviction = [
+        (
+            {
+                **record,
+                "session_cache": {
+                    **record["session_cache"],
+                    "counter_delta": {"evictions": 1},
+                },
+            }
+            if record.get("sample_index") == 6
+            else record
+        )
+        for record in records
+    ]
+
+    passed_rollup = _b1c2_rollup_for_test(
+        tmp_path,
+        records=records_with_eviction,
+        throughput_decay_max_relative=0.10,
+        throughput_min_samples=6,
+        concurrency_min_entry_breadth=6,
+        concurrency_require_cache_eviction=True,
+    )
+
+    passed_concurrency = passed_rollup["axis_verdicts"]["concurrency_stability"]
+    assert passed_concurrency["status"] == "passed"
+    assert passed_concurrency["cache_eviction_required"] is True
+    assert passed_concurrency["cache_eviction_observed"] is True
+    assert passed_concurrency["evictions_total"] == 1
+    assert passed_rollup["soak_plus_swap_stability"] == "passed"
+
+
+def test_b1c2_rollup_graduates_only_at_canonical_swap_floor(tmp_path):
+    records = [
+        _b1c2_rollup_measurement(
+            index,
+            model_id="model-a",
+            prompt_id=prompt_id,
+            active_bytes=1_000 + index,
+            resident_bytes=index,
+            throughput=10.0 if index <= 3 else 9.5,
+            active_entries_after=index,
+        )
+        for index, prompt_id in enumerate(
+            ["short", "medium", "long", "short.2", "medium.2", "long.2"],
+            start=1,
+        )
+    ]
+    records.extend(
+        _b1c2_rollup_swap(index)
+        for index in range(7, 7 + eviction_soak.B1C2_REQUIRED_SWAP_COUNT)
+    )
+
+    rollup = _b1c2_rollup_for_test(
+        tmp_path,
+        records=records,
+        required_swap_count=eviction_soak.B1C2_REQUIRED_SWAP_COUNT,
+        throughput_decay_max_relative=0.10,
+        throughput_min_samples=6,
+        concurrency_min_entry_breadth=6,
+    )
+
+    assert rollup["soak_plus_swap_stability"] == "passed"
+    assert rollup["canonical_gate"]["observed_swap_count"] == 24
+    assert rollup["canonical_gate"]["canonical_switch_requirement_met"] is True
+    assert rollup["graduates"]["soak_plus_swap_stability"] is True
+    assert rollup["graduates"]["session_kv_supported"] is False
 
 
 def test_b1c2_rollup_rejects_resident_accounting_without_direct_cache_object_mode(tmp_path):

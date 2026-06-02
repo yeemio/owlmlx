@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed and prompt-reset bounded windows produced one aggregate-eligible 4h / 1-swap segment (`20260601T025321Z`). The later 5-minute-cadence forced-swap canaries proved swap boundaries stay clean. Direct cache-object resident accounting (`cache_object_nbytes`) now explains the Gemma raw same-model load-epoch drift (`751370240` bytes raw drift; `1054965760` resident bytes; same-model unaccounted drift `0`), so §2 is no longer blocked on the raw-RSS drift false-fail. On 2026-06-02 the base §7 bar was re-founded on counts across four independent axes: load, throughput, switch, concurrency. Duration is now a reported byproduct, not a pass gate. The current runner satisfies load/switch evidence shape but reports throughput/concurrency as `blocked: under-measured`; see §7 and §11.
+> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed and prompt-reset bounded windows produced one aggregate-eligible 4h / 1-swap segment (`20260601T025321Z`). The later 5-minute-cadence forced-swap canaries proved swap boundaries stay clean. Direct cache-object resident accounting (`cache_object_nbytes`) now explains the Gemma raw same-model load-epoch drift (`751370240` bytes raw drift; `1054965760` resident bytes; same-model unaccounted drift `0`), so §2 is no longer blocked on the raw-RSS drift false-fail. On 2026-06-02 the base §7 bar was re-founded on counts across four independent axes: load, throughput, switch, concurrency. Duration is now a reported byproduct, not a pass gate. The current runner can now emit throughput-decay and cache-breadth/concurrency axis observations behind explicit thresholds. The first short native threshold smoke (`20260602T095334Z`) passed all four axes at 3 swaps, but canonical graduation remains blocked until the 24-swap floor is met; see §7 and §11.
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -156,6 +156,18 @@ axis_verdicts:
 measurement_wall_clock_gap_free: true | false
 ledger_gap_free: true | false
 max_drift_bytes: <int | null>
+canonical_gate:
+  required_swap_count: 24
+  observed_swap_count: <int>
+  canonical_switch_requirement_met: true | false
+  soak_plus_swap_graduation_eligible: true | false
+interrupted_soak_plus_swap:
+  interrupted: true | false
+  interruption_reason: planned_stop | user_interrupt | host_sleep | failure | unknown | null
+  observed_record_count: <int>
+  observed_measurement_count: <int>
+  observed_swap_count: <int>
+  graduation_eligible: true | false
 fatal_watermark_count: <int>
 failure_measurement_count: <int>
 unresolved_reclaim_barrier_events: <int>
@@ -185,6 +197,11 @@ interrupted_soak_plus_swap:
     concurrency_stability:
       status: passed | failed | blocked
 soak_plus_swap_stability: passed | failed | blocked
+canonical_gate:
+  required_swap_count: 24
+  observed_swap_count: <int>
+  canonical_switch_requirement_met: true | false
+  soak_plus_swap_graduation_eligible: true | false
 graduates:
   soak_plus_swap_stability: true | false
   session_kv_supported: false
@@ -241,8 +258,14 @@ resident-pressure defect that slow 4h switches would have hidden.
 measurement, not a standalone historical TTFT ratio. The exact pass band is
 `calibration-pending`: first measure same-run jitter, then set a band.
 
-Current evidence: `blocked: under-measured`. Existing §2 ledgers do not record
-TTFT/tok-s monotonic decay over the run.
+Current implementation: the §2 runner now records per-sample generation
+duration, token counts, and `throughput_tokens_per_second` when stream metadata
+is available. The axis remains `blocked` unless an explicit
+`--b1c2-throughput-decay-max-relative` threshold is configured and the run has at
+least `--b1c2-throughput-min-samples` usable samples. The short
+`20260602T095334Z` native smoke passed this axis with 18 usable samples and
+`relative_decay=0.0`; it is threshold evidence, not canonical graduation
+evidence.
 
 ### 7.4 Concurrency Stability
 
@@ -254,15 +277,22 @@ entry pressure:
 - no cross-entry merge, cache drop, expiration, or reject
 - no hidden coupling between short / medium / long / additional entries
 
-The exact breadth floor is `calibration-pending`; it must be set by a harness
-extension that actually drives the cache near its entry/count limits.
+The exact breadth floor is `calibration-pending`; it must be set as an explicit
+runner threshold for the evidence being collected.
 
-Current evidence: `blocked: under-measured`. The current §2 runner uses only
-three prompt ids and `max_generation_concurrency = 1`, so it does not measure
-multi-entry breadth or interleaving.
+Current implementation: the §2 runner now accepts an expanded
+`--b1c2-cache-breadth-entry-count` while preserving the canonical short /
+medium / long prompt families. The rollup records distinct prompt ids, prompt
+families, active-entry maxima, and eviction counters. The axis remains
+`blocked` unless `--b1c2-concurrency-min-entry-breadth` is configured and met;
+`--b1c2-concurrency-require-cache-eviction` can additionally require LRU
+pressure evidence. The short `20260602T095334Z` native smoke passed this axis
+with `observed_entry_breadth=6`; it did not require LRU eviction pressure and
+does not satisfy the 24-swap canonical gate.
 
-If load/switch are clean but throughput or concurrency remain under-measured,
-the result is `blocked`, not `passed`.
+If load/switch are clean but throughput or concurrency remain unconfigured,
+unmeasured, or below threshold, the result is `blocked` or `failed` per the
+axis reason, never silently `passed`.
 
 If any generation, unload, settle, load, watermark, reclaim, cache, or cleanup
 condition fails, the result is `failed`.
@@ -274,6 +304,8 @@ condition fails, the result is `failed`.
 | §1 prerequisite missing | `blocked` | Do not run or aggregate §2 as promotion evidence |
 | Load / switch clean but throughput or concurrency unmeasured | `blocked` | Useful evidence, not a four-axis pass |
 | Segment has host sleep / power gap | `blocked` | Operational interruption inside segment; not hard runtime failure |
+| Operator SIGINT / SIGTERM during segment | `blocked` | Cleanup and rollup must still be written; never promotion evidence |
+| Partial ledger without rollup | not accepted | Diagnostic artifact only; do not aggregate or promote |
 | Aggregate swap count < 24 | `blocked` | More clean switch evidence required |
 | Duration short but count axes measured | reported only | Duration is no longer a pass gate |
 | Unload / settle / load failure | `failed` | Swap boundary failed |
@@ -793,21 +825,24 @@ high-frequency clean validation is 40 minutes / 8 swaps; the count-based floor i
 should retain a short swap cadence (currently 5 minutes) so switch count grows.
 Duration is recorded for context only.
 
-### B5 — Throughput stability: BLOCKED / UNDER-MEASURED
+### B5 — Throughput stability: MEASURABLE / NATIVE EVIDENCE PENDING
 
-The §2 runner does not record run-internal TTFT or decode throughput decay. The
-old 24h soak shape could run for a long time without detecting monotonic
-slowdown. This axis requires a calibration slice: measure same-run throughput
-jitter, then set a pass band.
+The §2 runner records per-sample generation duration, token counts, and
+`throughput_tokens_per_second` when stream metadata is available. The old 24h
+soak shape could run for a long time without detecting monotonic slowdown; the
+new rollup compares early-run and late-run throughput and can pass only when an
+explicit relative-decay threshold is configured. Without that threshold the axis
+is measured but remains `blocked`.
 
-### B6 — Concurrency breadth: BLOCKED / UNDER-MEASURED
+### B6 — Concurrency breadth: MEASURABLE / NATIVE EVIDENCE PENDING
 
-The §2 runner keys sessions by `prompt_id`, so the canonical workload has only
-three live entries (`short`, `medium`, `long`) against the default `MAX_ENTRIES =
-64`, with `max_generation_concurrency = 1`. That is sequential breadth-3
-interleaving, not a concurrency/entry-pressure proof. This axis requires a
-harness extension that increases entry breadth and exercises both count-LRU and
-byte-LRU without cross-entry merge.
+The §2 runner still preserves `max_generation_concurrency = 1`, but it now can
+expand the session/prompt entry set beyond the canonical three families via
+`--b1c2-cache-breadth-entry-count`. Rollups record distinct prompt ids, family
+coverage, active-entry maxima, and eviction counters. The axis can pass only
+when an explicit entry-breadth floor is configured and met; an optional flag can
+also require cache eviction pressure. Without those policy knobs the axis is
+measured but remains `blocked`.
 
 ### Route forward
 
@@ -828,8 +863,9 @@ byte-LRU without cross-entry merge.
    Mac is not a reliable 24h-soak measurement environment.
 6. Do **not** relax the per-segment gap-free requirement; the fix is keeping the
    machine awake during measured windows, not tolerating hidden gaps.
-7. Extend the harness before claiming §2 pass: add throughput-decay sampling and
-   a breadth/concurrency mode that drives more than three entries.
+7. Run the updated harness before claiming §2 pass: configure a
+   throughput-decay threshold and entry-breadth floor, then collect native
+   evidence that satisfies all four axes.
 
 ### What this does NOT change
 
@@ -883,8 +919,62 @@ independent count-based axes:
 - `switch_stability`
 - `concurrency_stability`
 
-`duration_gate_role = reported_byproduct_not_pass_gate`. The runner now emits
-`axis_verdicts`; current evidence can pass load/switch sub-gates, but
-throughput/concurrency are intentionally `blocked` until the harness measures
-them. This is stricter than the old composite duration verdict because missing
-axes are visible instead of being hidden by a long wall-clock run.
+`duration_gate_role = reported_byproduct_not_pass_gate`. The runner emits
+`axis_verdicts`. As of the 2026-06-02 harness update it can measure
+throughput-decay and cache-breadth/concurrency observations. The first short
+native threshold smoke (`20260602T095334Z`) passed all four configured axes at
+3 swaps, while `canonical_gate.canonical_switch_requirement_met=false`, so
+`graduates.soak_plus_swap_stability=false`.
+This is stricter than the old composite duration verdict because missing or
+unconfigured axes are visible instead of being hidden by a long wall-clock run.
+
+### 2026-06-02 throughput / breadth harness addendum
+
+`scripts/bench/eviction_soak.py` now adds code-grade support for the two missing
+axes:
+
+- generation rows include a `performance` block with generation duration,
+  prompt/completion token counts, and throughput when stream metadata is
+  available;
+- `--b1c2-throughput-decay-max-relative` plus
+  `--b1c2-throughput-min-samples` let a segment judge throughput decay;
+- `--b1c2-cache-breadth-entry-count` expands session/prompt entries while
+  preserving canonical short / medium / long family balance;
+- `--b1c2-concurrency-min-entry-breadth` and
+  `--b1c2-concurrency-require-cache-eviction` let the rollup judge
+  cache-breadth / LRU-pressure evidence.
+
+`--b1c2-concurrency-require-cache-eviction` is intentionally strict: when it is
+enabled, concurrency stays `blocked` unless eviction / window-eviction /
+trim-eviction counters are observed. The no-MLX regression coverage in
+`tests/test_eviction_soak_bench.py` verifies both sides of that rule.
+
+The default behavior remains conservative: if thresholds are absent, the axes
+are recorded but stay `blocked` with explicit reasons. This update creates the
+next native evidence path. The `20260602T095334Z` threshold smoke proves the
+path can produce four-axis native evidence, but it remains below the canonical
+24-swap graduation floor and does not change the `experimental` capability
+label.
+
+`scripts/bench/session_kv_soak_audit.py --require-canonical` is the offline
+promotion guard for B-1c §2 evidence. It works on segment / aggregate rollups,
+and when given a ledger it follows the expected matching `*-rollup.jsonl` before
+making the canonical decision. A short threshold smoke may audit cleanly as
+local configured evidence, but canonical mode must fail unless
+`canonical_gate.canonical_switch_requirement_met=true`,
+`canonical_gate.soak_plus_swap_graduation_eligible=true`, and
+`graduates.soak_plus_swap_stability=true`.
+For canonical commands that require LRU-pressure evidence, add
+`--require-cache-eviction`; that audit path also requires
+`axis_verdicts.concurrency_stability.cache_eviction_required=true` and
+`cache_eviction_observed=true`.
+
+### 2026-06-02 interruption rollup addendum
+
+The B-1c §2 runner now mirrors B-1c §1's interruption discipline. SIGINT /
+SIGTERM requests write a segment rollup after cleanup instead of leaving only a
+partial ledger. Interrupted rollups must stay `blocked`, set
+`interrupted_soak_plus_swap.interrupted=true`, and keep
+`graduates.soak_plus_swap_stability=false`. The operator-paused
+`20260602T095953Z` and `20260602T100243Z` ledgers predate this protection and
+are diagnostic partial ledgers only, not pass or aggregate evidence.

@@ -103,7 +103,10 @@ N=20 both completed; cache-on had 20/20 warm hits, `failed_reclaim=0`,
 This remains `experimental`: native backend only, default off, explicit
 session id, append-only reuse for non-trimmable upstream caches. B-1c no-swap
 and soak-plus-swap gates remain open before any `supported` promotion; §2 is now
-blocked on under-measured throughput/concurrency axes, not on raw duration.
+blocked pending canonical 24-swap threshold evidence. The short
+`20260602T095334Z` native smoke passed load / throughput / switch / concurrency
+at 3 swaps, but `canonical_gate.canonical_switch_requirement_met=false`, so it
+is not promotion evidence.
 
 Short-prompt TPS on `Mac17,6` (`max_tokens=64`, `temperature=0`):
 
@@ -191,10 +194,13 @@ and `swap_boundaries_clean=true`; audit reports
 5-minute load/switch boundaries stay clean, direct cache-object resident
 accounting closed the raw-RSS drift false-fail, and the resident cap kept the
 held cache working set inside budget. The §2 rollup still correctly remains
-`blocked` because throughput decay and concurrency breadth are under-measured
-under the four-axis count-based §7, not because more passive wall-clock duration
-is needed. The next step is harness instrumentation for those two missing axes
-per `docs/architect/design/B-1c-section-2-spec.md §10`). Stage 1 refactor
+`blocked` because the first threshold-configured native four-axis smoke
+(`20260602T095334Z`) used 3 swaps, not the canonical 24-swap graduation floor.
+It passed the configured load / throughput / switch / concurrency axes with
+18 throughput samples and 6 cache-breadth entries, while
+`graduates.soak_plus_swap_stability=false`. The next step is a canonical native
+evidence segment using those knobs per
+`docs/architect/design/B-1c-section-2-spec.md §10`. Stage 1 refactor
 (2026-05-11) archived 151 spec-as-code modules; Stage 2 aligned landmark
 vocabulary with [PR #649][pr649]; Wave H · H1 (2026-05-17) extracted
 OpenAI/Anthropic compat routes into `server_routes_openai.py`. Campaign F-1

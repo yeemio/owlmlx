@@ -83,6 +83,14 @@ def _sample_indices(records: list[dict[str, Any]]) -> list[int]:
     return indices
 
 
+def _expected_b1c2_rollup_path(ledger_path: Path) -> Path:
+    name = ledger_path.name
+    suffix = "-soak-swap.jsonl"
+    if name.endswith(suffix):
+        return ledger_path.with_name(f"{name[:-len(suffix)]}-soak-swap-rollup.jsonl")
+    return ledger_path.with_name(f"{ledger_path.stem}-rollup.jsonl")
+
+
 def _segment_blockers(record: dict[str, Any]) -> list[str]:
     checks = {
         "hard_failure_false": record.get("hard_failure") is False,
@@ -162,11 +170,150 @@ def _claim_errors(record: dict[str, Any]) -> list[str]:
         errors.append("unsafe_claim:passed_without_axis_verdicts")
     if not swap_met and record.get("conclusion") == "passed":
         errors.append("unsafe_claim:passed_without_swap_requirement")
+    canonical_gate = record.get("canonical_gate", {})
+    if not isinstance(canonical_gate, dict):
+        canonical_gate = {}
+    canonical_eligible = (
+        canonical_gate.get("canonical_switch_requirement_met") is True
+        and canonical_gate.get("soak_plus_swap_graduation_eligible") is True
+    )
+    if graduates.get("soak_plus_swap_stability") is True and not canonical_eligible:
+        errors.append("unsafe_claim:graduates_soak_plus_swap_without_canonical_gate")
     return errors
 
 
-def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
+def _required_axis_statuses(record: dict[str, Any]) -> dict[str, str | None]:
+    axis_verdicts = record.get("axis_verdicts", {})
+    if not isinstance(axis_verdicts, dict) or not axis_verdicts:
+        aggregate = record.get("interrupted_soak_plus_swap", {})
+        if isinstance(aggregate, dict):
+            axis_verdicts = aggregate.get("axis_verdicts", {})
+    if not isinstance(axis_verdicts, dict):
+        axis_verdicts = {}
+    required_axes = (
+        "load_stability",
+        "throughput_stability",
+        "switch_stability",
+        "concurrency_stability",
+    )
+    return {
+        axis: (
+            axis_verdicts.get(axis, {}).get("status")
+            if isinstance(axis_verdicts.get(axis), dict)
+            else None
+        )
+        for axis in required_axes
+    }
+
+
+def _concurrency_axis(record: dict[str, Any]) -> dict[str, Any]:
+    axis_verdicts = record.get("axis_verdicts", {})
+    if not isinstance(axis_verdicts, dict) or not axis_verdicts:
+        aggregate = record.get("interrupted_soak_plus_swap", {})
+        if isinstance(aggregate, dict):
+            axis_verdicts = aggregate.get("axis_verdicts", {})
+    if not isinstance(axis_verdicts, dict):
+        return {}
+    concurrency = axis_verdicts.get("concurrency_stability", {})
+    return concurrency if isinstance(concurrency, dict) else {}
+
+
+def _cache_eviction_acceptance_errors(record: dict[str, Any]) -> list[str]:
+    concurrency = _concurrency_axis(record)
+    errors: list[str] = []
+    if not concurrency:
+        return ["cache_eviction:concurrency_axis_missing"]
+    if concurrency.get("cache_eviction_required") is not True:
+        errors.append("cache_eviction:requirement_flag_not_true")
+    if concurrency.get("cache_eviction_observed") is not True:
+        errors.append("cache_eviction:not_observed")
+    return errors
+
+
+def _canonical_acceptance_errors(
+    record: dict[str, Any],
+    *,
+    require_cache_eviction: bool = False,
+) -> list[str]:
+    errors: list[str] = []
+    canonical_gate = record.get("canonical_gate", {})
+    if not isinstance(canonical_gate, dict):
+        canonical_gate = {}
+    graduates = record.get("graduates", {})
+    if not isinstance(graduates, dict):
+        graduates = {}
+    interrupted = record.get("interrupted_soak_plus_swap", {})
+    if not isinstance(interrupted, dict):
+        interrupted = {}
+    axis_statuses = _required_axis_statuses(record)
+    if any(status != "passed" for status in axis_statuses.values()):
+        errors.append("canonical_gate:axis_verdicts_not_all_passed")
+    if record.get("conclusion") != "passed":
+        errors.append("canonical_gate:conclusion_not_passed")
+    if record.get("soak_plus_swap_stability") != "passed":
+        errors.append("canonical_gate:stability_not_passed")
+    if canonical_gate.get("canonical_switch_requirement_met") is not True:
+        errors.append("canonical_gate:canonical_switch_requirement_not_met")
+    if canonical_gate.get("soak_plus_swap_graduation_eligible") is not True:
+        errors.append("canonical_gate:graduation_not_eligible")
+    if graduates.get("soak_plus_swap_stability") is not True:
+        errors.append("canonical_gate:graduate_flag_not_true")
+    if graduates.get("session_kv_supported") is True:
+        errors.append("unsafe_claim:session_kv_supported=true")
+    if interrupted.get("interrupted") is True:
+        errors.append("canonical_gate:interrupted_segment")
+    if require_cache_eviction:
+        errors.extend(_cache_eviction_acceptance_errors(record))
+    return errors
+
+
+def _canonical_acceptance_status(
+    record: dict[str, Any],
+    *,
+    require_cache_eviction: bool = False,
+) -> str:
+    return (
+        "canonical_passed"
+        if not _canonical_acceptance_errors(
+            record,
+            require_cache_eviction=require_cache_eviction,
+        )
+        else "not_canonical"
+    )
+
+
+def audit_b1c2_ledger(
+    path: Path,
+    *,
+    require_rollup: bool = False,
+    require_canonical: bool = False,
+    require_cache_eviction: bool = False,
+) -> dict[str, Any]:
     records, errors = _read_jsonl(path)
+    expected_rollup_path = _expected_b1c2_rollup_path(path)
+    expected_rollup_exists = expected_rollup_path.exists()
+    if (
+        require_rollup
+        or require_canonical
+        or require_cache_eviction
+    ) and not expected_rollup_exists:
+        errors.append(f"missing_segment_rollup:{expected_rollup_path}")
+    expected_rollup_canonical_acceptance_status = None
+    expected_rollup_canonical_errors: list[str] = []
+    if (require_canonical or require_cache_eviction) and expected_rollup_exists:
+        rollup_audit = audit_b1c2_segment_rollup(
+            expected_rollup_path,
+            require_canonical=True,
+            require_cache_eviction=require_cache_eviction,
+        )
+        expected_rollup_canonical_acceptance_status = rollup_audit.get(
+            "canonical_acceptance_status"
+        )
+        canonical_errors = rollup_audit.get("canonical_acceptance_errors")
+        if isinstance(canonical_errors, list):
+            expected_rollup_canonical_errors = [str(error) for error in canonical_errors]
+        for error in rollup_audit.get("errors", []):
+            errors.append(f"expected_rollup:{error}")
     indices = _sample_indices(records)
     expected_indices = list(range(1, len(indices) + 1))
     phases = Counter(str(record.get("phase", "missing")) for record in records)
@@ -240,6 +387,17 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
     return {
         "kind": "b1c2_ledger",
         "path": str(path),
+        "expected_rollup_path": str(expected_rollup_path),
+        "expected_rollup_exists": expected_rollup_exists,
+        "expected_rollup_canonical_acceptance_status": (
+            expected_rollup_canonical_acceptance_status
+        ),
+        "expected_rollup_canonical_errors": expected_rollup_canonical_errors,
+        "ledger_acceptance_status": (
+            "rollup_available"
+            if expected_rollup_exists
+            else "diagnostic_partial_no_rollup"
+        ),
         "record_count": len(records),
         "schema_versions": sorted(
             {str(record.get("schema_version", "missing")) for record in records}
@@ -350,7 +508,12 @@ def audit_b1c2_ledger(path: Path) -> dict[str, Any]:
     }
 
 
-def audit_b1c2_segment_rollup(path: Path) -> dict[str, Any]:
+def audit_b1c2_segment_rollup(
+    path: Path,
+    *,
+    require_canonical: bool = False,
+    require_cache_eviction: bool = False,
+) -> dict[str, Any]:
     record, errors = _read_first_record(path)
     if record is None:
         return {
@@ -365,6 +528,12 @@ def audit_b1c2_segment_rollup(path: Path) -> dict[str, Any]:
     if record.get("gate") != "B-1c section 2":
         errors.append(f"wrong_gate:{record.get('gate')}")
     errors.extend(_claim_errors(record))
+    canonical_errors = _canonical_acceptance_errors(
+        record,
+        require_cache_eviction=require_cache_eviction,
+    )
+    if require_canonical or require_cache_eviction:
+        errors.extend(canonical_errors)
     blockers = _segment_blockers(record)
     return {
         "kind": "b1c2_segment_rollup",
@@ -379,6 +548,12 @@ def audit_b1c2_segment_rollup(path: Path) -> dict[str, Any]:
         "swap_count": record.get("swap_count"),
         "required_swap_count": record.get("required_swap_count"),
         "swap_requirement_met": record.get("swap_requirement_met"),
+        "canonical_gate": record.get("canonical_gate", {}),
+        "canonical_acceptance_status": _canonical_acceptance_status(
+            record,
+            require_cache_eviction=require_cache_eviction,
+        ),
+        "canonical_acceptance_errors": canonical_errors,
         "clean_for_interrupted_aggregate": eviction_soak._b1c2_segment_ok_for_rehearsal(
             record
         ),
@@ -407,7 +582,12 @@ def audit_b1c2_segment_rollup(path: Path) -> dict[str, Any]:
     }
 
 
-def audit_b1c2_aggregate_rollup(path: Path) -> dict[str, Any]:
+def audit_b1c2_aggregate_rollup(
+    path: Path,
+    *,
+    require_canonical: bool = False,
+    require_cache_eviction: bool = False,
+) -> dict[str, Any]:
     record, errors = _read_first_record(path)
     if record is None:
         return {
@@ -454,6 +634,12 @@ def audit_b1c2_aggregate_rollup(path: Path) -> dict[str, Any]:
     )
     if passed_claim and not aggregate_gates_met:
         errors.append("unsafe_claim:aggregate_passed_without_all_gates")
+    canonical_errors = _canonical_acceptance_errors(
+        record,
+        require_cache_eviction=require_cache_eviction,
+    )
+    if require_canonical or require_cache_eviction:
+        errors.extend(canonical_errors)
 
     return {
         "kind": "b1c2_aggregate_rollup",
@@ -462,6 +648,12 @@ def audit_b1c2_aggregate_rollup(path: Path) -> dict[str, Any]:
         "conclusion": record.get("conclusion"),
         "soak_plus_swap_stability": record.get("soak_plus_swap_stability"),
         "aggregate": aggregate,
+        "canonical_gate": record.get("canonical_gate", {}),
+        "canonical_acceptance_status": _canonical_acceptance_status(
+            record,
+            require_cache_eviction=require_cache_eviction,
+        ),
+        "canonical_acceptance_errors": canonical_errors,
         "graduates": graduates,
         "errors": errors,
     }
@@ -472,6 +664,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--ledger", type=Path, action="append", default=[])
     parser.add_argument("--segment-rollup", type=Path, action="append", default=[])
     parser.add_argument("--aggregate-rollup", type=Path, action="append", default=[])
+    parser.add_argument("--require-rollup", action="store_true")
+    parser.add_argument("--require-canonical", action="store_true")
+    parser.add_argument("--require-cache-eviction", action="store_true")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args(argv)
 
@@ -484,10 +679,18 @@ def _render_text(results: list[dict[str, Any]]) -> str:
             lines.append(
                 "  records={record_count} last={last_sample_index}/{last_phase} "
                 "swaps={swap_count} drops={session_cache_drops_total} "
-                "fatal={fatal_watermark_count} gap_free={ledger_gap_free}".format(
+                "fatal={fatal_watermark_count} gap_free={ledger_gap_free} "
+                "acceptance={ledger_acceptance_status}".format(
                     **result
                 )
             )
+            if result.get("errors"):
+                lines.append(f"  errors={result['errors']}")
+            if result.get("expected_rollup_canonical_acceptance_status"):
+                lines.append(
+                    "  expected_rollup_canonical_acceptance="
+                    "{expected_rollup_canonical_acceptance_status}".format(**result)
+                )
             if result.get("drop_sample_indices"):
                 lines.append(f"  drop_samples={result['drop_sample_indices']}")
         else:
@@ -495,6 +698,12 @@ def _render_text(results: list[dict[str, Any]]) -> str:
                 "  conclusion={conclusion} stability={soak_plus_swap_stability} "
                 "errors={errors}".format(**result)
             )
+            if result.get("canonical_acceptance_status"):
+                lines.append(
+                    "  canonical_acceptance={canonical_acceptance_status}".format(
+                        **result
+                    )
+                )
         blockers = result.get("blockers") or []
         if blockers:
             lines.append(f"  blockers={','.join(blockers)}")
@@ -505,11 +714,30 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
     results: list[dict[str, Any]] = []
     for path in args.ledger:
-        results.append(audit_b1c2_ledger(path))
+        results.append(
+            audit_b1c2_ledger(
+                path,
+                require_rollup=args.require_rollup,
+                require_canonical=args.require_canonical,
+                require_cache_eviction=args.require_cache_eviction,
+            )
+        )
     for path in args.segment_rollup:
-        results.append(audit_b1c2_segment_rollup(path))
+        results.append(
+            audit_b1c2_segment_rollup(
+                path,
+                require_canonical=args.require_canonical,
+                require_cache_eviction=args.require_cache_eviction,
+            )
+        )
     for path in args.aggregate_rollup:
-        results.append(audit_b1c2_aggregate_rollup(path))
+        results.append(
+            audit_b1c2_aggregate_rollup(
+                path,
+                require_canonical=args.require_canonical,
+                require_cache_eviction=args.require_cache_eviction,
+            )
+        )
     if not results:
         print("no audit inputs supplied", file=sys.stderr)
         return 2

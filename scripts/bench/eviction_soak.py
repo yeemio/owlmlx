@@ -102,6 +102,7 @@ B1C1_PROMPTS: tuple[tuple[str, str], ...] = (
 )
 B1C2_PROMPT_GROWTH_STRATEGY = "boundary_safe_generated_text_then_stable_suffix"
 B1C2_PROMPT_WINDOW_STRATEGY = "reset_to_base_prompt_when_max_chars_exceeded"
+B1C2_THROUGHPUT_DEFAULT_MIN_SAMPLES = 6
 
 
 def _b1c2_prompt_growth_fragment(generated_text: str, *, sample_index: int) -> str:
@@ -116,10 +117,35 @@ def _b1c2_apply_prompt_growth_window(
     prompt_id: str,
     prompt: str,
     max_chars: int | None,
+    base_prompt: str | None = None,
 ) -> str:
     if max_chars is None or max_chars <= 0 or len(prompt) <= max_chars:
         return prompt
-    return dict(B1C1_PROMPTS)[prompt_id]
+    return base_prompt if base_prompt is not None else dict(B1C1_PROMPTS)[prompt_id]
+
+
+def _b1c2_prompt_family(prompt_id: str | None) -> str | None:
+    if not prompt_id:
+        return None
+    return str(prompt_id).split(".", 1)[0]
+
+
+def _b1c2_prompt_entries(entry_count: int | None = None) -> tuple[tuple[str, str], ...]:
+    if entry_count is None:
+        return B1C1_PROMPTS
+    if entry_count < len(B1C1_PROMPTS):
+        raise ValueError(
+            "--b1c2-cache-breadth-entry-count must be >= the canonical prompt families"
+        )
+    entries = list(B1C1_PROMPTS)
+    lane = 2
+    while len(entries) < entry_count:
+        for family, prompt in B1C1_PROMPTS:
+            entries.append((f"{family}.{lane}", f"{prompt} Entry lane {lane}."))
+            if len(entries) >= entry_count:
+                break
+        lane += 1
+    return tuple(entries)
 
 
 @dataclass(frozen=True, slots=True)
@@ -2122,6 +2148,165 @@ def _b1c2_last_expected_minus_observed_active_bytes(
     return None
 
 
+def _b1c2_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed <= 0:
+        return None
+    return parsed
+
+
+def _b1c2_mean(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _b1c2_throughput_axis(
+    measurement_records: list[dict[str, Any]],
+    *,
+    max_relative_decay: float | None,
+    min_samples: int,
+) -> tuple[bool, dict[str, Any]]:
+    observations = [
+        {
+            "sample_index": record.get("sample_index"),
+            "model_id": record.get("model", {}).get("id"),
+            "prompt_id": record.get("prompt_id"),
+            "throughput_tokens_per_second": _b1c2_float(
+                record.get("performance", {}).get("throughput_tokens_per_second")
+            ),
+        }
+        for record in measurement_records
+    ]
+    observations = [
+        observation
+        for observation in observations
+        if observation["throughput_tokens_per_second"] is not None
+    ]
+    throughputs = [
+        float(observation["throughput_tokens_per_second"])
+        for observation in observations
+    ]
+    observed_count = len(throughputs)
+    split = max(observed_count // 2, 1)
+    early_mean = _b1c2_mean(throughputs[:split])
+    late_mean = _b1c2_mean(throughputs[split:]) if observed_count > 1 else None
+    relative_decay = (
+        max((early_mean - late_mean) / early_mean, 0.0)
+        if early_mean is not None and late_mean is not None and early_mean > 0
+        else None
+    )
+    if max_relative_decay is None:
+        status = "blocked"
+        reason = "throughput_decay_threshold_not_configured"
+    elif observed_count < min_samples:
+        status = "blocked"
+        reason = "throughput_sample_count_below_floor"
+    elif relative_decay is None:
+        status = "blocked"
+        reason = "throughput_decay_not_computable"
+    elif relative_decay <= max_relative_decay:
+        status = "passed"
+        reason = "throughput_decay_within_configured_threshold"
+    else:
+        status = "failed"
+        reason = "throughput_decay_exceeds_configured_threshold"
+    return status == "passed", {
+        "status": status,
+        "calibration_status": (
+            "configured" if max_relative_decay is not None else "pending"
+        ),
+        "observed_throughput_decay_samples": observed_count,
+        "min_required_samples": min_samples,
+        "max_relative_decay": max_relative_decay,
+        "early_mean_tokens_per_second": early_mean,
+        "late_mean_tokens_per_second": late_mean,
+        "relative_decay": relative_decay,
+        "reason": reason,
+    }
+
+
+def _b1c2_concurrency_axis(
+    measurement_records: list[dict[str, Any]],
+    *,
+    min_entry_breadth: int | None,
+    require_cache_eviction: bool,
+    evictions_total: int,
+    window_evictions_total: int,
+    trim_evictions_total: int,
+) -> tuple[bool, dict[str, Any]]:
+    prompt_ids = sorted(
+        {
+            str(record.get("prompt_id"))
+            for record in measurement_records
+            if record.get("prompt_id")
+        }
+    )
+    prompt_families = sorted(
+        {
+            str(_b1c2_prompt_family(record.get("prompt_id")))
+            for record in measurement_records
+            if _b1c2_prompt_family(record.get("prompt_id"))
+        }
+    )
+    active_entries = [
+        int(record["session_cache"]["active_entries_after"])
+        for record in measurement_records
+        if record.get("session_cache", {}).get("active_entries_after") is not None
+    ]
+    observed_entry_breadth = len(prompt_ids)
+    max_active_entries = max(active_entries) if active_entries else None
+    observed_max_generation_concurrency = max(
+        (
+            int(record.get("config", {}).get("max_generation_concurrency", 1) or 1)
+            for record in measurement_records
+        ),
+        default=1,
+    )
+    canonical_families = {prompt_id for prompt_id, _prompt in B1C1_PROMPTS}
+    family_complete = canonical_families.issubset(set(prompt_families))
+    cache_eviction_observed = (
+        evictions_total > 0 or window_evictions_total > 0 or trim_evictions_total > 0
+    )
+    if min_entry_breadth is None:
+        status = "blocked"
+        reason = "cache_breadth_floor_not_configured"
+    elif not family_complete:
+        status = "blocked"
+        reason = "canonical_prompt_family_breadth_incomplete"
+    elif observed_entry_breadth < min_entry_breadth:
+        status = "blocked"
+        reason = "cache_entry_breadth_below_floor"
+    elif require_cache_eviction and not cache_eviction_observed:
+        status = "blocked"
+        reason = "cache_lru_pressure_not_observed"
+    else:
+        status = "passed"
+        reason = "cache_entry_breadth_and_isolation_floor_satisfied"
+    return status == "passed", {
+        "status": status,
+        "calibration_status": "configured" if min_entry_breadth is not None else "pending",
+        "observed_entry_breadth": observed_entry_breadth,
+        "min_required_entry_breadth": min_entry_breadth,
+        "observed_prompt_ids": prompt_ids,
+        "observed_prompt_families": prompt_families,
+        "canonical_prompt_families_complete": family_complete,
+        "observed_active_entries_max": max_active_entries,
+        "observed_max_generation_concurrency": observed_max_generation_concurrency,
+        "cache_eviction_required": require_cache_eviction,
+        "cache_eviction_observed": cache_eviction_observed,
+        "evictions_total": evictions_total,
+        "window_evictions_total": window_evictions_total,
+        "trim_evictions_total": trim_evictions_total,
+        "reason": reason,
+    }
+
+
 def _b1c2_rollup(
     *,
     run_id: str,
@@ -2142,6 +2327,11 @@ def _b1c2_rollup(
     cleanup_unload: Any | None,
     cleanup_settle: SettleResult | None,
     b1c1_prerequisite_satisfied: bool,
+    throughput_decay_max_relative: float | None = None,
+    throughput_min_samples: int = B1C2_THROUGHPUT_DEFAULT_MIN_SAMPLES,
+    concurrency_min_entry_breadth: int | None = None,
+    concurrency_require_cache_eviction: bool = False,
+    interruption_reason: str | None = None,
 ) -> dict[str, Any]:
     total_duration_s = round(time.monotonic() - started_monotonic_s, 3)
     measurement_duration_s = (
@@ -2161,7 +2351,9 @@ def _b1c2_rollup(
     ledger_gap_free = sample_indices == list(range(1, len(records) + 1))
     prompt_mix_counts = {
         prompt_id: sum(
-            1 for record in measurement_records if record.get("prompt_id") == prompt_id
+            1
+            for record in measurement_records
+            if _b1c2_prompt_family(record.get("prompt_id")) == prompt_id
         )
         for prompt_id, _prompt in B1C1_PROMPTS
     }
@@ -2346,8 +2538,19 @@ def _b1c2_rollup(
         and expirations_total == 0
         and rejects_total == 0
     )
-    throughput_stability_ok = False
-    concurrency_stability_ok = False
+    throughput_stability_ok, throughput_axis = _b1c2_throughput_axis(
+        measurement_records,
+        max_relative_decay=throughput_decay_max_relative,
+        min_samples=throughput_min_samples,
+    )
+    concurrency_stability_ok, concurrency_axis = _b1c2_concurrency_axis(
+        measurement_records,
+        min_entry_breadth=concurrency_min_entry_breadth,
+        require_cache_eviction=concurrency_require_cache_eviction,
+        evictions_total=evictions_total,
+        window_evictions_total=window_evictions_total,
+        trim_evictions_total=trim_evictions_total,
+    )
     axis_verdicts = {
         "load_stability": {
             "status": "passed" if load_stability_ok else "blocked",
@@ -2376,27 +2579,8 @@ def _b1c2_rollup(
                 else "switch_count_or_boundary_gate_not_satisfied"
             ),
         },
-        "throughput_stability": {
-            "status": "passed" if throughput_stability_ok else "blocked",
-            "calibration_status": "pending",
-            "observed_throughput_decay_samples": 0,
-            "reason": "throughput_decay_not_measured_by_current_b1c2_runner",
-        },
-        "concurrency_stability": {
-            "status": "passed" if concurrency_stability_ok else "blocked",
-            "calibration_status": "pending",
-            "observed_entry_breadth": len(
-                {record.get("prompt_id") for record in sample_records if record.get("prompt_id")}
-            ),
-            "observed_max_generation_concurrency": max(
-                (
-                    int(record.get("config", {}).get("max_generation_concurrency", 1) or 1)
-                    for record in sample_records
-                ),
-                default=1,
-            ),
-            "reason": "multi_entry_breadth_and_interleaving_not_measured_by_current_b1c2_runner",
-        },
+        "throughput_stability": throughput_axis,
+        "concurrency_stability": concurrency_axis,
     }
     hard_failure = (
         bool(records)
@@ -2434,12 +2618,19 @@ def _b1c2_rollup(
         and unresolved_reclaim_barrier_events == 0
         and cleanup_ok
     )
-    if ok:
+    interrupted = interruption_reason is not None
+    if interrupted and not hard_failure:
+        conclusion = "blocked"
+    elif ok:
         conclusion = "passed"
     elif hard_failure:
         conclusion = "failed"
     else:
         conclusion = "blocked"
+    canonical_switch_requirement_met = len(swap_records) >= B1C2_REQUIRED_SWAP_COUNT
+    canonical_section2_gate_met = (
+        ok and canonical_switch_requirement_met and not interrupted
+    )
     return {
         "schema_version": "b1c2.rollup.v1",
         "gate": "B-1c section 2",
@@ -2458,6 +2649,20 @@ def _b1c2_rollup(
         "required_swap_count": required_swap_count,
         "swap_count": len(swap_records),
         "swap_requirement_met": swap_requirement_met,
+        "interrupted_soak_plus_swap": {
+            "interrupted": interrupted,
+            "interruption_reason": interruption_reason,
+            "observed_record_count": len(records),
+            "observed_measurement_count": len(measurement_records),
+            "observed_swap_count": len(swap_records),
+            "graduation_eligible": not interrupted,
+        },
+        "canonical_gate": {
+            "required_swap_count": B1C2_REQUIRED_SWAP_COUNT,
+            "observed_swap_count": len(swap_records),
+            "canonical_switch_requirement_met": canonical_switch_requirement_met,
+            "soak_plus_swap_graduation_eligible": canonical_section2_gate_met,
+        },
         "axis_verdicts": axis_verdicts,
         "ledger_gap_free": ledger_gap_free,
         "wall_clock_continuity": wall_clock_continuity,
@@ -2547,7 +2752,7 @@ def _b1c2_rollup(
         "soak_plus_swap_stability": conclusion,
         "conclusion": conclusion,
         "graduates": {
-            "soak_plus_swap_stability": ok,
+            "soak_plus_swap_stability": canonical_section2_gate_met,
             "session_kv_supported": False,
         },
     }
@@ -2573,6 +2778,12 @@ def run_b1c2_soak_plus_swap(
     session_cache_max_prompt_tokens: int | None = None,
     prompt_growth_max_chars: int | None = None,
     session_cache_auto_prefix: bool = False,
+    cache_breadth_entry_count: int | None = None,
+    throughput_decay_max_relative: float | None = None,
+    throughput_min_samples: int = B1C2_THROUGHPUT_DEFAULT_MIN_SAMPLES,
+    concurrency_min_entry_breadth: int | None = None,
+    concurrency_require_cache_eviction: bool = False,
+    interruption_reason: str = "planned_stop",
 ) -> dict[str, Any]:
     if runtime != "owlmlx":
         raise ValueError("only --runtime owlmlx is implemented in this baseline round")
@@ -2594,11 +2805,27 @@ def run_b1c2_soak_plus_swap(
         raise ValueError("--sample-interval-s must be >= 0")
     if max_samples is not None and max_samples < 1:
         raise ValueError("--max-samples must be >= 1")
+    if throughput_min_samples < 1:
+        raise ValueError("--b1c2-throughput-min-samples must be >= 1")
+    if (
+        throughput_decay_max_relative is not None
+        and throughput_decay_max_relative < 0
+    ):
+        raise ValueError("--b1c2-throughput-decay-max-relative must be >= 0")
+    if concurrency_min_entry_breadth is not None and concurrency_min_entry_breadth < 1:
+        raise ValueError("--b1c2-concurrency-min-entry-breadth must be >= 1")
+    if interruption_reason not in B1C1_INTERRUPTION_REASONS:
+        raise ValueError(
+            "--interruption-reason must be one of "
+            + ", ".join(sorted(B1C1_INTERRUPTION_REASONS))
+        )
 
     _b1c2_native_rotation_required(backend=backend, model_rotation=model_rotation)
     rotation = model_rotation or _default_b1c2_rotation()
     if len(rotation) != len(B1C2_ROTATION_LABELS):
         raise ValueError("B-1c section 2 requires the canonical three-model rotation")
+    prompt_entries = _b1c2_prompt_entries(cache_breadth_entry_count)
+    base_prompts_by_id = dict(prompt_entries)
 
     profile = MachineMemoryProfile(
         system_memory_gb=profile_memory_gb,
@@ -2618,425 +2845,515 @@ def run_b1c2_soak_plus_swap(
         required_duration_s=required_duration_s,
         sample_interval_s=sample_interval_s,
     )
+    stop_requested = False
+    stop_reason = interruption_reason
+    installed_signal_handlers: list[tuple[signal.Signals, Any]] = []
 
-    with _session_cache_env(
-        True,
-        ttl_s=effective_session_cache_ttl_s,
-        max_prompt_tokens=session_cache_max_prompt_tokens,
-        max_resident_bytes=resident_cache_budget_bytes,
-        auto_prefix_enabled=session_cache_auto_prefix,
-    ):
-        kernel, sampler = _make_kernel(backend=backend, profile=profile)
-        evidence_strength = _b1c2_evidence_strength(backend=backend)
-        allocator_truth = _b1c2_allocator_truth(backend=backend, sampler=sampler)
-        records: list[dict[str, Any]] = []
-        started_monotonic_s = time.monotonic()
-        measurement_started_monotonic_s: float | None = None
-        measurement_finished_monotonic_s: float | None = None
-        first_sample_bytes: int | None = None
-        first_measurement_bytes: int | None = None
-        current_index = 0
-        current_model = rotation[current_index]
-        session_prompts = {prompt_id: prompt for prompt_id, prompt in B1C1_PROMPTS}
-        initial_load = kernel.load_model(current_model.model_id, memory_gb=current_model.memory_gb)
-        current_load = initial_load
-        cleanup_unload: Any | None = None
-        cleanup_settle: SettleResult | None = None
+    def _request_stop(signum: int, _frame: object | None) -> None:
+        nonlocal stop_requested, stop_reason
+        stop_requested = True
+        if signum == signal.SIGINT:
+            stop_reason = "user_interrupt"
+        elif signum == signal.SIGTERM:
+            stop_reason = interruption_reason
 
-        def _write_generation_record(
-            stream: Any,
-            *,
-            phase: str,
-            prompt_id: str,
-        ) -> str:
-            nonlocal first_sample_bytes
-            nonlocal first_measurement_bytes
-            nonlocal measurement_started_monotonic_s
-            nonlocal measurement_finished_monotonic_s
-            sample_index = len(records) + 1
-            if phase == "measurement" and measurement_started_monotonic_s is None:
-                measurement_started_monotonic_s = time.monotonic()
-            session_id = (
-                None
-                if session_cache_auto_prefix
-                else f"{session_id_prefix}-{prompt_id}"
-            )
-            prompt = session_prompts[prompt_id]
-            cache_before = _session_cache_status(kernel)
-            before_bytes = sampler.active_memory_bytes(kernel)
-            try:
-                generation = (
-                    asyncio.run(
-                        _stream_generate_once(
-                            kernel,
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            previous = signal.getsignal(sig)
+            signal.signal(sig, _request_stop)
+            installed_signal_handlers.append((sig, previous))
+        except (ValueError, OSError):
+            continue
+
+    def _sleep_until_next_sample(sleep_for: float) -> None:
+        deadline = time.monotonic() + sleep_for
+        while not stop_requested:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(remaining, 1.0))
+
+    try:
+        with _session_cache_env(
+            True,
+            ttl_s=effective_session_cache_ttl_s,
+            max_prompt_tokens=session_cache_max_prompt_tokens,
+            max_resident_bytes=resident_cache_budget_bytes,
+            auto_prefix_enabled=session_cache_auto_prefix,
+        ):
+            kernel, sampler = _make_kernel(backend=backend, profile=profile)
+            evidence_strength = _b1c2_evidence_strength(backend=backend)
+            allocator_truth = _b1c2_allocator_truth(backend=backend, sampler=sampler)
+            records: list[dict[str, Any]] = []
+            started_monotonic_s = time.monotonic()
+            measurement_started_monotonic_s: float | None = None
+            measurement_finished_monotonic_s: float | None = None
+            first_sample_bytes: int | None = None
+            first_measurement_bytes: int | None = None
+            current_index = 0
+            current_model = rotation[current_index]
+            session_prompts = {prompt_id: prompt for prompt_id, prompt in prompt_entries}
+            initial_load = kernel.load_model(current_model.model_id, memory_gb=current_model.memory_gb)
+            current_load = initial_load
+            cleanup_unload: Any | None = None
+            cleanup_settle: SettleResult | None = None
+
+            def _write_generation_record(
+                stream: Any,
+                *,
+                phase: str,
+                prompt_id: str,
+            ) -> str:
+                nonlocal first_sample_bytes
+                nonlocal first_measurement_bytes
+                nonlocal measurement_started_monotonic_s
+                nonlocal measurement_finished_monotonic_s
+                sample_index = len(records) + 1
+                if phase == "measurement" and measurement_started_monotonic_s is None:
+                    measurement_started_monotonic_s = time.monotonic()
+                session_id = (
+                    None
+                    if session_cache_auto_prefix
+                    else f"{session_id_prefix}-{prompt_id}"
+                )
+                prompt = session_prompts[prompt_id]
+                cache_before = _session_cache_status(kernel)
+                before_bytes = sampler.active_memory_bytes(kernel)
+                generation_started_monotonic_s = time.monotonic()
+                try:
+                    generation = (
+                        asyncio.run(
+                            _stream_generate_once(
+                                kernel,
+                                model_id=current_model.model_id,
+                                prompt=prompt,
+                                max_tokens=max_tokens,
+                                session_id=session_id,
+                            )
+                        )
+                        if current_load.ok
+                        else StreamGenerationResult(
+                            ok=False,
+                            message="model load failed",
+                            error_code=RuntimeErrorCode.model_not_loaded,
                             model_id=current_model.model_id,
-                            prompt=prompt,
-                            max_tokens=max_tokens,
-                            session_id=session_id,
                         )
                     )
-                    if current_load.ok
-                    else StreamGenerationResult(
+                except Exception as exc:  # pragma: no cover - defensive real-run capture
+                    generation = StreamGenerationResult(
                         ok=False,
-                        message="model load failed",
-                        error_code=RuntimeErrorCode.model_not_loaded,
+                        message=str(exc),
+                        error_code=RuntimeErrorCode.backend_error,
                         model_id=current_model.model_id,
                     )
+                generation_duration_s = max(
+                    time.monotonic() - generation_started_monotonic_s,
+                    0.0,
                 )
-            except Exception as exc:  # pragma: no cover - defensive real-run capture
-                generation = StreamGenerationResult(
-                    ok=False,
-                    message=str(exc),
-                    error_code=RuntimeErrorCode.backend_error,
-                    model_id=current_model.model_id,
+                throughput_tokens_per_second = (
+                    float(generation.completion_tokens) / generation_duration_s
+                    if generation.completion_tokens is not None
+                    and generation.completion_tokens > 0
+                    and generation_duration_s > 0
+                    else None
                 )
-            after_bytes = sampler.active_memory_bytes(kernel)
-            if first_sample_bytes is None and after_bytes is not None:
-                first_sample_bytes = after_bytes
-            if (
-                phase == "measurement"
-                and first_measurement_bytes is None
-                and after_bytes is not None
-            ):
-                first_measurement_bytes = after_bytes
-            drift_bytes = (
-                abs(after_bytes - first_sample_bytes)
-                if after_bytes is not None and first_sample_bytes is not None
-                else None
-            )
-            measurement_drift_bytes = (
-                abs(after_bytes - first_measurement_bytes)
-                if after_bytes is not None and first_measurement_bytes is not None
-                else None
-            )
-            cache_after = _session_cache_status(kernel)
-            counter_delta = _counter_delta(
-                dict(cache_before.get("counters", {})),
-                dict(cache_after.get("counters", {})),
-            )
-            session_cache_failure_reasons = _session_cache_delta_failure_reasons(
-                counter_delta
-            )
-            if generation.ok:
-                grown_prompt = (
-                    f"{prompt}"
-                    f"{_b1c2_prompt_growth_fragment(generation.text, sample_index=sample_index)}"
+                after_bytes = sampler.active_memory_bytes(kernel)
+                if first_sample_bytes is None and after_bytes is not None:
+                    first_sample_bytes = after_bytes
+                if (
+                    phase == "measurement"
+                    and first_measurement_bytes is None
+                    and after_bytes is not None
+                ):
+                    first_measurement_bytes = after_bytes
+                drift_bytes = (
+                    abs(after_bytes - first_sample_bytes)
+                    if after_bytes is not None and first_sample_bytes is not None
+                    else None
                 )
-                session_prompts[prompt_id] = _b1c2_apply_prompt_growth_window(
-                    prompt_id=prompt_id,
-                    prompt=grown_prompt,
-                    max_chars=prompt_growth_max_chars,
+                measurement_drift_bytes = (
+                    abs(after_bytes - first_measurement_bytes)
+                    if after_bytes is not None and first_measurement_bytes is not None
+                    else None
                 )
-            next_prompt = session_prompts[prompt_id]
-            watermark_after = _watermark(after_bytes, profile=profile)
-            reclaim_stats = _reclaim_stats(kernel)
-            settle_snapshot = _compact_settle_barrier(_settle_barrier_snapshot(kernel))
-            sample_verdict = _b1c1_round_verdict(
-                load_ok=bool(current_load.ok),
-                generation=generation,
-                watermark=watermark_after,
-                reclaim_stats=reclaim_stats,
-                settle_barrier=settle_snapshot,
-            )
-            if session_cache_failure_reasons:
-                sample_verdict = "failed"
-            record = {
-                "schema_version": "b1c2.v1",
-                "gate": "B-1c section 2",
-                "run_id": run_id,
-                "mode": "soak_plus_swap",
-                "phase": phase,
-                "sample_index": sample_index,
-                "timestamp_utc": _now_iso_utc(),
-                "elapsed_s": round(time.monotonic() - started_monotonic_s, 3),
-                "runtime": runtime,
-                "backend": backend,
-                "measurement_mode": sampler.measurement_mode,
-                "evidence_strength": evidence_strength,
-                "model": {
-                    "id": current_model.model_id,
-                    "path": current_model.model_id,
-                    "runtime_model_id": current_model.model_id,
-                    "memory_gb": current_model.memory_gb,
-                },
-                "rotation": {
-                    "label": rotation_label,
-                    "models": [model.model_id for model in rotation],
-                    "current_index": current_index,
-                },
-                "config": {
-                    "OWLMLX_SESSION_CACHE_ENABLED": "1",
-                    "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
-                    "OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS": (
-                        session_cache_max_prompt_tokens
-                    ),
-                    "OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES": (
-                        resident_cache_budget_bytes
-                    ),
-                    "OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED": (
-                        "1" if session_cache_auto_prefix else "0"
-                    ),
-                    "session_id": session_id,
-                    "prompt_chars_before_generation": len(prompt),
-                    "prompt_chars_after_generation": len(next_prompt),
-                    "temperature": 0.0,
-                    "seed": 42,
-                    "max_tokens": max_tokens,
-                    "duration_s": duration_s,
-                    "required_duration_s": required_duration_s,
-                    "sample_interval_s": sample_interval_s,
-                    "max_samples": max_samples,
-                    "target_swap_count": swap_count,
-                    "required_swap_count": required_swap_count,
-                    "max_generation_concurrency": 1,
-                    "prompt_growth_strategy": B1C2_PROMPT_GROWTH_STRATEGY,
-                    "prompt_growth_max_chars": prompt_growth_max_chars,
-                    "prompt_window_strategy": (
-                        B1C2_PROMPT_WINDOW_STRATEGY
-                        if prompt_growth_max_chars
-                        else "unbounded"
-                    ),
-                },
-                "prompt_id": prompt_id,
-                "session_cache": {
-                    "active_entries_before": cache_before.get("active_entries"),
-                    "active_entries_after": cache_after.get("active_entries"),
-                    "resident_bytes_estimate_before": cache_before.get(
-                        "resident_bytes_estimate"
-                    ),
-                    "resident_bytes_estimate_after": cache_after.get(
-                        "resident_bytes_estimate"
-                    ),
-                    "resident_bytes_estimate_mode_before": cache_before.get(
-                        "resident_bytes_estimate_mode"
-                    ),
-                    "resident_bytes_estimate_mode": cache_after.get(
-                        "resident_bytes_estimate_mode"
-                    ),
-                    "resident_bytes_estimate_modes_after": cache_after.get(
-                        "resident_bytes_estimate_modes"
-                    ),
-                    "max_prompt_tokens": cache_after.get("max_prompt_tokens"),
-                    "max_resident_bytes": cache_after.get("max_resident_bytes"),
-                    "automatic_prefix_enabled": cache_after.get(
-                        "automatic_prefix_enabled"
-                    ),
-                    "prompt_window_policy": cache_after.get("prompt_window_policy"),
-                    "resident_pressure_policy": cache_after.get(
-                        "resident_pressure_policy"
-                    ),
-                    "last_drop_event_before": cache_before.get("last_drop_event"),
-                    "last_drop_event_after": cache_after.get("last_drop_event"),
-                    "last_bypass_event_before": cache_before.get("last_bypass_event"),
-                    "last_bypass_event_after": cache_after.get("last_bypass_event"),
-                    "drop_reason_code": (
-                        (cache_after.get("last_drop_event") or {}).get("reason_code")
-                        if int(counter_delta.get("drops", 0) or 0) > 0
-                        else None
-                    ),
-                    "bypass_reason_code": (
-                        (cache_after.get("last_bypass_event") or {}).get("reason_code")
-                        if int(counter_delta.get("trim_bypasses", 0) or 0) > 0
-                        or int(counter_delta.get("window_bypasses", 0) or 0) > 0
-                        else None
-                    ),
-                    "counter_delta": counter_delta,
-                    "verdict": "failed" if session_cache_failure_reasons else "passed",
-                    "failure_reasons": session_cache_failure_reasons,
-                    "synthetic": not allocator_truth,
-                    "allocator_truth": allocator_truth,
-                },
-                "operation": {
-                    "load_ok": bool(current_load.ok),
-                    "generation_ok": bool(generation.ok),
-                },
-                "memory": {
-                    "active_memory_before_sample_bytes": before_bytes,
-                    "active_memory_after_generation_bytes": after_bytes,
-                    "active_memory_after_generation_gb": _bytes_to_gb(after_bytes),
-                    "first_sample_active_memory_bytes": first_sample_bytes,
-                    "drift_from_first_sample_bytes": drift_bytes,
-                    "first_measurement_active_memory_bytes": first_measurement_bytes,
-                    "drift_from_measurement_start_bytes": measurement_drift_bytes,
-                    "drift_budget_bytes": drift_budget_bytes,
-                    "watermark_after_generation": watermark_after,
-                },
-                "settle_barrier_event": settle_snapshot,
-                "reclaim_barrier_stats_after_sample": reclaim_stats,
-                "load_result": _result_to_dict(current_load),
-                "generate_result": _result_to_dict(generation),
-                "sample_verdict": sample_verdict,
-            }
-            records.append(record)
-            stream.write(json.dumps(record, sort_keys=True))
-            stream.write("\n")
-            if phase == "measurement":
-                measurement_finished_monotonic_s = time.monotonic()
-            return sample_verdict
-
-        try:
-            with output_path.open("w", encoding="utf-8") as stream:
-                for prompt_id, _prompt in B1C1_PROMPTS:
-                    verdict = _write_generation_record(
-                        stream,
-                        phase="warmup",
+                cache_after = _session_cache_status(kernel)
+                counter_delta = _counter_delta(
+                    dict(cache_before.get("counters", {})),
+                    dict(cache_after.get("counters", {})),
+                )
+                session_cache_failure_reasons = _session_cache_delta_failure_reasons(
+                    counter_delta
+                )
+                if generation.ok:
+                    grown_prompt = (
+                        f"{prompt}"
+                        f"{_b1c2_prompt_growth_fragment(generation.text, sample_index=sample_index)}"
+                    )
+                    session_prompts[prompt_id] = _b1c2_apply_prompt_growth_window(
                         prompt_id=prompt_id,
+                        prompt=grown_prompt,
+                        max_chars=prompt_growth_max_chars,
+                        base_prompt=base_prompts_by_id[prompt_id],
                     )
-                    if verdict != "passed":
-                        break
-                swaps_completed = 0
+                next_prompt = session_prompts[prompt_id]
+                watermark_after = _watermark(after_bytes, profile=profile)
+                reclaim_stats = _reclaim_stats(kernel)
+                settle_snapshot = _compact_settle_barrier(_settle_barrier_snapshot(kernel))
+                sample_verdict = _b1c1_round_verdict(
+                    load_ok=bool(current_load.ok),
+                    generation=generation,
+                    watermark=watermark_after,
+                    reclaim_stats=reclaim_stats,
+                    settle_barrier=settle_snapshot,
+                )
+                if session_cache_failure_reasons:
+                    sample_verdict = "failed"
+                record = {
+                    "schema_version": "b1c2.v1",
+                    "gate": "B-1c section 2",
+                    "run_id": run_id,
+                    "mode": "soak_plus_swap",
+                    "phase": phase,
+                    "sample_index": sample_index,
+                    "timestamp_utc": _now_iso_utc(),
+                    "elapsed_s": round(time.monotonic() - started_monotonic_s, 3),
+                    "runtime": runtime,
+                    "backend": backend,
+                    "measurement_mode": sampler.measurement_mode,
+                    "evidence_strength": evidence_strength,
+                    "model": {
+                        "id": current_model.model_id,
+                        "path": current_model.model_id,
+                        "runtime_model_id": current_model.model_id,
+                        "memory_gb": current_model.memory_gb,
+                    },
+                    "rotation": {
+                        "label": rotation_label,
+                        "models": [model.model_id for model in rotation],
+                        "current_index": current_index,
+                    },
+                    "config": {
+                        "OWLMLX_SESSION_CACHE_ENABLED": "1",
+                        "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
+                        "OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS": (
+                            session_cache_max_prompt_tokens
+                        ),
+                        "OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES": (
+                            resident_cache_budget_bytes
+                        ),
+                        "OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED": (
+                            "1" if session_cache_auto_prefix else "0"
+                        ),
+                        "session_id": session_id,
+                        "prompt_chars_before_generation": len(prompt),
+                        "prompt_chars_after_generation": len(next_prompt),
+                        "temperature": 0.0,
+                        "seed": 42,
+                        "max_tokens": max_tokens,
+                        "duration_s": duration_s,
+                        "required_duration_s": required_duration_s,
+                        "sample_interval_s": sample_interval_s,
+                        "max_samples": max_samples,
+                        "target_swap_count": swap_count,
+                        "required_swap_count": required_swap_count,
+                        "b1c2_cache_breadth_entry_count": len(prompt_entries),
+                        "b1c2_throughput_decay_max_relative": (
+                            throughput_decay_max_relative
+                        ),
+                        "b1c2_throughput_min_samples": throughput_min_samples,
+                        "b1c2_concurrency_min_entry_breadth": (
+                            concurrency_min_entry_breadth
+                        ),
+                        "b1c2_concurrency_require_cache_eviction": (
+                            concurrency_require_cache_eviction
+                        ),
+                        "max_generation_concurrency": 1,
+                        "prompt_growth_strategy": B1C2_PROMPT_GROWTH_STRATEGY,
+                        "prompt_growth_max_chars": prompt_growth_max_chars,
+                        "prompt_window_strategy": (
+                            B1C2_PROMPT_WINDOW_STRATEGY
+                            if prompt_growth_max_chars
+                            else "unbounded"
+                        ),
+                    },
+                    "prompt_id": prompt_id,
+                    "prompt_family": _b1c2_prompt_family(prompt_id),
+                    "performance": {
+                        "generation_duration_s": round(generation_duration_s, 6),
+                        "prompt_tokens": generation.prompt_tokens,
+                        "completion_tokens": generation.completion_tokens,
+                        "throughput_tokens_per_second": (
+                            round(throughput_tokens_per_second, 6)
+                            if throughput_tokens_per_second is not None
+                            else None
+                        ),
+                        "throughput_source": (
+                            "stream_event_completion_tokens"
+                            if throughput_tokens_per_second is not None
+                            else "unavailable"
+                        ),
+                    },
+                    "session_cache": {
+                        "active_entries_before": cache_before.get("active_entries"),
+                        "active_entries_after": cache_after.get("active_entries"),
+                        "resident_bytes_estimate_before": cache_before.get(
+                            "resident_bytes_estimate"
+                        ),
+                        "resident_bytes_estimate_after": cache_after.get(
+                            "resident_bytes_estimate"
+                        ),
+                        "resident_bytes_estimate_mode_before": cache_before.get(
+                            "resident_bytes_estimate_mode"
+                        ),
+                        "resident_bytes_estimate_mode": cache_after.get(
+                            "resident_bytes_estimate_mode"
+                        ),
+                        "resident_bytes_estimate_modes_after": cache_after.get(
+                            "resident_bytes_estimate_modes"
+                        ),
+                        "max_prompt_tokens": cache_after.get("max_prompt_tokens"),
+                        "max_resident_bytes": cache_after.get("max_resident_bytes"),
+                        "automatic_prefix_enabled": cache_after.get(
+                            "automatic_prefix_enabled"
+                        ),
+                        "prompt_window_policy": cache_after.get("prompt_window_policy"),
+                        "resident_pressure_policy": cache_after.get(
+                            "resident_pressure_policy"
+                        ),
+                        "last_drop_event_before": cache_before.get("last_drop_event"),
+                        "last_drop_event_after": cache_after.get("last_drop_event"),
+                        "last_bypass_event_before": cache_before.get("last_bypass_event"),
+                        "last_bypass_event_after": cache_after.get("last_bypass_event"),
+                        "drop_reason_code": (
+                            (cache_after.get("last_drop_event") or {}).get("reason_code")
+                            if int(counter_delta.get("drops", 0) or 0) > 0
+                            else None
+                        ),
+                        "bypass_reason_code": (
+                            (cache_after.get("last_bypass_event") or {}).get("reason_code")
+                            if int(counter_delta.get("trim_bypasses", 0) or 0) > 0
+                            or int(counter_delta.get("window_bypasses", 0) or 0) > 0
+                            else None
+                        ),
+                        "counter_delta": counter_delta,
+                        "verdict": "failed" if session_cache_failure_reasons else "passed",
+                        "failure_reasons": session_cache_failure_reasons,
+                        "synthetic": not allocator_truth,
+                        "allocator_truth": allocator_truth,
+                    },
+                    "operation": {
+                        "load_ok": bool(current_load.ok),
+                        "generation_ok": bool(generation.ok),
+                    },
+                    "memory": {
+                        "active_memory_before_sample_bytes": before_bytes,
+                        "active_memory_after_generation_bytes": after_bytes,
+                        "active_memory_after_generation_gb": _bytes_to_gb(after_bytes),
+                        "first_sample_active_memory_bytes": first_sample_bytes,
+                        "drift_from_first_sample_bytes": drift_bytes,
+                        "first_measurement_active_memory_bytes": first_measurement_bytes,
+                        "drift_from_measurement_start_bytes": measurement_drift_bytes,
+                        "drift_budget_bytes": drift_budget_bytes,
+                        "watermark_after_generation": watermark_after,
+                    },
+                    "settle_barrier_event": settle_snapshot,
+                    "reclaim_barrier_stats_after_sample": reclaim_stats,
+                    "load_result": _result_to_dict(current_load),
+                    "generate_result": _result_to_dict(generation),
+                    "sample_verdict": sample_verdict,
+                }
+                records.append(record)
+                stream.write(json.dumps(record, sort_keys=True))
+                stream.write("\n")
+                if phase == "measurement":
+                    measurement_finished_monotonic_s = time.monotonic()
+                return sample_verdict
 
-                def _measurement_elapsed_s() -> float:
-                    if measurement_started_monotonic_s is None:
-                        return 0.0
-                    return time.monotonic() - measurement_started_monotonic_s
-
-                def _duration_requirement_reached() -> bool:
-                    return duration_s <= 0 or _measurement_elapsed_s() >= duration_s
-
-                def _next_swap_due() -> bool:
-                    if swaps_completed >= swap_count:
-                        return False
-                    if duration_s <= 0:
-                        return True
-                    swap_interval_s = duration_s / max(swap_count, 1)
-                    return _measurement_elapsed_s() >= swap_interval_s * (
-                        swaps_completed + 1
-                    )
-
-                while True:
-                    if records and records[-1].get("sample_verdict") == "failed":
-                        break
-                    for prompt_id, _prompt in B1C1_PROMPTS:
-                        if max_samples is not None and len(records) >= max_samples:
+            try:
+                with output_path.open("w", encoding="utf-8") as stream:
+                    for prompt_id, _prompt in prompt_entries:
+                        if stop_requested:
                             break
                         verdict = _write_generation_record(
                             stream,
-                            phase="measurement",
+                            phase="warmup",
                             prompt_id=prompt_id,
                         )
                         if verdict != "passed":
                             break
-                    if records and records[-1].get("sample_verdict") == "failed":
-                        break
-                    if max_samples is not None and len(records) >= max_samples:
-                        break
-                    if not _next_swap_due():
+                    swaps_completed = 0
+
+                    def _measurement_elapsed_s() -> float:
+                        if measurement_started_monotonic_s is None:
+                            return 0.0
+                        return time.monotonic() - measurement_started_monotonic_s
+
+                    def _duration_requirement_reached() -> bool:
+                        return duration_s <= 0 or _measurement_elapsed_s() >= duration_s
+
+                    def _next_swap_due() -> bool:
+                        if swaps_completed >= swap_count:
+                            return False
+                        if duration_s <= 0:
+                            return True
+                        swap_interval_s = duration_s / max(swap_count, 1)
+                        return _measurement_elapsed_s() >= swap_interval_s * (
+                            swaps_completed + 1
+                        )
+
+                    while True:
+                        if stop_requested:
+                            break
+                        if records and records[-1].get("sample_verdict") == "failed":
+                            break
+                        for prompt_id, _prompt in prompt_entries:
+                            if stop_requested:
+                                break
+                            if max_samples is not None and len(records) >= max_samples:
+                                break
+                            verdict = _write_generation_record(
+                                stream,
+                                phase="measurement",
+                                prompt_id=prompt_id,
+                            )
+                            if verdict != "passed":
+                                break
+                        if stop_requested:
+                            break
+                        if records and records[-1].get("sample_verdict") == "failed":
+                            break
+                        if max_samples is not None and len(records) >= max_samples:
+                            break
+                        if not _next_swap_due():
+                            if _duration_requirement_reached() and swaps_completed >= swap_count:
+                                break
+                            if sample_interval_s > 0:
+                                _sleep_until_next_sample(sample_interval_s)
+                            continue
+
+                        sample_index = len(records) + 1
+                        swap_index = swaps_completed + 1
+                        from_model = current_model
+                        to_index = (current_index + 1) % len(rotation)
+                        to_model = rotation[to_index]
+                        active_before_unload = sampler.active_memory_bytes(kernel)
+                        unload = kernel.unload_model(from_model.model_id) if current_load.ok else None
+                        settle = sampler.settle(kernel, max_iterations=5, sleep_s=0.0)
+                        reclaim_stats = _reclaim_stats(kernel)
+                        settle_snapshot = _compact_settle_barrier(_settle_barrier_snapshot(kernel))
+                        load_next = kernel.load_model(to_model.model_id, memory_gb=to_model.memory_gb)
+                        active_after_load = sampler.active_memory_bytes(kernel)
+                        swap = {
+                            "index": swap_index,
+                            "from_model": from_model.model_id,
+                            "to_model": to_model.model_id,
+                            "unload_ok": bool(unload.ok) if unload is not None else False,
+                            "settle_barrier_state": settle_snapshot.get("barrier_state", "unknown"),
+                            "load_ok": bool(load_next.ok),
+                            "active_memory_before_unload_bytes": active_before_unload,
+                            "active_memory_after_settle_bytes": settle.active_memory_bytes,
+                            "expected_minus_observed_active_bytes": (
+                                _b1c2_last_expected_minus_observed_active_bytes(reclaim_stats)
+                            ),
+                        }
+                        record = {
+                            "schema_version": "b1c2.v1",
+                            "gate": "B-1c section 2",
+                            "run_id": run_id,
+                            "mode": "soak_plus_swap",
+                            "phase": "swap",
+                            "sample_index": sample_index,
+                            "timestamp_utc": _now_iso_utc(),
+                            "elapsed_s": round(time.monotonic() - started_monotonic_s, 3),
+                            "runtime": runtime,
+                            "backend": backend,
+                            "measurement_mode": sampler.measurement_mode,
+                            "evidence_strength": evidence_strength,
+                            "rotation": {
+                                "label": rotation_label,
+                                "models": [model.model_id for model in rotation],
+                                "current_index": to_index,
+                            },
+                            "config": {
+                                "OWLMLX_SESSION_CACHE_ENABLED": "1",
+                                "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
+                                "OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS": (
+                                    session_cache_max_prompt_tokens
+                                ),
+                                "OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES": (
+                                    resident_cache_budget_bytes
+                                ),
+                                "OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED": (
+                                    "1" if session_cache_auto_prefix else "0"
+                                ),
+                                "session_id": None,
+                                "duration_s": duration_s,
+                                "required_duration_s": required_duration_s,
+                                "sample_interval_s": sample_interval_s,
+                                "max_samples": max_samples,
+                                "target_swap_count": swap_count,
+                                "required_swap_count": required_swap_count,
+                                "b1c2_cache_breadth_entry_count": len(prompt_entries),
+                                "b1c2_throughput_decay_max_relative": (
+                                    throughput_decay_max_relative
+                                ),
+                                "b1c2_throughput_min_samples": throughput_min_samples,
+                                "b1c2_concurrency_min_entry_breadth": (
+                                    concurrency_min_entry_breadth
+                                ),
+                                "b1c2_concurrency_require_cache_eviction": (
+                                    concurrency_require_cache_eviction
+                                ),
+                                "prompt_growth_max_chars": prompt_growth_max_chars,
+                                "prompt_window_strategy": (
+                                    B1C2_PROMPT_WINDOW_STRATEGY
+                                    if prompt_growth_max_chars
+                                    else "unbounded"
+                                ),
+                            },
+                            "session_cache": {
+                                "counter_delta": {},
+                                "synthetic": not allocator_truth,
+                                "allocator_truth": allocator_truth,
+                            },
+                            "memory": {
+                                "active_memory_before_unload_bytes": active_before_unload,
+                                "active_memory_after_settle_bytes": settle.active_memory_bytes,
+                                "active_memory_after_load_bytes": active_after_load,
+                            },
+                            "settle_barrier_event": settle_snapshot,
+                            "reclaim_barrier_stats_after_swap": reclaim_stats,
+                            "unload_result": _result_to_dict(unload) if unload is not None else None,
+                            "load_result": _result_to_dict(load_next),
+                            "swap": swap,
+                        }
+                        records.append(record)
+                        stream.write(json.dumps(record, sort_keys=True))
+                        stream.write("\n")
+                        measurement_finished_monotonic_s = time.monotonic()
+                        current_index = to_index
+                        current_model = to_model
+                        current_load = load_next
+                        swaps_completed += 1
+                        if not all(
+                            [
+                                swap["unload_ok"],
+                                swap["settle_barrier_state"] == "clean",
+                                swap["load_ok"],
+                            ]
+                        ):
+                            break
                         if _duration_requirement_reached() and swaps_completed >= swap_count:
                             break
                         if sample_interval_s > 0:
-                            time.sleep(sample_interval_s)
-                        continue
-
-                    sample_index = len(records) + 1
-                    swap_index = swaps_completed + 1
-                    from_model = current_model
-                    to_index = (current_index + 1) % len(rotation)
-                    to_model = rotation[to_index]
-                    active_before_unload = sampler.active_memory_bytes(kernel)
-                    unload = kernel.unload_model(from_model.model_id) if current_load.ok else None
-                    settle = sampler.settle(kernel, max_iterations=5, sleep_s=0.0)
-                    reclaim_stats = _reclaim_stats(kernel)
-                    settle_snapshot = _compact_settle_barrier(_settle_barrier_snapshot(kernel))
-                    load_next = kernel.load_model(to_model.model_id, memory_gb=to_model.memory_gb)
-                    active_after_load = sampler.active_memory_bytes(kernel)
-                    swap = {
-                        "index": swap_index,
-                        "from_model": from_model.model_id,
-                        "to_model": to_model.model_id,
-                        "unload_ok": bool(unload.ok) if unload is not None else False,
-                        "settle_barrier_state": settle_snapshot.get("barrier_state", "unknown"),
-                        "load_ok": bool(load_next.ok),
-                        "active_memory_before_unload_bytes": active_before_unload,
-                        "active_memory_after_settle_bytes": settle.active_memory_bytes,
-                        "expected_minus_observed_active_bytes": (
-                            _b1c2_last_expected_minus_observed_active_bytes(reclaim_stats)
-                        ),
-                    }
-                    record = {
-                        "schema_version": "b1c2.v1",
-                        "gate": "B-1c section 2",
-                        "run_id": run_id,
-                        "mode": "soak_plus_swap",
-                        "phase": "swap",
-                        "sample_index": sample_index,
-                        "timestamp_utc": _now_iso_utc(),
-                        "elapsed_s": round(time.monotonic() - started_monotonic_s, 3),
-                        "runtime": runtime,
-                        "backend": backend,
-                        "measurement_mode": sampler.measurement_mode,
-                        "evidence_strength": evidence_strength,
-                        "rotation": {
-                            "label": rotation_label,
-                            "models": [model.model_id for model in rotation],
-                            "current_index": to_index,
-                        },
-                        "config": {
-                            "OWLMLX_SESSION_CACHE_ENABLED": "1",
-                            "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
-                            "OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS": (
-                                session_cache_max_prompt_tokens
-                            ),
-                            "OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES": (
-                                resident_cache_budget_bytes
-                            ),
-                            "OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED": (
-                                "1" if session_cache_auto_prefix else "0"
-                            ),
-                            "session_id": None,
-                            "duration_s": duration_s,
-                            "required_duration_s": required_duration_s,
-                            "sample_interval_s": sample_interval_s,
-                            "max_samples": max_samples,
-                            "target_swap_count": swap_count,
-                            "required_swap_count": required_swap_count,
-                            "prompt_growth_max_chars": prompt_growth_max_chars,
-                            "prompt_window_strategy": (
-                                B1C2_PROMPT_WINDOW_STRATEGY
-                                if prompt_growth_max_chars
-                                else "unbounded"
-                            ),
-                        },
-                        "session_cache": {
-                            "counter_delta": {},
-                            "synthetic": not allocator_truth,
-                            "allocator_truth": allocator_truth,
-                        },
-                        "memory": {
-                            "active_memory_before_unload_bytes": active_before_unload,
-                            "active_memory_after_settle_bytes": settle.active_memory_bytes,
-                            "active_memory_after_load_bytes": active_after_load,
-                        },
-                        "settle_barrier_event": settle_snapshot,
-                        "reclaim_barrier_stats_after_swap": reclaim_stats,
-                        "unload_result": _result_to_dict(unload) if unload is not None else None,
-                        "load_result": _result_to_dict(load_next),
-                        "swap": swap,
-                    }
-                    records.append(record)
-                    stream.write(json.dumps(record, sort_keys=True))
-                    stream.write("\n")
-                    measurement_finished_monotonic_s = time.monotonic()
-                    current_index = to_index
-                    current_model = to_model
-                    current_load = load_next
-                    swaps_completed += 1
-                    if not all(
-                        [
-                            swap["unload_ok"],
-                            swap["settle_barrier_state"] == "clean",
-                            swap["load_ok"],
-                        ]
-                    ):
-                        break
-                    if _duration_requirement_reached() and swaps_completed >= swap_count:
-                        break
-                    if sample_interval_s > 0:
-                        time.sleep(sample_interval_s)
-        finally:
-            if current_load.ok:
-                cleanup_unload = kernel.unload_model(current_model.model_id)
-                cleanup_settle = sampler.settle(kernel, max_iterations=5, sleep_s=0.0)
+                            _sleep_until_next_sample(sample_interval_s)
+            finally:
+                if current_load.ok:
+                    cleanup_unload = kernel.unload_model(current_model.model_id)
+                    cleanup_settle = sampler.settle(kernel, max_iterations=5, sleep_s=0.0)
+    finally:
+        for sig, previous in reversed(installed_signal_handlers):
+            signal.signal(sig, previous)
 
     rollup = _b1c2_rollup(
         run_id=run_id,
@@ -3057,6 +3374,11 @@ def run_b1c2_soak_plus_swap(
         cleanup_unload=cleanup_unload,
         cleanup_settle=cleanup_settle,
         b1c1_prerequisite_satisfied=b1c1_prerequisite_satisfied,
+        throughput_decay_max_relative=throughput_decay_max_relative,
+        throughput_min_samples=throughput_min_samples,
+        concurrency_min_entry_breadth=concurrency_min_entry_breadth,
+        concurrency_require_cache_eviction=concurrency_require_cache_eviction,
+        interruption_reason=stop_reason if stop_requested else None,
     )
     rollup_path.parent.mkdir(parents=True, exist_ok=True)
     with rollup_path.open("w", encoding="utf-8") as stream:
@@ -3197,6 +3519,10 @@ def run_b1c2_interrupted_soak_plus_swap(
         conclusion = "failed"
     else:
         conclusion = "blocked"
+    canonical_switch_requirement_met = (
+        aggregate_swap_count >= B1C2_REQUIRED_SWAP_COUNT
+    )
+    canonical_section2_gate_met = ok and canonical_switch_requirement_met
     payload = {
         "schema_version": "b1c2.aggregate.v1",
         "gate": "B-1c section 2 interrupted soak plus swap",
@@ -3218,8 +3544,14 @@ def run_b1c2_interrupted_soak_plus_swap(
         },
         "soak_plus_swap_stability": conclusion,
         "conclusion": conclusion,
+        "canonical_gate": {
+            "required_swap_count": B1C2_REQUIRED_SWAP_COUNT,
+            "observed_swap_count": aggregate_swap_count,
+            "canonical_switch_requirement_met": canonical_switch_requirement_met,
+            "soak_plus_swap_graduation_eligible": canonical_section2_gate_met,
+        },
         "graduates": {
-            "soak_plus_swap_stability": ok,
+            "soak_plus_swap_stability": canonical_section2_gate_met,
             "session_kv_supported": False,
         },
     }
@@ -3294,6 +3626,15 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--rotation-label", default=None)
     parser.add_argument("--b1c1-prerequisite-satisfied", action="store_true")
     parser.add_argument("--b1c2-prompt-growth-max-chars", type=int, default=None)
+    parser.add_argument("--b1c2-cache-breadth-entry-count", type=int, default=None)
+    parser.add_argument("--b1c2-throughput-decay-max-relative", type=float, default=None)
+    parser.add_argument(
+        "--b1c2-throughput-min-samples",
+        type=int,
+        default=B1C2_THROUGHPUT_DEFAULT_MIN_SAMPLES,
+    )
+    parser.add_argument("--b1c2-concurrency-min-entry-breadth", type=int, default=None)
+    parser.add_argument("--b1c2-concurrency-require-cache-eviction", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -3357,6 +3698,16 @@ def main(argv: list[str] | None = None) -> int:
                 session_cache_max_prompt_tokens=args.session_cache_max_prompt_tokens,
                 prompt_growth_max_chars=args.b1c2_prompt_growth_max_chars,
                 session_cache_auto_prefix=args.session_cache_auto_prefix,
+                cache_breadth_entry_count=args.b1c2_cache_breadth_entry_count,
+                throughput_decay_max_relative=args.b1c2_throughput_decay_max_relative,
+                throughput_min_samples=args.b1c2_throughput_min_samples,
+                concurrency_min_entry_breadth=(
+                    args.b1c2_concurrency_min_entry_breadth
+                ),
+                concurrency_require_cache_eviction=(
+                    args.b1c2_concurrency_require_cache_eviction
+                ),
+                interruption_reason=args.interruption_reason,
             )
         elif args.gate == B1C1_REHEARSAL_GATE:
             summary = run_b1c1_interrupted_rehearsal(
