@@ -3,7 +3,7 @@
 > **Gate**: Campaign F · F-3 — Gemma 4 resident MTP A/B (assistant-drafter speculative decoding promoted from `deferred_cli_per_request` to a resident, parent-supervised runner with pure-decode A/B evidence)
 > **Layer**: design-grade, downstream of [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Part V · Campaign F · F-3, upstream of code-grade (resident MTP runner + A/B harness)
 > **Plan-grade source**: [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) line 335 ("F3 Gemma 4 resident MTP A/B（待 drafter / trim blocker 解除后恢复）") + [`../07-perf-optimization-proposal-20260526.md`](../07-perf-optimization-proposal-20260526.md)
-> **Status**: design-grade — **F-3.1 local prerequisite failed** (the upstream `mlx-lm #980` issue is closed, but the 2026-06-01 local `mlx-lm` / `mlx-vlm` pin failed the §2.2 resident-MTP feasibility probe; see §2.4 and §9). Code-grade does **not** start until a later local prerequisite probe reaches `resident_viable_*`.
+> **Status**: design-grade — **F-3.1 local prerequisite failed** (the upstream `mlx-lm #980` issue is closed, but the 2026-06-01 local `mlx-lm` / `mlx-vlm` pin failed the §2.2 resident-MTP feasibility probe; see §2.4 and §9). A 2026-06-02 local inventory also found no full-attention MTP target/drafter candidate to bypass the hybrid-cache blocker (§2.5). Code-grade does **not** start until a later local prerequisite probe reaches `resident_viable_*`.
 > **Non-goal**: this spec does not promote `assistant_drafter` to `supported`. It defines the resident-runner A/B that produces the evidence a later §1a Promotion Gate round would consume. It also does not touch the `mlx-lm` text line, DS4, or continuous batching.
 
 ## 1. Purpose
@@ -72,7 +72,39 @@ acceptance and the run entered a trim regime. This does not prove Gemma4 MTP is
 impossible in principle; it proves this local pin + prompt/cache path does not
 clear the prerequisite. F-3.2/F-3.3 remain blocked.
 
-### 2.5 Soft prerequisites (must hold, not blocking by themselves)
+### 2.5 2026-06-02 local MTP candidate inventory
+
+After the negative Gemma4 F-3.1 verdict, the next low-risk MTP action was to
+look for a local **full-attention** MTP target/drafter candidate that could avoid
+the hybrid-cache / trim blocker instead of forcing Gemma4 forward.
+
+Evidence:
+
+```text
+files/evidence/owlmlx/bench/f3-resident-mtp/20260602T093630Z-f3-mtp-candidate-inventory.jsonl
+```
+
+Result:
+
+- `schema_version=f3.mtp_candidate_inventory.v1`
+- `model_count=14`
+- `mtp_candidate_count=11`
+- `assistant_drafter_artifact_count=2`
+- `native_mtp_hybrid_or_unknown_candidate_count=9`
+- `native_mtp_full_attention_candidate_count=0`
+- `full_attention_resident_mtp_next_target_available=false`
+- `capability_label=experimental`
+- `used_for_promotion_gate=false`
+
+Interpretation: the local disk has MTP-like signals, but not the bypass target
+F-3 needs next. The Gemma4 assistant artifacts are already covered by the failed
+F-3.1 route. The Qwen3.5/Qwen3.6 and DeepSeek V4 configs expose native-MTP-ish
+signals (`mtp_num_hidden_layers` / `num_nextn_predict_layers`), but their config
+surfaces are hybrid or trim-sensitive (`linear_attention` / `sliding_window`).
+That means they are **not** the "full-attention resident MTP candidate" needed
+to bypass the current blocker. Do not start F-3.2/F-3.3 from this inventory.
+
+### 2.6 Soft prerequisites (must hold, not blocking by themselves)
 
 - F-1 design + code-grade landed and green (the `speculative_execution_status` surface F-3 will drive into the `loaded` shape) — **met** (F-1.2/F-1.3 landed, evidence `20260525T142617Z`)
 - this F-3 design-grade spec reviewed + signed off (architect + user, per [`README.md`](README.md) two-gate rule)
@@ -294,6 +326,11 @@ open-issue watch. Per the competitor-matrix upstream-watch discipline
   records `verdict=failed`; resident load was proven (`reloads_observed=0`,
   `requests_served=3`), but request 2+ had `mean_accepted_tokens=0.0` and the
   run observed 180 trim calls
+- 2026-06-02 local MTP candidate inventory:
+  [`20260602T093630Z-f3-mtp-candidate-inventory.jsonl`](../../../files/evidence/owlmlx/bench/f3-resident-mtp/20260602T093630Z-f3-mtp-candidate-inventory.jsonl)
+  records `native_mtp_full_attention_candidate_count=0` across 14 local model
+  dirs; Qwen / DeepSeek MTP signals remain hybrid or trim-sensitive rather than
+  a bypass path for F-3.2
 - 2026-05-06 whole-process A/B reference (the number F-3 must NOT conflate with decode speedup): [`gemma4-mtp-drafter-probe-20260506.md`](../../source-of-truth/gemma4-mtp-drafter-probe-20260506.md) §"A/B Timing Return"
 
 ## 12. Change Log
@@ -304,3 +341,4 @@ open-issue watch. Per the competitor-matrix upstream-watch discipline
 | 2026-06-01 | live upstream re-check: `mlx-lm #980` is closed, so the gate wording was narrowed from "open issue blocker" to "local prerequisite verification blocker"; F-3.1 remains required before code-grade starts | goal loop F-3.1 |
 | 2026-06-01 | added `blocked_on_local_runtime` as a first-class F-3.1 verdict because an unusable isolated probe venv is a different blocker from an upstream #980 defect | goal loop F-3.1 |
 | 2026-06-01 | recorded first F-3.1 local resident probe result: `verdict=failed`; target/drafter loaded once and served 3 requests, but request 2+ reported no non-trivial speculative acceptance and the run observed 180 trim calls; F-3.2 remains blocked | goal loop F-3.1 |
+| 2026-06-02 | recorded local MTP candidate inventory: 14 model dirs, 11 with MTP/assistant signals, but 0 full-attention native-MTP candidates; F-3 remains blocked rather than switching to an unproven hybrid target | MTP follow-up |

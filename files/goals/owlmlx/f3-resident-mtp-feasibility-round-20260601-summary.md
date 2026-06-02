@@ -111,3 +111,29 @@ Interpretation: F-3.1 produced an evidence-backed verdict, but it is a negative
 verdict. The installed local pin does not clear the resident-viable
 prerequisite for Gemma4 assistant-drafter MTP. F-3 remains design-ready and
 code-grade-blocked; `assistant_drafter` remains `experimental`.
+
+## Follow-up Inventory: 2026-06-02T09:36Z
+
+Evidence:
+`files/evidence/owlmlx/bench/f3-resident-mtp/20260602T093630Z-f3-mtp-candidate-inventory.jsonl`
+
+The post-verdict "try a full-attention target instead" path was checked with a
+config-only local inventory. It reads model `config.json` files only; it does
+not load weights or start any runtime process.
+
+- `schema_version=f3.mtp_candidate_inventory.v1`
+- `model_count=14`
+- `mtp_candidate_count=11`
+- `assistant_drafter_artifact_count=2`
+- `native_mtp_hybrid_or_unknown_candidate_count=9`
+- `native_mtp_full_attention_candidate_count=0`
+- `full_attention_resident_mtp_next_target_available=false`
+- `capability_label=experimental`
+- `used_for_promotion_gate=false`
+
+Interpretation: local disk has MTP-like signals, but no full-attention MTP
+target/drafter candidate that can bypass the hybrid-cache blocker. Gemma4
+assistant artifacts remain covered by the failed F-3.1 verdict; Qwen and
+DeepSeek V4 native-MTP-ish configs are hybrid / trim-sensitive and need their
+own cache-specific probe before any resident backend work. F-3.2/F-3.3 remain
+blocked.
