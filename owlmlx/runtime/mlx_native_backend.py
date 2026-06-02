@@ -103,6 +103,7 @@ class _PreparedPromptCache:
     previous_prompt_token_count: int = 0
     common_prefix_token_count: int = 0
     suffix_token_count: int = 0
+    automatic_prefix_scope: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -574,6 +575,7 @@ class MlxNativeBackend:
                             model_id=session.info.model_id,
                             reason_code="reuse_trim_unavailable_fresh_cache",
                             detail=detail,
+                            undo_reuse_hit=True,
                         )
                     else:
                         self._session_kv_cache.drop_for_session_model(
@@ -609,6 +611,7 @@ class MlxNativeBackend:
             previous_prompt_token_count=decision.previous_prompt_token_count,
             common_prefix_token_count=common_prefix_count if decision.reused else 0,
             suffix_token_count=len(suffix_tokens) if decision.reused else 0,
+            automatic_prefix_scope=automatic_prefix_scope,
         )
 
     def _finalize_session_prompt_cache_after_stream(
@@ -660,6 +663,22 @@ class MlxNativeBackend:
                 trim_result.trimmed_tokens == 0
                 and len(generated_token_ids) >= completion_tokens
             ):
+                if prepared.automatic_prefix_scope:
+                    self._session_kv_cache.bypass_for_session_model(
+                        session_id=prepared.session_id,
+                        model_id=session.info.model_id,
+                        reason_code="auto_prefix_completion_trim_unavailable",
+                        detail={
+                            "trim_reason_code": trim_result.reason_code,
+                            "requested_trim_tokens": completion_tokens,
+                            "trimmed_tokens": trim_result.trimmed_tokens,
+                            "generated_token_count": len(generated_token_ids),
+                            "prompt_token_count": len(prepared.prompt_tokens),
+                            "cache_decision": prepared.cache_decision,
+                            "cache_reason_code": prepared.cache_reason_code,
+                        },
+                    )
+                    return True
                 remembered_tokens = (
                     prepared.prompt_tokens
                     + generated_token_ids[:completion_tokens]

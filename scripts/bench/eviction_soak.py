@@ -354,8 +354,10 @@ def _session_cache_env(
     max_entries: int | None = None,
     max_prompt_tokens: int | None = None,
     max_resident_bytes: int | None = None,
+    auto_prefix_enabled: bool = False,
 ) -> Iterator[None]:
     previous_enabled = os.environ.get("OWLMLX_SESSION_CACHE_ENABLED")
+    previous_auto_prefix = os.environ.get("OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED")
     previous_ttl = os.environ.get("OWLMLX_SESSION_CACHE_TTL_S")
     previous_max_entries = os.environ.get("OWLMLX_SESSION_CACHE_MAX_ENTRIES")
     previous_max_prompt_tokens = os.environ.get("OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS")
@@ -363,6 +365,9 @@ def _session_cache_env(
         "OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES"
     )
     os.environ["OWLMLX_SESSION_CACHE_ENABLED"] = "1" if enabled else "0"
+    os.environ["OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED"] = (
+        "1" if auto_prefix_enabled else "0"
+    )
     if ttl_s is not None:
         os.environ["OWLMLX_SESSION_CACHE_TTL_S"] = str(float(ttl_s))
     if max_entries is not None:
@@ -382,6 +387,12 @@ def _session_cache_env(
             os.environ.pop("OWLMLX_SESSION_CACHE_ENABLED", None)
         else:
             os.environ["OWLMLX_SESSION_CACHE_ENABLED"] = previous_enabled
+        if previous_auto_prefix is None:
+            os.environ.pop("OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED", None)
+        else:
+            os.environ["OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED"] = (
+                previous_auto_prefix
+            )
         if previous_ttl is None:
             os.environ.pop("OWLMLX_SESSION_CACHE_TTL_S", None)
         else:
@@ -2478,6 +2489,7 @@ def run_b1c2_soak_plus_swap(
     b1c1_prerequisite_satisfied: bool = False,
     session_cache_max_prompt_tokens: int | None = None,
     prompt_growth_max_chars: int | None = None,
+    session_cache_auto_prefix: bool = False,
 ) -> dict[str, Any]:
     if runtime != "owlmlx":
         raise ValueError("only --runtime owlmlx is implemented in this baseline round")
@@ -2529,6 +2541,7 @@ def run_b1c2_soak_plus_swap(
         ttl_s=effective_session_cache_ttl_s,
         max_prompt_tokens=session_cache_max_prompt_tokens,
         max_resident_bytes=resident_cache_budget_bytes,
+        auto_prefix_enabled=session_cache_auto_prefix,
     ):
         kernel, sampler = _make_kernel(backend=backend, profile=profile)
         evidence_strength = _b1c2_evidence_strength(backend=backend)
@@ -2560,7 +2573,11 @@ def run_b1c2_soak_plus_swap(
             sample_index = len(records) + 1
             if phase == "measurement" and measurement_started_monotonic_s is None:
                 measurement_started_monotonic_s = time.monotonic()
-            session_id = f"{session_id_prefix}-{prompt_id}"
+            session_id = (
+                None
+                if session_cache_auto_prefix
+                else f"{session_id_prefix}-{prompt_id}"
+            )
             prompt = session_prompts[prompt_id]
             cache_before = _session_cache_status(kernel)
             before_bytes = sampler.active_memory_bytes(kernel)
@@ -2673,6 +2690,9 @@ def run_b1c2_soak_plus_swap(
                     "OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES": (
                         resident_cache_budget_bytes
                     ),
+                    "OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED": (
+                        "1" if session_cache_auto_prefix else "0"
+                    ),
                     "session_id": session_id,
                     "prompt_chars_before_generation": len(prompt),
                     "prompt_chars_after_generation": len(next_prompt),
@@ -2715,6 +2735,9 @@ def run_b1c2_soak_plus_swap(
                     ),
                     "max_prompt_tokens": cache_after.get("max_prompt_tokens"),
                     "max_resident_bytes": cache_after.get("max_resident_bytes"),
+                    "automatic_prefix_enabled": cache_after.get(
+                        "automatic_prefix_enabled"
+                    ),
                     "prompt_window_policy": cache_after.get("prompt_window_policy"),
                     "resident_pressure_policy": cache_after.get(
                         "resident_pressure_policy"
@@ -2870,6 +2893,12 @@ def run_b1c2_soak_plus_swap(
                             "OWLMLX_SESSION_CACHE_TTL_S": effective_session_cache_ttl_s,
                             "OWLMLX_SESSION_CACHE_MAX_PROMPT_TOKENS": (
                                 session_cache_max_prompt_tokens
+                            ),
+                            "OWLMLX_SESSION_CACHE_MAX_RESIDENT_BYTES": (
+                                resident_cache_budget_bytes
+                            ),
+                            "OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED": (
+                                "1" if session_cache_auto_prefix else "0"
                             ),
                             "session_id": None,
                             "duration_s": duration_s,
@@ -3125,6 +3154,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--warmup-cycles", type=int, default=B1C1_WARMUP_CYCLES)
     parser.add_argument("--session-cache-ttl-s", type=float, default=None)
     parser.add_argument("--session-cache-max-prompt-tokens", type=int, default=None)
+    parser.add_argument("--session-cache-auto-prefix", action="store_true")
     parser.add_argument("--rehearsal-group-id", default=None)
     parser.add_argument("--rehearsal-segment-id", default=None)
     parser.add_argument("--resumes-prior-segment", action="store_true")
@@ -3206,6 +3236,7 @@ def main(argv: list[str] | None = None) -> int:
                 b1c1_prerequisite_satisfied=args.b1c1_prerequisite_satisfied,
                 session_cache_max_prompt_tokens=args.session_cache_max_prompt_tokens,
                 prompt_growth_max_chars=args.b1c2_prompt_growth_max_chars,
+                session_cache_auto_prefix=args.session_cache_auto_prefix,
             )
         elif args.gate == B1C1_REHEARSAL_GATE:
             summary = run_b1c1_interrupted_rehearsal(

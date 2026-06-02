@@ -166,6 +166,7 @@ def classify_prefix_cache_candidate(
     existing_isolation_scope: str | None = None,
     requested_isolation_scope: str | None = None,
     trim_available: bool = False,
+    require_existing_prompt_prefix: bool = False,
 ) -> PrefixCacheCandidateDecision:
     """Classify prefix-cache eligibility without exposing a cache handle."""
 
@@ -200,6 +201,16 @@ def classify_prefix_cache_candidate(
     needs_trim = common_prefix_count < previous_count
     suffix_count = max(requested_count - common_prefix_count, 0)
     if common_prefix_count == 0 and (previous_count > 0 or requested_count > 0):
+        return PrefixCacheCandidateDecision(
+            eligible=False,
+            reason_code="not_token_prefix",
+            common_prefix_token_count=common_prefix_count,
+            previous_prompt_token_count=previous_count,
+            requested_prompt_token_count=requested_count,
+            suffix_token_count=suffix_count,
+            needs_trim=needs_trim,
+        )
+    if require_existing_prompt_prefix and common_prefix_count < previous_count:
         return PrefixCacheCandidateDecision(
             eligible=False,
             reason_code="not_token_prefix",
@@ -376,6 +387,7 @@ class SessionKVCacheStore:
                     existing_isolation_scope=normalized_session_id,
                     requested_isolation_scope=normalized_session_id,
                     trim_available=True,
+                    require_existing_prompt_prefix=strict_prefix_reuse,
                 )
                 if strict_prefix_reuse and not candidate.eligible:
                     removed = self._entries.pop(key, None)
@@ -586,6 +598,7 @@ class SessionKVCacheStore:
         model_id: str,
         reason_code: str,
         detail: dict[str, Any] | None = None,
+        undo_reuse_hit: bool = False,
     ) -> bool:
         """Evict one reusable entry before generation and fall back to fresh cache."""
 
@@ -594,8 +607,12 @@ class SessionKVCacheStore:
             return False
         with self._lock:
             removed = self._entries.pop((normalized_session_id, model_id), None)
+            hit_count = self._counters.hits
+            if undo_reuse_hit:
+                hit_count = max(hit_count - 1, 0)
             self._counters = _replace_counter(
                 self._counters,
+                hits=hit_count,
                 trim_bypasses=self._counters.trim_bypasses + 1,
                 trim_evictions=(
                     self._counters.trim_evictions + (1 if removed is not None else 0)

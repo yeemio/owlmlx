@@ -1,7 +1,7 @@
 # Session KV Cache Experimental Contract
 
 > Status: authoritative
-> Updated: 2026-06-01
+> Updated: 2026-06-02
 > Implementation: `owlmlx/session_kv_cache.py`,
 > `owlmlx/runtime/mlx_native_backend.py`
 
@@ -21,8 +21,12 @@ It is intentionally narrow:
 - reuse is scoped to the same model and either the explicit session id or the
   runtime-owned automatic prefix scope
 - append-only reuse is supported when the upstream cache cannot be trimmed
+  in the explicit session lane
 - tail-edit reuse is attempted only when `mlx_lm.models.cache.trim_prompt_cache`
   can trim the concrete cache object
+- automatic no-header reuse must keep a prompt-only entry; if generated-token
+  completion trim is unavailable, OwlMLX evicts the automatic entry and falls
+  back to fresh cache rather than retaining a generated-token-extended prefix
 - no default-on implicit prefix matching
 - no paged KV
 - no continuous batching
@@ -58,10 +62,12 @@ behavior through `CacheManager.acquire_for_request(...)`.
 
 When `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`, a streaming request without
 `X-Owlmlx-Session-Id` may enter the runtime-owned automatic prefix scope. The
-backend reuses only when the remembered prompt and requested prompt satisfy the
-same token-prefix safety classifier used by the explicit lane. Ineligible
-requests evict the prior automatic entry and fall back to a fresh cache object;
-they do not silently merge unrelated prompts.
+backend reuses only when the remembered prompt is the complete token prefix of
+the requested prompt. Ineligible requests evict the prior automatic entry and
+fall back to a fresh cache object; they do not silently merge unrelated prompts.
+The automatic lane is stricter than the explicit session lane: it does not keep
+append-only generated-token-extended entries when the upstream cache cannot be
+trimmed back to prompt-only state after generation.
 
 ## 3. Memory Discipline
 
@@ -122,6 +128,14 @@ As of B-2.3, the first opt-in automatic prefix slice exists behind
 still report it as experimental and default-off until the B-1c section 2 policy
 gate and B-2 compatibility evidence justify a broader claim.
 
+The current B-2.3 real-hit blocker is documented by
+`files/evidence/owlmlx/bench/prefix-cache-compatibility/20260602T004000Z-b2-auto-prefix-qwen27-real-hit-summary.json`.
+That Qwen3.6-27B-4bit probe loaded and generated successfully, but produced
+`usable_hit_count=0` with `known_blocker=auto_prefix_completion_trim_unavailable`.
+This means OwlMLX can safely avoid private-header adaptation and avoid unsafe
+reuse, but it cannot yet claim real no-header cached-token hits on that model
+path.
+
 This surface does **not** imply any of the following:
 
 - default-on or supported automatic cross-request prefix cache
@@ -146,7 +160,9 @@ per-request `session_kv_cache.cached_prompt_tokens` metadata. They must not
 infer request-level cache hits from aggregate `/v1/runtime/session-kv-cache`
 counters. As of B-2.3, automatic safe prefix reuse is implemented only as an
 opt-in native-streaming slice; upper layers should not normalize the private
-session header as their permanent integration burden.
+session header as their permanent integration burden, and they must not infer a
+real automatic no-header hit while the runtime reports
+`auto_prefix_completion_trim_unavailable`.
 
 As of the 2026-06-01 B-1c §2 fast-swap drift triage, the diagnostic payload
 also reports resident-cache accounting mode. When upstream prompt-cache objects

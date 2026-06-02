@@ -176,6 +176,26 @@ def test_prefix_cache_candidate_rejects_non_prefix_tokens() -> None:
     assert decision.reason_code == "not_token_prefix"
 
 
+def test_prefix_cache_candidate_rejects_partial_prefix_when_full_prefix_required() -> None:
+    decision = classify_prefix_cache_candidate(
+        existing_model_id="model-a",
+        requested_model_id="model-a",
+        existing_prompt_tokens=(1, 2, 3),
+        requested_prompt_tokens=(1, 2, 9, 10),
+        existing_runtime_profile_id="profile-a",
+        requested_runtime_profile_id="profile-a",
+        existing_isolation_scope="tenant-a",
+        requested_isolation_scope="tenant-a",
+        trim_available=True,
+        require_existing_prompt_prefix=True,
+    )
+
+    assert decision.eligible is False
+    assert decision.reason_code == "not_token_prefix"
+    assert decision.common_prefix_token_count == 2
+    assert decision.needs_trim is True
+
+
 def test_prefix_cache_candidate_rejects_edited_prefix_without_trim() -> None:
     decision = classify_prefix_cache_candidate(
         existing_model_id="model-a",

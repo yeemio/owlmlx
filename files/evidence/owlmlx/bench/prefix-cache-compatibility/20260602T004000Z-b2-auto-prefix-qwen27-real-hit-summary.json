@@ -1,0 +1,28 @@
+{
+  "auto_prefix_ineligible_count": 0,
+  "bypass_reason_counts": {
+    "auto_prefix_completion_trim_unavailable": 4
+  },
+  "cleanup_unload_ok": true,
+  "completion_trim_unavailable_count": 4,
+  "drops_total": 0,
+  "expirations_total": 0,
+  "hits_total": 0,
+  "known_blocker": "auto_prefix_completion_trim_unavailable",
+  "ledger": "files/evidence/owlmlx/bench/prefix-cache-compatibility/20260602T004000Z-b2-auto-prefix-qwen27-real-hit.jsonl",
+  "load_ok": true,
+  "misses_total": 4,
+  "model_gb": 27.0,
+  "model_id": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B-4bit",
+  "rejects_total": 0,
+  "reuse_trim_bypass_count": 0,
+  "run_id": "20260602T004000Z-b2-auto-prefix-qwen27-real-hit",
+  "sample_count": 4,
+  "schema_version": "b2.automatic_prefix_reuse.summary.v1",
+  "terminal_fallback_count": 0,
+  "timestamp_utc": "2026-06-02T00:13:14Z",
+  "trim_bypasses_total": 4,
+  "trim_evictions_total": 4,
+  "usable_hit_count": 0,
+  "verdict": "failed"
+}

@@ -130,6 +130,17 @@ Capability labels:
 | Multi-model lifecycle controls (pin / TTL / eviction history) | supported | `RuntimeKernel` owns `pin_model()` / `unpin_model()` (pinned unload blocked, pin state survives restart), `set_model_ttl()` / `clear_model_ttl()` / `sweep_expired_models()` (expired non-pinned models can be swept; pinned-expired stay blocked), and runtime-owned eviction history that records both TTL unload and pinned-expiry skip events. Validated by `tests/test_settle_barrier_event.py` and adjacent kernel tests. |
 | Multi-model governance observation surface | partial | Resident-model count, active/default semantics, and recoverability visibility are exposed via `RuntimeKernel.status_dict()` and consumed by the `/v1/runtime/orchestration-status` endpoint. The dedicated `multi_model_governance_*` spec modules from earlier phases were retired in Stage 1 (2026-05-11) because their dataclass fields were never read by a runtime decision path; only the underlying kernel state remains as the governance source. |
 | Control-plane downgrade-path hardening | supported | Runtime-10 makes `healthz` a liveness-only fallback; it no longer fabricates `openai_chat` protocol when richer runtime truth is absent |
+
+Session KV B-2.3 note (2026-06-02): the no-header automatic prefix slice remains
+`experimental`. The `20260601T172007Z` 20-minute / 4-swap run validates safe
+fallback under 5-minute switch cadence (`swap_boundaries_clean=true`, drops /
+expirations / rejects all `0`, resident working set within budget). The
+`20260602T004000Z` Qwen3.6-27B-4bit hit probe validates the blocker instead of
+a pass: load/generate/unload succeeded, but `usable_hit_count=0` and
+`known_blocker=auto_prefix_completion_trim_unavailable`. OwlMLX must not claim
+real no-header cached-token hits or default-on mainstream prefix cache until a
+prompt-only retention or upstream completion-trim primitive exists and is
+evidenced.
 | Runtime model visibility contract | supported | `owlmlx/runtime_model_visibility.py` now freezes owlmlx-owned rule `runtime_gate_required_before_visible`: `GET /v1/openai/models` is the formal visibility list, `GET /v1/runtime/model-visibility` is the diagnostic contract surface, and `GET /v1/models` remains loaded inventory with an embedded `visibility_contract` block; the gate is owlmlx registry plus `$MODELS_ROOT/{model-id}/config.json` presence rather than router lifecycle curation; see `runtime-model-visibility-contract.md` |
 | Degraded local routing now fails closed | supported | Runtime-11 blocks `localRuntimeProtocol=auto` when only `/healthz` is reachable; it no longer silently falls through to `/v1/chat/completions` for local models |
 | Replacement readiness verdict surface | supported | Runtime-12 promotes replacement readiness into explicit `doctor` output with a blocker list; launch readiness and replacement readiness are now distinct control-plane truths |

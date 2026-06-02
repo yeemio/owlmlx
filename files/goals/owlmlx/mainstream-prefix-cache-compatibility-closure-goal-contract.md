@@ -1,7 +1,7 @@
 # owlmlx Goal Contract: Mainstream Prefix-Cache Compatibility Closure
 
 > Status: active goal contract
-> Updated: 2026-06-01 after B-2.3 opt-in auto-prefix slice
+> Updated: 2026-06-02 after B-2.3 no-header blocker probe
 
 ## goal_id
 
@@ -93,6 +93,10 @@ missing primitive precisely. Do not reframe the private header as the solution.
   `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`. It is native-streaming only,
   default-off, and falls back to fresh cache when the prefix classifier rejects
   the candidate.
+- The automatic no-header lane is stricter than the explicit session lane:
+  edited-prefix reuse is rejected unless the existing prompt is a full token
+  prefix of the requested prompt, and generated-token-extended entries are not
+  retained when completion trim is unavailable.
 - Non-stream `generate` remains fresh single-request cache today.
 - The current OpenAI / Anthropic compatibility routes can forward the explicit
   header, but they do not derive a mainstream cache scope by themselves.
@@ -144,6 +148,19 @@ missing primitive precisely. Do not reframe the private header as the solution.
   4 LRU evictions, and `max_session_cache_resident_bytes=2144829440` within the
   `2147483648` budget. It remains `blocked` only because it is not the canonical
   aggregate duration.
+- The `20260601T172007Z` no-header automatic-prefix run used the user-requested
+  5-minute switch cadence for 20 minutes / 4 swaps. It stayed boundary-clean and
+  cache-clean: `swap_boundaries_clean=true`,
+  `measurement_wall_clock_gap_free=true`, drops / expirations / rejects all 0,
+  `max_same_model_load_epoch_drift_bytes=54067200`, and resident working set
+  `358481920 <= 2147483648`. This validates automatic-lane safety/fallback
+  under fast switching, not real cache-hit performance.
+- The `20260602T004000Z` Qwen3.6-27B-4bit no-header hit probe loaded, generated,
+  and unloaded successfully, but failed the real-hit gate with
+  `usable_hit_count=0`, `hits_total=0`, and
+  `known_blocker=auto_prefix_completion_trim_unavailable`. That is now the
+  precise missing primitive for mainstream automatic cached-token hits on the
+  current native path.
 
 ## remaining_gaps
 
@@ -160,9 +177,10 @@ missing primitive precisely. Do not reframe the private header as the solution.
    B-2.3 opt-in implementation can consume it, but any broader claim still
    needs an explicit aggregate / policy decision.
 4. B-2.3 automatic safe prefix reuse is implemented only as a narrow
-   native-streaming, no-header, default-off slice. It must remain an
-   `experimental` capability claim until B-1c section 2 aggregate stability
-   passes.
+   native-streaming, no-header, default-off slice. It currently proves safe
+   fallback and strict admission, not real automatic cached-token hits. It must
+   remain an `experimental` capability claim until B-1c section 2 aggregate
+   stability passes and the B-2 no-header hit blocker is resolved.
 5. The explicit `X-Owlmlx-Session-Id` lane is no longer the only physical reuse
    path, but it remains the dogfood/control lane and must not be presented as
    the mainstream consumer contract.
@@ -175,10 +193,18 @@ missing primitive precisely. Do not reframe the private header as the solution.
 `B-1c-section-2-high-frequency-swap-aggregate-policy-for-B-2.3`
 
 The next executable closure is not another consumer-side adapter and not F-3
-runtime work. B-2.1 and B-2.2 are already landed; the dominant blocker is the
-B-1c section 2 aggregate / policy decision under high-frequency swap stress,
-plus a small B-2 evidence row for the newly landed opt-in no-header path. Do not
-run another passive 4h topoff with one switch. Keep the 5-minute cadence: it
-already found the resident-pressure issue, and the first LRU resident-cap
-validation is clean. Keep B-2.3 broader promotion blocked until the aggregate /
-policy prerequisite is honestly met.
+runtime work. B-2.1, B-2.2, and the first B-2.3 automatic slice are already
+landed. The remaining closure has two concrete blockers:
+
+1. B-1c section 2 aggregate / policy evidence under high-frequency swap stress
+   is still required for any broader stability claim. Do not run another
+   passive 4h topoff with one switch. Keep the 5-minute cadence: it already
+   found the resident-pressure issue, and the first LRU resident-cap validation
+   is clean.
+2. Real no-header cached-token hits are blocked by
+   `auto_prefix_completion_trim_unavailable` on the current Qwen27 native path.
+   The next implementation step must provide a prompt-only retention primitive
+   or wait for an upstream cache-trim path that can trim generated tokens after
+   stream completion.
+
+Keep B-2.3 broader promotion blocked until both blockers are honestly resolved.
