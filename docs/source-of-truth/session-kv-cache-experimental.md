@@ -177,6 +177,24 @@ GET /v1/runtime/session-kv-cache
 /v1/runtime/status -> backend.detail.session_kv_cache
 ```
 
+For live consumer validation, use the native preview server rather than the
+fake-backend quick-start or the subprocess technical-preview server:
+
+```bash
+uv run python scripts/runtime_native_preview_server.py \
+  --port 8066 \
+  --models-root /Users/yeemio/AI/Agent/models \
+  --enable-session-cache \
+  --enable-auto-prefix \
+  --session-cache-max-resident-bytes 2147483648
+```
+
+This preserves public model ids through a local model-path resolver and mounts
+`MlxNativeBackend`, so OwlCoda can validate OpenAI/Anthropic streaming usage
+metadata without hard-coding OwlMLX-specific session headers or absolute model
+paths. The flags above still keep the capability experimental and operator
+opt-in; they do not make automatic prefix reuse default-on.
+
 As of B-2.2, compatibility routes may mirror cached-token counts into OpenAI
 `usage.prompt_tokens_details.cached_tokens` or Anthropic
 `cache_read_input_tokens` only when the backend event/result carries real

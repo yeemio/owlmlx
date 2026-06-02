@@ -236,6 +236,10 @@ Their CLIs are stable; their internal helpers are not.
 - `scripts/runtime_technical_preview_server.py` — `supported` — operator
   entry for side-by-side owlmlx technical-preview serving with the real
   MLX subprocess backend; it does not stop legacy `oMLX` or router services
+- `scripts/runtime_native_preview_server.py` — `supported` — operator entry
+  for side-by-side owlmlx technical-preview serving with the native MLX backend;
+  it is the opt-in live validation path for experimental session KV cache /
+  automatic prefix-cache behavior and does not promote those capabilities
 - `scripts/runtime_large_weight_specimen_gate.py` — `supported`
 - `scripts/runtime_large_weight_first_smoke.py` — `supported`
 - `scripts/runtime_large_weight_first_smoke_decision.py` — `supported`

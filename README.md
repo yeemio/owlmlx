@@ -101,8 +101,9 @@ N=20 both completed; cache-on had 20/20 warm hits, `failed_reclaim=0`,
 `failed_unload=0`, and p50/p99 settle durations stayed within threshold.
 
 This remains `experimental`: native backend only, default off, explicit
-session id, append-only reuse for non-trimmable upstream caches. The 24h
-no-swap and swap soak gates remain open before any `supported` promotion.
+session id, append-only reuse for non-trimmable upstream caches. B-1c no-swap
+and soak-plus-swap gates remain open before any `supported` promotion; §2 is now
+blocked on under-measured throughput/concurrency axes, not on raw duration.
 
 Short-prompt TPS on `Mac17,6` (`max_tokens=64`, `temperature=0`):
 
@@ -124,6 +125,18 @@ uv sync --extra runtime
 uv run pytest
 uv run python -m uvicorn 'owlmlx.runtime.server:create_app' --factory --port 8066
 curl http://127.0.0.1:8066/v1/runtime/monitor/snapshot
+```
+
+For real native-session-cache validation against OpenAI/Anthropic compatible
+routes, use the native preview server instead of the fake-backend quick-start:
+
+```bash
+uv run python scripts/runtime_native_preview_server.py \
+  --port 8066 \
+  --models-root /Users/yeemio/AI/Agent/models \
+  --enable-session-cache \
+  --enable-auto-prefix \
+  --session-cache-max-resident-bytes 2147483648
 ```
 
 Project Python is **3.11.15** (pinned via `.python-version`). `pytest`
@@ -154,7 +167,7 @@ gate. Session KV cache remains experimental: B-1a passed (Gemma 4-31B-it
 current-Mac `interrupted_no_swap_rehearsal=passed` @ ≈24.69h cumulative
 clean native segments, B-1c §2 (soak plus swap) has closed the drop / drift /
 swap-boundary / single-segment measurement-continuity subcriteria and is now in
-aggregate-volume closure
+four-axis closure
 (2026-05-22 boundary-safe 4h segment recorded `max_drift_bytes=352MB
 > 200MB budget`; 2026-05-24 Qwen-only no-swap probe reproduced the same
 352MB drift with cache drops/expirations/rejects all 0; 2026-05-25 accounting
@@ -174,10 +187,14 @@ violations, max gap `7064.873s`). The 2026-06-01 repeat
 (`measurement_wall_clock_gap_free=true`, max gap `60.642s`) with drops /
 expirations / rejects all 0, trim bypasses still 3, `max_drift_bytes=171704320`,
 and `swap_boundaries_clean=true`; audit reports
-`clean_for_interrupted_aggregate=true`, while the segment rollup correctly
-remains `blocked` because 24h / 6 swaps are still unmet. The next step is five
-more gap-free repeat segments before any §2 pass or promotion review per
-`docs/architect/design/B-1c-section-2-spec.md §10`). Stage 1 refactor
+`clean_for_interrupted_aggregate=true`. Later fast forced-swap canaries proved
+5-minute load/switch boundaries stay clean, direct cache-object resident
+accounting closed the raw-RSS drift false-fail, and the resident cap kept the
+held cache working set inside budget. The §2 rollup still correctly remains
+`blocked` because throughput decay and concurrency breadth are under-measured
+under the four-axis count-based §7, not because more passive wall-clock duration
+is needed. The next step is harness instrumentation for those two missing axes
+per `docs/architect/design/B-1c-section-2-spec.md §10`). Stage 1 refactor
 (2026-05-11) archived 151 spec-as-code modules; Stage 2 aligned landmark
 vocabulary with [PR #649][pr649]; Wave H · H1 (2026-05-17) extracted
 OpenAI/Anthropic compat routes into `server_routes_openai.py`. Campaign F-1
