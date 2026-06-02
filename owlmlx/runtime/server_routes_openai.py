@@ -288,6 +288,7 @@ def _openai_response_dict(
     cached_prompt_tokens: int | None = None,
     reasoning_trace_policy: dict[str, object] | None = None,
     tool_calls: list[dict[str, Any]] | None = None,
+    tool_call_diagnostics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     usage = None
     if prompt_tokens is not None or completion_tokens is not None:
@@ -308,6 +309,8 @@ def _openai_response_dict(
     }
     if tool_calls:
         message["tool_calls"] = tool_calls
+    if tool_call_diagnostics is not None:
+        message["owlmlx_tool_call_diagnostics"] = tool_call_diagnostics
     if reasoning_trace_policy is not None:
         message["owlmlx_reasoning_trace_policy"] = reasoning_trace_policy
     payload = {
@@ -351,6 +354,29 @@ def _openai_tool_calls_from_detail(detail: dict[str, Any] | None) -> list[dict[s
     raw_tool_use = detail.get("tool_use")
     normalized = _tool_use_to_openai_tool_call(raw_tool_use, index=0)
     return [normalized] if normalized is not None else []
+
+
+_TOOL_CALL_DIAGNOSTIC_KEYS = (
+    "template_render_fallback",
+    "template_render_error_type",
+    "template_render_error",
+    "tool_parser_missing",
+    "tool_parse_dropped",
+    "tool_parse_errors",
+)
+
+
+def _openai_tool_call_diagnostics_from_detail(
+    detail: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not isinstance(detail, dict):
+        return None
+    diagnostics = {
+        key: detail[key]
+        for key in _TOOL_CALL_DIAGNOSTIC_KEYS
+        if key in detail
+    }
+    return diagnostics or None
 
 
 def _normalize_openai_tool_call(
@@ -738,6 +764,9 @@ def register_openai_compat_routes(
                 policy=reasoning_policy,
             )
             tool_calls = _openai_tool_calls_from_detail(result.detail)
+            tool_call_diagnostics = _openai_tool_call_diagnostics_from_detail(
+                result.detail
+            )
             finish_reason = result.finish_reason or "stop"
             if tool_calls:
                 finish_reason = "tool_calls"
@@ -753,6 +782,7 @@ def register_openai_compat_routes(
                     cached_prompt_tokens=_compat_cached_prompt_tokens(result.detail),
                     reasoning_trace_policy=reasoning_policy_payload,
                     tool_calls=tool_calls,
+                    tool_call_diagnostics=tool_call_diagnostics,
                 ),
             )
 
@@ -785,6 +815,9 @@ def register_openai_compat_routes(
                     policy=reasoning_policy,
                 )
                 tool_calls = _openai_tool_calls_from_detail(result.detail)
+                tool_call_diagnostics = _openai_tool_call_diagnostics_from_detail(
+                    result.detail
+                )
                 if visible_text and not tool_calls:
                     content_chunk = {
                         "id": completion_id,
@@ -832,6 +865,8 @@ def register_openai_compat_routes(
                 }
                 if policy_payload is not None:
                     done_chunk["owlmlx_reasoning_trace_policy"] = policy_payload
+                if tool_call_diagnostics is not None:
+                    done_chunk["owlmlx_tool_call_diagnostics"] = tool_call_diagnostics
                 if result.prompt_tokens is not None or result.completion_tokens is not None:
                     done_chunk["usage"] = _openai_usage_dict(
                         prompt_tokens=result.prompt_tokens,

@@ -361,6 +361,114 @@ def test_native_backend_generate_messages_parses_qwen_tool_call(
         importlib.reload(mod)
 
 
+def _run_fake_native_generate_messages(
+    monkeypatch: pytest.MonkeyPatch,
+    tokenizer: object,
+    generated_text: str,
+    *,
+    tools: list[dict[str, object]] | None = None,
+) -> GenerateResult:
+    fake = types.ModuleType("mlx_lm")
+
+    def fake_load(model_id: str) -> tuple[object, object]:
+        return (object(), tokenizer)
+
+    def fake_generate(model, tokenizer, *, prompt, max_tokens):  # type: ignore[no-untyped-def]
+        return generated_text
+
+    fake.load = fake_load  # type: ignore[attr-defined]
+    fake.generate = fake_generate  # type: ignore[attr-defined]
+    previous_mlx_lm = sys.modules.get("mlx_lm")
+    monkeypatch.setitem(sys.modules, "mlx_lm", fake)
+    import owlmlx.runtime.mlx_native_backend as mod
+    importlib.reload(mod)
+    try:
+        backend = mod.MlxNativeBackend()
+        backend.load("fake-model")
+        return backend.generate_messages(
+            "fake-model",
+            [ChatTurn(role="user", content="Use Bash")],
+            tools=tools
+            or [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "Bash",
+                        "parameters": {"type": "object"},
+                    },
+                }
+            ],
+        )
+    finally:
+        if previous_mlx_lm is None:
+            sys.modules.pop("mlx_lm", None)
+        else:
+            sys.modules["mlx_lm"] = previous_mlx_lm
+        importlib.reload(mod)
+
+
+def test_native_backend_records_tool_parser_missing_when_tools_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeTokenizer:
+        def apply_chat_template(self, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return "templated prompt"
+
+    result = _run_fake_native_generate_messages(
+        monkeypatch,
+        _FakeTokenizer(),
+        "plain text",
+    )
+
+    assert result.ok is True
+    assert result.finish_reason is None
+    assert result.detail["tool_parser_missing"] is True
+
+
+def test_native_backend_records_tool_parse_drop_when_parser_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeTokenizer:
+        tool_call_start = "<tool_call>"
+        tool_call_end = "</tool_call>"
+
+        def apply_chat_template(self, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return "templated prompt"
+
+        @staticmethod
+        def tool_parser(tool_text, tools):  # type: ignore[no-untyped-def]
+            raise ValueError("bad tool json")
+
+    result = _run_fake_native_generate_messages(
+        monkeypatch,
+        _FakeTokenizer(),
+        "<tool_call>{bad}</tool_call>",
+    )
+
+    assert result.ok is True
+    assert result.finish_reason is None
+    assert result.detail["tool_parse_dropped"] == 1
+    assert result.detail["tool_parse_errors"][0]["error_type"] == "ValueError"
+
+
+def test_native_backend_records_template_render_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FakeTokenizer:
+        def apply_chat_template(self, messages, **kwargs):  # type: ignore[no-untyped-def]
+            raise RuntimeError("template exploded")
+
+    result = _run_fake_native_generate_messages(
+        monkeypatch,
+        _FakeTokenizer(),
+        "plain text",
+    )
+
+    assert result.ok is True
+    assert result.detail["template_render_fallback"] is True
+    assert result.detail["template_render_error_type"] == "RuntimeError"
+
+
 def test_native_backend_module_has_no_subprocess_or_sentinel_chain_ties() -> None:
     """The native adapter must not import subprocess machinery or sentinel parsers."""
 

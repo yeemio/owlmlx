@@ -303,6 +303,49 @@ def test_openai_chat_completion_returns_openai_tool_calls_from_backend_detail() 
     assert choice["message"]["tool_calls"][0]["function"]["name"] == "Bash"
 
 
+def test_openai_chat_completion_exposes_tool_call_diagnostics_from_backend_detail() -> None:
+    class _ToolDiagnosticBackend(FakeBackend):
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return GenerateResult(
+                ok=True,
+                message="generated with tool diagnostics",
+                model_id=model_id,
+                text="plain fallback",
+                detail={
+                    "tool_parser_missing": True,
+                    "template_render_fallback": True,
+                    "template_render_error_type": "RuntimeError",
+                },
+            )
+
+    kernel = RuntimeKernel(_ToolDiagnosticBackend())
+    assert kernel.load_model("fake-model").ok is True
+    client = TestClient(create_app(kernel))
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-model",
+            "messages": [{"role": "user", "content": "Use Bash to run pwd"}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "Bash",
+                        "parameters": {"type": "object"},
+                    },
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    diagnostics = response.json()["choices"][0]["message"]["owlmlx_tool_call_diagnostics"]
+    assert diagnostics["tool_parser_missing"] is True
+    assert diagnostics["template_render_fallback"] is True
+    assert diagnostics["template_render_error_type"] == "RuntimeError"
+
+
 def test_openai_chat_completion_converts_backend_tool_uses_to_tool_calls() -> None:
     client = _client_with_loaded_fake_model()
 
@@ -340,6 +383,7 @@ def test_openai_chat_completion_stream_buffers_tool_generation_into_single_delta
                 model_id=model_id,
                 finish_reason="tool_calls",
                 detail={
+                    "tool_parse_dropped": 1,
                     "tool_calls": [
                         {
                             "id": "call_stream",
@@ -381,6 +425,7 @@ def test_openai_chat_completion_stream_buffers_tool_generation_into_single_delta
     assert response.status_code == 200
     assert '"finish_reason": "tool_calls"' in response.text
     assert '"tool_calls": [{"index": 0, "id": "call_stream"' in response.text
+    assert '"owlmlx_tool_call_diagnostics": {"tool_parse_dropped": 1}' in response.text
 
 
 def test_openai_reasoning_policy_defaults_to_profile_declared_trace_policy() -> None:

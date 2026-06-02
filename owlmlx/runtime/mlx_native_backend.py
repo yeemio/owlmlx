@@ -26,6 +26,7 @@ both backends can be swapped behind the same runtime kernel contract.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import queue
 import threading
@@ -59,6 +60,7 @@ from .types import (
 
 _BACKEND_NAME = "mlx-native"
 _AUTO_PREFIX_SESSION_ID = "__owlmlx_auto_prefix_runtime_default__"
+_LOGGER = logging.getLogger(__name__)
 _T = TypeVar("_T")
 
 
@@ -113,6 +115,19 @@ class _TrimPromptCacheResult:
     requested_tokens: int
     trimmed_tokens: int
     reason_code: str
+
+
+@dataclass(frozen=True, slots=True)
+class _RenderedChatPrompt:
+    prompt: str
+    detail: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class _ParsedNativeToolCalls:
+    tool_calls: list[dict[str, Any]]
+    visible_text: str
+    detail: dict[str, Any] = field(default_factory=dict)
 
 
 class _TicketedAdmission:
@@ -251,6 +266,10 @@ def _encode_prompt_tokens(tokenizer: Any, prompt: str) -> tuple[int, ...] | None
         return None
 
 
+def _tools_requested(tools: object | None) -> bool:
+    return isinstance(tools, list) and bool(tools)
+
+
 def _chat_turn_to_template_message(turn: ChatTurn) -> dict[str, Any]:
     message: dict[str, Any] = {"role": turn.role}
     if isinstance(turn.content, list):
@@ -292,9 +311,10 @@ def _render_chat_messages_with_template(
     *,
     tools: object | None = None,
     chat_template_kwargs: dict[str, Any] | None = None,
-) -> str:
+) -> _RenderedChatPrompt:
     template_messages = [_chat_turn_to_template_message(turn) for turn in messages]
     apply_chat_template = getattr(tokenizer, "apply_chat_template", None)
+    detail: dict[str, Any] = {}
     if callable(apply_chat_template):
         kwargs: dict[str, Any] = {
             "tokenize": False,
@@ -305,9 +325,17 @@ def _render_chat_messages_with_template(
         if isinstance(tools, list) and tools:
             kwargs["tools"] = tools
         try:
-            return str(apply_chat_template(template_messages, **kwargs))
-        except Exception:
-            pass
+            return _RenderedChatPrompt(str(apply_chat_template(template_messages, **kwargs)))
+        except Exception as exc:
+            detail = {
+                "template_render_fallback": True,
+                "template_render_error_type": type(exc).__name__,
+                "template_render_error": str(exc)[:200],
+            }
+            _LOGGER.warning(
+                "Native chat template rendering failed; falling back to plain text prompt",
+                exc_info=True,
+            )
     rendered: list[str] = []
     for message in template_messages:
         rendered.append(f"{message.get('role')}: {message.get('content')}")
@@ -317,7 +345,7 @@ def _render_chat_messages_with_template(
             )
         if message.get("tool_call_id"):
             rendered.append(f"tool_call_id: {message['tool_call_id']}")
-    return "\n".join(rendered)
+    return _RenderedChatPrompt("\n".join(rendered), detail=detail)
 
 
 def _visible_text_after_think_boundary(text: str) -> str:
@@ -360,10 +388,16 @@ def _parse_native_tool_calls(
     text: str,
     *,
     tools: object | None = None,
-) -> tuple[list[dict[str, Any]], str]:
+) -> _ParsedNativeToolCalls:
     tool_parser = getattr(tokenizer, "tool_parser", None)
     if not callable(tool_parser):
-        return [], text
+        detail: dict[str, Any] = {}
+        if _tools_requested(tools):
+            detail["tool_parser_missing"] = True
+            _LOGGER.warning(
+                "Native tokenizer has no callable tool_parser despite tools request"
+            )
+        return _ParsedNativeToolCalls([], text, detail=detail)
     visible_text = _visible_text_after_think_boundary(text)
     start_marker = getattr(tokenizer, "tool_call_start", None)
     end_marker = getattr(tokenizer, "tool_call_end", None)
@@ -373,12 +407,27 @@ def _parse_native_tool_calls(
         end_marker=end_marker if isinstance(end_marker, str) else None,
     )
     if not tool_texts:
-        return [], text
+        return _ParsedNativeToolCalls([], text)
     tool_calls: list[dict[str, Any]] = []
+    detail: dict[str, Any] = {}
+    dropped = 0
+    errors: list[dict[str, str]] = []
     for tool_text in tool_texts:
         try:
             parsed = tool_parser(tool_text, tools)
-        except Exception:
+        except Exception as exc:
+            dropped += 1
+            if len(errors) < 3:
+                errors.append(
+                    {
+                        "error_type": type(exc).__name__,
+                        "text_prefix": tool_text[:160],
+                    }
+                )
+            _LOGGER.warning(
+                "Native tool parser dropped a generated tool call",
+                exc_info=True,
+            )
             continue
         parsed_items = parsed if isinstance(parsed, list) else [parsed]
         for item in parsed_items:
@@ -400,13 +449,16 @@ def _parse_native_tool_calls(
                     },
                 }
             )
+    if dropped:
+        detail["tool_parse_dropped"] = dropped
+        detail["tool_parse_errors"] = errors
     if not tool_calls:
-        return [], text
+        return _ParsedNativeToolCalls([], text, detail=detail)
     remainder = visible_text
     for tool_text in tool_texts:
         wrapped = f"{start_marker}{tool_text}{end_marker or ''}"
         remainder = remainder.replace(wrapped, "", 1)
-    return tool_calls, remainder.strip()
+    return _ParsedNativeToolCalls(tool_calls, remainder.strip(), detail=detail)
 
 
 def _trim_prompt_cache(
@@ -1269,6 +1321,7 @@ class MlxNativeBackend:
                 error_code=RuntimeErrorCode.model_not_loaded,
                 model_id=model_id,
             )
+        template_render_detail = kwargs.pop("_template_render_detail", None)
         max_tokens = int(kwargs.get("max_tokens") or 64)  # type: ignore[arg-type]
         session_id = _non_empty_string(kwargs.pop("session_id", None))
         memory_watermark = _non_empty_string(
@@ -1321,21 +1374,24 @@ class MlxNativeBackend:
                 self._run_on_worker(lambda: self._release_active_cache(session))
             finally:
                 self._admission.release()
-        tool_calls, visible_text = _parse_native_tool_calls(
+        parsed_tool_calls = _parse_native_tool_calls(
             session.tokenizer,
             str(text),
             tools=kwargs.get("tools"),
         )
         detail: dict[str, Any] = {}
+        if isinstance(template_render_detail, dict):
+            detail.update(template_render_detail)
+        detail.update(parsed_tool_calls.detail)
         finish_reason: str | None = None
-        if tool_calls:
-            detail["tool_calls"] = tool_calls
+        if parsed_tool_calls.tool_calls:
+            detail["tool_calls"] = parsed_tool_calls.tool_calls
             finish_reason = "tool_calls"
         return GenerateResult(
             ok=True,
             message="generated",
             model_id=model_id,
-            text=visible_text,
+            text=parsed_tool_calls.visible_text,
             finish_reason=finish_reason,
             detail=detail,
             execution_time_s=time.time() - started,
@@ -1357,7 +1413,7 @@ class MlxNativeBackend:
                 error_code=RuntimeErrorCode.model_not_loaded,
                 model_id=model_id,
             )
-        prompt = _render_chat_messages_with_template(
+        rendered_prompt = _render_chat_messages_with_template(
             session.tokenizer,
             messages,
             tools=kwargs.get("tools"),
@@ -1367,7 +1423,9 @@ class MlxNativeBackend:
                 else None
             ),
         )
-        return self.generate(model_id, prompt, **kwargs)
+        if rendered_prompt.detail:
+            kwargs["_template_render_detail"] = rendered_prompt.detail
+        return self.generate(model_id, rendered_prompt.prompt, **kwargs)
 
     def generate_cohort(
         self,
