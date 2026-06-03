@@ -207,6 +207,29 @@ def evaluate_readiness(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class ToolLaneVerdict:
+    passed: bool
+    subgates: dict[str, bool]
+    failing: tuple[str, ...]
+
+
+def evaluate_tool_lane(subgates: Mapping[str, bool]) -> ToolLaneVerdict:
+    """Evaluate the 4 INDEPENDENT tool-lane sub-gates (constraint #3).
+
+    Every sub-gate is normalized into the record (missing -> False), so the
+    artifact always carries all four booleans. The lane passes only when all
+    four are True.
+    """
+    normalized = {name: bool(subgates.get(name, False)) for name in TOOL_LANE_SUBGATES}
+    failing = tuple(name for name in TOOL_LANE_SUBGATES if not normalized[name])
+    return ToolLaneVerdict(
+        passed=not failing,
+        subgates=normalized,
+        failing=failing,
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="R4 Phase-1 ops-cutover pilot harness (owlmlx-internal)."

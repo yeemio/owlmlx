@@ -77,3 +77,43 @@ def test_evaluate_readiness_tool_lane_empty_fails() -> None:
     verdict = pilot.evaluate_readiness(probes, model_id="Qwen3.6-27B")
     assert verdict.ready is False
     assert "tool_lane_live" in verdict.failures
+
+
+def test_evaluate_tool_lane_all_true_passes() -> None:
+    verdict = pilot.evaluate_tool_lane(
+        {
+            "tool_call_emitted": True,
+            "tool_call_executed": True,
+            "tool_result_roundtrip": True,
+            "final_answer_after_tool": True,
+        }
+    )
+    assert verdict.passed is True
+    assert verdict.failing == ()
+    assert verdict.subgates == {
+        "tool_call_emitted": True,
+        "tool_call_executed": True,
+        "tool_result_roundtrip": True,
+        "final_answer_after_tool": True,
+    }
+
+
+def test_evaluate_tool_lane_one_false_fails_and_records_all_four() -> None:
+    verdict = pilot.evaluate_tool_lane(
+        {
+            "tool_call_emitted": True,
+            "tool_call_executed": True,
+            "tool_result_roundtrip": False,
+            "final_answer_after_tool": True,
+        }
+    )
+    assert verdict.passed is False
+    assert verdict.failing == ("tool_result_roundtrip",)
+    assert set(verdict.subgates) == set(pilot.TOOL_LANE_SUBGATES)
+
+
+def test_evaluate_tool_lane_missing_subgate_is_treated_false() -> None:
+    verdict = pilot.evaluate_tool_lane({"tool_call_emitted": True})
+    assert verdict.passed is False
+    assert "tool_call_executed" in verdict.failing
+    assert verdict.subgates["final_answer_after_tool"] is False
