@@ -117,3 +117,54 @@ def test_evaluate_tool_lane_missing_subgate_is_treated_false() -> None:
     assert verdict.passed is False
     assert "tool_call_executed" in verdict.failing
     assert verdict.subgates["final_answer_after_tool"] is False
+
+
+def _proof_inputs():
+    return dict(
+        config_snapshot={
+            "base_url": "http://127.0.0.1:8066",
+            "provider": "owlmlx",
+            "fallback_enabled": False,
+        },
+        consumer_outbound={
+            "fallback_count": 0,
+            "outbound_hosts": ["127.0.0.1:8066"],
+        },
+        owlmlx_inbound={"served_request_ids": ["req_a", "req_b", "req_c"]},
+        pilot_request_ids=["req_a", "req_b"],
+        pilot_base_url="http://127.0.0.1:8066",
+    )
+
+
+def test_evaluate_fallback_proof_all_legs_pass() -> None:
+    proof = pilot.evaluate_fallback_proof(**_proof_inputs())
+    assert proof.proven is True
+    assert proof.config_ok is True
+    assert proof.consumer_outbound_ok is True
+    assert proof.owlmlx_inbound_ok is True
+    assert proof.reasons == ()
+
+
+def test_evaluate_fallback_proof_config_points_at_8009_fails() -> None:
+    args = _proof_inputs()
+    args["config_snapshot"]["base_url"] = "http://127.0.0.1:8009"
+    proof = pilot.evaluate_fallback_proof(**args)
+    assert proof.proven is False
+    assert proof.config_ok is False
+    assert any("8009" in r or "base_url" in r for r in proof.reasons)
+
+
+def test_evaluate_fallback_proof_outbound_fallback_count_nonzero_fails() -> None:
+    args = _proof_inputs()
+    args["consumer_outbound"]["fallback_count"] = 2
+    proof = pilot.evaluate_fallback_proof(**args)
+    assert proof.proven is False
+    assert proof.consumer_outbound_ok is False
+
+
+def test_evaluate_fallback_proof_inbound_coverage_gap_fails() -> None:
+    args = _proof_inputs()
+    args["owlmlx_inbound"]["served_request_ids"] = ["req_a"]  # missing req_b
+    proof = pilot.evaluate_fallback_proof(**args)
+    assert proof.proven is False
+    assert proof.owlmlx_inbound_ok is False

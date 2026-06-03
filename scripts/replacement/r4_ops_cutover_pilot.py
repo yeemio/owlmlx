@@ -230,6 +230,80 @@ def evaluate_tool_lane(subgates: Mapping[str, bool]) -> ToolLaneVerdict:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class FallbackProof:
+    proven: bool
+    config_ok: bool
+    consumer_outbound_ok: bool
+    owlmlx_inbound_ok: bool
+    reasons: tuple[str, ...]
+
+
+def _host_of(url: str) -> str:
+    # "http://127.0.0.1:8066/v1/..." -> "127.0.0.1:8066"
+    rest = url.split("://", 1)[-1]
+    return rest.split("/", 1)[0]
+
+
+def evaluate_fallback_proof(
+    *,
+    config_snapshot: Mapping[str, Any],
+    consumer_outbound: Mapping[str, Any],
+    owlmlx_inbound: Mapping[str, Any],
+    pilot_request_ids: Sequence[str],
+    pilot_base_url: str,
+) -> FallbackProof:
+    """Double-proof that the pilot used owlmlx with NO `:8009` fallback (#2).
+
+    Leg (a) consumer config snapshot, (b) consumer outbound, (c) owlmlx inbound
+    coverage. owlmlx never makes outbound `:8009` calls, so the no-`:8009` leg is
+    consumer-side; owlmlx contributes inbound coverage as corroboration.
+    """
+    reasons: list[str] = []
+    pilot_host = _host_of(pilot_base_url)
+
+    # Leg (a): consumer config points at the pilot, fallback disabled, not :8009.
+    cfg_base = str(config_snapshot.get("base_url") or "")
+    cfg_host = _host_of(cfg_base)
+    cfg_fallback_disabled = config_snapshot.get("fallback_enabled") is False
+    config_ok = cfg_host == pilot_host and ":8009" not in cfg_base and cfg_fallback_disabled
+    if cfg_host != pilot_host:
+        reasons.append(f"config base_url host {cfg_host!r} != pilot host {pilot_host!r}")
+    if ":8009" in cfg_base:
+        reasons.append("config base_url still references :8009")
+    if not cfg_fallback_disabled:
+        reasons.append("config fallback_enabled is not False")
+
+    # Leg (b): consumer outbound — no fallback, only the pilot host.
+    fallback_count = int(consumer_outbound.get("fallback_count", -1))
+    outbound_hosts = [str(h) for h in (consumer_outbound.get("outbound_hosts") or [])]
+    hosts_ok = bool(outbound_hosts) and all(h == pilot_host for h in outbound_hosts)
+    consumer_outbound_ok = fallback_count == 0 and hosts_ok
+    if fallback_count != 0:
+        reasons.append(f"consumer fallback_count={fallback_count} (expected 0)")
+    if not hosts_ok:
+        reasons.append(f"consumer outbound_hosts {outbound_hosts} not all == {pilot_host!r}")
+
+    # Leg (c): owlmlx inbound coverage — every pilot request-id was served.
+    served = set(str(r) for r in (owlmlx_inbound.get("served_request_ids") or []))
+    pilot_ids = set(str(r) for r in pilot_request_ids)
+    missing = sorted(pilot_ids - served)
+    owlmlx_inbound_ok = bool(pilot_ids) and not missing
+    if not pilot_ids:
+        reasons.append("no pilot_request_ids supplied for inbound coverage")
+    if missing:
+        reasons.append(f"owlmlx inbound log missing request_ids: {missing}")
+
+    proven = config_ok and consumer_outbound_ok and owlmlx_inbound_ok
+    return FallbackProof(
+        proven=proven,
+        config_ok=config_ok,
+        consumer_outbound_ok=consumer_outbound_ok,
+        owlmlx_inbound_ok=owlmlx_inbound_ok,
+        reasons=tuple(reasons),
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="R4 Phase-1 ops-cutover pilot harness (owlmlx-internal)."
