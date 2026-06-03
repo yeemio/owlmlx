@@ -263,6 +263,9 @@ def _build_grammar_logits_processor(tokenizer: Any, grammar_spec: dict[str, Any]
                     begin=begin, schema=_json.dumps(schema), end=end
                 )
                 compiled = compiler.compile_structural_tag([item], [begin])
+            elif kind == "ebnf":
+                ebnf = str(grammar_spec.get("ebnf") or "")
+                compiled = compiler.compile_grammar(xgr.Grammar.from_ebnf(ebnf))
             else:
                 raise GrammarCompileError(f"unknown grammar kind: {kind!r}")
         except GrammarCompileError:

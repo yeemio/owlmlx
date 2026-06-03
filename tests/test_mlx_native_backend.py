@@ -234,6 +234,103 @@ def test_native_backend_generate_succeeds_with_fake_mlx_lm(
         importlib.reload(mod)
 
 
+def _force_tool() -> list[dict[str, object]]:
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "run_bash",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"command": {"type": "string"}},
+                },
+            },
+        }
+    ]
+
+
+def test_native_backend_generate_forces_tool_choice_required_with_logits_processor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = types.ModuleType("mlx_lm")
+    captured: dict[str, object] = {}
+
+    def fake_load(model_id: str) -> tuple[object, object]:
+        return (object(), object())
+
+    def fake_generate(model, tokenizer, *, prompt, max_tokens, logits_processors=None):  # type: ignore[no-untyped-def]
+        captured["logits_processors"] = logits_processors
+        return "done"
+
+    fake.load = fake_load  # type: ignore[attr-defined]
+    fake.generate = fake_generate  # type: ignore[attr-defined]
+    previous_mlx_lm = sys.modules.get("mlx_lm")
+    monkeypatch.setitem(sys.modules, "mlx_lm", fake)
+    import owlmlx.runtime.mlx_native_backend as mod
+    importlib.reload(mod)
+    try:
+        sentinel = object()
+        monkeypatch.setattr(
+            mod, "_build_grammar_logits_processor", lambda tokenizer, spec: sentinel
+        )
+        backend = mod.MlxNativeBackend()
+        backend.load("fake-model")
+        result = backend.generate(
+            "fake-model", "hi", max_tokens=3, tools=_force_tool(), tool_choice="required"
+        )
+        assert result.ok is True
+        assert captured["logits_processors"] == [sentinel]
+    finally:
+        if previous_mlx_lm is None:
+            sys.modules.pop("mlx_lm", None)
+        else:
+            sys.modules["mlx_lm"] = previous_mlx_lm
+        importlib.reload(mod)
+
+
+def test_native_backend_generate_does_not_force_tool_choice_auto(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = types.ModuleType("mlx_lm")
+    captured: dict[str, object] = {}
+
+    def fake_load(model_id: str) -> tuple[object, object]:
+        return (object(), object())
+
+    def fake_generate(model, tokenizer, *, prompt, max_tokens, logits_processors=None):  # type: ignore[no-untyped-def]
+        captured["logits_processors"] = logits_processors
+        return "done"
+
+    fake.load = fake_load  # type: ignore[attr-defined]
+    fake.generate = fake_generate  # type: ignore[attr-defined]
+    previous_mlx_lm = sys.modules.get("mlx_lm")
+    monkeypatch.setitem(sys.modules, "mlx_lm", fake)
+    import owlmlx.runtime.mlx_native_backend as mod
+    importlib.reload(mod)
+    try:
+        calls = {"n": 0}
+
+        def _spy(tokenizer, spec):  # type: ignore[no-untyped-def]
+            calls["n"] += 1
+            return object()
+
+        monkeypatch.setattr(mod, "_build_grammar_logits_processor", _spy)
+        backend = mod.MlxNativeBackend()
+        backend.load("fake-model")
+        result = backend.generate(
+            "fake-model", "hi", max_tokens=3, tools=_force_tool(), tool_choice="auto"
+        )
+        assert result.ok is True
+        assert captured["logits_processors"] is None
+        assert calls["n"] == 0
+    finally:
+        if previous_mlx_lm is None:
+            sys.modules.pop("mlx_lm", None)
+        else:
+            sys.modules["mlx_lm"] = previous_mlx_lm
+        importlib.reload(mod)
+
+
 def test_native_backend_generate_messages_applies_chat_template_with_tools(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -467,6 +564,66 @@ def test_native_backend_records_template_render_fallback(
     assert result.ok is True
     assert result.detail["template_render_fallback"] is True
     assert result.detail["template_render_error_type"] == "RuntimeError"
+
+
+_FORCE_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "run_bash",
+            "parameters": {"type": "object", "properties": {"command": {"type": "string"}}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "parameters": {"type": "object", "properties": {"path": {"type": "string"}}},
+        },
+    },
+]
+
+
+def test_tool_choice_forcing_ebnf_required_allows_all_tools() -> None:
+    from owlmlx.runtime.mlx_native_backend import _tool_choice_forcing_ebnf
+
+    ebnf = _tool_choice_forcing_ebnf(_FORCE_TOOLS, "required")
+    assert ebnf is not None
+    assert '"run_bash"' in ebnf and '"read_file"' in ebnf
+    assert '"command"' in ebnf and '"path"' in ebnf
+    assert "<tool_call>" in ebnf
+
+
+def test_tool_choice_forcing_ebnf_named_restricts_to_one_function() -> None:
+    from owlmlx.runtime.mlx_native_backend import _tool_choice_forcing_ebnf
+
+    ebnf = _tool_choice_forcing_ebnf(
+        _FORCE_TOOLS, {"type": "function", "function": {"name": "run_bash"}}
+    )
+    assert ebnf is not None
+    assert '"run_bash"' in ebnf
+    assert '"read_file"' not in ebnf
+
+
+def test_tool_choice_forcing_ebnf_none_for_auto_none_and_missing_tools() -> None:
+    from owlmlx.runtime.mlx_native_backend import _tool_choice_forcing_ebnf
+
+    assert _tool_choice_forcing_ebnf(_FORCE_TOOLS, "auto") is None
+    assert _tool_choice_forcing_ebnf(_FORCE_TOOLS, "none") is None
+    assert _tool_choice_forcing_ebnf(_FORCE_TOOLS, None) is None
+    assert _tool_choice_forcing_ebnf(None, "required") is None
+    assert _tool_choice_forcing_ebnf([], "required") is None
+
+
+def test_tool_choice_forcing_ebnf_compiles_as_valid_xgrammar() -> None:
+    import pytest
+
+    xgr = pytest.importorskip("xgrammar")
+    from owlmlx.runtime.mlx_native_backend import _tool_choice_forcing_ebnf
+
+    ebnf = _tool_choice_forcing_ebnf(_FORCE_TOOLS, "required")
+    # from_ebnf parses the grammar without a tokenizer -> proves valid EBNF.
+    assert xgr.Grammar.from_ebnf(ebnf) is not None
 
 
 def test_native_backend_module_has_no_subprocess_or_sentinel_chain_ties() -> None:

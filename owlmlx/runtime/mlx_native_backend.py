@@ -56,6 +56,7 @@ from .types import (
     StreamEvent,
     UnloadResult,
 )
+from .mlx_lm_runner import _build_grammar_logits_processor
 
 
 _BACKEND_NAME = "mlx-native"
@@ -459,6 +460,84 @@ def _parse_native_tool_calls(
         wrapped = f"{start_marker}{tool_text}{end_marker or ''}"
         remainder = remainder.replace(wrapped, "", 1)
     return _ParsedNativeToolCalls(tool_calls, remainder.strip(), detail=detail)
+
+
+def _tool_function_name(tool: object) -> str | None:
+    if not isinstance(tool, dict):
+        return None
+    function = tool.get("function")
+    if not isinstance(function, dict):
+        return None
+    name = function.get("name")
+    return name if isinstance(name, str) and name else None
+
+
+def _ebnf_string_literal(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return '"%s"' % escaped
+
+
+def _qwen3_coder_forcing_ebnf(funcs: list[str], param_names: list[str]) -> str:
+    """EBNF that constrains output to a qwen3_coder tool call whose function is
+    one of ``funcs`` and whose parameter names are within ``param_names``."""
+    fname_alt = " | ".join(_ebnf_string_literal(f) for f in funcs)
+    if param_names:
+        pname_alt = " | ".join(_ebnf_string_literal(p) for p in param_names)
+        return "\n".join(
+            [
+                r'root ::= "<tool_call>\n<function=" fname ">\n" plist "</function>\n</tool_call>"',
+                "fname ::= " + fname_alt,
+                "plist ::= param*",
+                r'param ::= "<parameter=" pname ">\n" value "</parameter>\n"',
+                "pname ::= " + pname_alt,
+                "value ::= [^<]*",
+            ]
+        )
+    return "\n".join(
+        [
+            r'root ::= "<tool_call>\n<function=" fname ">\n</function>\n</tool_call>"',
+            "fname ::= " + fname_alt,
+        ]
+    )
+
+
+def _tool_choice_forcing_ebnf(
+    tools: object | None,
+    tool_choice: object | None,
+) -> str | None:
+    """Build a qwen3_coder tool-call forcing grammar (EBNF) from OpenAI ``tools``
+    + ``tool_choice``, or None when no forcing is required.
+
+    Forcing applies to ``tool_choice == "required"`` (any provided tool) or a
+    named choice ``{"type": "function", "function": {"name": X}}``. ``auto`` /
+    ``none`` / missing return None (model decides; handled upstream). qwen3_coder
+    format only — other model families' tool-call formats differ.
+    """
+    if not isinstance(tools, list) or not tools:
+        return None
+    forced_names: list[str] = []
+    if tool_choice == "required":
+        forced_names = [name for name in (_tool_function_name(t) for t in tools) if name]
+    elif isinstance(tool_choice, dict) and tool_choice.get("type") == "function":
+        function = tool_choice.get("function")
+        if isinstance(function, dict):
+            name = function.get("name")
+            if isinstance(name, str) and name:
+                forced_names = [name]
+    if not forced_names:
+        return None
+    param_names: list[str] = []
+    for tool in tools:
+        if _tool_function_name(tool) not in forced_names:
+            continue
+        function = tool.get("function") if isinstance(tool, dict) else None
+        params = function.get("parameters") if isinstance(function, dict) else None
+        props = params.get("properties") if isinstance(params, dict) else None
+        if isinstance(props, dict):
+            for key in props:
+                if isinstance(key, str) and key and key not in param_names:
+                    param_names.append(key)
+    return _qwen3_coder_forcing_ebnf(forced_names, param_names)
 
 
 def _trim_prompt_cache(
@@ -1327,6 +1406,24 @@ class MlxNativeBackend:
         memory_watermark = _non_empty_string(
             kwargs.pop("session_kv_cache_watermark", None)
         ) or _non_empty_string(kwargs.pop("memory_watermark", None))
+        forcing_ebnf = _tool_choice_forcing_ebnf(
+            kwargs.get("tools"), kwargs.get("tool_choice")
+        )
+        forcing_processor = None
+        forcing_detail: dict[str, Any] = {}
+        if forcing_ebnf is not None:
+            try:
+                forcing_processor = _build_grammar_logits_processor(
+                    session.tokenizer, {"kind": "ebnf", "ebnf": forcing_ebnf}
+                )
+                forcing_detail["tool_choice_forced"] = True
+            except Exception as exc:  # noqa: BLE001 - degrade, never break generation
+                forcing_detail["tool_choice_forcing_failed"] = True
+                forcing_detail["tool_choice_forcing_error_type"] = type(exc).__name__
+                _LOGGER.warning(
+                    "tool_choice forcing grammar build failed; continuing unforced",
+                    exc_info=True,
+                )
         started = time.time()
         wait_started = started
         _ticket, was_queued = self._admission.acquire()
@@ -1351,6 +1448,8 @@ class MlxNativeBackend:
                         }
                         if prompt_cache is not None:
                             call_kwargs["prompt_cache"] = prompt_cache
+                        if forcing_processor is not None:
+                            call_kwargs["logits_processors"] = [forcing_processor]
                         return mlx_lm.generate(
                             session.model,
                             session.tokenizer,
@@ -1382,6 +1481,8 @@ class MlxNativeBackend:
         detail: dict[str, Any] = {}
         if isinstance(template_render_detail, dict):
             detail.update(template_render_detail)
+        if forcing_detail:
+            detail.update(forcing_detail)
         detail.update(parsed_tool_calls.detail)
         finish_reason: str | None = None
         if parsed_tool_calls.tool_calls:
