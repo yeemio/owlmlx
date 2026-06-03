@@ -2,6 +2,8 @@
 
 > Status: authoritative
 > Updated: 2026-04-22
+>
+> **⚠️ Re-baselined 2026-06-03 — see [`runtime13-replacement-rebaseline-verdict.md`](runtime13-replacement-rebaseline-verdict.md).** 本文档的 gap 分类为 2026-04 point-in-time；最新分类与每条 "是否阻断 owlmlx-only cutover" 判定以 Runtime-13 为准。本文档正文未改写。
 
 ## 1. Purpose
 
