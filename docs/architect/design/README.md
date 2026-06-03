@@ -58,11 +58,12 @@
 
 ## 替代收口 R-series Specs（2026-06-03）
 
-> 顶层目标见 [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md)「下阶段主线声明（替代收口）」。R-series 承接 Runtime-12 §7。一次一个：当前只 **R0**；R1/R2/R4 由 R0 收窄清单驱动后再各自落 spec。
+> 顶层目标见 [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md)「下阶段主线声明（替代收口）」。R-series 承接 Runtime-12 §7 + `runtime13` §5。一次一个：R0 已完成（verdict landed）；按用户选择下一个做 **R4 Phase 1**（R1/R2 仍 pending，由 `runtime13` §5 驱动）。
 
 | Gate | Spec | 状态 | Plan-grade 来源 |
 |---|---|---|---|
-| **R0** | [`R0-replacement-rebaseline-spec.md`](R0-replacement-rebaseline-spec.md) | design-grade · brainstorming-approved 2026-06-03 · pending user spec review；交付 `runtime13` verdict | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) 下阶段主线声明 + Runtime-12 §7 |
+| **R0** | [`R0-replacement-rebaseline-spec.md`](R0-replacement-rebaseline-spec.md) | ✅ done · verdict landed `180df57f`（[`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md)）| [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) 下阶段主线声明 + Runtime-12 §7 |
+| **R4** (Phase 1) | [`R4-ops-cutover-spec.md`](R4-ops-cutover-spec.md) | design-grade · brainstorming-approved 2026-06-03 · pending user spec review；readiness + 受控 smoke，不翻默认 / 不 claim replacement | [`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md) §5（R4）|
 
 ---
 
