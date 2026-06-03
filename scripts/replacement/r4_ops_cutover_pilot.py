@@ -331,6 +331,127 @@ def evaluate_watermark_health(classifications: Sequence[str]) -> WatermarkHealth
     )
 
 
+_HONESTY_NOTE = (
+    "A `passed` verdict means this ONE controlled pilot session met its gates. "
+    "It does NOT claim replacement complete, does NOT flip any default, and "
+    "promotes NO capability. The replacement verdict stays `not yet replaceable`."
+)
+
+
+@dataclass(frozen=True, slots=True)
+class PilotVerdict:
+    verdict: str  # "passed" | "pilot_readiness_failed" | "loop_failed"
+    reasons: tuple[str, ...]
+
+
+def build_pilot_verdict(
+    *,
+    readiness: ReadinessVerdict,
+    tool_lane: ToolLaneVerdict,
+    fallback: FallbackProof,
+    watermark: WatermarkHealth,
+    loop_completed: bool,
+) -> PilotVerdict:
+    """Synthesize the single honest pilot verdict (precedence-ordered)."""
+    if not readiness.ready:
+        return PilotVerdict(
+            "pilot_readiness_failed",
+            tuple(f"readiness:{name}" for name in readiness.failures),
+        )
+
+    reasons: list[str] = []
+    if not loop_completed:
+        reasons.append("agentic loop did not complete (operator-reported)")
+    if not tool_lane.passed:
+        reasons.extend(f"tool_lane:{name}" for name in tool_lane.failing)
+    if not fallback.proven:
+        reasons.extend(f"fallback:{reason}" for reason in fallback.reasons)
+    if watermark.watermark_red_observed:
+        reasons.append("watermark health gate tripped (RED/FATAL this session)")
+
+    if reasons:
+        return PilotVerdict("loop_failed", tuple(reasons))
+    return PilotVerdict("passed", ())
+
+
+def _readiness_to_dict(verdict: ReadinessVerdict) -> dict[str, Any]:
+    return {
+        "verdict": verdict.verdict,
+        "ready": verdict.ready,
+        "failures": list(verdict.failures),
+        "checks": [
+            {"name": c.name, "ok": c.ok, "detail": c.detail} for c in verdict.checks
+        ],
+    }
+
+
+def build_readiness_artifact(
+    *,
+    verdict: ReadinessVerdict,
+    base_url: str,
+    model_id: str,
+    owlmlx_commit: str,
+    recorded_at: str,
+) -> dict[str, Any]:
+    return {
+        "surface": EVIDENCE_SURFACE,
+        "version": EVIDENCE_VERSION,
+        "kind": "readiness",
+        "recorded_at": recorded_at,
+        "verdict": verdict.verdict,
+        "readiness": _readiness_to_dict(verdict),
+        "reproduction": {
+            "base_url": base_url,
+            "model_id": model_id,
+            "owlmlx_commit": owlmlx_commit,
+        },
+        "promotes": "nothing",
+        "honesty_note": _HONESTY_NOTE,
+    }
+
+
+def build_pilot_artifact(
+    *,
+    pilot_verdict: PilotVerdict,
+    readiness: ReadinessVerdict,
+    tool_lane: ToolLaneVerdict,
+    fallback: FallbackProof,
+    watermark: WatermarkHealth,
+    reproduction: Mapping[str, Any],
+    recorded_at: str,
+) -> dict[str, Any]:
+    return {
+        "surface": EVIDENCE_SURFACE,
+        "version": EVIDENCE_VERSION,
+        "kind": "pilot",
+        "recorded_at": recorded_at,
+        "verdict": pilot_verdict.verdict,
+        "verdict_reasons": list(pilot_verdict.reasons),
+        "readiness": _readiness_to_dict(readiness),
+        "tool_lane": {
+            "passed": tool_lane.passed,
+            "subgates": dict(tool_lane.subgates),
+            "failing": list(tool_lane.failing),
+        },
+        "fallback": {
+            "fallback_used": not fallback.proven,
+            "proven_not_used": fallback.proven,
+            "config_ok": fallback.config_ok,
+            "consumer_outbound_ok": fallback.consumer_outbound_ok,
+            "owlmlx_inbound_ok": fallback.owlmlx_inbound_ok,
+            "reasons": list(fallback.reasons),
+        },
+        "watermark": {
+            "watermark_red_observed": watermark.watermark_red_observed,
+            "classifications_seen": list(watermark.classifications_seen),
+            "interpretation": watermark.interpretation,
+        },
+        "reproduction": dict(reproduction),
+        "promotes": "nothing",
+        "honesty_note": _HONESTY_NOTE,
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="R4 Phase-1 ops-cutover pilot harness (owlmlx-internal)."

@@ -187,3 +187,121 @@ def test_evaluate_watermark_health_red_trips_gate() -> None:
 def test_evaluate_watermark_health_fatal_counts_as_red() -> None:
     health = pilot.evaluate_watermark_health(["fatal"])
     assert health.watermark_red_observed is True
+
+
+def _passing_components():
+    readiness = pilot.evaluate_readiness(_all_pass_probes(), model_id="Qwen3.6-27B")
+    tool_lane = pilot.evaluate_tool_lane(
+        {k: True for k in pilot.TOOL_LANE_SUBGATES}
+    )
+    fallback = pilot.evaluate_fallback_proof(**_proof_inputs())
+    watermark = pilot.evaluate_watermark_health(["green", "green"])
+    return readiness, tool_lane, fallback, watermark
+
+
+def test_build_pilot_verdict_passed() -> None:
+    readiness, tool_lane, fallback, watermark = _passing_components()
+    verdict = pilot.build_pilot_verdict(
+        readiness=readiness,
+        tool_lane=tool_lane,
+        fallback=fallback,
+        watermark=watermark,
+        loop_completed=True,
+    )
+    assert verdict.verdict == "passed"
+    assert verdict.reasons == ()
+
+
+def test_build_pilot_verdict_readiness_failure_dominates() -> None:
+    probes = _all_pass_probes()
+    probes["healthz"]["body"]["ok"] = False
+    readiness = pilot.evaluate_readiness(probes, model_id="Qwen3.6-27B")
+    _, tool_lane, fallback, watermark = _passing_components()
+    verdict = pilot.build_pilot_verdict(
+        readiness=readiness,
+        tool_lane=tool_lane,
+        fallback=fallback,
+        watermark=watermark,
+        loop_completed=True,
+    )
+    assert verdict.verdict == "pilot_readiness_failed"
+
+
+def test_build_pilot_verdict_tool_lane_fail_is_loop_failed() -> None:
+    readiness, _, fallback, watermark = _passing_components()
+    tool_lane = pilot.evaluate_tool_lane(
+        {**{k: True for k in pilot.TOOL_LANE_SUBGATES}, "final_answer_after_tool": False}
+    )
+    verdict = pilot.build_pilot_verdict(
+        readiness=readiness,
+        tool_lane=tool_lane,
+        fallback=fallback,
+        watermark=watermark,
+        loop_completed=True,
+    )
+    assert verdict.verdict == "loop_failed"
+    assert any("final_answer_after_tool" in r for r in verdict.reasons)
+
+
+def test_build_pilot_verdict_watermark_red_is_loop_failed() -> None:
+    readiness, tool_lane, fallback, _ = _passing_components()
+    watermark = pilot.evaluate_watermark_health(["green", "red"])
+    verdict = pilot.build_pilot_verdict(
+        readiness=readiness,
+        tool_lane=tool_lane,
+        fallback=fallback,
+        watermark=watermark,
+        loop_completed=True,
+    )
+    assert verdict.verdict == "loop_failed"
+    assert any("watermark" in r.lower() for r in verdict.reasons)
+
+
+def test_build_readiness_artifact_shape() -> None:
+    readiness = pilot.evaluate_readiness(_all_pass_probes(), model_id="Qwen3.6-27B")
+    artifact = pilot.build_readiness_artifact(
+        verdict=readiness,
+        base_url="http://127.0.0.1:8066",
+        model_id="Qwen3.6-27B",
+        owlmlx_commit="abc1234",
+        recorded_at="2026-06-03T00:00:00Z",
+    )
+    assert artifact["surface"] == pilot.EVIDENCE_SURFACE
+    assert artifact["version"] == pilot.EVIDENCE_VERSION
+    assert artifact["kind"] == "readiness"
+    assert artifact["verdict"] == "readiness_passed"
+    assert artifact["reproduction"]["owlmlx_commit"] == "abc1234"
+    assert artifact["promotes"] == "nothing"
+
+
+def test_build_pilot_artifact_shape_records_all_subgates() -> None:
+    readiness, tool_lane, fallback, watermark = _passing_components()
+    verdict = pilot.build_pilot_verdict(
+        readiness=readiness, tool_lane=tool_lane, fallback=fallback,
+        watermark=watermark, loop_completed=True,
+    )
+    reproduction = {
+        "launch_command": "uv run python -m owlmlx.runtime.server ...",
+        "env": {"OWLMLX_PILOT_BASE_URL": "http://127.0.0.1:8066"},
+        "owlmlx_commit": "abc1234",
+        "base_url": "http://127.0.0.1:8066",
+        "model_id": "Qwen3.6-27B",
+        "session_id": "pilot-001",
+        "request_ids": ["req_a", "req_b"],
+    }
+    artifact = pilot.build_pilot_artifact(
+        pilot_verdict=verdict,
+        readiness=readiness,
+        tool_lane=tool_lane,
+        fallback=fallback,
+        watermark=watermark,
+        reproduction=reproduction,
+        recorded_at="2026-06-03T00:00:00Z",
+    )
+    assert artifact["kind"] == "pilot"
+    assert artifact["verdict"] == "passed"
+    assert set(artifact["tool_lane"]["subgates"]) == set(pilot.TOOL_LANE_SUBGATES)
+    assert artifact["fallback"]["fallback_used"] is False
+    assert artifact["watermark"]["watermark_red_observed"] is False
+    assert artifact["reproduction"]["request_ids"] == ["req_a", "req_b"]
+    assert "replacement complete" in artifact["honesty_note"].lower()
