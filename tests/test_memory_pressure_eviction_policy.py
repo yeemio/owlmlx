@@ -309,6 +309,59 @@ def test_runtime_kernel_executes_pressure_eviction_with_observable_residency_cha
     assert history_event["source"] == "memory_pressure_policy"
 
 
+def test_load_model_evict_to_fit_unloads_non_pinned_resident_for_switch() -> None:
+    from owlmlx.runtime.types import RuntimeErrorCode
+
+    kernel = RuntimeKernel(
+        FakeBackend(),
+        profile=MachineMemoryProfile(
+            system_memory_gb=16.0,
+            system_reserve_gb=2.0,
+            serving_budget_gb=10.0,
+            warning_threshold_gb=8.0,
+        ),
+    )
+    assert kernel.load_model("model-a", memory_gb=7.0).ok is True
+
+    # model-b alone fits (8 <= 10) but model-a (7) + model-b (8) = 15 > 10,
+    # so a plain switch is refused on budget.
+    blocked = kernel.load_model("model-b", memory_gb=8.0)
+    assert blocked.ok is False
+    assert blocked.error_code is RuntimeErrorCode.memory_budget_exceeded
+
+    # evict_to_fit frees the non-pinned resident (model-a) and loads model-b.
+    switched = kernel.load_model("model-b", memory_gb=8.0, evict_to_fit=True)
+    assert switched.ok is True
+    loaded = {entry.model_id for entry in kernel.backend.status().loaded_models}
+    assert "model-b" in loaded
+    assert "model-a" not in loaded
+    assert kernel.active_model_id == "model-b"
+
+
+def test_load_model_evict_to_fit_never_unloads_pinned_blocker() -> None:
+    from owlmlx.runtime.types import RuntimeErrorCode
+
+    kernel = RuntimeKernel(
+        FakeBackend(),
+        profile=MachineMemoryProfile(
+            system_memory_gb=16.0,
+            system_reserve_gb=2.0,
+            serving_budget_gb=10.0,
+            warning_threshold_gb=8.0,
+        ),
+    )
+    assert kernel.load_model("pinned-a", memory_gb=7.0).ok is True
+    kernel.pin_model("pinned-a")
+
+    # A pinned resident must never be unloaded, so the switch is refused with a
+    # clear budget error rather than evicting the pinned model.
+    result = kernel.load_model("model-b", memory_gb=8.0, evict_to_fit=True)
+    assert result.ok is False
+    assert result.error_code is RuntimeErrorCode.memory_budget_exceeded
+    loaded = {entry.model_id for entry in kernel.backend.status().loaded_models}
+    assert "pinned-a" in loaded
+
+
 def test_runtime_kernel_pressure_eviction_skips_pinned_candidates() -> None:
     kernel = RuntimeKernel(
         FakeBackend(),

@@ -314,14 +314,45 @@ class RuntimeKernel:
         )
         return ModelInventorySnapshot(entries=entries)
 
+    def _evict_non_pinned_to_fit(
+        self,
+        *,
+        target_model_id: str,
+        requested_gb: float,
+    ) -> list[str]:
+        """Unload non-pinned resident models (excluding the target) until the
+        requested model fits the serving budget, for single-active compat switch
+        semantics. Pinned models are never unloaded. Returns ids unloaded."""
+        evicted: list[str] = []
+        for entry in list(self.inventory_snapshot().entries):
+            budget = inventory_budget_check(
+                self.inventory_snapshot(),
+                requested_model_gb=float(requested_gb),
+                profile=self.profile,
+            )
+            if budget.verdict != BudgetVerdict.exceeds:
+                break
+            candidate_id = entry.model_id
+            if candidate_id == target_model_id or candidate_id in self._pinned_model_ids:
+                continue
+            if self.unload_model(candidate_id, _operation="switch_evict").ok:
+                evicted.append(candidate_id)
+        return evicted
+
     def load_model(
         self,
         model_id: str,
         *,
         memory_gb: float | None = None,
         post_load_warmup: bool = False,
+        evict_to_fit: bool = False,
     ) -> LoadResult:
-        """Load a model after owlmlx memory-budget preflight."""
+        """Load a model after owlmlx memory-budget preflight.
+
+        ``evict_to_fit`` (used by single-active compat consumers) unloads
+        non-pinned resident models to make room when the budget would otherwise
+        be exceeded; pinned models are never evicted.
+        """
 
         backend_status = self.backend.status()
         self._sync_memory_pressure_cooldown_from_backend(backend_status)
@@ -386,6 +417,16 @@ class RuntimeKernel:
             requested_model_gb=float(requested_gb),
             profile=self.profile,
         )
+        if budget.verdict == BudgetVerdict.exceeds and evict_to_fit:
+            self._evict_non_pinned_to_fit(
+                target_model_id=model_id,
+                requested_gb=float(requested_gb),
+            )
+            budget = inventory_budget_check(
+                self.inventory_snapshot(),
+                requested_model_gb=float(requested_gb),
+                profile=self.profile,
+            )
         if budget.verdict == BudgetVerdict.exceeds:
             self._record_load_failure_event(
                 model_id=model_id,

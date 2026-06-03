@@ -428,6 +428,122 @@ def test_openai_chat_completion_stream_buffers_tool_generation_into_single_delta
     assert '"owlmlx_tool_call_diagnostics": {"tool_parse_dropped": 1}' in response.text
 
 
+def test_openai_chat_completion_normal_stream_does_not_duplicate_tool_delta() -> None:
+    """A tool call carried on BOTH the tool_use event and the done event must be
+    streamed exactly once. The non-buffered ("normal") branch previously emitted
+    it twice (once per event), corrupting index-keyed clients."""
+    from owlmlx.runtime.types import StreamEvent
+
+    tool_call = {
+        "id": "call_dup",
+        "type": "function",
+        "function": {"name": "Bash", "arguments": "{\"command\": \"pwd\"}"},
+    }
+
+    class _DuplicateToolStreamBackend(FakeBackend):
+        def stream_generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return [
+                StreamEvent(
+                    event="tool_use",
+                    model_id=model_id,
+                    detail={"tool_calls": [tool_call]},
+                ),
+                StreamEvent(
+                    event="done",
+                    model_id=model_id,
+                    finish_reason="tool_calls",
+                    detail={"tool_calls": [tool_call]},
+                ),
+            ]
+
+    kernel = RuntimeKernel(_DuplicateToolStreamBackend())
+    assert kernel.load_model("fake-model").ok is True
+    client = TestClient(create_app(kernel))
+
+    # No `tools` in the request -> the non-buffered ("normal") stream branch.
+    response = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-model",
+            "messages": [{"role": "user", "content": "run pwd"}],
+            "stream": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.text.count('"delta": {"tool_calls"') == 1
+    assert response.text.count('"id": "call_dup"') == 1
+    assert '"finish_reason": "tool_calls"' in response.text
+
+
+def test_openai_chat_completion_returns_409_when_budget_exceeded_unresolvable(tmp_path) -> None:
+    """When a model switch can't fit the budget and nothing is evictable, the
+    compat route must return a non-retryable 409 (not the retryable 503 that
+    makes OpenAI clients hammer the endpoint)."""
+    from owlmlx.memory_budget import MachineMemoryProfile
+
+    model_id = "Qwen3.6-27B"
+    model_dir = tmp_path / model_id
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
+    (model_dir / "weights.safetensors").write_bytes(b"x" * 16)
+    # Estimated size is floored at 1.0 GB, which alone exceeds this tiny budget.
+    kernel = RuntimeKernel(
+        FakeBackend(),
+        profile=MachineMemoryProfile(
+            system_memory_gb=4.0,
+            system_reserve_gb=1.0,
+            serving_budget_gb=0.5,
+            warning_threshold_gb=0.4,
+        ),
+    )
+    client = TestClient(create_app(kernel, visibility_models_root=str(tmp_path)))
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={"model": model_id, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 4},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "memory_budget_exceeded"
+
+
+def test_openai_chat_completion_evicts_non_pinned_resident_to_switch_models(tmp_path) -> None:
+    """Switching to a visible cold model that won't fit alongside a non-pinned
+    resident must auto-unload the resident and succeed (no manual unload, no
+    503 retry storm)."""
+    from owlmlx.memory_budget import MachineMemoryProfile
+
+    model_id = "Qwen3.6-27B"
+    model_dir = tmp_path / model_id
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
+    (model_dir / "weights.safetensors").write_bytes(b"x" * 16)  # est 1.0 GB
+    kernel = RuntimeKernel(
+        FakeBackend(),
+        profile=MachineMemoryProfile(
+            system_memory_gb=8.0,
+            system_reserve_gb=1.0,
+            serving_budget_gb=1.5,
+            warning_threshold_gb=1.0,
+        ),
+    )
+    # Non-pinned resident occupies most of the budget; 1.0 resident + 1.0 cold
+    # = 2.0 > 1.5, so the switch needs the resident evicted.
+    assert kernel.load_model("resident-old", memory_gb=1.0).ok is True
+    client = TestClient(create_app(kernel, visibility_models_root=str(tmp_path)))
+
+    response = client.post(
+        "/v1/chat/completions",
+        json={"model": model_id, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 4},
+    )
+
+    assert response.status_code == 200
+    loaded = {entry.model_id for entry in kernel.backend.status().loaded_models}
+    assert model_id in loaded
+    assert "resident-old" not in loaded
+
+
 def test_openai_reasoning_policy_defaults_to_profile_declared_trace_policy() -> None:
     from owlmlx.model_profile import resolve_model_profile
     from owlmlx.runtime.server_routes_openai import (

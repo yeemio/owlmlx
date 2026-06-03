@@ -592,6 +592,7 @@ async def _ensure_compat_model_loaded(
         model_id,
         memory_gb=memory_gb,
         post_load_warmup=False,
+        evict_to_fit=True,
     )
     if (
         not result.ok
@@ -734,9 +735,15 @@ def register_openai_compat_routes(
             visibility_registry=visibility_registry,
         )
         if load_result is not None and not load_result.ok:
-            status_code = 404 if (
-                load_result.error_code and load_result.error_code.value == "model_not_found"
-            ) else 503
+            if load_result.error_code and load_result.error_code.value == "model_not_found":
+                status_code = 404
+            elif (
+                load_result.error_code
+                and load_result.error_code.value == "memory_budget_exceeded"
+            ):
+                status_code = 409
+            else:
+                status_code = 503
             return _compat_error_response(
                 request_id=request_id,
                 message=load_result.message,
@@ -983,6 +990,7 @@ def register_openai_compat_routes(
                         return
                 return
 
+            tool_calls_streamed = False
             async for event in runtime.generate_stream_messages(
                 messages,
                 model_id=target_model,
@@ -1024,9 +1032,10 @@ def register_openai_compat_routes(
                         ],
                     }
                     yield f"data: {json.dumps(chunk)}\n\n"
+                    tool_calls_streamed = True
                 elif event.event == "done":
                     tool_calls = event_tool_calls
-                    if tool_calls:
+                    if tool_calls and not tool_calls_streamed:
                         chunk = {
                             "id": completion_id,
                             "object": "chat.completion.chunk",
@@ -1053,7 +1062,7 @@ def register_openai_compat_routes(
                                 "index": 0,
                                 "delta": {},
                                 "finish_reason": (
-                                    "tool_calls" if tool_calls else event.finish_reason or "stop"
+                                    "tool_calls" if (tool_calls or tool_calls_streamed) else event.finish_reason or "stop"
                                 ),
                             }
                         ],
@@ -1115,9 +1124,15 @@ def register_openai_compat_routes(
             visibility_registry=visibility_registry,
         )
         if load_result is not None and not load_result.ok:
-            status_code = 404 if (
-                load_result.error_code and load_result.error_code.value == "model_not_found"
-            ) else 503
+            if load_result.error_code and load_result.error_code.value == "model_not_found":
+                status_code = 404
+            elif (
+                load_result.error_code
+                and load_result.error_code.value == "memory_budget_exceeded"
+            ):
+                status_code = 409
+            else:
+                status_code = 503
             return _anthropic_error_response(
                 request_id=request_id,
                 message=load_result.message,
@@ -1289,9 +1304,15 @@ def register_openai_compat_routes(
             visibility_registry=visibility_registry,
         )
         if load_result is not None and not load_result.ok:
-            status_code = 404 if (
-                load_result.error_code and load_result.error_code.value == "model_not_found"
-            ) else 503
+            if load_result.error_code and load_result.error_code.value == "model_not_found":
+                status_code = 404
+            elif (
+                load_result.error_code
+                and load_result.error_code.value == "memory_budget_exceeded"
+            ):
+                status_code = 409
+            else:
+                status_code = 503
             return _compat_error_response(
                 request_id=request_id,
                 message=load_result.message,
