@@ -56,6 +56,14 @@
 
 **节奏纪律**：design spec **一次一个**，per round 落盘 + review；不允许批量预先撰写未启动的 gate。
 
+## 替代收口 R-series Specs（2026-06-03）
+
+> 顶层目标见 [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md)「下阶段主线声明（替代收口）」。R-series 承接 Runtime-12 §7。一次一个：当前只 **R0**；R1/R2/R4 由 R0 收窄清单驱动后再各自落 spec。
+
+| Gate | Spec | 状态 | Plan-grade 来源 |
+|---|---|---|---|
+| **R0** | [`R0-replacement-rebaseline-spec.md`](R0-replacement-rebaseline-spec.md) | design-grade · brainstorming-approved 2026-06-03 · pending user spec review；交付 `runtime13` verdict | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) 下阶段主线声明 + Runtime-12 §7 |
+
 ---
 
 ## 与 plan-grade / source-of-truth 的关系

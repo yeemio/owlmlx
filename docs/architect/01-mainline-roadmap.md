@@ -46,6 +46,18 @@
 
 下一条真实执行线：**B-2 no-header prefix-cache route-level / policy closure**。B-1c §2 的 fast-count canonical 证据已经由 `20260603T031832Z` 通过并被 `--require-canonical --require-cache-eviction` 接受；现在不能再把 B-1c §2 当作 B-2 的前置 blocker。接下来要确认 B-2.3 的 default-off route-level 证据、policy 边界、source-of-truth 和 audit harness 是否足以支持更窄的 automatic-prefix claim，仍不做 default-on / supported promotion。F-4 已归档窄 lane，后续 F-4 residual 不阻塞当前 runtime stability 主线；DS4 的下一步不是 MTP，除非新 artifact / adapter fork 改变 D3 checkpoint inspection 结果。
 
+### 下阶段主线声明（2026-06-03 · 老平台替代收口）
+
+B-1c §2 fast-count canonical 通过后，按 §IV.1 既定身份，下阶段**首要目标 = 老平台替代收口（boundary 替代）**：把 runtime control boundary 从 oMLX 收归 owlmlx，自有栈（OwlCoda / OwlCC）生产流量全切 owlmlx-only、无 oMLX 回退；**不追 fleet / 批处理（§IV.2 边界不变）**。
+
+执行以 **R-series** 承接（Runtime-12 §7 已预名 "Runtime-13 = actual replacement work"）：
+
+- **R0 — Replacement re-baseline（先行）**：跨 repo 只读重核 4 个 Runtime-12 blocker + 5 个 replacement-grade stability gap，产出 `docs/source-of-truth/runtime13-replacement-rebaseline-verdict.md`（刷新 verdict + 收窄 blocker 清单 + 每 blocker "是否阻断 owlmlx-only cutover" 判定）。design spec：`docs/architect/design/R0-replacement-rebaseline-spec.md`。
+- **R1 / R2 / R4**：由 R0 收窄清单驱动 —— source-first parity / 生产控制面闭环 / ops cutover + customer evidence。**R3（backend 质量 parity）降级 no-regression**，非硬验收线。
+- campaigns A–F 与 stability gaps **不另起炉灶**：R0 按 "是否阻断 cutover" 重判它们并挂入相应 R（含当前执行线 **B-2** —— 其是否为 cutover-blocker 由 R0 裁定，在此之前 B-2 不停）。
+
+本声明**不晋级任何 capability**：替代 verdict 仍为 "not yet replaceable"（待 R0 刷新），Session KV / prefix cache 仍 `experimental`，§1a Promotion Gate 不因本声明放宽。
+
 ---
 
 ## 主线声明（Mainline Statement · 2026-05-16）
