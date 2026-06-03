@@ -168,3 +168,22 @@ def test_evaluate_fallback_proof_inbound_coverage_gap_fails() -> None:
     proof = pilot.evaluate_fallback_proof(**args)
     assert proof.proven is False
     assert proof.owlmlx_inbound_ok is False
+
+
+def test_evaluate_watermark_health_no_red() -> None:
+    health = pilot.evaluate_watermark_health(["green", "green", "yellow"])
+    assert health.watermark_red_observed is False
+    assert health.classifications_seen == ("green", "yellow")
+    assert "not" in health.interpretation.lower()
+    assert "stability" in health.interpretation.lower()
+
+
+def test_evaluate_watermark_health_red_trips_gate() -> None:
+    health = pilot.evaluate_watermark_health(["green", "red"])
+    assert health.watermark_red_observed is True
+    assert "red" in health.classifications_seen
+
+
+def test_evaluate_watermark_health_fatal_counts_as_red() -> None:
+    health = pilot.evaluate_watermark_health(["fatal"])
+    assert health.watermark_red_observed is True

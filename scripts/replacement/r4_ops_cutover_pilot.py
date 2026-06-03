@@ -304,6 +304,33 @@ def evaluate_fallback_proof(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class WatermarkHealth:
+    watermark_red_observed: bool
+    classifications_seen: tuple[str, ...]
+    interpretation: str
+
+
+def evaluate_watermark_health(classifications: Sequence[str]) -> WatermarkHealth:
+    """Per-session memory-watermark HEALTH gate (constraint #6).
+
+    `watermark_red_observed=False` means "this session did not trigger RED" —
+    it is explicitly NOT a sustained-stability conclusion (that is R4 Phase B).
+    """
+    seen = tuple(dict.fromkeys(str(c).lower() for c in classifications))
+    red = any(c in WATERMARK_RED_CLASSIFICATIONS for c in seen)
+    interpretation = (
+        "RED/FATAL observed in this session — health gate tripped. "
+        if red
+        else "This session did not trigger RED. "
+    ) + "Health gate for THIS pilot session only; NOT a sustained-stability claim (see R4 Phase B / soak)."
+    return WatermarkHealth(
+        watermark_red_observed=red,
+        classifications_seen=seen,
+        interpretation=interpretation,
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="R4 Phase-1 ops-cutover pilot harness (owlmlx-internal)."
