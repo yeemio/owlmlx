@@ -360,3 +360,79 @@ def test_run_probe_readiness_failure_still_writes_artifact(tmp_path, monkeypatch
     assert "tool_lane_live" in result["failures"]
     artifact_path = tmp_path / result["artifact_filename"]
     assert artifact_path.exists()  # constraint #5: failure ALWAYS yields an artifact
+
+
+def _write_capture(tmp_path, *, override=None):
+    capture = {
+        "loop_completed": True,
+        "tool_lane_subgates": {k: True for k in pilot.TOOL_LANE_SUBGATES},
+        "fallback": {
+            "config_snapshot": {"base_url": "http://127.0.0.1:8066",
+                                 "provider": "owlmlx", "fallback_enabled": False},
+            "consumer_outbound": {"fallback_count": 0, "outbound_hosts": ["127.0.0.1:8066"]},
+            "owlmlx_inbound": {"served_request_ids": ["req_a", "req_b"]},
+        },
+        "watermark_classifications": ["green", "green"],
+        "reproduction": {
+            "launch_command": "uv run python -m owlmlx.runtime.server",
+            "env": {"OWLMLX_PILOT_BASE_URL": "http://127.0.0.1:8066"},
+            "owlmlx_commit": "abc1234",
+            "base_url": "http://127.0.0.1:8066",
+            "model_id": "Qwen3.6-27B",
+            "session_id": "pilot-001",
+            "request_ids": ["req_a", "req_b"],
+        },
+    }
+    if override:
+        override(capture)
+    path = tmp_path / "capture.json"
+    path.write_text(_json.dumps(capture))
+    return path
+
+
+def _write_passing_readiness_artifact(tmp_path):
+    readiness = pilot.evaluate_readiness(_all_pass_probes(), model_id="Qwen3.6-27B")
+    artifact = pilot.build_readiness_artifact(
+        verdict=readiness, base_url="http://127.0.0.1:8066",
+        model_id="Qwen3.6-27B", owlmlx_commit="abc1234",
+        recorded_at="2026-06-03T00:00:00Z",
+    )
+    path = tmp_path / "readiness.json"
+    path.write_text(_json.dumps(artifact))
+    return path
+
+
+def test_run_assemble_evidence_passed(tmp_path) -> None:
+    capture = _write_capture(tmp_path)
+    readiness = _write_passing_readiness_artifact(tmp_path)
+    result = pilot.run_assemble_evidence(
+        capture_path=capture,
+        readiness_artifact_path=readiness,
+        pilot_base_url="http://127.0.0.1:8066",
+        evidence_dir=tmp_path,
+    )
+    assert result["verdict"] == "passed"
+    artifact = _json.loads((tmp_path / result["artifact_filename"]).read_text())
+    assert artifact["fallback"]["fallback_used"] is False
+    assert set(artifact["tool_lane"]["subgates"]) == set(pilot.TOOL_LANE_SUBGATES)
+    ledger_rows = [
+        _json.loads(line)
+        for line in (tmp_path / "pilot-ledger.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    assert ledger_rows[-1]["verdict"] == "passed"
+
+
+def test_run_assemble_evidence_subgate_false_is_loop_failed(tmp_path) -> None:
+    def _break(cap):
+        cap["tool_lane_subgates"]["tool_result_roundtrip"] = False
+    capture = _write_capture(tmp_path, override=_break)
+    readiness = _write_passing_readiness_artifact(tmp_path)
+    result = pilot.run_assemble_evidence(
+        capture_path=capture,
+        readiness_artifact_path=readiness,
+        pilot_base_url="http://127.0.0.1:8066",
+        evidence_dir=tmp_path,
+    )
+    assert result["verdict"] == "loop_failed"
+    assert any("tool_result_roundtrip" in r for r in result["reasons"])

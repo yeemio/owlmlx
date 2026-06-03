@@ -531,6 +531,81 @@ def run_probe_readiness(
     }
 
 
+def _rebuild_readiness_from_artifact(artifact: Mapping[str, Any]) -> ReadinessVerdict:
+    payload = artifact.get("readiness") or {}
+    checks = tuple(
+        ReadinessCheck(c["name"], bool(c["ok"]), dict(c.get("detail") or {}))
+        for c in (payload.get("checks") or [])
+    )
+    return ReadinessVerdict(
+        verdict=str(artifact.get("verdict") or payload.get("verdict")),
+        ready=bool(payload.get("ready")),
+        checks=checks,
+        failures=tuple(payload.get("failures") or []),
+    )
+
+
+def run_assemble_evidence(
+    *,
+    capture_path: Path,
+    readiness_artifact_path: Path,
+    pilot_base_url: str,
+    evidence_dir: Path,
+) -> dict[str, Any]:
+    capture = json.loads(Path(capture_path).read_text(encoding="utf-8"))
+    readiness_artifact = json.loads(
+        Path(readiness_artifact_path).read_text(encoding="utf-8")
+    )
+    readiness = _rebuild_readiness_from_artifact(readiness_artifact)
+
+    tool_lane = evaluate_tool_lane(capture.get("tool_lane_subgates") or {})
+    fb = capture.get("fallback") or {}
+    reproduction = capture.get("reproduction") or {}
+    fallback = evaluate_fallback_proof(
+        config_snapshot=fb.get("config_snapshot") or {},
+        consumer_outbound=fb.get("consumer_outbound") or {},
+        owlmlx_inbound=fb.get("owlmlx_inbound") or {},
+        pilot_request_ids=reproduction.get("request_ids") or [],
+        pilot_base_url=pilot_base_url,
+    )
+    watermark = evaluate_watermark_health(capture.get("watermark_classifications") or [])
+    pilot_verdict = build_pilot_verdict(
+        readiness=readiness,
+        tool_lane=tool_lane,
+        fallback=fallback,
+        watermark=watermark,
+        loop_completed=bool(capture.get("loop_completed")),
+    )
+    recorded_at = _now_iso_utc()
+    artifact = build_pilot_artifact(
+        pilot_verdict=pilot_verdict,
+        readiness=readiness,
+        tool_lane=tool_lane,
+        fallback=fallback,
+        watermark=watermark,
+        reproduction=reproduction,
+        recorded_at=recorded_at,
+    )
+    session_id = str(reproduction.get("session_id") or "session")
+    filename = f"{_now_compact_utc()}-pilot-{pilot_verdict.verdict}-{session_id}.json"
+    _write_json(evidence_dir / filename, artifact)
+    _append_jsonl(
+        evidence_dir / "pilot-ledger.jsonl",
+        {
+            "recorded_at": recorded_at,
+            "verdict": pilot_verdict.verdict,
+            "session_id": session_id,
+            "artifact": filename,
+        },
+    )
+    return {
+        "verdict": pilot_verdict.verdict,
+        "reasons": list(pilot_verdict.reasons),
+        "artifact_filename": filename,
+        "artifact_path": str(evidence_dir / filename),
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="R4 Phase-1 ops-cutover pilot harness (owlmlx-internal)."
@@ -556,6 +631,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     probe.add_argument("--evidence-dir", type=Path, default=DEFAULT_EVIDENCE_DIR)
     probe.add_argument("--timeout-s", type=float, default=60.0)
 
+    assemble = sub.add_parser(
+        "assemble-evidence",
+        help="Assemble controlled-smoke captures into a pilot verdict artifact.",
+    )
+    assemble.add_argument("--capture", type=Path, required=True,
+                          help="Operator-captured smoke JSON (see runbook).")
+    assemble.add_argument("--readiness-artifact", type=Path, required=True,
+                          help="The readiness artifact emitted by probe-readiness.")
+    assemble.add_argument(
+        "--base-url",
+        default=os.environ.get("OWLMLX_PILOT_BASE_URL", DEFAULT_BASE_URL),
+    )
+    assemble.add_argument("--evidence-dir", type=Path, default=DEFAULT_EVIDENCE_DIR)
+
     args = parser.parse_args(argv)
 
     if args.command == "probe-readiness":
@@ -568,6 +657,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(json.dumps(result, indent=2, sort_keys=True))
         return 0 if result["ready"] else 1
+
+    if args.command == "assemble-evidence":
+        result = run_assemble_evidence(
+            capture_path=args.capture,
+            readiness_artifact_path=args.readiness_artifact,
+            pilot_base_url=args.base_url,
+            evidence_dir=args.evidence_dir,
+        )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0 if result["verdict"] == "passed" else 1
 
     return 0
 
