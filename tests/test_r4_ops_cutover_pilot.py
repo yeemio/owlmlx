@@ -305,3 +305,58 @@ def test_build_pilot_artifact_shape_records_all_subgates() -> None:
     assert artifact["watermark"]["watermark_red_observed"] is False
     assert artifact["reproduction"]["request_ids"] == ["req_a", "req_b"]
     assert "replacement complete" in artifact["honesty_note"].lower()
+
+
+import json as _json
+
+
+def _install_fake_http(monkeypatch, model_id: str, *, tool_calls: bool = True):
+    def fake_http_json(*, method, url, payload=None, timeout_s):
+        if url.endswith("/healthz"):
+            return 200, {"ok": True, "readiness": "ready"}
+        if url.endswith("/v1/runtime/model-visibility"):
+            return 200, {"visible_model_ids": [model_id], "blocked_model_ids": []}
+        if url.endswith("/v1/openai/models"):
+            return 200, {"object": "list", "data": [{"id": model_id}]}
+        if url.endswith("/v1/chat/completions"):
+            calls = [{"id": "c1", "type": "function",
+                      "function": {"name": "t", "arguments": "{}"}}] if tool_calls else []
+            return 200, {"choices": [{"message": {"tool_calls": calls},
+                                      "finish_reason": "tool_calls"}]}
+        if url.endswith("/v1/runtime/monitor/snapshot"):
+            return 200, {"resources": {"host_pressure": {"classification": "green"}}}
+        raise AssertionError(f"unexpected url {url}")
+
+    monkeypatch.setattr(pilot, "_http_json", fake_http_json)
+
+
+def test_run_probe_readiness_writes_passed_artifact(tmp_path, monkeypatch) -> None:
+    _install_fake_http(monkeypatch, "Qwen3.6-27B")
+    result = pilot.run_probe_readiness(
+        base_url="http://127.0.0.1:8066",
+        model_id="Qwen3.6-27B",
+        owlmlx_commit="abc1234",
+        evidence_dir=tmp_path,
+        timeout_s=5.0,
+    )
+    assert result["verdict"] == "readiness_passed"
+    artifact_path = tmp_path / result["artifact_filename"]
+    assert artifact_path.exists()
+    written = _json.loads(artifact_path.read_text())
+    assert written["kind"] == "readiness"
+    assert written["verdict"] == "readiness_passed"
+
+
+def test_run_probe_readiness_failure_still_writes_artifact(tmp_path, monkeypatch) -> None:
+    _install_fake_http(monkeypatch, "Qwen3.6-27B", tool_calls=False)
+    result = pilot.run_probe_readiness(
+        base_url="http://127.0.0.1:8066",
+        model_id="Qwen3.6-27B",
+        owlmlx_commit="abc1234",
+        evidence_dir=tmp_path,
+        timeout_s=5.0,
+    )
+    assert result["verdict"] == "pilot_readiness_failed"
+    assert "tool_lane_live" in result["failures"]
+    artifact_path = tmp_path / result["artifact_filename"]
+    assert artifact_path.exists()  # constraint #5: failure ALWAYS yields an artifact

@@ -452,12 +452,123 @@ def build_pilot_artifact(
     }
 
 
+def _probe_live(base_url: str, *, model_id: str, timeout_s: float) -> dict[str, Any]:
+    base = base_url.rstrip("/")
+
+    hz_status, hz_body = _http_json(method="GET", url=f"{base}/healthz", timeout_s=timeout_s)
+    mv_status, mv_body = _http_json(
+        method="GET", url=f"{base}/v1/runtime/model-visibility", timeout_s=timeout_s
+    )
+    om_status, om_body = _http_json(
+        method="GET", url=f"{base}/v1/openai/models", timeout_s=timeout_s
+    )
+    tl_status, tl_body = _http_json(
+        method="POST",
+        url=f"{base}/v1/chat/completions",
+        payload={
+            "model": model_id,
+            "messages": [{"role": "user", "content": "What is the weather in Paris?"}],
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "description": "Get the weather for a city.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {"city": {"type": "string"}},
+                            "required": ["city"],
+                        },
+                    },
+                }
+            ],
+            "tool_choice": "required",
+            "max_tokens": 64,
+            "stream": False,
+        },
+        timeout_s=timeout_s,
+    )
+    mon_status, mon_body = _http_json(
+        method="GET", url=f"{base}/v1/runtime/monitor/snapshot", timeout_s=timeout_s
+    )
+    return {
+        "healthz": {"status": hz_status, "body": hz_body},
+        "model_visibility": {"status": mv_status, "body": mv_body},
+        "openai_models": {"status": om_status, "body": om_body},
+        "tool_lane": {"status": tl_status, "body": tl_body},
+        "monitor": {"status": mon_status, "body": mon_body},
+    }
+
+
+def run_probe_readiness(
+    *,
+    base_url: str,
+    model_id: str,
+    owlmlx_commit: str,
+    evidence_dir: Path,
+    timeout_s: float,
+) -> dict[str, Any]:
+    probes = _probe_live(base_url, model_id=model_id, timeout_s=timeout_s)
+    verdict = evaluate_readiness(probes, model_id=model_id)
+    recorded_at = _now_iso_utc()
+    artifact = build_readiness_artifact(
+        verdict=verdict,
+        base_url=base_url,
+        model_id=model_id,
+        owlmlx_commit=owlmlx_commit,
+        recorded_at=recorded_at,
+    )
+    artifact["probes"] = probes  # raw probe payloads for audit
+    safe_model = model_id.strip("/").replace("/", "-")
+    filename = f"{_now_compact_utc()}-readiness-{verdict.verdict}-{safe_model}.json"
+    _write_json(evidence_dir / filename, artifact)
+    return {
+        "verdict": verdict.verdict,
+        "ready": verdict.ready,
+        "failures": list(verdict.failures),
+        "artifact_filename": filename,
+        "artifact_path": str(evidence_dir / filename),
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="R4 Phase-1 ops-cutover pilot harness (owlmlx-internal)."
     )
-    parser.add_subparsers(dest="command", required=True)
-    parser.parse_args(argv)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    probe = sub.add_parser(
+        "probe-readiness",
+        help="Probe a running owlmlx server; emit readiness_passed OR pilot_readiness_failed.",
+    )
+    probe.add_argument(
+        "--base-url",
+        default=os.environ.get("OWLMLX_PILOT_BASE_URL", DEFAULT_BASE_URL),
+        help="owlmlx base URL (default $OWLMLX_PILOT_BASE_URL or %(default)s; port is NOT a contract).",
+    )
+    probe.add_argument(
+        "--model-id",
+        default=os.environ.get("OWLMLX_PILOT_MODEL_ID"),
+        required=os.environ.get("OWLMLX_PILOT_MODEL_ID") is None,
+        help="Pilot model id (default $OWLMLX_PILOT_MODEL_ID).",
+    )
+    probe.add_argument("--owlmlx-commit", required=True, help="owlmlx git commit under test.")
+    probe.add_argument("--evidence-dir", type=Path, default=DEFAULT_EVIDENCE_DIR)
+    probe.add_argument("--timeout-s", type=float, default=60.0)
+
+    args = parser.parse_args(argv)
+
+    if args.command == "probe-readiness":
+        result = run_probe_readiness(
+            base_url=args.base_url,
+            model_id=args.model_id,
+            owlmlx_commit=args.owlmlx_commit,
+            evidence_dir=args.evidence_dir,
+            timeout_s=args.timeout_s,
+        )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0 if result["ready"] else 1
+
     return 0
 
 
