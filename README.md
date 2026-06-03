@@ -101,12 +101,13 @@ N=20 both completed; cache-on had 20/20 warm hits, `failed_reclaim=0`,
 `failed_unload=0`, and p50/p99 settle durations stayed within threshold.
 
 This remains `experimental`: native backend only, default off, explicit
-session id, append-only reuse for non-trimmable upstream caches. B-1c no-swap
-and soak-plus-swap gates remain open before any `supported` promotion; §2 is now
-blocked pending canonical 24-swap threshold evidence. The short
-`20260602T095334Z` native smoke passed load / throughput / switch / concurrency
-at 3 swaps, but `canonical_gate.canonical_switch_requirement_met=false`, so it
-is not promotion evidence.
+session id, append-only reuse for non-trimmable upstream caches. B-1c §2 now has
+count-canonical fast-cadence evidence, not a continuous 24h current-Mac soak:
+`20260603T031832Z` passed 24/24 swaps, all four axes, and cache-eviction
+pressure under `--require-canonical --require-cache-eviction`. That closes the
+immediate §2 canonical evidence gap, but it still does not promote Session KV
+to `supported`; promotion requires the full §1a Promotion Gate review across
+B-1a + B-1b + B-1c §1 + B-1c §2.
 
 Short-prompt TPS on `Mac17,6` (`max_tokens=64`, `temperature=0`):
 
@@ -162,7 +163,7 @@ emits a loud warning if run outside `.venv/`.
 
 ## Development status
 
-Internal runtime milestone as of 2026-05-25. Public Python surface and HTTP
+Internal runtime milestone as of 2026-06-03. Public Python surface and HTTP
 routes are stable enough for the runtime engineering channel, while OwlCoda
 product readiness remains parked behind the npm local-model learning-loop
 gate. Session KV cache remains experimental: B-1a passed (Gemma 4-31B-it
@@ -193,13 +194,16 @@ and `swap_boundaries_clean=true`; audit reports
 `clean_for_interrupted_aggregate=true`. Later fast forced-swap canaries proved
 5-minute load/switch boundaries stay clean, direct cache-object resident
 accounting closed the raw-RSS drift false-fail, and the resident cap kept the
-held cache working set inside budget. The §2 rollup still correctly remains
-`blocked` because the first threshold-configured native four-axis smoke
-(`20260602T095334Z`) used 3 swaps, not the canonical 24-swap graduation floor.
-It passed the configured load / throughput / switch / concurrency axes with
-18 throughput samples and 6 cache-breadth entries, while
-`graduates.soak_plus_swap_stability=false`. The next step is a canonical native
-evidence segment using those knobs per
+held cache working set inside budget. The short threshold-configured smoke
+(`20260602T095334Z`) proved the four-axis path at 3 swaps but remained
+non-canonical. The 2026-06-03 canonical fast-count segment
+(`20260603T031832Z`) then passed 24/24 swaps in a bounded operator window:
+load / throughput / switch / concurrency all `passed`, throughput relative
+decay `0.2431881471775777 <= 0.30`, observed prompt-entry breadth 6,
+cache evictions 2, drops / expirations / rejects 0, and independent audit
+reported `canonical_acceptance_status=canonical_passed`. This is B-1c §2
+fast-count canonical evidence, not a 24h continuous soak and not a standalone
+Session KV `supported` promotion.
 `docs/architect/design/B-1c-section-2-spec.md §10`. Stage 1 refactor
 (2026-05-11) archived 151 spec-as-code modules; Stage 2 aligned landmark
 vocabulary with [PR #649][pr649]; Wave H · H1 (2026-05-17) extracted

@@ -1,10 +1,22 @@
 # Execution Prompt: B-1c §2 Canonical Threshold Native Segment
 
 > Created: 2026-06-02
+> Completed: 2026-06-03 by `20260603T031832Z`
 > Goal: `owlmlx-runtime-acceleration-substrate-b1c2-b2`
 > Dominant gap: promote the short threshold-native B-1c §2 path from a
 > 3-swap smoke into a count-canonical 24-swap evidence candidate without
 > weakening capability labels.
+
+## Completion Note
+
+This prompt has been executed. The accepted rollup is:
+
+`files/evidence/owlmlx/bench/session-kv-soak/20260603T031832Z-b1c2-qwen-gemma-qwen35-canonical-threshold-fast-count-soak-swap-rollup.jsonl`
+
+Independent audit with `--require-canonical --require-cache-eviction` returned
+`canonical_acceptance_status=canonical_passed`. Do not rerun this prompt as the
+dominant next gap unless a new regression explicitly invalidates that evidence.
+The next goal-loop gap is B-2 post-B-1c route-level / policy closure.
 
 ## Current Verified Truth
 
@@ -33,9 +45,24 @@ configuration from the short smoke, raises `swap_count` and
 
 This round is allowed to use fast count cadence (`duration_s=0`) so it can close
 inside an execution turn. It must not be described as 5-minute-cadence or 2-hour
-evidence.
+evidence. It also must not be described or scheduled as continuous 24h evidence:
+the current execution target is a bounded 3-4 hour operator window.
 
 ## Command
+
+Before starting, run a process preflight and require no competing MLX training
+process:
+
+```bash
+ps -axo pid,etime,pcpu,pmem,rss,command | rg "eviction_soak|b1c2|native-swap|mlx_lm|lora_config"
+```
+
+If an external `mlx_lm lora ...` process is active, do not start the canonical
+segment. If the process list is clean and the command starts, repeat the same
+process check after the first several minutes of runtime. If a competing LoRA
+process appears during the run, interrupt only the B-1c process, let the runner
+write its blocked interrupted rollup, and then audit that rollup as
+`not_canonical` rather than treating it as pass evidence.
 
 ```bash
 uv run python scripts/bench/eviction_soak.py \
@@ -95,6 +122,11 @@ occupied by a separate `mlx_lm lora -c lora_config.yaml` process:
 - `tests/test_session_kv_soak_audit.py` includes a no-MLX regression proving
   `--require-cache-eviction` rejects canonical rollups that pass count gates but
   lack explicit cache-eviction requirement/observation fields.
+- The 2026-06-03 `20260603T012641Z` attempt proved why the process preflight
+  must be repeated after startup: the initial check was clean, but an external
+  `mlx_lm lora -c lora_config_resume400.yaml` process appeared mid-run. The
+  B-1c segment was correctly interrupted and wrote a blocked rollup at 20/24
+  swaps; it is useful diagnostic evidence, not canonical pass evidence.
 
 ## Acceptance Criteria
 
@@ -109,6 +141,9 @@ occupied by a separate `mlx_lm lora -c lora_config.yaml` process:
   `session_cache_rejects_total=0`.
 - `axis_verdicts.concurrency_stability.cache_eviction_observed=true`.
 - `graduates.session_kv_supported=false` remains unchanged.
+- No external LoRA / training process is competing with the run during the
+  segment; if one appears, the resulting rollup must remain blocked /
+  interrupted and must not be promoted.
 
 Post-run audit should use both canonical and eviction-pressure guards:
 

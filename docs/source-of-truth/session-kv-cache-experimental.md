@@ -262,19 +262,22 @@ The same payload is also visible at:
 > **⚠️ Gate superseded (flagged 2026-05-30 audit).** The flat gate below predates
 > the B-1c framework. The live promotion gate is **B-1a + B-1b + B-1c §1 + B-1c §2**
 > together (the §1a Promotion Gate). B-1c §2 has been re-founded on four
-> count-based axes: load, throughput, switch, and concurrency. It is currently
-> **`blocked` pending canonical 24-swap threshold evidence**, not on duration
-> and not on the raw-RSS false-fail: the reviewed direct cache-object resident
-> gate closes the Gemma fast-swap drift false-fail, and the short
-> `20260602T095334Z` native smoke passed all four configured axes at 3 swaps.
-> That smoke records `canonical_gate.canonical_switch_requirement_met=false`
-> and `graduates.soak_plus_swap_stability=false`, so it is threshold-path
-> evidence, not promotion evidence. See
+> count-based axes: load, throughput, switch, and concurrency. The
+> `20260603T031832Z` native fast-count segment passed the canonical 24-swap
+> threshold with cache-eviction pressure and independent
+> `--require-canonical --require-cache-eviction` audit acceptance; this is not
+> continuous 24h evidence and not a standalone promotion. The earlier
+> `20260602T095334Z` native smoke remains threshold-path evidence only because
+> it stopped at 3 swaps. See
 > `runtime-capability-matrix.md` (session-KV row) +
 > `docs/architect/design/B-1c-section-2-spec.md` §11. The `experimental` label
-> below is still correct; the *criteria* below are not the current ones.
+> below is still correct; the *criteria* below are not the current ones. Do not
+> schedule a continuous 24h current-Mac test from the superseded flat gate; any
+> repeat B-1c §2 execution lane must fit inside a 3-4 hour operator window.
 
-The capability remains `experimental` until all of the following are true:
+The capability remains `experimental` until the live §1a Promotion Gate accepts
+B-1a + B-1b + B-1c §1 + B-1c §2 together. The historical flat criteria below
+are retained only as superseded context, not as the current runbook:
 
 - 24h soak with `OWLMLX_SESSION_CACHE_ENABLED=1` and mixed 1-10 sessions
 - settle-barrier failed reclaim count is zero

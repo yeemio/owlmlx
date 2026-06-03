@@ -70,6 +70,17 @@ serving.
 - Two operator-paused 24-swap fast-count attempts (`20260602T095953Z` and
   `20260602T100243Z`) are diagnostic partial ledgers only because they have no
   matching rollup and do not satisfy `--require-canonical`.
+- The `20260603T012641Z` canonical-threshold attempt produced a blocked
+  interrupted rollup after renewed external LoRA contention was detected. It
+  reached 20/24 swaps, observed cache eviction pressure, and kept drops /
+  expirations / rejects at 0, but it is not canonical: `interrupted=true`,
+  `canonical_switch_requirement_met=false`, and throughput decay
+  `0.31106123332617563` exceeded the configured `0.30` ceiling.
+- The `20260603T031832Z` clean canonical-threshold run passed 24/24 swaps,
+  all four configured axes, and cache-eviction pressure. Independent
+  `session_kv_soak_audit.py --require-canonical --require-cache-eviction`
+  reports `canonical_acceptance_status=canonical_passed`, with drops /
+  expirations / rejects all 0 and `session_kv_supported=false`.
 - B-2.3 has a narrow no-header automatic prefix slice behind
   `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`.
 - Real route evidence on 2026-06-02 passed on Qwen27, Qwen35, and Gemma31 for
@@ -83,20 +94,22 @@ serving.
 
 ## Remaining Gaps
 
-- B-1c section 2 still needs a count-canonical 24-swap native segment with all
-  four axes passing and `--require-canonical` acceptance.
-- The canonical segment should preserve the short smoke's explicit throughput
-  and cache-breadth thresholds and should require cache eviction pressure.
-- B-2 route-level validation needs to remain tied to real backend metadata and
-  resident-cache budget evidence.
-- Source-of-truth docs need to track the new measurable axes without changing
-  the capability ceiling.
+- B-1c section 2 fast-count canonical evidence is now present, but source-of-
+  truth must keep the claim ceiling clear: this is not continuous 24h evidence
+  and not a standalone Session KV `supported` promotion.
+- B-2 route-level validation needs to remain tied to real backend metadata,
+  default-off policy, and resident-cache budget evidence.
+- Source-of-truth docs need to pivot the dominant gap from B-1c evidence
+  collection to B-2 route-level / policy closure without changing the
+  capability ceiling.
 
 ## Dominant Next Gap
 
-`B-1c-section-2-canonical-24-swap-threshold-segment`
+`B-2-post-B-1c-route-level-policy-closure`
 
-The next round should run the archived native command in
-`files/execution-prompts/owlmlx/owlmlx-b1c2-canonical-threshold-native-segment-20260602.md`
-once the MLX path is not occupied by the separate LoRA process. The expected
-result is count-canonical fast-cadence evidence, not supported promotion.
+The next round should treat `20260603T031832Z` as the accepted B-1c §2
+fast-count canonical evidence and move to B-2 no-header prefix-cache
+route-level / policy closure. It should revalidate the existing Qwen27/Qwen35/
+Gemma31 compat-route ledgers with the offline B-2 audits, refresh B-2 source-of-
+truth so it is no longer blocked on B-1c §2, and keep automatic prefix cache
+`experimental`, default-off, and native-streaming only.

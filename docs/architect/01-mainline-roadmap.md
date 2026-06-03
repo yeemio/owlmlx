@@ -24,14 +24,14 @@
 - `docs/architect/**` 仍是 **plan-grade / architecture intent**，不进入 `docs/source-of-truth/master-outline.md`，除非经 runtime evidence + §1a Promotion Gate 晋级。
 - Wave / Campaign 结束时必须反推刷新：主规划结论、对应 companion、README 阅读顺序；不得只在聊天或临时 plan 文件里留下新事实。
 
-当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。B-1 Session KV cache `supported` 四条 gate 仍有 B-1c §2 待闭环；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`；Campaign D 的 DeepSeek D1-D7 已把 DSV4 推到 diagnostic technical-preview `partial`，但 D3/D4 仍证明 DS4 MTP weights unavailable / clean reject；2026-05-26 performance lane 复盘显示 raw TPS / n-gram serving / prompt cache / prefill chunking 短期不再是最大杠杆；F-4 structured-output 已赢得窄 grammar lane `partial`，整体仍 `experimental`。当前执行主线回到 B-1c §2 canonical 24-swap threshold closure。
+当前最新收拢结论：主线仍是 **`owlmlx` runtime engineering mainline**；推进形态是 **6 个 Campaign（A–F）+ Wave G（治理刷新）+ Wave H（server 工程化拆分）**。B-1 Session KV cache `supported` 四条 gate 已补齐 B-1c §2 fast-count canonical 证据，但仍需 §1a Promotion Gate review 才能谈 `supported`；Wave H 的 H1 compat routes split 已落到 `server_routes_openai.py`；Campaign D 的 DeepSeek D1-D7 已把 DSV4 推到 diagnostic technical-preview `partial`，但 D3/D4 仍证明 DS4 MTP weights unavailable / clean reject；2026-05-26 performance lane 复盘显示 raw TPS / n-gram serving / prompt cache / prefill chunking 短期不再是最大杠杆；F-4 structured-output 已赢得窄 grammar lane `partial`，整体仍 `experimental`。当前执行主线从 B-1c §2 canonical closure 转入 B-2 no-header prefix-cache route-level / policy closure；B-1c §2 的 24-swap 是计数门槛，不是 continuous 24h 测试。
 
-| 最新落点（2026-06-02） | 状态 | 证据边界 |
+| 最新落点（2026-06-03） | 状态 | 证据边界 |
 |---|---|---|
 | B-1b design spec | landed | `docs/architect/design/B-1b-spec.md` |
 | B-1b cache reclaim gate | passed · native N=20 | cache-off N=20 + cache-on N=20；20/20 warm hits；`failed_reclaim=0`；`failed_unload=0`；p50/p99 settle duration within threshold |
-| B-1c §1 no-swap soak runner | current-Mac interrupted rehearsal passed · continuous 24h still not claimed | first native rehearsal exposed default TTL expiry as drift; TTL-locked 121s native segment recorded `max_drift_bytes=0`; 4h + planned-shutdown aggregate `20260517T161707Z` stayed blocked; 2026-05-19 segment `20260519T014912Z` recorded `measurement_duration_s=28245.605`, wall-clock gap free, max drift 0; 2026-05-20 segment `20260520T075227Z` recorded `measurement_duration_s=53441.374`, wall-clock gap free, max drift 0; 2026-05-21 top-off `20260521T044517Z` recorded `measurement_duration_s=7201.552`, wall-clock gap free, max drift 0; aggregate `20260521T064658Z` records `aggregate_measurement_duration_s=88888.531`, `all_segments_ok_for_rehearsal=true`, `interrupted_no_swap_rehearsal=passed`, `current_mac_section_1_prerequisite_met=true`, while `no_swap_soak_stability=blocked` remains correct because only dedicated/UPS continuous native `mlx_core_active_memory` + required_duration ≥24h can produce continuous stability |
-| B-1c §2 soak + swap runner | threshold instrumentation landed · canonical 24-swap still open | `scripts/bench/eviction_soak.py` now records throughput samples, cache-breadth entries, switch/load/concurrency axis verdicts, and writes a blocked interrupted rollup on SIGINT/SIGTERM. The `20260602T095334Z` native threshold smoke passed all four configured axes at 3 swaps with 18 throughput samples and 6 cache-breadth entries, drops / expirations / rejects all `0`; however `canonical_gate.canonical_switch_requirement_met=false`, `graduates.soak_plus_swap_stability=false`, and `session_kv_supported=false`. `session_kv_soak_audit.py --require-canonical` rejects that smoke from either rollup or matching ledger path. Operator-paused `20260602T095953Z` / `20260602T100243Z` ledgers have no rollup and are diagnostic partial artifacts only. No supported claim. |
+| B-1c §1 no-swap runner | current-Mac interrupted rehearsal accepted · no continuous 24h current-Mac requirement | first native rehearsal exposed default TTL expiry as drift; TTL-locked 121s native segment recorded `max_drift_bytes=0`; 4h + planned-shutdown aggregate `20260517T161707Z` stayed blocked; 2026-05-19 segment `20260519T014912Z` recorded `measurement_duration_s=28245.605`, wall-clock gap free, max drift 0; 2026-05-20 segment `20260520T075227Z` recorded `measurement_duration_s=53441.374`, wall-clock gap free, max drift 0; 2026-05-21 top-off `20260521T044517Z` recorded `measurement_duration_s=7201.552`, wall-clock gap free, max drift 0; aggregate `20260521T064658Z` records `aggregate_measurement_duration_s=88888.531`, `all_segments_ok_for_rehearsal=true`, `interrupted_no_swap_rehearsal=passed`, `current_mac_section_1_prerequisite_met=true`. Dedicated/UPS continuous soak may be recorded as optional stronger evidence, but it is not a current-Mac execution requirement. |
+| B-1c §2 soak + swap runner | fast-count canonical accepted · no supported promotion | `scripts/bench/eviction_soak.py` records throughput samples, cache-breadth entries, switch/load/concurrency axis verdicts, and writes blocked interrupted rollups on SIGINT/SIGTERM. The short `20260602T095334Z` native threshold smoke passed all four configured axes at 3 swaps but remains non-canonical. The `20260603T012641Z` attempt correctly stayed diagnostic after LoRA contention interrupted it at 20/24 swaps. The new clean `20260603T031832Z` fast-count segment passed 24/24 swaps with 144 throughput samples, 6 prompt entries, 2 cache evictions, drops / expirations / rejects all `0`, and all four axis verdicts passed; `session_kv_soak_audit.py --require-canonical --require-cache-eviction --json` reports `canonical_acceptance_status=canonical_passed`. This is count-canonical §2 evidence inside the bounded current-Mac policy, not continuous 24h evidence and not `session_kv_supported=true`. |
 | D1 DeepSeek repeatability runner | passed · experimental lane · messages prompt policy adopted | default `messages` prompt surface passed the formal 5 prompt × 128/512/1024 matrix (`20260517T-d1-full-ladder-adopted-messages-policy.jsonl`) with 15/15 passed, no repetition, and clean load/unload health; raw prompt remains diagnostic failure at p1/1024 and is not the accepted D1 surface; preflight shows Blaizzy `mlx-lm` fork `pc/add-deepseekv4flash-model` at `5c10538136b9038b9626c134612b08afc18d697a` |
 | D2 DeepSeek metrics ledger | passed · p1/p2/p4 × 128/512 | fd-buffered child stdout reader fixed the previous stream block; `20260517T-d2-p1-p2-p4-128-512-metrics-v2.jsonl` records 6/6 passed rows, TTFT p50 593.840ms, decode p50 38.17885 tok/s after first token, child-process RSS p50 7.214432GB (not peak/process-tree aggregate), clean unload |
 | D3 DeepSeek MTP checkpoint inspection | passed · explicit missing reason | `20260517T-d3-mtp-checkpoint-inspection.jsonl` records `num_nextn_predict_layers=1`, 2610 weight keys / 19 shards, no MTP key candidates, no extra layer keys, `missingReason=mtp_weights_absent_or_stripped`; DS4 MTP remains unavailable even though the model family later gained diagnostic technical-preview visibility via D7. |
@@ -42,9 +42,9 @@
 | H1 compat route split | landed | `server_routes_openai.py` 拆出 OpenAI / Anthropic compat routes |
 | F-2 / perf lane | C0/C1 passed · serving integration paused | n-gram C2 and prompt-cache reuse are blocked/paused on mlx-lm hybrid trim; B prefill chunking configuration/progress surfaces are supported, but wall-clock acceleration is not promised |
 | F-4 Structured-Output Invariance | narrow grammar lane partial · overall experimental | `structured-output-grammar-lane.md` freezes the Qwen grammar-on lane (`json_schema_flat` / `enum_constrained` / `function_call_arguments` / `nested_object`) as feature-lane `partial`; Gemma and `thinking_tag_closed` remain residual; no F-4-wide or supported claim |
-| Targeted tests | passed | Current no-MLX regression for the B-1c/B-2 harness work: 86 passed, 2 warnings; focused audit / compatibility suite: 36 passed. |
+| Targeted tests | passed | Current no-MLX regression for the B-1c/B-2 harness work: `uv run pytest tests/test_eviction_soak_bench.py tests/test_session_kv_soak_audit.py tests/test_prefix_cache_compatibility_bench.py -q` -> 78 passed; B-2 focused prefix compatibility bench -> 12 passed. Offline B-2 ledger audits passed for Qwen27 auto-prefix and Qwen27/Qwen35/Gemma31 compat-route real-hit ledgers. |
 
-下一条真实执行线：**B-1c §2 canonical 24-swap threshold segment**。短 smoke 已证明四轴 instrumentation 与本地 threshold path 可用，但 canonical 24-swap 证据仍未跑通；只有该段通过并由 `--require-canonical` 接受后，才可进入 §2 pass review。F-4 已归档窄 lane，后续 F-4 residual 不阻塞当前 runtime stability 主线；DS4 的下一步不是 MTP，除非新 artifact / adapter fork 改变 D3 checkpoint inspection 结果。
+下一条真实执行线：**B-2 no-header prefix-cache route-level / policy closure**。B-1c §2 的 fast-count canonical 证据已经由 `20260603T031832Z` 通过并被 `--require-canonical --require-cache-eviction` 接受；现在不能再把 B-1c §2 当作 B-2 的前置 blocker。接下来要确认 B-2.3 的 default-off route-level 证据、policy 边界、source-of-truth 和 audit harness 是否足以支持更窄的 automatic-prefix claim，仍不做 default-on / supported promotion。F-4 已归档窄 lane，后续 F-4 residual 不阻塞当前 runtime stability 主线；DS4 的下一步不是 MTP，除非新 artifact / adapter fork 改变 D3 checkpoint inspection 结果。
 
 ---
 
@@ -75,7 +75,7 @@
 - **决策 A** · B-1a 锁定 Gemma 4-31B-it
 - **决策 B** · Wave H · H1 已完成 / H2-H3 等 B-1 闭环
 - **决策 C** · 4-gate G1 通过条件 = B-1a 通过（含 N≥5 prompt 字节等价）
-- **决策 D = D3** · B-1c 拆 §1（24h 纯 soak）+ §2（24h soak+swap）；结论字段独立
+- **决策 D = D3（2026-06-03 执行校准）** · B-1c 拆 §1（bounded no-swap prerequisite）+ §2（count-based soak+swap threshold）；结论字段独立。当前 Mac 不再安排 continuous 24h 测试。
 - **决策 E** · Campaign D 启动时点 = B-1a 完成后
 
 ---
@@ -251,23 +251,23 @@
 - session KV 启用不在 unload 路径上引入 reclaim mismatch
 - reclaim-barrier-event/stats 分布与 cache=off 基线对齐（中位数 / p99 / failed 计数）
 
-#### B-1c · 长上线稳定 · 拆成两段 48h+（决策 D3 · 2026-05-16）
+#### B-1c · 稳定证据 · 当前 Mac 3-4h bounded segment 优先（决策 D3 · 2026-05-16，2026-06-03 校准）
 
-**B-1c §1 · 纯 soak（当前 Mac 路线 = 可中断分段累计 ≥24h；dedicated host 可追加 continuous 24h）**
+**B-1c §1 · 纯 soak prerequisite（当前 Mac 路线 = bounded segment evidence；dedicated host 可追加长时证据）**
 
 - 混合负载：短 / 中 / 长 session = **1:1:1**
 - **无人为 unload / swap**
 - 验证单一命题："`cache=on` 不破坏 `active_memory`"
 - 漂移阈值：`min(200 MB, 0.5% host budget)`
-- 当前 Mac / laptop 路线：多个可中断 native segment 累计 ≥24h；每个 segment 内无 hard failure、无 measurement wall-clock gap、ledger index 连续、cleanup unload / settle 干净；聚合结论字段 `interrupted_no_swap_rehearsal = passed | failed | blocked`
-- dedicated host / UPS 路线（可选更强证据）：单段 continuous ≥24h；额外产出 `no_swap_soak_stability = passed | failed`
+- 当前 Mac / laptop 路线：只接受可在 3-4 小时 operator window 内完成或干净中断的 native segment；每个 segment 内无 hard failure、无 measurement wall-clock gap、ledger index 连续、cleanup unload / settle 干净；聚合结论字段 `interrupted_no_swap_rehearsal = passed | failed | blocked`
+- dedicated host / UPS 路线（可选更强证据）：可另行追加长时 continuous soak；它不是当前 Mac 主线 gate，也不得阻塞 3-4 小时 bounded 交付。
 - **不再假设当前 Mac 能 continuous 24h**；host sleep / power gap 是运行环境事实，必须被记录为 segment boundary 或 gap，不许被抹平
 
-**B-1c §2 · soak + swap（≥24h，§1 通过后启动）**
+**B-1c §2 · soak + swap（count-canonical fast-cadence，§1 prerequisite 后启动）**
 
-- §1 基础上每 4h 一次 model swap（Qwen3.6-27B ↔ Gemma 4-31B ↔ Qwen3.6-35B-A3B 轮换，共 6 次）
-- 验证累积切换 reclaim 在 24h 上下文下行为干净
-- 验收：每次 swap 后 settle_barrier 通过 + `failed_reclaim` 累积 = 0 + `active_memory` 漂移 < §1 阈值
+- 当前主线不做 continuous 24h / 每 4h swap。§2 使用 count-canonical fast-cadence：Qwen3.6-27B ↔ Gemma 4-31B ↔ Qwen3.6-35B-A3B 轮换，`required_swap_count=24`，并在 3-4 小时内完成。
+- 验证累积切换 reclaim、throughput decay、cache-breadth/concurrency 和 cache-eviction pressure 是否在可审计计数窗口内保持干净
+- 验收：每次 swap 后 settle_barrier 通过 + `failed_reclaim` 累积 = 0 + `active_memory` 漂移 < §1 阈值 + 四轴 verdict 全 passed + `--require-canonical --require-cache-eviction` 接受 rollup
 - 任意一次 swap 触发 watermark→FATAL 即整条 §2 失败
 - **结论字段**：`soak_plus_swap_stability = passed | failed`（独立陈述）
 
@@ -276,8 +276,8 @@
 1. §1 的当前 Mac 路线达到 `interrupted_no_swap_rehearsal = passed` 且 `current_mac_section_1_prerequisite_met = true` 后才启动 §2 native execution；若未来拿到 dedicated host / UPS，`no_swap_soak_stability = passed` 可作为更强证据补充
 2. **§2 失败不撤销 §1 结论**——当前 Mac 的 `interrupted_no_swap_rehearsal = passed` 或 dedicated host / UPS 的 `no_swap_soak_stability = passed` 都作为独立事实保留；但 supported / release gate **不能 graduate**（gate 要求 §1 + §2 同时 passed 且经 §1a Promotion Gate）
 3. §1 与 §2 各自产出**独立 ledger**，不混合（防归因混淆，R14）
-4. **不允许**"§1 §2 合并跑 36h"假装通过 48h；**不允许**"§1 失败重启后接续 §2"——§1 失败时 §2 必须重头
-5. 总占用 ≥48h host 时间，建议夜间 / 周末启动
+4. **不允许**"§1 §2 合并跑"伪造更强结论；**不允许**"§1 失败重启后接续 §2"——§1 失败时 §2 必须重头
+5. 当前 Mac 主线测试必须能在 3-4 小时内执行、审计和归档；超过这个窗口的长时 continuous soak 只能作为 dedicated host 可选增强证据，不是本轮 gate。
 
 #### B-1 supported 晋级条件
 
@@ -288,13 +288,13 @@
 - `B-1c §1 · interrupted_no_swap_rehearsal = passed`（current Mac 的 §2 前置）或 `no_swap_soak_stability = passed`（dedicated host / UPS continuous 更强证据）；任一 §1 结论都不单独 promotion
 - `B-1c · soak_plus_swap_stability = passed`
 
-当前状态：**3/4 前置推进**（B-1a、B-1b、B-1c §1 current-Mac interrupted prerequisite 已过）；B-1c §2 token-boundary / unknown-drop / over-budget-drift 已收窄到 prompt-reset candidate，且 `20260601T025321Z` 首条 gap-free swap-bearing segment 已可计入 interrupted aggregate。仍需再跑 5 个 gap-free 4h fail-fast segments / aggregate ≥24h / swap count ≥6；未进入 supported 晋级判断。
+当前状态：**4/4 evidence present, promotion review pending**（B-1a、B-1b、B-1c §1 current-Mac interrupted prerequisite、B-1c §2 fast-count canonical 均有证据）。`20260603T031832Z` 在 3-4 小时政策窗口内完成 count-canonical 24-swap threshold segment，并由 `--require-canonical --require-cache-eviction` 接受；`20260603T012641Z` 仍保留为 LoRA 资源竞争导致的 diagnostic interrupted artifact。剩余工作不是再跑 24h，而是做 §1a Promotion Gate review，把 B-1c §2 pass 与 B-2 default-off no-header policy 边界分开确认。
 
 加 §1a Promotion Gate + `extraction-inventory.md` §8 → session KV cache 行从 `experimental` 升 `supported`。
 
 #### Campaign B · 其他近期闭环（0–3 月）
 
-- B-2：mainstream prefix-cache compatibility closure（见 `files/goals/owlmlx/mainstream-prefix-cache-compatibility-closure-goal-contract.md` 与 `docs/architect/design/B-2-mainstream-prefix-cache-compatibility-spec.md`）。目标是把 explicit `X-Owlmlx-Session-Id` dogfood/control lane 与 OpenAI/Anthropic-compatible prefix-cache contract 分开：先做 read-only prefix-candidate classifier 与真实 cache metadata 规划，再在 B-1c §2 aggregate 通过后评估自动 safe reuse；**不**要求 OwlCoda/Codex 适配私有 header，**不**实装跨用户共享。
+- B-2：mainstream prefix-cache compatibility closure（见 `files/goals/owlmlx/mainstream-prefix-cache-compatibility-closure-goal-contract.md` 与 `docs/architect/design/B-2-mainstream-prefix-cache-compatibility-spec.md`）。目标是把 explicit `X-Owlmlx-Session-Id` dogfood/control lane 与 OpenAI/Anthropic-compatible prefix-cache contract 分开：B-1c §2 fast-count canonical 已通过后，下一步评估 default-off automatic safe reuse 的 route-level / policy closure；**不**要求 OwlCoda/Codex 适配私有 header，**不**实装跨用户共享。
 - B-3：cache_manager 退出 scaffold-only，按 `release-floor-3-1-cache-scheduler-capability-audit.md` 选 1–2 个 extension point 实装；**不**实装跨用户共享
 - B-4：scheduler_admission 加入 prefill warmup 决策权（与 Campaign C 联动）
 
@@ -400,7 +400,7 @@
 | R10 | OwlCoda 消费就绪 gate 卡顿 | 中 | 中 | §IV.5 已明确"不在主线" |
 | R11 | `server.py` 单文件膨胀 | 高 | 中 | **Wave H 拆分**；H1 已把 OpenAI/Anthropic compat routes 拆到 `server_routes_openai.py`；H2/H3 后续推进；CI 行数 lint |
 | R12 | `llm_router` 被误当主线 | 中 | 高 | §IV.5 transitional；不向 `llm_router` 借入或反向依赖 |
-| R13 | Session KV gate **四条**偏短跑（B-1a + B-1b + B-1c §1 + B-1c §2） | 高 | 极高 | 必须**全部**满足；§1 / §2 独立 ledger；§2 必须 §1 通过后启动；**不允许**合并跑或缩短；B-1c §1 需要 ledger index + wall-clock continuity 双重连续 |
+| R13 | Session KV gate **四条**证据错配（B-1a + B-1b + B-1c §1 + B-1c §2） | 高 | 极高 | 必须**全部**满足；§1 / §2 独立 ledger；§2 必须 §1 通过后启动；**不允许**把 3-4h count-canonical segment 夸大成 continuous 24h，也不允许把历史长时口径继续作为当前 Mac 必跑 gate；B-1c §1 需要 ledger index + wall-clock continuity 双重连续 |
 | R14 | B-1c §2 swap 失败归因混淆 | 中 | 高 | §1 / §2 独立 ledger；§2 失败不回溯 §1；归因清单（swap 触发 vs cache 长跑） |
 | R15 | Wave H 拆迁中 contract 回归未发现 | 中 | 高 | 全套 835 test 强制通过；拆分 PR 分 "move only" / "behavior" 两轮 review |
 

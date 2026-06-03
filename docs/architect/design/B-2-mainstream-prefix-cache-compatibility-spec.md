@@ -1,7 +1,7 @@
 # B-2 Mainstream Prefix-Cache Compatibility Spec
 
-> Status: design-grade spec; B-2.1 classifier, B-2.2 metadata plumbing, and first B-2.3 opt-in automatic prefix slice landed; prompt-only refresh now produces real no-header Qwen27 hits and route-level Qwen27/Qwen35/Gemma31 metadata hits, while broader promotion remains blocked on B-1c §2 canonical 24-swap evidence
-> Updated: 2026-06-02
+> Status: design-grade spec; B-2.1 classifier, B-2.2 metadata plumbing, and first B-2.3 opt-in automatic prefix slice landed; prompt-only refresh now produces real no-header Qwen27 hits and route-level Qwen27/Qwen35/Gemma31 metadata hits. B-1c §2 fast-count canonical evidence is now accepted, so the remaining B-2 blocker is route-level / policy closure, not missing B-1c §2 evidence.
+> Updated: 2026-06-03
 > Campaign: B-2
 > Parent goal:
 > `files/goals/owlmlx/mainstream-prefix-cache-compatibility-closure-goal-contract.md`
@@ -41,13 +41,14 @@ Current verified truth:
   scope only when no explicit session header is present, reuses only classifier
   eligible token-prefix candidates, and falls back to fresh cache with an
   ineligible reason instead of merging unrelated prompts.
-- B-1c section 2 remains blocked for graduation, but not for missing
-  instrumentation. The base gate now requires four count-based axes; the
+- B-1c section 2 now has accepted fast-count canonical evidence. The
   `20260602T095334Z` native threshold smoke passed load, switch, throughput,
-  and cache-breadth/concurrency at 3 swaps with 18 throughput samples and
-  6 cache-breadth entries. It is local threshold evidence only:
-  `canonical_gate.canonical_switch_requirement_met=false` and
-  `graduates.soak_plus_swap_stability=false`.
+  and cache-breadth/concurrency at 3 swaps but remained local threshold
+  evidence only. The follow-up `20260603T031832Z` run passed 24/24 swaps with
+  all four axes, cache eviction observed, drops / expirations / rejects all 0,
+  and `--require-canonical --require-cache-eviction` audit acceptance. This
+  removes B-1c §2 as the B-2.3 blocker, while preserving the `experimental`
+  label.
 - The operator-paused `20260601T074541Z` topoff is not aggregate input: its
   partial ledger reached about 2h18m with zero drops / expirations / rejects,
   but `swap_count=0` and no rollup exists. It cannot unlock B-2.3 because the
@@ -396,8 +397,9 @@ After B-2.3:
   hit is possible through prompt-only refresh, with safe fallback for non-prefix
   prompts; route evidence now extends the no-header OpenAI/Anthropic metadata
   path to Qwen27, Qwen35, and Gemma31. It may claim a broader automatic
-  prefix-cache lane only if B-1c section 2 aggregate stability / policy and
-  wider B-2 compatibility evidence both pass.
+  prefix-cache lane only if the accepted B-1c §2 fast-count evidence is reviewed
+  together with B-2 route-level / policy evidence and the default-off boundary
+  remains explicit.
 
 No stage in this spec independently promotes B-1 to `supported`.
 
@@ -407,9 +409,9 @@ The first B-2.3 code-grade slice has landed, the first Qwen27 no-header real-hit
 blocker has been resolved by prompt-only refresh, and no-header OpenAI/Anthropic
 route evidence now passes on Qwen27, Qwen35, and Gemma31. The next round should
 not run longer passive soaks hoping for a different result; it should decide the
-B-1c aggregate / policy evidence needed for the already-working narrow automatic
-prefix lane, then expand coverage only where the same safety contract can be
-measured.
+B-2 route-level / policy evidence needed for the already-working narrow
+automatic prefix lane, then expand coverage only where the same safety contract
+can be measured.
 
 Immediate handoff:
 
@@ -435,9 +437,9 @@ Immediate handoff:
    `OWLMLX_SESSION_CACHE_AUTO_PREFIX_ENABLED=1`.
 8. Do not treat partial measurement-only ledgers as B-1c section 2 aggregate
    input. The segment must reach its planned swap boundary and produce a rollup.
-9. Refresh this spec when B-1c section 2 either passes the aggregate gate,
-   accepts a revised high-frequency aggregate policy, or produces a new blocker
-   that changes B-2.3 feasibility.
+9. Treat `20260603T031832Z` as the accepted B-1c §2 fast-count canonical
+   evidence, then keep B-2.3 broader claims blocked until route-level / policy
+   closure is reviewed under the default-off safety contract.
 10. Preserve the `20260602T004000Z` blocker as historical evidence only:
     automatic no-header reuse could not produce real `cached_tokens` while
     completion trim returned `0`. The `20260602T011000Z` prompt-only-refresh
@@ -450,8 +452,8 @@ behavior, ineligible requests fall back to fresh cache with an explicit reason,
 and trim-unavailable automatic requests do not retain generated-token-extended
 entries. Route-level Qwen27/Qwen35/Gemma31 evidence proves no-header OpenAI SSE
 and Anthropic SSE metadata hits only when real runtime cache events carry cached
-token counts. Broader claims still require B-1c §2 canonical 24-swap acceptance
-and policy review.
+token counts. Broader claims still require B-2 policy review against the
+accepted B-1c §2 fast-count evidence.
 
 ## 13. Change Log
 
@@ -511,7 +513,7 @@ and policy review.
   `cached_tokens` and Anthropic SSE `cache_read_input_tokens`. These tests prove
   metadata propagation through compatibility surfaces when the backend supplies
   real per-request cache metadata; they do not replace real-model route evidence
-  or B-1c aggregate / policy gates.
+  or B-2 policy review.
 - 2026-06-02: Added and ran the real-model `compat-route-hit` probe. The
   `20260602T015245Z` Qwen27 route run passed on both OpenAI SSE and Anthropic
   SSE without `X-Owlmlx-Session-Id`, with cached-token counts surfaced from
@@ -520,7 +522,7 @@ and policy review.
   (`20260602T015559Z`). Both passed on OpenAI SSE and Anthropic SSE without
   `X-Owlmlx-Session-Id`, with one cached-token hit per surface and drops /
   expirations / rejects all `0`. This closes the three-primary-model route
-  evidence gap, not the B-1c aggregate / policy gate.
+  evidence gap, not the B-2 policy review.
 - 2026-06-02: Added B-1c §2 throughput / cache-breadth harness support in
   `scripts/bench/eviction_soak.py`. The runner can now record per-sample
   throughput and expanded prompt-entry breadth, and it can judge those axes only
@@ -548,3 +550,8 @@ and policy review.
   `20260602T095334Z` native threshold smoke. The smoke passed all four
   configured axes at 3 swaps but remains below the canonical 24-swap floor, so
   B-2.3 remains `experimental` and default-off.
+- 2026-06-03: Updated B-2 after `20260603T031832Z` passed B-1c §2
+  fast-count canonical acceptance with 24/24 swaps, all four axes passed, cache
+  eviction observed, and `--require-canonical --require-cache-eviction` audit
+  accepted. The remaining B-2 blocker is now route-level / policy closure, not
+  missing B-1c §2 evidence.

@@ -2,7 +2,7 @@
 
 > **Gate**: Campaign B-1c section 2 · Session KV cache soak plus model swap
 > **Layer**: design-grade, downstream of `docs/architect/01-mainline-roadmap.md`
-> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed and prompt-reset bounded windows produced one aggregate-eligible 4h / 1-swap segment (`20260601T025321Z`). The later 5-minute-cadence forced-swap canaries proved swap boundaries stay clean. Direct cache-object resident accounting (`cache_object_nbytes`) now explains the Gemma raw same-model load-epoch drift (`751370240` bytes raw drift; `1054965760` resident bytes; same-model unaccounted drift `0`), so §2 is no longer blocked on the raw-RSS drift false-fail. On 2026-06-02 the base §7 bar was re-founded on counts across four independent axes: load, throughput, switch, concurrency. Duration is now a reported byproduct, not a pass gate. The current runner can now emit throughput-decay and cache-breadth/concurrency axis observations behind explicit thresholds. The first short native threshold smoke (`20260602T095334Z`) passed all four axes at 3 swaps, but canonical graduation remains blocked until the 24-swap floor is met; see §7 and §11.
+> **Status**: design-grade spec + native §2 runner landed; token-boundary cache drops closed and prompt-reset bounded windows produced one aggregate-eligible 4h / 1-swap segment (`20260601T025321Z`). The later 5-minute-cadence forced-swap canaries proved swap boundaries stay clean. Direct cache-object resident accounting (`cache_object_nbytes`) now explains the Gemma raw same-model load-epoch drift (`751370240` bytes raw drift; `1054965760` resident bytes; same-model unaccounted drift `0`), so §2 is no longer blocked on the raw-RSS drift false-fail. On 2026-06-02 the base §7 bar was re-founded on counts across four independent axes: load, throughput, switch, concurrency. Duration is now a reported byproduct, not a pass gate. The current runner can emit throughput-decay and cache-breadth/concurrency axis observations behind explicit thresholds. The 2026-06-03 native fast-count segment (`20260603T031832Z`) passed the canonical 24-swap floor with all four axes passed and cache eviction observed; this is count-based fast-cadence evidence inside the bounded current-Mac policy, not a continuous 24h soak. See §7 and §11.
 > **Capability label**: Session KV cache remains `experimental`
 
 ## 1. Purpose
@@ -23,13 +23,20 @@ result must not be used to hide a missing or failed §1 result.
 
 Do not run section 2 until one of these is true:
 
-- current Mac route: B-1c §1 has `interrupted_no_swap_rehearsal = passed` with
-  cumulative clean native segments >= 24h
-- stronger dedicated-host route: B-1c §1 has `no_swap_soak_stability = passed`
+- current Mac route: B-1c §1 has accepted bounded prerequisite evidence, as
+  already recorded by `interrupted_no_swap_rehearsal = passed` and
+  `current_mac_section_1_prerequisite_met = true`
+- stronger dedicated-host route: B-1c §1 has optional
+  `no_swap_soak_stability = passed`
 
 The current Mac / laptop route is expected to be operator-interruptible. Section
 2 should follow the same principle: explicit segment boundaries are allowed;
 hidden wall-clock gaps inside a segment are not.
+
+Do not schedule a new continuous 24h current-Mac test as a prerequisite for
+§2. Current-Mac §2 evidence must be a bounded, auditable segment that can be
+started, monitored, stopped if resources collide, and reviewed inside a 3-4 hour
+operator window.
 
 ## 3. Scope
 
@@ -88,6 +95,8 @@ The current count-based base shape is:
 - reported duration byproduct: about `7200s` for 24 swaps at 5-minute cadence
 - required segment rule: each segment remains wall-clock continuous and records
   exact swap boundaries
+- operator window: design each current-Mac segment to finish within 3-4 hours;
+  longer continuous soak is not the current gate
 
 Duration still appears in ledgers because it helps interpret host conditions and
 swap cadence. It no longer makes a clean run pass by itself, and it no longer
@@ -859,8 +868,9 @@ measured but remains `blocked`.
 4. **Run segments only in confirmed-awake windows**, aggregate via the §2
    interrupted route (each segment internally gap-free; segment *boundaries* are
    allowed). Prefer 5-minute swap cadence over long single-swap waits.
-5. **Dedicated always-on host** is the clean long-term route; a shared personal
-   Mac is not a reliable 24h-soak measurement environment.
+5. **Dedicated always-on host** can provide optional stronger long-term soak
+   evidence, but it is not the current B-1c §2 gate. A shared personal Mac is
+   not a reliable 24h-soak measurement environment.
 6. Do **not** relax the per-segment gap-free requirement; the fix is keeping the
    machine awake during measured windows, not tolerating hidden gaps.
 7. Run the updated harness before claiming §2 pass: configure a
@@ -951,10 +961,13 @@ trim-eviction counters are observed. The no-MLX regression coverage in
 
 The default behavior remains conservative: if thresholds are absent, the axes
 are recorded but stay `blocked` with explicit reasons. This update creates the
-next native evidence path. The `20260602T095334Z` threshold smoke proves the
-path can produce four-axis native evidence, but it remains below the canonical
-24-swap graduation floor and does not change the `experimental` capability
-label.
+native evidence path. The `20260602T095334Z` threshold smoke proved the path can
+produce four-axis native evidence, but it stayed below the canonical 24-swap
+floor. The follow-up `20260603T031832Z` run reached 24/24 swaps, passed all four
+axes, observed cache eviction pressure, and was accepted by
+`session_kv_soak_audit.py --require-canonical --require-cache-eviction`; it
+changes the §2 evidence state, but does not change the `experimental`
+capability label by itself.
 
 `scripts/bench/session_kv_soak_audit.py --require-canonical` is the offline
 promotion guard for B-1c §2 evidence. It works on segment / aggregate rollups,
@@ -978,3 +991,30 @@ partial ledger. Interrupted rollups must stay `blocked`, set
 `graduates.soak_plus_swap_stability=false`. The operator-paused
 `20260602T095953Z` and `20260602T100243Z` ledgers predate this protection and
 are diagnostic partial ledgers only, not pass or aggregate evidence.
+
+### 2026-06-03 canonical fast-count acceptance
+
+`20260603T031832Z` is the first clean count-canonical native §2 evidence under
+the bounded current-Mac policy:
+
+- rollup:
+  `files/evidence/owlmlx/bench/session-kv-soak/20260603T031832Z-b1c2-qwen-gemma-qwen35-canonical-threshold-fast-count-soak-swap-rollup.jsonl`
+- ledger:
+  `files/evidence/owlmlx/bench/session-kv-soak/20260603T031832Z-b1c2-qwen-gemma-qwen35-canonical-threshold-fast-count-soak-swap.jsonl`
+- `canonical_gate.required_swap_count=24`
+- `canonical_gate.observed_swap_count=24`
+- `canonical_gate.canonical_switch_requirement_met=true`
+- `soak_plus_swap_stability=passed`
+- axis verdicts: load, throughput, switch, concurrency all `passed`
+- throughput decay: `relative_decay=0.2431881471775777` against `0.30`
+- cache breadth: 6 prompt entries, canonical short / medium / long complete
+- cache pressure: `session_cache_evictions_total=2`,
+  `cache_eviction_observed=true`
+- cache health: drops / expirations / rejects all `0`
+- audit:
+  `uv run python scripts/bench/session_kv_soak_audit.py --segment-rollup <rollup> --require-canonical --require-cache-eviction --json`
+  returned `canonical_acceptance_status=canonical_passed`.
+
+This pass is a count-based fast-cadence §2 pass. It must not be restated as a
+continuous 24h soak and it must not promote Session KV cache to `supported`
+without the separate §1a Promotion Gate review.

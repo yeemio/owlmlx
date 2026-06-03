@@ -1,7 +1,7 @@
 # owlmlx Goal Contract: Mainstream Prefix-Cache Compatibility Closure
 
 > Status: active goal contract
-> Updated: 2026-06-02 after B-2.3 prompt-only refresh real-hit probe
+> Updated: 2026-06-03 after B-1c §2 fast-count canonical acceptance
 
 ## goal_id
 
@@ -110,9 +110,11 @@ missing primitive precisely. Do not reframe the private header as the solution.
   `session_kv_cache.cached_prompt_tokens` metadata for the current request.
 - `/v1/runtime/session-kv-cache` remains the diagnostic truth surface for the
   explicit session lane.
-- B-1c section 2 has clean load/switch evidence, but the base gate has been
-  re-founded on four count-based axes: load, throughput, switch, concurrency.
-  Duration is now a reported byproduct, not the pass bar.
+- B-1c section 2 has accepted fast-count canonical evidence under the
+  four-axis gate. `20260603T031832Z` passed 24/24 swaps, load / throughput /
+  switch / concurrency, cache eviction pressure, and independent
+  `--require-canonical --require-cache-eviction` audit acceptance. Duration is
+  a reported byproduct, not the pass bar.
 - The 2026-06-01 `20260601T074541Z` topoff was operator-paused before the
   planned 4h / 1-swap boundary. Its ledger reached `last_elapsed_s=8298.33`
   with zero drops / expirations / rejects and `max_drift_bytes=171704320`, but
@@ -174,9 +176,9 @@ missing primitive precisely. Do not reframe the private header as the solution.
   `measurement_wall_clock_gap_free=true`, drops / expirations / rejects all `0`,
   `max_same_model_load_epoch_drift_bytes=60620800`,
   `max_session_cache_resident_bytes=364216320`) and audit reports
-  `clean_for_interrupted_aggregate=true`; it remains `blocked` because the
-  current §2 runner still under-measures throughput decay and concurrency
-  breadth.
+  `clean_for_interrupted_aggregate=true`; it remains historical safety evidence
+  because the later `20260603T031832Z` segment is the accepted canonical
+  four-axis §2 evidence.
 - Route-level OpenAI and Anthropic streaming tests now prove that ordinary
   no-header compatibility requests can receive cached-token usage when backend
   stream events carry real per-request `session_kv_cache.cached_prompt_tokens`
@@ -194,10 +196,10 @@ missing primitive precisely. Do not reframe the private header as the solution.
 
 ## remaining_gaps
 
-1. B-1c section 2 still needs four-axis evidence: load/switch are countable, but
-   throughput decay and concurrency breadth are under-measured. The operator-
-   paused `20260601T074541Z` ledger does not reduce this gap because it ended
-   before any swap boundary and measured neither missing axis.
+1. B-1c section 2 no longer blocks B-2 on missing canonical evidence:
+   `20260603T031832Z` supplies the fast-count canonical pass. Do not turn this
+   into a continuous-24h requirement and do not promote B-2.3 solely from this
+   B-1c evidence.
 2. The immediate false blocker is closed: raw 751MB Gemma same-model drift is
    accepted only when direct `cache_object_nbytes` resident working-set
    accounting is available, resident cache bytes stay within budget, and
@@ -215,29 +217,24 @@ missing primitive precisely. Do not reframe the private header as the solution.
 5. The explicit `X-Owlmlx-Session-Id` lane is no longer the only physical reuse
    path, but it remains the dogfood/control lane and must not be presented as
    the mainstream consumer contract.
-6. Source-of-truth docs must continue to distinguish three separate facts:
+6. B-2.3 still needs route-level / policy closure for any broader claim beyond
+   the narrow default-off native-streaming implementation.
+7. Source-of-truth docs must continue to distinguish three separate facts:
    classifier diagnostics, compatibility-visible real cached-token accounting,
    and actual automatic reuse.
 
 ## dominant_next_gap
 
-`B-1c-section-2-high-frequency-swap-aggregate-policy-for-B-2.3`
+`B-2-post-B-1c-route-level-policy-closure`
 
-The next executable closure is not another consumer-side adapter and not F-3
-runtime work. B-2.1, B-2.2, and the first B-2.3 automatic slice are already
-landed. The remaining closure has two concrete blockers:
+The next executable closure is not another consumer-side adapter and not another
+B-1c soak. B-2.1, B-2.2, the first B-2.3 automatic slice, Qwen27 no-header
+real-hit evidence, and Qwen27/Qwen35/Gemma31 route-level metadata evidence are
+already landed. With B-1c §2 now accepted, the remaining implementation/evidence
+gap is a B-2 policy review: confirm the default-off route-level claim ceiling,
+re-run the offline ledger audits, and decide whether the narrow automatic prefix
+lane can be described as a verified experimental B-2.3 slice without broadening
+to supported/default-on/cross-user reuse.
 
-1. B-1c section 2 count-based evidence is still required for any broader
-   stability claim. Do not run another passive 4h topoff with one switch. Keep
-   the 5-minute cadence for switch stress, but add throughput-decay sampling and
-   breadth/concurrency pressure so the two previously empty axes are measured.
-2. The prior real-hit blocker
-   (`auto_prefix_completion_trim_unavailable` on Qwen27) is resolved by
-   prompt-only refresh. Route-level tests now cover OpenAI/Anthropic streaming
-   metadata propagation without a private session header, and real-model route
-   evidence now passes for Qwen27, Qwen35, and Gemma31 on OpenAI SSE and
-   Anthropic SSE. The remaining implementation/evidence gap is B-1c aggregate /
-   policy coverage under the same narrow safety contract, not another
-   consumer-side private-header adapter.
-
-Keep B-2.3 broader promotion blocked until both blockers are honestly resolved.
+Keep B-2.3 broader promotion blocked until that policy closure is honestly
+resolved.
