@@ -234,6 +234,48 @@ def test_native_backend_generate_succeeds_with_fake_mlx_lm(
         importlib.reload(mod)
 
 
+def test_native_backend_generate_populates_usage_token_counts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Regression for "non-stream has no usage": the non-streaming generate() must
+    # return prompt_tokens (exact) + completion_tokens (best-effort re-encode) so
+    # the OpenAI/Anthropic routes can emit a usage block.
+    fake = types.ModuleType("mlx_lm")
+
+    class FakeTokenizer:
+        bos_token = None
+
+        def encode(self, text, add_special_tokens=True):  # type: ignore[no-untyped-def]
+            _ = add_special_tokens
+            return [ord(ch) for ch in text]
+
+    def fake_load(model_id: str) -> tuple[object, object]:
+        return (object(), FakeTokenizer())
+
+    def fake_generate(model, tokenizer, *, prompt, max_tokens):  # type: ignore[no-untyped-def]
+        return "ABCD"
+
+    fake.load = fake_load  # type: ignore[attr-defined]
+    fake.generate = fake_generate  # type: ignore[attr-defined]
+    previous_mlx_lm = sys.modules.get("mlx_lm")
+    monkeypatch.setitem(sys.modules, "mlx_lm", fake)
+    import owlmlx.runtime.mlx_native_backend as mod
+    importlib.reload(mod)
+    try:
+        backend = mod.MlxNativeBackend()
+        backend.load("fake-model")
+        result = backend.generate("fake-model", "hello", max_tokens=8)
+        assert result.ok is True
+        assert result.prompt_tokens == 5  # len("hello"), exact via _encode_prompt_tokens
+        assert result.completion_tokens == 4  # len("ABCD"), best-effort re-encode
+    finally:
+        if previous_mlx_lm is None:
+            sys.modules.pop("mlx_lm", None)
+        else:
+            sys.modules["mlx_lm"] = previous_mlx_lm
+        importlib.reload(mod)
+
+
 def _force_tool() -> list[dict[str, object]]:
     return [
         {

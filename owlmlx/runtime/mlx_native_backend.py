@@ -267,6 +267,24 @@ def _encode_prompt_tokens(tokenizer: Any, prompt: str) -> tuple[int, ...] | None
         return None
 
 
+def _count_output_tokens(tokenizer: Any, text: str) -> int | None:
+    """Best-effort completion-token count by re-encoding the output text.
+
+    The non-streaming ``mlx_lm.generate`` returns only text, so the exact
+    generated-token count is not available on this path; the streaming path
+    remains the exact completion-count source. Re-encoding is exact for typical
+    completions (encode∘decode round-trips) and must never raise into generation.
+    """
+    try:
+        try:
+            encoded = tokenizer.encode(text, add_special_tokens=False)
+        except TypeError:
+            encoded = tokenizer.encode(text)
+        return len(encoded)
+    except Exception:
+        return None
+
+
 def _tools_requested(tools: object | None) -> bool:
     return isinstance(tools, list) and bool(tools)
 
@@ -1492,6 +1510,13 @@ class MlxNativeBackend:
         if parsed_tool_calls.tool_calls:
             detail["tool_calls"] = parsed_tool_calls.tool_calls
             finish_reason = "tool_calls"
+        # Non-streaming usage: prompt count is exact (same encoder the streaming
+        # path uses); completion count is a best-effort re-encode of the output
+        # because mlx_lm.generate returns only text (the streaming path remains
+        # the exact completion-count source). Counting never breaks generation.
+        prompt_token_ids = _encode_prompt_tokens(session.tokenizer, prompt)
+        prompt_tokens = len(prompt_token_ids) if prompt_token_ids is not None else None
+        completion_tokens = _count_output_tokens(session.tokenizer, str(text))
         return GenerateResult(
             ok=True,
             message="generated",
@@ -1502,6 +1527,8 @@ class MlxNativeBackend:
             execution_time_s=time.time() - started,
             wait_time_s=wait_time_s,
             was_queued=was_queued,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
         )
 
     def generate_messages(
