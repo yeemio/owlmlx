@@ -284,6 +284,31 @@ def test_openai_stream_no_header_auto_prefix_hit_maps_cached_tokens() -> None:
     )
 
 
+def test_openai_stream_without_cache_hit_still_emits_usage() -> None:
+    # F4: streaming usage must be emitted whenever token counts exist, not only
+    # on a cache hit. The first (no-cache) request previously emitted NO usage
+    # because the done branch gated on `cached_prompt_tokens is not None`.
+    client, _backend = _client_with_no_header_auto_prefix_backend()
+
+    first = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "fake-model",
+            "messages": [{"role": "user", "content": "no cache here"}],
+            "stream": True,
+            "max_tokens": 1,
+        },
+    )
+
+    assert first.status_code == 200
+    payloads = _sse_json_payloads(first.text)
+    usage_chunks = [p["usage"] for p in payloads if "usage" in p]
+    assert usage_chunks, "streaming must emit usage even without a cache hit"
+    assert usage_chunks[-1]["prompt_tokens"] == len("user: no cache here".split())
+    # No cache hit -> no cached_tokens detail, but prompt/completion still present.
+    assert "prompt_tokens_details" not in usage_chunks[-1]
+
+
 def test_anthropic_stream_no_header_auto_prefix_hit_maps_cache_read_tokens() -> None:
     client, backend = _client_with_no_header_auto_prefix_backend()
 

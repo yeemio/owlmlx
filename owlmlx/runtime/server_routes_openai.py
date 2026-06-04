@@ -1068,7 +1068,10 @@ def register_openai_compat_routes(
                         ],
                     }
                     cached_prompt_tokens = _compat_cached_prompt_tokens(event.detail)
-                    if cached_prompt_tokens is not None:
+                    if (
+                        event.prompt_tokens is not None
+                        or event.completion_tokens is not None
+                    ):
                         chunk["usage"] = _openai_usage_dict(
                             prompt_tokens=event.prompt_tokens,
                             completion_tokens=event.completion_tokens,
