@@ -330,6 +330,10 @@ B-2.1 tests:
 B-2.2 tests:
 
 - OpenAI non-stream usage remains unchanged when no cache metadata exists;
+  - ⚠️ Superseded 2026-06-04: non-stream `generate` now **always** emits
+    `usage.prompt_tokens`/`completion_tokens` (native `ca1c97da`, subprocess
+    `d905c2f6`). This B-2.2 line described B-2's own scope (B-2 did not add
+    non-stream usage), not the current runtime behavior.
 - OpenAI usage includes `prompt_tokens_details.cached_tokens` when a real hit is
   reported;
 - Anthropic usage uses real `cache_read_input_tokens`;
