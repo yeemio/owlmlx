@@ -63,7 +63,7 @@
 | Gate | Spec | 状态 | Plan-grade 来源 |
 |---|---|---|---|
 | **R0** | [`R0-replacement-rebaseline-spec.md`](R0-replacement-rebaseline-spec.md) | ✅ done · verdict landed `180df57f`（[`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md)）| [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) 下阶段主线声明 + Runtime-12 §7 |
-| **R4** (Phase 1) | [`R4-ops-cutover-spec.md`](R4-ops-cutover-spec.md) | design-grade · brainstorming-approved 2026-06-03 · pending user spec review；readiness + 受控 smoke，不翻默认 / 不 claim replacement | [`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md) §5（R4）|
+| **R4** (Phase 1) | [`R4-ops-cutover-spec.md`](R4-ops-cutover-spec.md) · plan + runbook | ✅ **pilot PASSED 2026-06-04** · spec/plan/harness (`scripts/replacement/`, 24 tests) all pushed；live `OwlCoda→owlmlx→Qwen35` controlled smoke `passed` (`da6f35e3`) → [`r4-phase1-pilot-closeout.md`](../../source-of-truth/r4-phase1-pilot-closeout.md)；不翻默认 / 不 sustained / promotes nothing / verdict 仍 not-yet | [`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md) §5（R4）|
 
 ---
 

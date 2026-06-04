@@ -6,6 +6,8 @@
 > Spec: `docs/architect/design/R0-replacement-rebaseline-spec.md`
 > Plan-grade 来源: `docs/architect/01-mainline-roadmap.md`「下阶段主线声明（替代收口）」; Runtime-12 §7 ("Runtime-13 = actual replacement work")
 > Evidence priority (every finding): current source-of-truth doc → capability matrix → real tests/evidence ledger → current code path → commit (provenance only).
+>
+> **Update 2026-06-04 — R4 Phase-1 controlled pilot PASSED** (see [`r4-phase1-pilot-closeout.md`](r4-phase1-pilot-closeout.md), evidence `da6f35e3`): blocker ④ / gap 5 below move ⛔→◐ — first controlled owlmlx-only customer evidence; **not** a default cutover, **not** sustained, promotes nothing — verdict stays `not yet replaceable`. The §3 / §4 cells below are 2026-06-03 point-in-time; the closeout is current for ④ / gap 5.
 
 ---
 
