@@ -1,0 +1,701 @@
+{
+  "honesty_note": "A `passed` verdict means this ONE controlled pilot session met its gates. It does NOT claim replacement complete, does NOT flip any default, and promotes NO capability. The replacement verdict stays `not yet replaceable`.",
+  "kind": "readiness",
+  "probes": {
+    "healthz": {
+      "body": {
+        "active_model_id": null,
+        "backend_error": null,
+        "backend_name": "mlx-native",
+        "child_health": {},
+        "contract": {
+          "surface": "owlmlx.healthz",
+          "version": "stabilization1"
+        },
+        "model_count": 0,
+        "ok": true,
+        "persistent_child": false,
+        "readiness": "degraded",
+        "runtime": "owlmlx"
+      },
+      "status": 200
+    },
+    "model_visibility": {
+      "body": {
+        "blocked_model_ids": [
+          "Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+          "Qwen3.5-35B-A3B-4bit",
+          "gpt-oss-20b-MXFP4-Q4",
+          "Qwen3-Embedding-8B-4bit-DWQ"
+        ],
+        "contract_version": "runtime-owned-2",
+        "diagnostic_surface": {
+          "component": "owlmlx",
+          "endpoint": "/v1/runtime/model-visibility",
+          "role": "diagnostic",
+          "shape": "owlmlx.runtime.model_visibility"
+        },
+        "distinct_from_loaded_inventory": {
+          "loaded_model_ids": [],
+          "reason": "loaded inventory tracks active backend state; visibility tracks owlmlx-registered local models that are loadable on demand."
+        },
+        "distinct_from_platform_rule": {
+          "platform_rule": "gate_required_before_visible",
+          "platform_surface": {
+            "component": "llm_router",
+            "endpoint": "/v1/models"
+          },
+          "reason": "owlmlx visibility no longer depends on router-owned lifecycle curation or platform gate files; it is derived from owlmlx registration plus base-model artifact presence."
+        },
+        "entries": [
+          {
+            "block_reason": "base_model_directory_missing",
+            "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit/config.json",
+            "config_present": false,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+            "local_model_dir_present": false,
+            "model_id": "Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+            "registered": true,
+            "tier": "default",
+            "visible": false
+          },
+          {
+            "block_reason": "base_model_directory_missing",
+            "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit/config.json",
+            "config_present": false,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit",
+            "local_model_dir_present": false,
+            "model_id": "Qwen3.5-35B-A3B-4bit",
+            "registered": true,
+            "tier": "default",
+            "visible": false
+          },
+          {
+            "block_reason": null,
+            "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B/config.json",
+            "config_present": true,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B",
+            "local_model_dir_present": true,
+            "model_id": "Qwen3.6-27B",
+            "registered": true,
+            "tier": "default",
+            "visible": true
+          },
+          {
+            "block_reason": null,
+            "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B/config.json",
+            "config_present": true,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B",
+            "local_model_dir_present": true,
+            "model_id": "Qwen3.6-35B-A3B",
+            "registered": true,
+            "tier": "default",
+            "visible": true
+          },
+          {
+            "block_reason": null,
+            "config_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it/config.json",
+            "config_present": true,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+            "local_model_dir_present": true,
+            "model_id": "gemma-4-31B-it",
+            "registered": true,
+            "tier": "default",
+            "visible": true
+          },
+          {
+            "block_reason": "base_model_directory_missing",
+            "config_path": "/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4/config.json",
+            "config_present": false,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4",
+            "local_model_dir_present": false,
+            "model_id": "gpt-oss-20b-MXFP4-Q4",
+            "registered": true,
+            "tier": "default",
+            "visible": false
+          },
+          {
+            "block_reason": "base_model_directory_missing",
+            "config_path": "/Users/yeemio/AI/Agent/models/Qwen3-Embedding-8B-4bit-DWQ/config.json",
+            "config_present": false,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3-Embedding-8B-4bit-DWQ",
+            "local_model_dir_present": false,
+            "model_id": "Qwen3-Embedding-8B-4bit-DWQ",
+            "registered": true,
+            "tier": "default",
+            "visible": false
+          },
+          {
+            "block_reason": null,
+            "config_path": "/Users/yeemio/AI/Agent/models/../model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ/config.json",
+            "config_present": true,
+            "local_model_dir": "/Users/yeemio/AI/Agent/models/../model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ",
+            "local_model_dir_present": true,
+            "model_id": "DeepSeek-V4-Flash-2bit-DQ",
+            "registered": true,
+            "tier": "technical_preview",
+            "visible": true
+          }
+        ],
+        "formal_surface": {
+          "component": "owlmlx",
+          "endpoint": "/v1/openai/models",
+          "role": "authoritative",
+          "shape": "openai.model.list"
+        },
+        "gate": {
+          "kind": "registered_base_model_config_present",
+          "models_root": "/Users/yeemio/AI/Agent/models",
+          "owner": "owlmlx",
+          "required_artifact": "{model-id}/config.json"
+        },
+        "loaded_inventory_surface": {
+          "component": "owlmlx",
+          "endpoint": "/v1/models",
+          "semantic_role": "currently_loaded_inventory_only",
+          "shape": "owlmlx.runtime.inventory"
+        },
+        "model_count": 3,
+        "registered_model_count": 8,
+        "rule": "runtime_gate_required_before_visible",
+        "surface": "owlmlx.runtime.model_visibility",
+        "technical_preview_model_count": 1,
+        "technical_preview_visible_model_ids": [
+          "DeepSeek-V4-Flash-2bit-DQ"
+        ],
+        "visible_model_ids": [
+          "Qwen3.6-27B",
+          "Qwen3.6-35B-A3B",
+          "gemma-4-31B-it"
+        ],
+        "visible_when": {
+          "base_model_config_present": true,
+          "base_model_directory_present": true,
+          "registered_in_owlmlx_visibility_registry": true
+        }
+      },
+      "status": 200
+    },
+    "monitor": {
+      "body": {
+        "backend": {
+          "backend_error": null,
+          "backend_name": "mlx-native",
+          "child_health": {},
+          "healthy": true,
+          "last_failure_class": null,
+          "loaded_models": [
+            {
+              "backend": "mlx-native",
+              "loaded_at": 1780560048.797295,
+              "memory_gb": 71.927,
+              "model_id": "Qwen3.6-35B-A3B"
+            }
+          ],
+          "persistent_child": false,
+          "unsupported_fields": [
+            "process_identity"
+          ]
+        },
+        "contract": {
+          "surface": "owlmlx.runtime.monitor.snapshot",
+          "version": "v1"
+        },
+        "models": {
+          "active_model_id": "Qwen3.6-35B-A3B",
+          "loaded_models": [
+            {
+              "backend": "mlx-native",
+              "loaded_at": 1780560048.797295,
+              "memory_gb": 71.927,
+              "model_id": "Qwen3.6-35B-A3B"
+            }
+          ],
+          "model_count": 1,
+          "model_load_admission_summary": {
+            "decision_counts": {
+              "already_loaded": 1,
+              "blocked": 4,
+              "unknown": 3
+            },
+            "entry_count": 8,
+            "ledger_status": "not_connected",
+            "status": "partial",
+            "supported_budget_projections": [
+              "fits",
+              "fits_warning",
+              "exceeds",
+              "already_loaded",
+              "unknown"
+            ],
+            "supported_decisions": [
+              "admit",
+              "warn",
+              "blocked",
+              "already_loaded",
+              "unknown"
+            ],
+            "target_model_id": null
+          },
+          "model_visibility": {
+            "blocked_model_ids": [
+              "Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+              "Qwen3.5-35B-A3B-4bit",
+              "gpt-oss-20b-MXFP4-Q4",
+              "Qwen3-Embedding-8B-4bit-DWQ"
+            ],
+            "contract_version": "runtime-owned-2",
+            "diagnostic_surface": {
+              "component": "owlmlx",
+              "endpoint": "/v1/runtime/model-visibility",
+              "role": "diagnostic",
+              "shape": "owlmlx.runtime.model_visibility"
+            },
+            "distinct_from_loaded_inventory": {
+              "loaded_model_ids": [
+                "Qwen3.6-35B-A3B"
+              ],
+              "reason": "loaded inventory tracks active backend state; visibility tracks owlmlx-registered local models that are loadable on demand."
+            },
+            "distinct_from_platform_rule": {
+              "platform_rule": "gate_required_before_visible",
+              "platform_surface": {
+                "component": "llm_router",
+                "endpoint": "/v1/models"
+              },
+              "reason": "owlmlx visibility no longer depends on router-owned lifecycle curation or platform gate files; it is derived from owlmlx registration plus base-model artifact presence."
+            },
+            "entries": [
+              {
+                "block_reason": "base_model_directory_missing",
+                "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit/config.json",
+                "config_present": false,
+                "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+                "local_model_dir_present": false,
+                "model_id": "Qwen3.5-27B-Claude-4.6-Opus-Distilled-MLX-4bit",
+                "registered": true,
+                "tier": "default",
+                "visible": false
+              },
+              {
+                "block_reason": "base_model_directory_missing",
+                "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit/config.json",
+                "config_present": false,
+                "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.5-35B-A3B-4bit",
+                "local_model_dir_present": false,
+                "model_id": "Qwen3.5-35B-A3B-4bit",
+                "registered": true,
+                "tier": "default",
+                "visible": false
+              },
+              {
+                "block_reason": null,
+                "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B/config.json",
+                "config_present": true,
+                "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-27B",
+                "local_model_dir_present": true,
+                "model_id": "Qwen3.6-27B",
+                "registered": true,
+                "tier": "default",
+                "visible": true
+              },
+              {
+                "block_reason": null,
+                "config_path": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B/config.json",
+                "config_present": true,
+                "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3.6-35B-A3B",
+                "local_model_dir_present": true,
+                "model_id": "Qwen3.6-35B-A3B",
+                "registered": true,
+                "tier": "default",
+                "visible": true
+              },
+              {
+                "block_reason": null,
+                "config_path": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it/config.json",
+                "config_present": true,
+                "local_model_dir": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it",
+                "local_model_dir_present": true,
+                "model_id": "gemma-4-31B-it",
+                "registered": true,
+                "tier": "default",
+                "visible": true
+              },
+              {
+                "block_reason": "base_model_directory_missing",
+                "config_path": "/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4/config.json",
+                "config_present": false,
+                "local_model_dir": "/Users/yeemio/AI/Agent/models/gpt-oss-20b-MXFP4-Q4",
+                "local_model_dir_present": false,
+                "model_id": "gpt-oss-20b-MXFP4-Q4",
+                "registered": true,
+                "tier": "default",
+                "visible": false
+              },
+              {
+                "block_reason": "base_model_directory_missing",
+                "config_path": "/Users/yeemio/AI/Agent/models/Qwen3-Embedding-8B-4bit-DWQ/config.json",
+                "config_present": false,
+                "local_model_dir": "/Users/yeemio/AI/Agent/models/Qwen3-Embedding-8B-4bit-DWQ",
+                "local_model_dir_present": false,
+                "model_id": "Qwen3-Embedding-8B-4bit-DWQ",
+                "registered": true,
+                "tier": "default",
+                "visible": false
+              },
+              {
+                "block_reason": null,
+                "config_path": "/Users/yeemio/AI/Agent/models/../model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ/config.json",
+                "config_present": true,
+                "local_model_dir": "/Users/yeemio/AI/Agent/models/../model-candidates/mlx-community/DeepSeek-V4-Flash-2bit-DQ",
+                "local_model_dir_present": true,
+                "model_id": "DeepSeek-V4-Flash-2bit-DQ",
+                "registered": true,
+                "tier": "technical_preview",
+                "visible": true
+              }
+            ],
+            "formal_surface": {
+              "component": "owlmlx",
+              "endpoint": "/v1/openai/models",
+              "role": "authoritative",
+              "shape": "openai.model.list"
+            },
+            "gate": {
+              "kind": "registered_base_model_config_present",
+              "models_root": "/Users/yeemio/AI/Agent/models",
+              "owner": "owlmlx",
+              "required_artifact": "{model-id}/config.json"
+            },
+            "loaded_inventory_surface": {
+              "component": "owlmlx",
+              "endpoint": "/v1/models",
+              "semantic_role": "currently_loaded_inventory_only",
+              "shape": "owlmlx.runtime.inventory"
+            },
+            "model_count": 3,
+            "registered_model_count": 8,
+            "rule": "runtime_gate_required_before_visible",
+            "surface": "owlmlx.runtime.model_visibility",
+            "technical_preview_model_count": 1,
+            "technical_preview_visible_model_ids": [
+              "DeepSeek-V4-Flash-2bit-DQ"
+            ],
+            "visible_model_ids": [
+              "Qwen3.6-27B",
+              "Qwen3.6-35B-A3B",
+              "gemma-4-31B-it"
+            ],
+            "visible_when": {
+              "base_model_config_present": true,
+              "base_model_directory_present": true,
+              "registered_in_owlmlx_visibility_registry": true
+            }
+          },
+          "visible_model_ids": [
+            "Qwen3.6-27B",
+            "Qwen3.6-35B-A3B",
+            "gemma-4-31B-it"
+          ]
+        },
+        "recovery": {
+          "load_failure": {
+            "events": [],
+            "total_event_count": 0,
+            "unresolved_event_count": 0
+          },
+          "reclaim_barrier": {
+            "events": [],
+            "total_event_count": 0,
+            "unresolved_event_count": 0
+          },
+          "restartability": {
+            "active_model_id": "Qwen3.6-35B-A3B",
+            "auto_restart_dead_session": false,
+            "restart_exhausted_models": [],
+            "restartable_models": []
+          },
+          "termination_recovery": {
+            "status": "unsupported"
+          }
+        },
+        "release_candidates": {
+          "history_count": 0,
+          "latest_by_model": {},
+          "latest_model_count": 0,
+          "latest_records": [],
+          "ledger_path": null,
+          "ledger_status": "not_connected",
+          "truth_level": "unsupported"
+        },
+        "resources": {
+          "available_gb": 44.07,
+          "budget": {
+            "available_gb": 44.07,
+            "currently_loaded_gb": 71.93,
+            "serving_budget_gb": 116.0,
+            "system_memory_gb": 128.0,
+            "system_reserve_gb": 12.0,
+            "utilization": 0.62,
+            "warning_threshold_gb": 100.0
+          },
+          "cooldown": {
+            "active": false,
+            "cooldown_until_s": null,
+            "policy": "metal_oom_child_loss_cooldown",
+            "reason_code": null,
+            "reason_message": null,
+            "remaining_s": 0.0
+          },
+          "host_pressure": {
+            "available": true,
+            "block_free_percent": 10.0,
+            "classification": "normal",
+            "compressor_gb": 5.508652,
+            "free_gb": 0.05484,
+            "free_percent": 39.0,
+            "raw_excerpt": "The system has 137438953472 (8388608 pages with a page size of 16384).\n\nStats: \nPages free: 3594 \nPages purgeable: 281 \nPages purged: 7433050 \n\nSwap I/O:\nSwapins: 4187393 \nSwapouts: 11893136 \n\nPage Q counts:\nPages active: 1289842 \nPages inactive: 1984504 \nPages speculative: 13216 \nPages throttled: 0 \nPages wired down: 4645310 \n\nCompressor Stats:\nPages used by compressor: 361015 \nPages decompressed: 140109987 \nPages compressed: 172472316 \n\nFile I/O:\nPageins: 280300143 \nPageouts: 33952 \n\nSystem-wide memory free percentage: 39%\n",
+            "reason_code": "free_percent_above_warning_threshold",
+            "reason_message": "Host free memory is above the runtime-owned warning threshold.",
+            "sampled_at_s": 118355.424832,
+            "source": "memory_pressure",
+            "total_gb": 128.0,
+            "warn_free_percent": 20.0,
+            "wired_gb": 70.881805
+          },
+          "loaded_gb": null,
+          "pressure_classification": "normal"
+        },
+        "runtime_url": "http://127.0.0.1:8066",
+        "sampled_at": "2026-06-04T08:00:52Z",
+        "service": {
+          "active_model_id": "Qwen3.6-35B-A3B",
+          "clean_idle_degraded": false,
+          "health_classification": "healthy_serving",
+          "listener": {
+            "process_identity": "unsupported",
+            "status": "live_http"
+          },
+          "model_count": 1,
+          "ok": true,
+          "port": 8066,
+          "readiness": "ready",
+          "runtime": "owlmlx",
+          "runtime_url": "http://127.0.0.1:8066",
+          "staleness": {
+            "staleness_ms": 0,
+            "status": "sampled_now"
+          }
+        },
+        "sources": [
+          {
+            "name": "healthz",
+            "route_or_file": "/healthz",
+            "sampled_at": "2026-06-04T08:00:52Z",
+            "staleness_ms": 0,
+            "status": "available",
+            "truth_level": "runtime_owned"
+          },
+          {
+            "name": "runtime_status",
+            "route_or_file": "/v1/runtime/status",
+            "sampled_at": "2026-06-04T08:00:52Z",
+            "staleness_ms": 0,
+            "status": "available",
+            "truth_level": "runtime_owned"
+          },
+          {
+            "name": "model_visibility",
+            "route_or_file": "/v1/runtime/model-visibility",
+            "sampled_at": "2026-06-04T08:00:52Z",
+            "staleness_ms": 0,
+            "status": "available",
+            "truth_level": "runtime_owned"
+          },
+          {
+            "name": "model_load_admission",
+            "route_or_file": "/v1/runtime/model-load-admission",
+            "sampled_at": "2026-06-04T08:00:52Z",
+            "staleness_ms": 0,
+            "status": "not_connected",
+            "truth_level": "runtime_owned"
+          },
+          {
+            "name": "model_release_candidate_ledger",
+            "route_or_file": null,
+            "sampled_at": "2026-06-04T08:00:52Z",
+            "staleness_ms": 0,
+            "status": "not_connected",
+            "truth_level": "unsupported"
+          },
+          {
+            "name": "runtime_test_runs",
+            "route_or_file": "in_memory_first_slice",
+            "sampled_at": "2026-06-04T08:00:52Z",
+            "staleness_ms": 0,
+            "status": "partial",
+            "truth_level": "runtime_owned"
+          }
+        ],
+        "test_runs": {
+          "active_run_id": null,
+          "audit_ledger_path": null,
+          "audit_ledger_status": "not_connected",
+          "known_run_count": 0,
+          "policy_boundaries": {
+            "audit_ledger_not_wired": true,
+            "does_not_launch_from_snapshot": true
+          },
+          "recent_runs": [],
+          "status": "partial"
+        },
+        "workload": {
+          "active_run_id": null,
+          "block_reason": null,
+          "current_phase": "idle",
+          "generation_gate": "idle",
+          "longest_execution_s": 3.779,
+          "queue_policy": "ticketed_fifo",
+          "queue_size": 0,
+          "total_served": 1
+        }
+      },
+      "status": 200
+    },
+    "openai_models": {
+      "body": {
+        "data": [
+          {
+            "id": "Qwen3.6-27B",
+            "object": "model",
+            "owned_by": "owlmlx"
+          },
+          {
+            "id": "Qwen3.6-35B-A3B",
+            "object": "model",
+            "owned_by": "owlmlx"
+          },
+          {
+            "id": "gemma-4-31B-it",
+            "object": "model",
+            "owned_by": "owlmlx"
+          }
+        ],
+        "object": "list"
+      },
+      "status": 200
+    },
+    "tool_lane": {
+      "body": {
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "message": {
+              "content": null,
+              "owlmlx_reasoning_trace_policy": {
+                "caveats": [
+                  "empty output has no final-text candidate"
+                ],
+                "final_text": null,
+                "final_text_source": null,
+                "output_sanity_label": "empty_text",
+                "surface": "owlmlx.reasoning_trace_policy",
+                "trace_marker_family": null,
+                "trace_status": "none",
+                "version": "v1",
+                "visible_reasoning_trace": false
+              },
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "function": {
+                    "arguments": "{\"city\": \"Paris\"}",
+                    "name": "get_weather"
+                  },
+                  "id": "call_fdcfde73f57f47d8bd1562c6",
+                  "type": "function"
+                }
+              ]
+            }
+          }
+        ],
+        "created": 1780560052,
+        "id": "chatcmpl-db2f0128940b4a64b1936bc88161a1e2",
+        "model": "Qwen3.6-35B-A3B",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 25,
+          "prompt_tokens": 277,
+          "total_tokens": 302
+        }
+      },
+      "status": 200
+    }
+  },
+  "promotes": "nothing",
+  "readiness": {
+    "checks": [
+      {
+        "detail": {
+          "readiness": "degraded",
+          "status": 200
+        },
+        "name": "healthz_ok",
+        "ok": true
+      },
+      {
+        "detail": {
+          "status": 200,
+          "visible_model_ids": [
+            "Qwen3.6-27B",
+            "Qwen3.6-35B-A3B",
+            "gemma-4-31B-it"
+          ]
+        },
+        "name": "model_visible",
+        "ok": true
+      },
+      {
+        "detail": {
+          "ids": [
+            "Qwen3.6-27B",
+            "Qwen3.6-35B-A3B",
+            "gemma-4-31B-it"
+          ],
+          "status": 200
+        },
+        "name": "model_in_openai_models",
+        "ok": true
+      },
+      {
+        "detail": {
+          "status": 200,
+          "tool_call_count": 1
+        },
+        "name": "tool_lane_live",
+        "ok": true
+      },
+      {
+        "detail": {
+          "classification": "normal",
+          "status": 200
+        },
+        "name": "monitor_reachable",
+        "ok": true
+      }
+    ],
+    "failures": [],
+    "ready": true,
+    "verdict": "readiness_passed"
+  },
+  "recorded_at": "2026-06-04T08:00:52Z",
+  "reproduction": {
+    "base_url": "http://127.0.0.1:8066",
+    "model_id": "Qwen3.6-35B-A3B",
+    "owlmlx_commit": "9014775ee6ae7bb67c7b2337aa17f89c209360b1"
+  },
+  "surface": "owlmlx.replacement.r4_ops_cutover_pilot",
+  "verdict": "readiness_passed",
+  "version": "v1"
+}

@@ -1,0 +1,64 @@
+{
+  "loop_completed": true,
+  "tool_lane_subgates": {
+    "tool_call_emitted": true,
+    "tool_call_executed": true,
+    "tool_result_roundtrip": true,
+    "final_answer_after_tool": true
+  },
+  "fallback": {
+    "config_snapshot": {
+      "base_url": "http://127.0.0.1:8066",
+      "provider": "owlmlx",
+      "fallback_enabled": false,
+      "config_path": "files/evidence/owlmlx/replacement/r4-ops-cutover/live-logs/20260604T080009Z-r4-owlcoda-pilot-correlated/config.json",
+      "model_endpoint": "http://127.0.0.1:8066/v1",
+      "static_x_request_id_for_correlation": "r4-pilot-correlated-20260604T080009Z",
+      "note": "Static x-request-id is pilot-only correlation evidence, not a production session header recommendation."
+    },
+    "consumer_outbound": {
+      "fallback_count": 0,
+      "outbound_hosts": [
+        "127.0.0.1:8066"
+      ],
+      "audit_request_ids": [
+        "52fe3ad6-9ab8-4c07-83e4-3793256ddcbe",
+        "9da6e671-3200-4b38-a8ff-06361a31e313"
+      ],
+      "audit_rows": 2,
+      "audit_all_fallback_used_false": true,
+      "served_by_values": [
+        "Qwen3.6-35B-A3B"
+      ]
+    },
+    "owlmlx_inbound": {
+      "served_request_ids": [
+        "r4-pilot-correlated-20260604T080009Z"
+      ],
+      "chat_completion_200_count_for_request_id": 2,
+      "request_lifecycle_log": "files/evidence/owlmlx/replacement/r4-ops-cutover/live-logs/20260604T080009Z-r4-owlcoda-pilot-correlated/owlmlx-request-lifecycle.jsonl"
+    }
+  },
+  "watermark_classifications": [
+    "healthy_serving"
+  ],
+  "reproduction": {
+    "launch_command": "OWLMLX request logger to request-lifecycle.jsonl; OwlCoda pilot static x-request-id for correlation.",
+    "owlmlx_commit": "9014775e",
+    "base_url": "http://127.0.0.1:8066",
+    "model_id": "Qwen3.6-35B-A3B",
+    "owlcoda_model": "qwen35-owlmlx-pilot",
+    "owlcoda_version": "0.15.0",
+    "session_id": "conv-1780560067760-d35frq",
+    "request_ids": [
+      "r4-pilot-correlated-20260604T080009Z"
+    ],
+    "owlcoda_audit_request_ids": [
+      "52fe3ad6-9ab8-4c07-83e4-3793256ddcbe",
+      "9da6e671-3200-4b38-a8ff-06361a31e313"
+    ],
+    "evidence_run_dir": "files/evidence/owlmlx/replacement/r4-ops-cutover/live-logs/20260604T080009Z-r4-owlcoda-pilot-correlated",
+    "cli_output": "files/evidence/owlmlx/replacement/r4-ops-cutover/live-logs/20260604T080009Z-r4-owlcoda-pilot-correlated/owlcoda-cli-output.json",
+    "session_file": "files/evidence/owlmlx/replacement/r4-ops-cutover/live-logs/20260604T080009Z-r4-owlcoda-pilot-correlated/owlcoda-home/sessions/conv-1780560067760-d35frq.json"
+  }
+}

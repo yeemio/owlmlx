@@ -1,0 +1,38 @@
+{
+  "port": 8029,
+  "host": "127.0.0.1",
+  "routerUrl": "http://127.0.0.1:8066",
+  "localRuntimeProtocol": "openai_chat",
+  "responseModelStyle": "platform",
+  "models": [
+    {
+      "id": "qwen35-owlmlx-pilot",
+      "label": "Qwen35 OwlMLX Pilot",
+      "backendModel": "Qwen3.6-35B-A3B",
+      "endpoint": "http://127.0.0.1:8066/v1",
+      "provider": "openai-compat",
+      "aliases": [
+        "default",
+        "qwen35"
+      ],
+      "tier": "balanced",
+      "default": true,
+      "timeoutMs": 300000,
+      "contextWindow": 32768,
+      "headers": {
+        "x-request-id": "r4-pilot-correlated-20260604T080009Z"
+      }
+    }
+  ],
+  "middleware": {
+    "fallbackEnabled": false,
+    "retryMaxAttempts": 0,
+    "requestTimeoutMs": 300000,
+    "streamFirstTokenTimeoutMs": 300000,
+    "streamFallbackToNonStreamingEnabled": false,
+    "nonStreamFallbackToStreamingEnabled": false
+  },
+  "skillInjection": false,
+  "trainingCollection": false,
+  "logLevel": "info"
+}

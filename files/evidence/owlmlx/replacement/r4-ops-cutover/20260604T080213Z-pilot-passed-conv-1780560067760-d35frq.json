@@ -1,0 +1,109 @@
+{
+  "fallback": {
+    "config_ok": true,
+    "consumer_outbound_ok": true,
+    "fallback_used": false,
+    "owlmlx_inbound_ok": true,
+    "proven_not_used": true,
+    "reasons": []
+  },
+  "honesty_note": "A `passed` verdict means this ONE controlled pilot session met its gates. It does NOT claim replacement complete, does NOT flip any default, and promotes NO capability. The replacement verdict stays `not yet replaceable`.",
+  "kind": "pilot",
+  "promotes": "nothing",
+  "readiness": {
+    "checks": [
+      {
+        "detail": {
+          "readiness": "degraded",
+          "status": 200
+        },
+        "name": "healthz_ok",
+        "ok": true
+      },
+      {
+        "detail": {
+          "status": 200,
+          "visible_model_ids": [
+            "Qwen3.6-27B",
+            "Qwen3.6-35B-A3B",
+            "gemma-4-31B-it"
+          ]
+        },
+        "name": "model_visible",
+        "ok": true
+      },
+      {
+        "detail": {
+          "ids": [
+            "Qwen3.6-27B",
+            "Qwen3.6-35B-A3B",
+            "gemma-4-31B-it"
+          ],
+          "status": 200
+        },
+        "name": "model_in_openai_models",
+        "ok": true
+      },
+      {
+        "detail": {
+          "status": 200,
+          "tool_call_count": 1
+        },
+        "name": "tool_lane_live",
+        "ok": true
+      },
+      {
+        "detail": {
+          "classification": "normal",
+          "status": 200
+        },
+        "name": "monitor_reachable",
+        "ok": true
+      }
+    ],
+    "failures": [],
+    "ready": true,
+    "verdict": "readiness_passed"
+  },
+  "recorded_at": "2026-06-04T08:02:13Z",
+  "reproduction": {
+    "base_url": "http://127.0.0.1:8066",
+    "cli_output": "files/evidence/owlmlx/replacement/r4-ops-cutover/live-logs/20260604T080009Z-r4-owlcoda-pilot-correlated/owlcoda-cli-output.json",
+    "evidence_run_dir": "files/evidence/owlmlx/replacement/r4-ops-cutover/live-logs/20260604T080009Z-r4-owlcoda-pilot-correlated",
+    "launch_command": "OWLMLX request logger to request-lifecycle.jsonl; OwlCoda pilot static x-request-id for correlation.",
+    "model_id": "Qwen3.6-35B-A3B",
+    "owlcoda_audit_request_ids": [
+      "52fe3ad6-9ab8-4c07-83e4-3793256ddcbe",
+      "9da6e671-3200-4b38-a8ff-06361a31e313"
+    ],
+    "owlcoda_model": "qwen35-owlmlx-pilot",
+    "owlcoda_version": "0.15.0",
+    "owlmlx_commit": "9014775e",
+    "request_ids": [
+      "r4-pilot-correlated-20260604T080009Z"
+    ],
+    "session_file": "files/evidence/owlmlx/replacement/r4-ops-cutover/live-logs/20260604T080009Z-r4-owlcoda-pilot-correlated/owlcoda-home/sessions/conv-1780560067760-d35frq.json",
+    "session_id": "conv-1780560067760-d35frq"
+  },
+  "surface": "owlmlx.replacement.r4_ops_cutover_pilot",
+  "tool_lane": {
+    "failing": [],
+    "passed": true,
+    "subgates": {
+      "final_answer_after_tool": true,
+      "tool_call_emitted": true,
+      "tool_call_executed": true,
+      "tool_result_roundtrip": true
+    }
+  },
+  "verdict": "passed",
+  "verdict_reasons": [],
+  "version": "v1",
+  "watermark": {
+    "classifications_seen": [
+      "healthy_serving"
+    ],
+    "interpretation": "This session did not trigger RED. Health gate for THIS pilot session only; NOT a sustained-stability claim (see R4 Phase B / soak).",
+    "watermark_red_observed": false
+  }
+}

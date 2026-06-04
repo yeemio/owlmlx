@@ -1,0 +1,9 @@
+{
+  "pid": 88852,
+  "runtimeToken": "524ef483-56b6-4742-b467-7ef77cbb5cc0",
+  "host": "127.0.0.1",
+  "port": 8029,
+  "routerUrl": "http://127.0.0.1:8066",
+  "version": "0.15.0",
+  "startedAt": "2026-06-04T08:01:07.447Z"
+}

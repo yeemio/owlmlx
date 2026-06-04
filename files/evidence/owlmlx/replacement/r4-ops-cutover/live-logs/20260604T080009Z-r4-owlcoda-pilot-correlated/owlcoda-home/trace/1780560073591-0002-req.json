@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-06-04T08:01:13.591Z",
+  "direction": "request",
+  "method": "POST",
+  "endpoint": "/v1/messages",
+  "body": "[body read in handler]",
+  "headers": {
+    "host": "127.0.0.1:8029",
+    "connection": "keep-alive",
+    "content-type": "application/json",
+    "x-api-key": "[REDACTED]",
+    "anthropic-version": "2023-06-01",
+    "accept": "*/*",
+    "accept-language": "*",
+    "sec-fetch-mode": "cors",
+    "user-agent": "node",
+    "accept-encoding": "gzip, deflate",
+    "content-length": "45993"
+  }
+}

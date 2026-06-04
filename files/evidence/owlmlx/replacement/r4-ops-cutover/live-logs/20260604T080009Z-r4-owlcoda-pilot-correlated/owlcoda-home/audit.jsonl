@@ -1,0 +1,2 @@
+{"timestamp":"2026-06-04T08:01:13.574Z","requestId":"52fe3ad6-9ab8-4c07-83e4-3793256ddcbe","model":"qwen35-owlmlx-pilot","servedBy":"Qwen3.6-35B-A3B","inputTokens":14069,"outputTokens":25,"durationMs":5750,"status":200,"fallbackUsed":false,"streaming":true}
+{"timestamp":"2026-06-04T08:01:18.917Z","requestId":"9da6e671-3200-4b38-a8ff-06361a31e313","model":"qwen35-owlmlx-pilot","servedBy":"Qwen3.6-35B-A3B","inputTokens":14136,"outputTokens":19,"durationMs":5325,"status":200,"fallbackUsed":false,"streaming":true}

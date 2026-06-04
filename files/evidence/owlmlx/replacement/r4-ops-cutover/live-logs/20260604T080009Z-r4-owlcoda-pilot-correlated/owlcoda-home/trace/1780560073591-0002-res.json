@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-06-04T08:01:18.917Z",
+  "direction": "response",
+  "method": "POST",
+  "endpoint": "/v1/messages",
+  "statusCode": 200,
+  "durationMs": 5326,
+  "body": "[streamed/non-streamed response]",
+  "headers": {}
+}

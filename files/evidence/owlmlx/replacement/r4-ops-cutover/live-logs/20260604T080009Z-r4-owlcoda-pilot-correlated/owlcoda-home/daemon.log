@@ -1,0 +1,16 @@
+
+===== owlcoda daemon starting v0.15.0 @ 2026-06-04T08:01:07.446Z =====
+OwlCoda v0.15.0
+Proxy listening on http://127.0.0.1:8029
+Local runtime target: http://127.0.0.1:8066
+{"ts":"2026-06-04T08:01:07.576Z","level":"info","component":"config","msg":"Watching for config changes"}
+[health] Monitor started (interval: 60s)
+Local runtime: connected ✓ (openai_models)
+Visibility models: 3 live
+{"ts":"2026-06-04T08:01:07.601Z","level":"info","component":"http","msg":"GET /healthz → 200","data":{"requestId":"8146d4d7","durationMs":1}}
+{"ts":"2026-06-04T08:01:07.823Z","level":"info","component":"skills","msg":"Injected","data":{"query":"Use the Bash tool to run: pwd. Then answer with the exact working directory you …","matched":["screenshot"],"scores":[0.133],"matchMs":45}}
+{"ts":"2026-06-04T08:01:13.575Z","level":"info","component":"http","msg":"POST /v1/messages → 200","data":{"requestId":"52fe3ad6","durationMs":5798}}
+{"ts":"2026-06-04T08:01:13.592Z","level":"info","component":"skills","msg":"Injected","data":{"query":"Use the Bash tool to run: pwd. Then answer with the exact working directory you …","matched":["screenshot"],"scores":[0.133],"matchMs":0}}
+{"ts":"2026-06-04T08:01:18.917Z","level":"info","component":"http","msg":"POST /v1/messages → 200","data":{"requestId":"9da6e671","durationMs":5326}}
+[shutdown] Draining — stop accepting new connections...
+[shutdown] All connections closed, exiting.
