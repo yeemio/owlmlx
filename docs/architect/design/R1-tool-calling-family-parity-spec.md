@@ -16,7 +16,7 @@ R1 收 blocker ①:把 tool-calling 从 "Qwen-only experimental" 扩到消费者
 
 **Phase-1 = (A) live-verify Gemma `auto`/`none` + (B) family-aware forcing(qwen3_coder | gemma4)**。
 
-**验收**:Gemma `auto`/`none` 经一次 live 跑确认(emit+parse)**或**落 gap artifact;Gemma forcing(forced/named)工作;Qwen 行为不变;证据落盘;capability label 诚实更新(仍 `experimental`,scope=Qwen+Gemma native);**不晋级、promotes nothing**。
+**验收**:Gemma `auto`/`none` 经一次 live 跑确认(emit+parse)**或**落 gap artifact;Qwen 行为不变;Gemma forcing 分支给出明确 verdict:要么 forced/named 工作并有证据,要么证明 Gemma envelope/grammar 在当前栈不可行并落 documented gap + graceful-degrade diagnostic。后一种分支不声明 Gemma forcing capability。证据落盘;capability label 诚实更新(仍 `experimental`,scope=Qwen+Gemma native);**不晋级、promotes nothing**。
 
 ---
 
@@ -42,11 +42,11 @@ R1 收 blocker ①:把 tool-calling 从 "Qwen-only experimental" 扩到消费者
 `_tool_choice_forcing_ebnf(tools, tool_choice, *, parser_family)` → 分派:`qwen3_coder`→`_qwen3_coder_forcing_ebnf`(**不动**)、`gemma4`→`_gemma4_forcing_ebnf`(**新增**)、其它→`None` + 诊断。调用点(native `generate`)传入 §2 检出的 family。
 
 ### 3.2 `_gemma4_forcing_ebnf(funcs, param_names)`（新增，纯函数）
-EBNF 约束到 `<|tool_call>call:` + fname-alternation + `{` + param-key-alternation + values + `}<tool_call|>`。**scope = 约束信封 + 函数名 + 参数键;值放松**(对齐 qwen builder 的 scope:约束 fname + param-names,值不强约束)。build 失败 → `None` + 诊断(降级)。**Feasibility 风险(probe 目标)**:Gemma 的 `<|tool_call>`/`<tool_call|>` 可能是单一特殊 token,xgrammar EBNF over token 边界能否表达该信封是未知;若不可行,gemma forcing 记为 **documented gap** + 优雅降级(`auto`/`none` 仍工作),不视为 R1 失败。
+EBNF 约束到 `<|tool_call>call:` + fname-alternation + `{` + param-key-alternation + values + `}<tool_call|>`。**scope = 约束信封 + 函数名 + 参数键;值放松**(对齐 qwen builder 的 scope:约束 fname + param-names,值不强约束)。build 失败 → `None` + 诊断(降级)。**Feasibility 风险(probe 目标)**:Gemma 的 `<|tool_call>`/`<tool_call|>` 可能是单一特殊 token,xgrammar EBNF over token 边界能否表达该信封是未知;若不可行,gemma forcing 记为 **documented gap** + 优雅降级(`auto`/`none` 仍工作),不视为 R1 auto/none parity 失败,也不产生 Gemma forcing capability claim。
 
 ### 3.3 live probe（`scripts/probe/r1_gemma_tool_calling_feasibility.py`）
-- **model-free**:断言 Gemma template → 推出 `gemma4`;markers 在;两个 forcing EBNF 都能 build。
-- **live**(需活 owlmlx + Gemma):`auto` tools 请求 → tool_calls emit+parse;`required`/named 请求 → forcing 生效。落 evidence(每家族 sub-results:parse/auto/none/forced)。
+- **model-free**:断言 Gemma template → 推出 `gemma4`;markers 在;qwen forcing EBNF 能 build;Gemma forcing EBNF 要么能 build,要么产出 documented-infeasible verdict。
+- **live**(需活 owlmlx + Gemma):`auto` tools 请求 → tool_calls emit+parse;`required`/named 请求 → forcing 生效或产出 documented graceful-degrade diagnostic。落 evidence(每家族 sub-results:parse/auto/none/forced/forcing_verdict)。
 - live 跑吃机器时间(Gemma ~62GB)→ 执行时 surface run-now-vs-defer(见 §9.4)。
 
 ---
@@ -68,7 +68,9 @@ OpenAI `tools`/`tool_choice` → native `generate` → 检出 family → (需 fo
 
 ## 7. Definition of Done
 1. Gemma `auto`/`none` tool-calling 一次 live 跑确认(tool_calls emit+parse)**或**落 documented gap artifact。
-2. Family-aware forcing:gemma4 forced/named 工作(model-free EBNF 测 + live 确认);qwen3_coder **不变**。
+2. Family-aware forcing:qwen3_coder **不变**;gemma4 branch 必须落一个明确 verdict:
+   - `applied`:forced/named 工作(model-free EBNF + live confirmation),或
+   - `documented_infeasible`:Gemma envelope/special-token forcing 在当前栈不可表达;forced tool_choice 优雅降级并写诊断,且**不声明 Gemma forcing capability**。
 3. 未知家族 forcing → `None` + `tool_choice_forcing_unsupported_family` 诊断。
 4. Model-free 测试:gemma4 EBNF builder + 分派(qwen→qwen、gemma→gemma、unknown→None)。
 5. 证据(§4)+ 复现落盘。
@@ -97,4 +99,4 @@ OpenAI `tools`/`tool_choice` → native `generate` → 检出 family → (需 fo
 ---
 
 ## 10. 验证（怎么算"做对"）
-§7 DoD 全满足 + 测试绿 + live probe 证据可复现 + 无 experimental→supported 跳跃 + Qwen 无回归。
+§7 DoD 全满足 + 测试绿 + live probe 证据可复现 + Gemma forcing verdict 分支明确 + 无 experimental→supported 跳跃 + Qwen 无回归。
