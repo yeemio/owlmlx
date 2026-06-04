@@ -90,6 +90,8 @@ def _build_fake_mlx_lm_with_observable_cache(
         prompt_cache=None,
     ) -> str:
         seen_prompt_caches.append(prompt_cache)
+        if len(prompt) == 0:
+            raise ValueError("prompt must not be empty")
         return f"generated:{prompt}:{max_tokens}"
 
     def fake_stream_generate(
@@ -103,6 +105,11 @@ def _build_fake_mlx_lm_with_observable_cache(
         _ = (model, tokenizer, max_tokens)
         seen_prompt_caches.append(prompt_cache)
         seen_stream_prompts.append(prompt)
+        if len(prompt) == 0:
+            # Faithful to real mlx_lm: generate_step raises on an empty prompt
+            # ("Either input_embeddings or prompt (or both) must be provided.").
+            # The prior fake silently tolerated [], masking the full-reuse crash.
+            raise ValueError("prompt must not be empty")
         if prompt_cache is not None:
             tokens = prompt_cache["tokens"]
             assert isinstance(tokens, list)
@@ -339,9 +346,13 @@ def test_native_session_kv_cache_auto_prefix_refreshes_prompt_only_cache_when_tr
         importlib.reload(mod)
 
 
-def test_native_session_kv_cache_exact_prompt_hit_streams_empty_suffix(
+def test_native_session_kv_cache_exact_prompt_hit_reforwards_last_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Regression: an exact-prompt hit (identical prompt re-sent) must NOT forward
+    # an empty prompt to mlx_lm (real mlx_lm raises ValueError on an empty prompt).
+    # The full-overlap backoff re-forwards exactly the final token and trims the
+    # reused cache by one.
     monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
     mod, fake = _reload_native_backend_with_fake_mlx_lm(monkeypatch)
     try:
@@ -356,8 +367,9 @@ def test_native_session_kv_cache_exact_prompt_hit_streams_empty_suffix(
         assert len(fake._created_caches) == 1
         assert fake._seen_prompt_caches[0] is fake._seen_prompt_caches[1]
         assert fake._seen_stream_prompts[0] == [ord(ch) for ch in "prefix A"]
-        assert fake._seen_stream_prompts[1] == []
-        assert fake._trim_calls == [1, 1]
+        # Full-overlap backoff: re-forward exactly the last token, never [].
+        assert fake._seen_stream_prompts[1] == [ord("A")]
+        assert fake._trim_calls == [1, 1, 1]
         status = backend.status().detail["session_kv_cache"]
         assert status["active_entries"] == 1
         assert status["counters"]["hits"] == 1

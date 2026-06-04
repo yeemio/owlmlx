@@ -848,11 +848,13 @@ class MlxNativeBackend:
                 and common_prefix_count == len(prompt_tokens)
                 and common_prefix_count == decision.previous_prompt_token_count
             )
-            if (
-                not suffix_tokens
-                and common_prefix_count > 0
-                and common_prefix_count < decision.previous_prompt_token_count
-            ):
+            if not suffix_tokens and common_prefix_count > 0:
+                # Full-overlap / prompt-within-cache (incl. an exact-prompt hit
+                # where common_prefix_count == previous == len(prompt)): re-forward
+                # the final token so the model has >=1 token to run a forward pass.
+                # Real mlx_lm raises ValueError on an empty prompt, so a reused
+                # cache must never yield an empty prompt_for_call. Trim the reused
+                # cache by one to match (reported cached prefix = N-1).
                 common_prefix_count -= 1
                 suffix_tokens = prompt_tokens[common_prefix_count:]
             trim_count = max(decision.previous_prompt_token_count - common_prefix_count, 0)
@@ -897,7 +899,9 @@ class MlxNativeBackend:
                             session,
                         ),
                     )
-            prompt_for_call = [] if exact_prompt_hit else list(suffix_tokens or prompt_tokens)
+            # After the full-overlap backoff above, suffix_tokens is non-empty
+            # whenever we reuse a cache, so prompt_for_call is never empty.
+            prompt_for_call = list(suffix_tokens or prompt_tokens)
 
         session.last_prompt_cache = cache
         session.last_prompt_cache_id = id(cache)
