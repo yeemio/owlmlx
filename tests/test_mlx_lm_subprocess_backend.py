@@ -37,7 +37,7 @@ def _write_runner(
                 "        count += 1\n"
                 "        print(json.dumps({'ok': True, 'action': 'generate', "
                 "'text': req['prompt'] + ' :: child', 'pid': os.getpid(), "
-                "'generation_count': count}), flush=True)"
+                "'generation_count': count, 'prompt_tokens': 7, 'completion_tokens': 3}), flush=True)"
                 )
             )
         )
@@ -67,7 +67,7 @@ def _write_runner(
                     "    elif action == 'generate_messages':",
                     "        count += 1",
                     "        text = ' | '.join(f\"{m['role']}:{m['content']}\" for m in req.get('messages', []))",
-                    "        print(json.dumps({'ok': True, 'action': 'generate_messages', 'text': text + ' :: child', 'pid': os.getpid(), 'generation_count': count, 'message_count': len(req.get('messages', []))}), flush=True)",
+                    "        print(json.dumps({'ok': True, 'action': 'generate_messages', 'text': text + ' :: child', 'pid': os.getpid(), 'generation_count': count, 'message_count': len(req.get('messages', [])), 'prompt_tokens': 9, 'completion_tokens': 4}), flush=True)",
                     "    elif action == 'stream_generate':",
                     "        count += 1",
                     "        timing = {'surface': 'owlmlx.child_stream_timing', 'version': 'v1', 'first_response_ms': 11.0, 'first_visible_token_ms': 12.0, 'stream_wall_ms': 13.0}",
@@ -273,6 +273,23 @@ def test_subprocess_backend_generate_reuses_same_child(tmp_path: Path) -> None:
     assert backend.status().detail["cache_runtime_observations"][
         "repeated_generation_models"
     ] == ["model-a"]
+    backend.unload("model-a")
+
+
+def test_subprocess_backend_generate_surfaces_usage_token_counts(tmp_path: Path) -> None:
+    # Supported-backend parity with the native non-stream usage fix: the child
+    # emits prompt_tokens/completion_tokens; the backend must surface them on the
+    # GenerateResult so the routes can build a usage block.
+    runner = _write_runner(tmp_path)
+    backend = MlxLmSubprocessBackend(
+        runner_module=runner,
+        extra_pythonpath=(str(tmp_path),),
+    )
+    backend.load("model-a", memory_gb=2.0)
+    result = backend.generate("model-a", "hello", max_tokens=4)
+    assert result.ok is True
+    assert result.prompt_tokens == 7
+    assert result.completion_tokens == 3
     backend.unload("model-a")
 
 

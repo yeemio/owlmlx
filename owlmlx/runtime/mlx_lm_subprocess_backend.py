@@ -1936,6 +1936,8 @@ class MlxLmSubprocessBackend:
             message="generated",
             model_id=model_id,
             text=str(result.payload.get("text", "")),
+            prompt_tokens=result.payload.get("prompt_tokens"),
+            completion_tokens=result.payload.get("completion_tokens"),
             detail={
                 "returncode": result.returncode,
                 "pid": result.payload.get("pid"),
@@ -1995,6 +1997,8 @@ class MlxLmSubprocessBackend:
             message="generated",
             model_id=model_id,
             text=str(result.payload.get("text", "")),
+            prompt_tokens=result.payload.get("prompt_tokens"),
+            completion_tokens=result.payload.get("completion_tokens"),
             detail={
                 "returncode": result.returncode,
                 "pid": result.payload.get("pid"),

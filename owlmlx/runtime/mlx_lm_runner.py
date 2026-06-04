@@ -46,6 +46,28 @@ def _positive_int_or_none(value: Any) -> int | None:
     return parsed
 
 
+def _safe_usage_token_count(tokenizer: Any, text: str, *, is_prompt: bool) -> int | None:
+    """Best-effort non-stream usage token count; never raises into generation.
+
+    The prompt count is bos-aware (avoid double-counting BOS); the completion
+    count uses no special tokens. ``mlx_lm.generate`` returns only text on the
+    non-stream path, so this re-encode is the count source there (the stream path
+    stays exact).
+    """
+    try:
+        if is_prompt:
+            bos = getattr(tokenizer, "bos_token", None)
+            add_special = bos is None or not str(text).startswith(str(bos))
+        else:
+            add_special = False
+        try:
+            return len(tokenizer.encode(text, add_special_tokens=add_special))
+        except TypeError:
+            return len(tokenizer.encode(text))
+    except Exception:
+        return None
+
+
 def _stop_strings_from_params(params: dict[str, Any]) -> tuple[str, ...]:
     raw_stop = params.get("stop")
     if raw_stop is None:
@@ -550,6 +572,12 @@ def main() -> int:
                         "finish_reason": "stop" if stop_hit else "stop",
                         "pid": os.getpid(),
                         "generation_count": generation_count,
+                        "prompt_tokens": _safe_usage_token_count(
+                            tokenizer, str(prompt), is_prompt=True
+                        ),
+                        "completion_tokens": _safe_usage_token_count(
+                            tokenizer, text, is_prompt=False
+                        ),
                     }
                 )
                 continue
@@ -658,6 +686,12 @@ def main() -> int:
                         "pid": os.getpid(),
                         "generation_count": generation_count,
                         "message_count": len(messages),
+                        "prompt_tokens": _safe_usage_token_count(
+                            tokenizer, str(rendered_prompt), is_prompt=True
+                        ),
+                        "completion_tokens": _safe_usage_token_count(
+                            tokenizer, text, is_prompt=False
+                        ),
                     }
                 )
                 continue
