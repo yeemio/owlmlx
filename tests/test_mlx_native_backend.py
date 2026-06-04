@@ -297,8 +297,12 @@ def test_native_backend_generate_forces_tool_choice_required_with_logits_process
     fake = types.ModuleType("mlx_lm")
     captured: dict[str, object] = {}
 
+    class _QwenTokenizer:
+        tool_parser_type = "qwen3_coder"
+        tool_call_start = "<tool_call>"
+
     def fake_load(model_id: str) -> tuple[object, object]:
-        return (object(), object())
+        return (object(), _QwenTokenizer())
 
     def fake_generate(model, tokenizer, *, prompt, max_tokens, logits_processors=None):  # type: ignore[no-untyped-def]
         captured["logits_processors"] = logits_processors
@@ -322,6 +326,54 @@ def test_native_backend_generate_forces_tool_choice_required_with_logits_process
         )
         assert result.ok is True
         assert captured["logits_processors"] == [sentinel]
+    finally:
+        if previous_mlx_lm is None:
+            sys.modules.pop("mlx_lm", None)
+        else:
+            sys.modules["mlx_lm"] = previous_mlx_lm
+        importlib.reload(mod)
+
+
+def test_native_backend_generate_records_unsupported_tool_choice_family(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = types.ModuleType("mlx_lm")
+    captured: dict[str, object] = {}
+
+    class _UnknownTokenizer:
+        tool_call_start = "<custom_tool>"
+
+    def fake_load(model_id: str) -> tuple[object, object]:
+        return (object(), _UnknownTokenizer())
+
+    def fake_generate(model, tokenizer, *, prompt, max_tokens, logits_processors=None):  # type: ignore[no-untyped-def]
+        captured["logits_processors"] = logits_processors
+        return "done"
+
+    fake.load = fake_load  # type: ignore[attr-defined]
+    fake.generate = fake_generate  # type: ignore[attr-defined]
+    previous_mlx_lm = sys.modules.get("mlx_lm")
+    monkeypatch.setitem(sys.modules, "mlx_lm", fake)
+    import owlmlx.runtime.mlx_native_backend as mod
+    importlib.reload(mod)
+    try:
+        calls = {"n": 0}
+
+        def _spy(tokenizer, spec):  # type: ignore[no-untyped-def]
+            calls["n"] += 1
+            return object()
+
+        monkeypatch.setattr(mod, "_build_grammar_logits_processor", _spy)
+        backend = mod.MlxNativeBackend()
+        backend.load("fake-model")
+        result = backend.generate(
+            "fake-model", "hi", max_tokens=3, tools=_force_tool(), tool_choice="required"
+        )
+        assert result.ok is True
+        assert captured["logits_processors"] is None
+        assert calls["n"] == 0
+        assert result.detail["tool_choice_forcing_unsupported_family"] is True
+        assert result.detail["tool_choice_forcing_family"] == "unsupported"
     finally:
         if previous_mlx_lm is None:
             sys.modules.pop("mlx_lm", None)
@@ -629,7 +681,9 @@ _FORCE_TOOLS = [
 def test_tool_choice_forcing_ebnf_required_allows_all_tools() -> None:
     from owlmlx.runtime.mlx_native_backend import _tool_choice_forcing_ebnf
 
-    ebnf = _tool_choice_forcing_ebnf(_FORCE_TOOLS, "required")
+    ebnf = _tool_choice_forcing_ebnf(
+        _FORCE_TOOLS, "required", parser_family="qwen3_coder"
+    )
     assert ebnf is not None
     assert '"run_bash"' in ebnf and '"read_file"' in ebnf
     assert '"command"' in ebnf and '"path"' in ebnf
@@ -640,7 +694,9 @@ def test_tool_choice_forcing_ebnf_named_restricts_to_one_function() -> None:
     from owlmlx.runtime.mlx_native_backend import _tool_choice_forcing_ebnf
 
     ebnf = _tool_choice_forcing_ebnf(
-        _FORCE_TOOLS, {"type": "function", "function": {"name": "run_bash"}}
+        _FORCE_TOOLS,
+        {"type": "function", "function": {"name": "run_bash"}},
+        parser_family="qwen3_coder",
     )
     assert ebnf is not None
     assert '"run_bash"' in ebnf
@@ -650,11 +706,57 @@ def test_tool_choice_forcing_ebnf_named_restricts_to_one_function() -> None:
 def test_tool_choice_forcing_ebnf_none_for_auto_none_and_missing_tools() -> None:
     from owlmlx.runtime.mlx_native_backend import _tool_choice_forcing_ebnf
 
-    assert _tool_choice_forcing_ebnf(_FORCE_TOOLS, "auto") is None
-    assert _tool_choice_forcing_ebnf(_FORCE_TOOLS, "none") is None
-    assert _tool_choice_forcing_ebnf(_FORCE_TOOLS, None) is None
-    assert _tool_choice_forcing_ebnf(None, "required") is None
-    assert _tool_choice_forcing_ebnf([], "required") is None
+    assert (
+        _tool_choice_forcing_ebnf(_FORCE_TOOLS, "auto", parser_family="qwen3_coder")
+        is None
+    )
+    assert (
+        _tool_choice_forcing_ebnf(_FORCE_TOOLS, "none", parser_family="qwen3_coder")
+        is None
+    )
+    assert _tool_choice_forcing_ebnf(_FORCE_TOOLS, None, parser_family="qwen3_coder") is None
+    assert _tool_choice_forcing_ebnf(None, "required", parser_family="qwen3_coder") is None
+    assert _tool_choice_forcing_ebnf([], "required", parser_family="qwen3_coder") is None
+
+
+def test_tool_choice_forcing_ebnf_dispatches_by_tool_parser_family() -> None:
+    from owlmlx.runtime.mlx_native_backend import _tool_choice_forcing_ebnf
+
+    qwen = _tool_choice_forcing_ebnf(
+        _FORCE_TOOLS, "required", parser_family="qwen3_coder"
+    )
+    gemma = _tool_choice_forcing_ebnf(_FORCE_TOOLS, "required", parser_family="gemma4")
+    unknown = _tool_choice_forcing_ebnf(
+        _FORCE_TOOLS, "required", parser_family="unsupported"
+    )
+
+    assert qwen is not None and "<tool_call>" in qwen
+    assert gemma is not None and "<|tool_call>call:" in gemma
+    assert "run_bash" in gemma and "read_file" in gemma
+    assert "command" in gemma and "path" in gemma
+    assert unknown is None
+
+
+def test_infer_tool_choice_forcing_family_uses_parser_type_then_marker() -> None:
+    from owlmlx.runtime.mlx_native_backend import _infer_tool_choice_forcing_family
+
+    class _Explicit:
+        tool_parser_type = "gemma4"
+        tool_call_start = "<tool_call>"
+
+    class _QwenMarker:
+        tool_call_start = "<tool_call>"
+
+    class _GemmaMarker:
+        tool_call_start = "<|tool_call>"
+
+    class _Unknown:
+        tool_call_start = "<custom_tool>"
+
+    assert _infer_tool_choice_forcing_family(_Explicit()) == "gemma4"
+    assert _infer_tool_choice_forcing_family(_QwenMarker()) == "qwen3_coder"
+    assert _infer_tool_choice_forcing_family(_GemmaMarker()) == "gemma4"
+    assert _infer_tool_choice_forcing_family(_Unknown()) == "unsupported"
 
 
 def test_tool_choice_forcing_ebnf_compiles_as_valid_xgrammar() -> None:
@@ -663,7 +765,9 @@ def test_tool_choice_forcing_ebnf_compiles_as_valid_xgrammar() -> None:
     xgr = pytest.importorskip("xgrammar")
     from owlmlx.runtime.mlx_native_backend import _tool_choice_forcing_ebnf
 
-    ebnf = _tool_choice_forcing_ebnf(_FORCE_TOOLS, "required")
+    ebnf = _tool_choice_forcing_ebnf(
+        _FORCE_TOOLS, "required", parser_family="qwen3_coder"
+    )
     # from_ebnf parses the grammar without a tokenizer -> proves valid EBNF.
     assert xgr.Grammar.from_ebnf(ebnf) is not None
 

@@ -519,32 +519,73 @@ def _qwen3_coder_forcing_ebnf(funcs: list[str], param_names: list[str]) -> str:
     )
 
 
-def _tool_choice_forcing_ebnf(
+def _gemma4_forcing_ebnf(funcs: list[str], param_names: list[str]) -> str:
+    """EBNF that constrains output to the Gemma4 tool-call envelope.
+
+    This mirrors the qwen3_coder forcing scope: constrain envelope, function
+    name, and parameter keys while leaving values intentionally loose.
+    """
+    fname_alt = " | ".join(_ebnf_string_literal(f) for f in funcs)
+    if param_names:
+        pname_alt = " | ".join(_ebnf_string_literal(p) for p in param_names)
+        return "\n".join(
+            [
+                r'root ::= "<|tool_call>call:" fname "{" plist "}<tool_call|>"',
+                "fname ::= " + fname_alt,
+                r'plist ::= pair ("," pair)*',
+                r'pair ::= "\"" pname "\":" value',
+                "pname ::= " + pname_alt,
+                r'value ::= [^,}]*',
+            ]
+        )
+    return "\n".join(
+        [
+            r'root ::= "<|tool_call>call:" fname "{" value "}<tool_call|>"',
+            "fname ::= " + fname_alt,
+            r'value ::= [^}]*',
+        ]
+    )
+
+
+def _infer_tool_choice_forcing_family(tokenizer: Any) -> str:
+    parser_type = getattr(tokenizer, "tool_parser_type", None)
+    if isinstance(parser_type, str):
+        normalized = parser_type.strip().lower()
+        if normalized in {"qwen3_coder", "gemma4"}:
+            return normalized
+
+    start_marker = getattr(tokenizer, "tool_call_start", None)
+    if start_marker == "<tool_call>":
+        return "qwen3_coder"
+    if start_marker == "<|tool_call>":
+        return "gemma4"
+    return "unsupported"
+
+
+def _tool_choice_forcing_names(
     tools: object | None,
     tool_choice: object | None,
-) -> str | None:
-    """Build a qwen3_coder tool-call forcing grammar (EBNF) from OpenAI ``tools``
-    + ``tool_choice``, or None when no forcing is required.
-
-    Forcing applies to ``tool_choice == "required"`` (any provided tool) or a
-    named choice ``{"type": "function", "function": {"name": X}}``. ``auto`` /
-    ``none`` / missing return None (model decides; handled upstream). qwen3_coder
-    format only — other model families' tool-call formats differ.
-    """
+) -> list[str]:
     if not isinstance(tools, list) or not tools:
-        return None
-    forced_names: list[str] = []
+        return []
     if tool_choice == "required":
-        forced_names = [name for name in (_tool_function_name(t) for t in tools) if name]
-    elif isinstance(tool_choice, dict) and tool_choice.get("type") == "function":
+        return [name for name in (_tool_function_name(t) for t in tools) if name]
+    if isinstance(tool_choice, dict) and tool_choice.get("type") == "function":
         function = tool_choice.get("function")
         if isinstance(function, dict):
             name = function.get("name")
             if isinstance(name, str) and name:
-                forced_names = [name]
-    if not forced_names:
-        return None
+                return [name]
+    return []
+
+
+def _tool_choice_param_names(
+    tools: object | None,
+    forced_names: list[str],
+) -> list[str]:
     param_names: list[str] = []
+    if not isinstance(tools, list):
+        return param_names
     for tool in tools:
         if _tool_function_name(tool) not in forced_names:
             continue
@@ -555,7 +596,32 @@ def _tool_choice_forcing_ebnf(
             for key in props:
                 if isinstance(key, str) and key and key not in param_names:
                     param_names.append(key)
-    return _qwen3_coder_forcing_ebnf(forced_names, param_names)
+    return param_names
+
+
+def _tool_choice_forcing_ebnf(
+    tools: object | None,
+    tool_choice: object | None,
+    *,
+    parser_family: str = "qwen3_coder",
+) -> str | None:
+    """Build a family-aware tool-call forcing grammar (EBNF) from OpenAI
+    ``tools`` + ``tool_choice``, or None when no forcing is required or the
+    family is unsupported.
+
+    Forcing applies to ``tool_choice == "required"`` (any provided tool) or a
+    named choice ``{"type": "function", "function": {"name": X}}``. ``auto`` /
+    ``none`` / missing return None (model decides; handled upstream).
+    """
+    forced_names = _tool_choice_forcing_names(tools, tool_choice)
+    if not forced_names:
+        return None
+    param_names = _tool_choice_param_names(tools, forced_names)
+    if parser_family == "qwen3_coder":
+        return _qwen3_coder_forcing_ebnf(forced_names, param_names)
+    if parser_family == "gemma4":
+        return _gemma4_forcing_ebnf(forced_names, param_names)
+    return None
 
 
 def _trim_prompt_cache(
@@ -1441,24 +1507,40 @@ class MlxNativeBackend:
         memory_watermark = _non_empty_string(
             kwargs.pop("session_kv_cache_watermark", None)
         ) or _non_empty_string(kwargs.pop("memory_watermark", None))
+        forcing_family = _infer_tool_choice_forcing_family(session.tokenizer)
+        forcing_requested = bool(
+            _tool_choice_forcing_names(kwargs.get("tools"), kwargs.get("tool_choice"))
+        )
         forcing_ebnf = _tool_choice_forcing_ebnf(
-            kwargs.get("tools"), kwargs.get("tool_choice")
+            kwargs.get("tools"),
+            kwargs.get("tool_choice"),
+            parser_family=forcing_family,
         )
         forcing_processor = None
         forcing_detail: dict[str, Any] = {}
+        if forcing_requested:
+            forcing_detail["tool_choice_forcing_family"] = forcing_family
+            if forcing_family == "unsupported":
+                forcing_detail["tool_choice_forcing_unsupported_family"] = True
         if forcing_ebnf is not None:
             try:
                 forcing_processor = _build_grammar_logits_processor(
                     session.tokenizer, {"kind": "ebnf", "ebnf": forcing_ebnf}
                 )
                 forcing_detail["tool_choice_forced"] = True
+                forcing_detail["tool_choice_forcing_verdict"] = "applied"
             except Exception as exc:  # noqa: BLE001 - degrade, never break generation
                 forcing_detail["tool_choice_forcing_failed"] = True
                 forcing_detail["tool_choice_forcing_error_type"] = type(exc).__name__
+                forcing_detail["tool_choice_forcing_verdict"] = (
+                    "documented_infeasible"
+                )
                 _LOGGER.warning(
                     "tool_choice forcing grammar build failed; continuing unforced",
                     exc_info=True,
                 )
+        elif forcing_requested and forcing_family == "unsupported":
+            forcing_detail["tool_choice_forcing_verdict"] = "unsupported"
         started = time.time()
         wait_started = started
         _ticket, was_queued = self._admission.acquire()
