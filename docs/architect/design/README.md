@@ -58,12 +58,13 @@
 
 ## 替代收口 R-series Specs（2026-06-03）
 
-> 顶层目标见 [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md)「下阶段主线声明（替代收口）」。R-series 承接 Runtime-12 §7 + `runtime13` §5。一次一个：R0 已完成（verdict landed）；按用户选择下一个做 **R4 Phase 1**（R1/R2 仍 pending，由 `runtime13` §5 驱动）。
+> 顶层目标见 [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md)「下阶段主线声明（替代收口）」。R-series 承接 Runtime-12 §7 + `runtime13` §5。进度：R0 ✅ done · R4 Phase-1 ✅ pilot passed（`da6f35e3`）· **当前做 R1**（tool-calling family parity, scout-first）· R2 pending。
 
 | Gate | Spec | 状态 | Plan-grade 来源 |
 |---|---|---|---|
 | **R0** | [`R0-replacement-rebaseline-spec.md`](R0-replacement-rebaseline-spec.md) | ✅ done · verdict landed `180df57f`（[`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md)）| [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) 下阶段主线声明 + Runtime-12 §7 |
 | **R4** (Phase 1) | [`R4-ops-cutover-spec.md`](R4-ops-cutover-spec.md) · plan + runbook | ✅ **pilot PASSED 2026-06-04** · spec/plan/harness (`scripts/replacement/`, 24 tests) all pushed；live `OwlCoda→owlmlx→Qwen35` controlled smoke `passed` (`da6f35e3`) → [`r4-phase1-pilot-closeout.md`](../../source-of-truth/r4-phase1-pilot-closeout.md)；不翻默认 / 不 sustained / promotes nothing / verdict 仍 not-yet | [`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md) §5（R4）|
+| **R1** (Phase 1) | [`R1-tool-calling-family-parity-spec.md`](R1-tool-calling-family-parity-spec.md) | design-grade · brainstorming-approved (scout-first) 2026-06-04 · pending user spec review；Qwen+Gemma native:`auto`/`none` load-path-verified + family-aware forcing + live probe；停在 `experimental`,不晋级 | [`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md) §5（R1）|
 
 ---
 
