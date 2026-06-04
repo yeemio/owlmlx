@@ -13,6 +13,7 @@ def _build_fake_mlx_lm_with_observable_cache(
     *,
     trim_supported: bool = True,
     trim_partial: bool = False,
+    mismatch_trim_when_count: int | None = None,
     stream_token_ids: tuple[int, ...] = (999,),
 ) -> types.ModuleType:
     fake = types.ModuleType("mlx_lm")
@@ -62,6 +63,14 @@ def _build_fake_mlx_lm_with_observable_cache(
         trimmed = min(int(token_count), len(tokens))
         if trim_partial and trimmed > 0:
             trimmed -= 1
+        # Simulate a real-mlx_lm cache that cannot trim exactly
+        # ``mismatch_trim_when_count`` tokens (e.g. the 1-token reuse backoff),
+        # so trim reports a mismatching count and the prep falls back to fresh.
+        if (
+            mismatch_trim_when_count is not None
+            and int(token_count) == mismatch_trim_when_count
+        ):
+            trimmed = max(int(token_count) - 1, 0)
         if trimmed:
             del tokens[-trimmed:]
         trim_calls.append(trimmed)
@@ -141,11 +150,13 @@ def _reload_native_backend_with_fake_mlx_lm(
     *,
     trim_supported: bool = True,
     trim_partial: bool = False,
+    mismatch_trim_when_count: int | None = None,
     stream_token_ids: tuple[int, ...] = (999,),
 ):
     fake = _build_fake_mlx_lm_with_observable_cache(
         trim_supported=trim_supported,
         trim_partial=trim_partial,
+        mismatch_trim_when_count=mismatch_trim_when_count,
         stream_token_ids=stream_token_ids,
     )
     monkeypatch.setitem(sys.modules, "mlx_lm", fake)
@@ -370,10 +381,43 @@ def test_native_session_kv_cache_exact_prompt_hit_reforwards_last_token(
         # Full-overlap backoff: re-forward exactly the last token, never [].
         assert fake._seen_stream_prompts[1] == [ord("A")]
         assert fake._trim_calls == [1, 1, 1]
+        # Accounting on the (clean-trim) reuse success path: full prompt + N-1 cached.
+        assert second[-1].prompt_tokens == len("prefix A")  # 8
+        assert (
+            second[-1].detail["session_kv_cache"]["cached_prompt_tokens"]
+            == len("prefix A") - 1  # 7 = N-1
+        )
         status = backend.status().detail["session_kv_cache"]
         assert status["active_entries"] == 1
         assert status["counters"]["hits"] == 1
         assert status["counters"]["drops"] == 0
+    finally:
+        importlib.reload(mod)
+
+
+def test_native_session_kv_cache_exact_resend_trim_mismatch_keeps_prompt_accounting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Live-confirmed regression: when the exact-resend's 1-token reuse trim
+    # mismatches (real mlx_lm may not trim the backoff token), the prep falls
+    # back to a fresh cache. That fallback must STILL carry prompt_tokens so
+    # usage reports the full prompt count (N), not 0. completion=2 keeps req1's
+    # cache alive; the reuse prefill-trim (count=1) is what mismatches.
+    monkeypatch.setenv("OWLMLX_SESSION_CACHE_ENABLED", "1")
+    mod, _fake = _reload_native_backend_with_fake_mlx_lm(
+        monkeypatch,
+        mismatch_trim_when_count=1,
+        stream_token_ids=(999, 1000),
+    )
+    try:
+        backend = mod.MlxNativeBackend()
+        assert backend.load("fake-model").ok is True
+        first = list(backend.stream_generate("fake-model", "prefix A", session_id="s1"))
+        second = list(backend.stream_generate("fake-model", "prefix A", session_id="s1"))
+        assert first[-1].event == "done"
+        assert second[-1].event == "done"
+        # Reuse fell back to fresh (trim mismatch), but prompt accounting holds:
+        assert second[-1].prompt_tokens == len("prefix A")  # 8, not 0/None
     finally:
         importlib.reload(mod)
 

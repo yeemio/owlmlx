@@ -807,23 +807,33 @@ class MlxNativeBackend:
             normalized_session_id = _AUTO_PREFIX_SESSION_ID
             automatic_prefix_scope = True
 
+        # Encode once up-front so prompt-token accounting survives EVERY return
+        # path below (fresh, fallback, OR reuse). Otherwise a non-reuse/fallback
+        # return leaves prompt_tokens=None and the stream's usage reports 0.
+        prompt_tokens = _encode_prompt_tokens(session.tokenizer, prompt)
+
         if not self._session_kv_cache.enabled or normalized_session_id is None:
             return _PreparedPromptCache(
                 prompt_for_call=prompt,
                 prompt_cache=self._make_fresh_prompt_cache(mlx_lm_module, session),
+                prompt_tokens=prompt_tokens,
             )
 
         make_cache = _resolve_make_prompt_cache(mlx_lm_module)
         if make_cache is None:
             session.last_prompt_cache = None
             session.last_prompt_cache_id = None
-            return _PreparedPromptCache(prompt_for_call=prompt, prompt_cache=None)
+            return _PreparedPromptCache(
+                prompt_for_call=prompt,
+                prompt_cache=None,
+                prompt_tokens=prompt_tokens,
+            )
 
-        prompt_tokens = _encode_prompt_tokens(session.tokenizer, prompt)
         if not prompt_tokens:
             return _PreparedPromptCache(
                 prompt_for_call=prompt,
                 prompt_cache=self._make_fresh_prompt_cache(mlx_lm_module, session),
+                prompt_tokens=prompt_tokens,
             )
 
         try:
@@ -843,12 +853,14 @@ class MlxNativeBackend:
             return _PreparedPromptCache(
                 prompt_for_call=prompt,
                 prompt_cache=self._make_fresh_prompt_cache(mlx_lm_module, session),
+                prompt_tokens=prompt_tokens,
             )
 
         if decision.cache_object is None:
             return _PreparedPromptCache(
                 prompt_for_call=prompt,
                 prompt_cache=self._make_fresh_prompt_cache(mlx_lm_module, session),
+                prompt_tokens=prompt_tokens,
             )
 
         cache = decision.cache_object
@@ -916,6 +928,7 @@ class MlxNativeBackend:
                             mlx_lm_module,
                             session,
                         ),
+                        prompt_tokens=prompt_tokens,
                     )
             # After the full-overlap backoff above, suffix_tokens is non-empty
             # whenever we reuse a cache, so prompt_for_call is never empty.
