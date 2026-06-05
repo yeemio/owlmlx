@@ -53,6 +53,7 @@
 | **F-3** | [`F-3-resident-mtp-spec.md`](F-3-resident-mtp-spec.md) | design-grade draft · **BLOCKED on `mlx-lm #980`** (hybrid-model trim); unblock path = owlmlx non-trimmable resident feasibility probe (§2.2). Gemma4 / `mlx-vlm` line only; produces resident pure-decode A/B evidence, promotes nothing | [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) Campaign F · F-3 (line 335) |
 | **B prefill chunking** | [`B-prefill-chunking-spec.md`](B-prefill-chunking-spec.md) | configuration/progress surfaces supported; wall-clock acceleration not promised; cross-chunk consistency diagnostic-only | [`../07-perf-optimization-proposal-20260526.md`](../07-perf-optimization-proposal-20260526.md) direction B |
 | **F-4** | [`F-4-structured-output-invariance-spec.md`](F-4-structured-output-invariance-spec.md) | design-grade draft; validator + smoke matrix next; no code-grade implementation yet | [`../08-campaign-F4-structured-output-invariance-plan.md`](../08-campaign-F4-structured-output-invariance-plan.md) |
+| **对标 refresh** | [`comparative-evidence-refresh-spec.md`](comparative-evidence-refresh-spec.md) | design-grade · brainstorming-approved 2026-06-05 · pending review；复用冻结 comparative harness，cold(`single_prompt_short`)+warm(`multi_prompt_serial`) vs oMLX/vMLX，gemma，N≥5，禁词照守，promotes nothing | [`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md) §3 blocker ③ |
 
 **节奏纪律**：design spec **一次一个**，per round 落盘 + review；不允许批量预先撰写未启动的 gate。
 
