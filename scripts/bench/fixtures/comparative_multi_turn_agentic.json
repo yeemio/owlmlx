@@ -1,0 +1,10 @@
+{
+  "description": "Realistic agentic coding session: shared growing context. Each turn appends to history; warm runtimes reuse the common prefix.",
+  "system": "You are a senior Python engineer. Be concise. When asked to edit code, output only the changed function.",
+  "turns": [
+    "Here is a module:\n\n```python\ndef parse_config(path):\n    import json\n    return json.load(open(path))\n```\nExplain what's fragile about this in 2 sentences.",
+    "Rewrite parse_config to close the file handle and raise a clear error when the file is missing. Output only the function.",
+    "Now add support for a default config dict merged under the file's values. Output only the function.",
+    "Write one pytest test for the missing-file case. Output only the test function."
+  ]
+}
