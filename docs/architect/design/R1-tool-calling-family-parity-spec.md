@@ -1,7 +1,7 @@
 # R1 — Tool-Calling Family Parity (Qwen + Gemma, native, OpenAI shape) — Design Spec
 
 > 文档 grade：design-grade · 见 [README.md](README.md)
-> Status：brainstorming-approved (scout-first scope) 2026-06-04 · pending user spec review
+> Status：Phase-1 closed 2026-06-05 · code landed (format-bug fix `55e0762e` + evidence `41ab7202`) · Gemma `tool_choice` forcing = **applied (model-free construction-confirmed)** · Gemma `auto`/`none` = **load-path-compatible (live deferred)** · stays `experimental`, promotes nothing; §1a untouched · evidence: `files/evidence/owlmlx/replacement/r1-tool-parity/20260605T130129Z-r1-gemma-feasibility.json`
 > Campaign：替代收口 R-series — **R1**（blocker ①：source-first / tool-calling parity 超出 Qwen-only experimental）
 > Plan-grade 来源：[`../../source-of-truth/runtime13-replacement-rebaseline-verdict.md`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md) §5（R1）；关联 `project-owlcoda-tool-calling-campaign-a`（Route 1 / mlx_lm registry）
 > **Phase：Phase-1 only** — verify + forcing for **Qwen (done) + Gemma**, native backend, OpenAI shape。**停在 `experimental`，不走 §1a 晋级**。
