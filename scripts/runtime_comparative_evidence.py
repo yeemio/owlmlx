@@ -48,6 +48,12 @@ def _now_iso_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _prompt_set_hash(path: str) -> str:
+    import hashlib
+    data = Path(path).read_bytes()
+    return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
 def _empty_measurement(*, failed: bool) -> ComparativeEvidenceMeasurement:
     return ComparativeEvidenceMeasurement(
         throughput_tokens_per_second=0.0,
@@ -222,6 +228,24 @@ def _run_measured_short_prompt(
     return appended
 
 
+def _run_measured_multi_turn(
+    *,
+    ledger: ComparativeEvidenceLedger,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
+    """Execute the measured multi-turn serial run and append exactly one record.
+
+    The driver reads the prompt-set file itself (via the runner-config argv).
+    Here ``prompt`` carries the path so ``{prompt}`` substitution stays valid,
+    and the hash is computed from the file for honest reproducibility.
+    """
+    args.prompt = args.prompt_set
+    args.prompt_set_hash = _prompt_set_hash(args.prompt_set)
+    if not getattr(args, "workload_class", None):
+        args.workload_class = "multi_prompt_serial"
+    return _run_measured_short_prompt(ledger=ledger, args=args)
+
+
 def _import_manifest_record(
     *,
     ledger: ComparativeEvidenceLedger,
@@ -321,6 +345,24 @@ def main() -> int:
         help="Defaults to the manifest.json path inside --evidence-dir",
     )
 
+    multi = sub.add_parser(
+        "run-measured-multi-turn",
+        help="Run multi-turn serial attempts (owlmlx warm + reference) and append one record",
+    )
+    multi.add_argument("--evidence-dir", required=True)
+    multi.add_argument("--runner-config", required=True)
+    multi.add_argument("--host-class", required=True)
+    multi.add_argument("--workload-class", default="multi_prompt_serial")
+    multi.add_argument("--model-id", required=True)
+    multi.add_argument("--model-path", required=True)
+    multi.add_argument("--model-quantization", default="full_precision_unquantized")
+    multi.add_argument("--prompt-set", required=True)
+    multi.add_argument("--decode-max-tokens", type=int, default=128)
+    multi.add_argument("--decode-temperature", type=float, default=0.0)
+    multi.add_argument("--serving-budget-bytes", type=int, default=85899345920)
+    multi.add_argument("--repeats", type=int, default=5)
+    multi.add_argument("--evidence-pointer", default=None)
+
     import_manifest = sub.add_parser(
         "import-manifest-record",
         help=(
@@ -360,6 +402,11 @@ def main() -> int:
 
     if args.command == "run-measured-short-prompt":
         payload = _run_measured_short_prompt(ledger=ledger, args=args)
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "run-measured-multi-turn":
+        payload = _run_measured_multi_turn(ledger=ledger, args=args)
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 0
 
