@@ -1,0 +1,31 @@
+The function fails to close the file handle, leading to potential resource leaks. It also lacks error handling for missing files or invalid JSON, which will cause the application to crash.
+```python
+def parse_config(path):
+    import json
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Configuration file not found at: {path}")
+```
+```python
+def parse_config(path, default_config=None):
+    import json
+    try:
+        with open(path) as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Configuration file not found at: {path}")
+    
+    if default_config:
+        return {**default_config, **config}
+    return config
+```
+```python
+import pytest
+
+def test_parse_config_missing_file():
+    with pytest.raises(FileNotFoundError, match="Configuration file not found at"):
+        parse_config("non_existent_file.json")
+```
+{"generated_tokens": 242}

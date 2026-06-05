@@ -1,0 +1,1 @@
+{"dynamic_listener_ports": [8066], "dynamic_pid_files": [], "per_pid_rss_bytes": {"93855": 353386496}, "resolved_root_pids": [53714, 93855], "t_s": 161137.208149, "tick_total_rss_bytes": 353386496, "tracked_root_pids": [53714, 93855]}
