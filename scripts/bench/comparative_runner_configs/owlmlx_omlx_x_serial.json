@@ -1,0 +1,37 @@
+{
+  "owlmlx": {
+    "runtime_id": "owlmlx",
+    "runtime_version": "local-checkout-warm-8066",
+    "argv": [
+      "python3", "scripts/bench/comparative_http_driver.py",
+      "--mode", "multi-turn", "--base-url", "http://127.0.0.1:8066",
+      "--model", "{model_id}",
+      "--prompt-set", "scripts/bench/fixtures/comparative_multi_turn_agentic.json",
+      "--max-tokens", "{max_tokens}", "--temperature", "{temperature}",
+      "--session-id", "refresh-serial-001"
+    ],
+    "env": {"PYTHONPATH": "."},
+    "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+    "tokens_method": "json_field:generated_tokens",
+    "first_token_strategy": "first_nonempty_chunk",
+    "external_listener_ports": [8066],
+    "timeout_s": 240.0
+  },
+  "reference": {
+    "runtime_id": "omlx",
+    "runtime_version": "0.3.5-warm-8063",
+    "argv": [
+      "python3", "scripts/bench/comparative_http_driver.py",
+      "--mode", "multi-turn", "--base-url", "http://127.0.0.1:8063",
+      "--model", "{model_id}",
+      "--prompt-set", "scripts/bench/fixtures/comparative_multi_turn_agentic.json",
+      "--max-tokens", "{max_tokens}", "--temperature", "{temperature}"
+    ],
+    "env": {},
+    "cwd": "/Users/yeemio/AI/gitrep/owlmlx",
+    "tokens_method": "json_field:generated_tokens",
+    "first_token_strategy": "first_nonempty_chunk",
+    "external_listener_ports": [8063],
+    "timeout_s": 240.0
+  }
+}
