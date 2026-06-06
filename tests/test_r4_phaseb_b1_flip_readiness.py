@@ -46,3 +46,26 @@ def test_build_flip_readiness_artifact_shape():
     assert art["verdict"] == "go"
     assert art["promotes"] == "nothing"
     assert art["reproduction"]["model_id"] == "m"
+
+
+def test_flip_state_inbound_covered_and_fallback_zero():
+    cap = {"request_ids": ["a", "b"],
+           "owlmlx_inbound": {"served_request_ids": ["a", "b", "c"]},
+           "consumer": {"fallback_count": 0, "outbound_hosts": ["127.0.0.1:8066"]}}
+    ev = b1.build_flip_state_evidence(flip_readiness={"verdict": "go"}, post_flip_capture=cap,
+                                      reproduction={"session_id": "s"}, recorded_at="t")
+    assert ev["inbound_coverage_ok"] is True
+    assert ev["fallback_used_count"] == 0
+    assert ev["fallback_retained"] is True
+    assert ev["promotes"] == "nothing"
+
+
+def test_flip_state_fallback_used_is_honest_signal():
+    cap = {"request_ids": ["a", "b"],
+           "owlmlx_inbound": {"served_request_ids": ["a"]},
+           "consumer": {"fallback_count": 3, "outbound_hosts": ["127.0.0.1:8066", "127.0.0.1:8009"]}}
+    ev = b1.build_flip_state_evidence(flip_readiness={"verdict": "go"}, post_flip_capture=cap,
+                                      reproduction={"session_id": "s"}, recorded_at="t")
+    assert ev["inbound_coverage_ok"] is False   # 'b' not served
+    assert ev["fallback_used_count"] == 3        # honest owlmlx-gap signal, not hidden
+    assert "not sustained" in ev["honesty"].lower()

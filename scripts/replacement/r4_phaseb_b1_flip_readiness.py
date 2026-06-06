@@ -95,6 +95,53 @@ def run_flip_readiness(*, base_url, model_id, owlmlx_commit, evidence_dir, timeo
             "artifact_path": str(evidence_dir / fname)}
 
 
+def build_flip_state_evidence(*, flip_readiness, post_flip_capture, reproduction, recorded_at):
+    """Pure. Record the POST-flip state: owlmlx serving the default + fallback baseline.
+
+    post_flip_capture: operator-captured {request_ids:[...],
+      owlmlx_inbound:{served_request_ids:[...]}, consumer:{fallback_count:int, outbound_hosts:[...]}}.
+    HONEST: B1 = flip staged + initial real traffic served + :8009 fallback retained.
+    NOT sustained (that is B2); fallback_used_count>0 is a truthful owlmlx-gap signal.
+    """
+    served = {str(r) for r in (post_flip_capture.get("owlmlx_inbound", {}).get("served_request_ids") or [])}
+    req_ids = {str(r) for r in (post_flip_capture.get("request_ids") or [])}
+    inbound_coverage_ok = bool(req_ids) and req_ids <= served
+    fallback_count = int(post_flip_capture.get("consumer", {}).get("fallback_count", -1))
+    return {
+        "surface": "owlmlx.replacement.r4_phaseb_b1_flip_state",
+        "version": "v1",
+        "kind": "flip_state",
+        "recorded_at": recorded_at,
+        "flip_readiness": flip_readiness,
+        "inbound_coverage_ok": inbound_coverage_ok,
+        "missing_request_ids": sorted(req_ids - served),
+        "fallback_used_count": fallback_count,
+        "fallback_retained": True,
+        "reproduction": dict(reproduction),
+        "promotes": "nothing",
+        "honesty": (
+            "B1 flip staged + initial real traffic served by owlmlx + :8009 fallback "
+            "RETAINED. NOT sustained (B2), NOT replacement-complete. fallback_used_count>0 "
+            "is an honest owlmlx-gap signal (fed back to R1/diagnosis), not hidden."
+        ),
+    }
+
+
+def run_assemble_flip_state(*, capture_path, evidence_dir):
+    capture = json.loads(Path(capture_path).read_text(encoding="utf-8"))
+    ev = build_flip_state_evidence(
+        flip_readiness=capture.get("flip_readiness") or {},
+        post_flip_capture=capture.get("post_flip_capture") or {},
+        reproduction=capture.get("reproduction") or {},
+        recorded_at=_r4._now_iso_utc(),
+    )
+    fname = f"{_r4._now_compact_utc()}-flip-state.json"
+    _r4._write_json(evidence_dir / fname, ev)
+    return {"inbound_coverage_ok": ev["inbound_coverage_ok"],
+            "fallback_used_count": ev["fallback_used_count"],
+            "artifact_path": str(evidence_dir / fname)}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="R4 Phase B · B1 flip-readiness gate (owlmlx-side).")
     sub = parser.add_subparsers(dest="command", required=True)
