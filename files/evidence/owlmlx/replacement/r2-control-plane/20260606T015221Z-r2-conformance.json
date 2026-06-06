@@ -1,0 +1,116 @@
+{
+  "round": "R2",
+  "tier": "consumer-contract-conformance",
+  "verdict": "contract_gap_found",
+  "gap_count": 1,
+  "contracts": [
+    {
+      "contract": "owlcc_preflight_healthz",
+      "endpoint": "/healthz",
+      "consumer_ref": "owlcc/src/preflight.ts:36,57",
+      "consumer_reads": [
+        "HTTP status < 400",
+        "ok",
+        "readiness"
+      ],
+      "status": "pass",
+      "missing": [],
+      "notes": "Preflight only needs HTTP<400; ok/readiness checked as health extras.",
+      "http_status": 200
+    },
+    {
+      "contract": "owlcc_preflight_v1_models",
+      "endpoint": "/v1/models",
+      "consumer_ref": "owlcc/src/preflight.ts:119-120",
+      "consumer_reads": [
+        "data[].id"
+      ],
+      "status": "gap",
+      "missing": [
+        "data[].id (owlmlx /v1/models is loaded-inventory status-dict, not an OpenAI list)"
+      ],
+      "notes": "Resolution: post-cutover OwlCC must probe /v1/openai/models for availability truth.",
+      "http_status": 200
+    },
+    {
+      "contract": "owlcc_resolution_openai_models",
+      "endpoint": "/v1/openai/models",
+      "consumer_ref": "owlcc/src/preflight.ts:119-120 (resolution surface)",
+      "consumer_reads": [
+        "data[].id"
+      ],
+      "status": "pass",
+      "missing": [],
+      "notes": "Availability-truth surface OwlCC should read post-cutover.",
+      "http_status": 200
+    },
+    {
+      "contract": "owlcoda_gate_openai_models",
+      "endpoint": "/v1/openai/models",
+      "consumer_ref": "owlcoda/src/runtime-probe.ts:61-66",
+      "consumer_reads": [
+        "data[].id"
+      ],
+      "status": "pass",
+      "missing": [],
+      "notes": "Availability-truth surface for owlmlx-gate.",
+      "http_status": 200
+    },
+    {
+      "contract": "owlcoda_gate_model_visibility",
+      "endpoint": "/v1/runtime/model-visibility",
+      "consumer_ref": "owlcoda/src/runtime-probe.ts:93-154; admin/src/api/types.ts:43-63",
+      "consumer_reads": [
+        "rule",
+        "contract_version",
+        "formal_surface.endpoint",
+        "diagnostic_surface.endpoint",
+        "loaded_inventory_surface.endpoint",
+        "loaded_inventory_surface.semantic_role",
+        "gate.owner",
+        "gate.kind",
+        "gate.models_root",
+        "visible_model_ids",
+        "blocked_model_ids",
+        "entries[].model_id",
+        "entries[].visible",
+        "entries[].block_reason"
+      ],
+      "status": "pass",
+      "missing": [],
+      "notes": "Diagnostic surface; all fields owlmlx-gate parses must be present.",
+      "http_status": 200
+    },
+    {
+      "contract": "owlcoda_gate_loaded_inventory",
+      "endpoint": "/v1/models",
+      "consumer_ref": "owlcoda/src/runtime-probe.ts:68-84",
+      "consumer_reads": [
+        "inventory.entries[].model_id",
+        "inventory.model_count",
+        "visibility_contract.loaded_inventory_surface.semantic_role"
+      ],
+      "status": "pass",
+      "missing": [],
+      "notes": "owlmlx /v1/models = loaded-inventory only (owlmlx-gate reads it correctly).",
+      "http_status": 200
+    },
+    {
+      "contract": "owlcoda_gate_runtime_status",
+      "endpoint": "/v1/runtime/status",
+      "consumer_ref": "owlcoda/src/runtime-probe.ts:231-245",
+      "consumer_reads": [
+        "health.readiness",
+        "backend.healthy",
+        "inventory.entries[].model_id",
+        "inventory.model_count",
+        "backend.loaded_models[].model_id"
+      ],
+      "status": "pass",
+      "missing": [],
+      "notes": "Probe reports actual owlmlx status shape; missing fields are honest gaps.",
+      "http_status": 200
+    }
+  ],
+  "base_url": "http://127.0.0.1:8066"
+}
