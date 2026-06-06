@@ -58,13 +58,14 @@
 
 ## 替代收口 R-series Specs（2026-06-03）
 
-> 顶层目标见 [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md)「下阶段主线声明（替代收口）」。R-series 承接 Runtime-12 §7 + `runtime13` §5。进度：R0 ✅ done · R4 Phase-1 ✅ pilot passed（`da6f35e3`）· **当前做 R1**（tool-calling family parity, scout-first）· R2 pending。
+> 顶层目标见 [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md)「下阶段主线声明（替代收口）」。R-series 承接 Runtime-12 §7 + `runtime13` §5。进度：R0 ✅ done · R4 Phase-1 ✅ pilot passed（`da6f35e3`）· R1 ✅ Phase-1 LIVE-confirmed（branch `r1-gemma-forcing-fix`，未 merge）· **当前做 R2**（control-plane closure, scout-first）。
 
 | Gate | Spec | 状态 | Plan-grade 来源 |
 |---|---|---|---|
 | **R0** | [`R0-replacement-rebaseline-spec.md`](R0-replacement-rebaseline-spec.md) | ✅ done · verdict landed `180df57f`（[`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md)）| [`../01-mainline-roadmap.md`](../01-mainline-roadmap.md) 下阶段主线声明 + Runtime-12 §7 |
 | **R4** (Phase 1) | [`R4-ops-cutover-spec.md`](R4-ops-cutover-spec.md) · plan + runbook | ✅ **pilot PASSED 2026-06-04** · spec/plan/harness (`scripts/replacement/`, 24 tests) all pushed；live `OwlCoda→owlmlx→Qwen35` controlled smoke `passed` (`da6f35e3`) → [`r4-phase1-pilot-closeout.md`](../../source-of-truth/r4-phase1-pilot-closeout.md)；不翻默认 / 不 sustained / promotes nothing / verdict 仍 not-yet | [`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md) §5（R4）|
 | **R1** (Phase 1) | [`R1-tool-calling-family-parity-spec.md`](R1-tool-calling-family-parity-spec.md) | design-grade · brainstorming-approved (scout-first) 2026-06-04 · pending user spec review；Qwen+Gemma native:`auto`/`none` load-path-verified + family-aware forcing + live probe；停在 `experimental`,不晋级 | [`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md) §5（R1）|
+| **R2** (Phase 1) | [`R2-control-plane-closure-spec.md`](R2-control-plane-closure-spec.md) · runbook (pending) | design-grade · 档2（consumer-contract conformance + operability rehearsal）· scope 定档 2026-06-06；auth/routing/curation out-of-scope；现有 ~41 control-plane endpoint 已建好，R2 收口消费者契约 + operability + last-mile 冻结；promotes nothing, §1a 不动 | [`runtime13`](../../source-of-truth/runtime13-replacement-rebaseline-verdict.md) §3 blocker ② + §5（R2）|
 
 ---
 
