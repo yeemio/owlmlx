@@ -63,3 +63,26 @@ def test_aggregate_lifecycle_failed():
     steps = [{"status": r2o.PASS}, {"status": r2o.FAIL}]
     agg = r2o.aggregate_lifecycle(steps)
     assert agg["verdict"] == "rehearsal_failed"
+
+
+def test_switch_step_fail():
+    v = r2o.evaluate_switch_step("m2", {"summary": {"active_model_id": "other"}})
+    assert v["status"] == r2o.FAIL
+
+
+def test_restart_step_fail_empty_recovery():
+    v = r2o.evaluate_restart_step({}, {"summary": {"readiness": "ready"}})
+    assert v["status"] == r2o.FAIL
+
+
+def test_restart_step_fail_bad_readiness():
+    v = r2o.evaluate_restart_step({"recovery": "ok"}, {"summary": {"readiness": "error"}})
+    assert v["status"] == r2o.FAIL
+
+
+def test_load_step_fail_when_not_ready():
+    healthz = {"active_model_id": "m", "readiness": "loading"}
+    status = {"summary": {"active_model_id": "m"}}
+    v = r2o.evaluate_load_step("m", healthz, status)
+    assert v["status"] == r2o.FAIL
+    assert any("readiness" in r for r in v["reasons"])

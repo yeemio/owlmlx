@@ -8,6 +8,13 @@ cost-flagged. Promotes nothing; one controlled run != sustained stability.
 """
 from __future__ import annotations
 
+import argparse
+import json
+import os
+import sys
+import urllib.parse
+import urllib.request
+
 PASS = "pass"
 FAIL = "fail"
 
@@ -74,13 +81,6 @@ def aggregate_lifecycle(steps):
     }
 
 
-import argparse
-import json
-import os
-import sys
-import urllib.request
-
-
 def _http(base_url, method, path, body=None, timeout=120):
     url = base_url.rstrip("/") + path
     data = json.dumps(body).encode("utf-8") if body is not None else None
@@ -136,15 +136,17 @@ def main(argv=None):
             print("REFUSED: rehearse mutates runtime state. Pass --i-understand-bench-only "
                   "and target an isolated bench server (never :8066).", file=sys.stderr)
             return 3
-        if ":8066" in args.base_url:
-            print("REFUSED: --base-url points at :8066 (the default daemon). Use an isolated bench.",
+        if urllib.parse.urlparse(args.base_url).port == 8066:
+            print("REFUSED: --base-url points at port 8066 (the default daemon). Use an isolated bench.",
                   file=sys.stderr)
             return 3
         result = rehearse(args.base_url, args.model_a, args.model_b, victim=args.victim)
         result["base_url"] = args.base_url
         text = json.dumps(result, indent=2, ensure_ascii=False)
         if args.out:
-            os.makedirs(os.path.dirname(args.out), exist_ok=True)
+            d = os.path.dirname(args.out)
+            if d:
+                os.makedirs(d, exist_ok=True)
             with open(args.out, "w", encoding="utf-8") as fh:
                 fh.write(text + "\n")
         print(text)
