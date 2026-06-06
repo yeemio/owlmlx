@@ -36,3 +36,13 @@ def test_no_go_when_readiness_not_ready():
                                    {"ready": False, "failures": ["model_visible"], "verdict": "pilot_readiness_failed"})
     assert v["verdict"] == "no_go"
     assert any("readiness:model_visible" in b for b in v["blocking"])
+
+
+def test_build_flip_readiness_artifact_shape():
+    verdict = {"round": "R4-phaseB-B1", "tier": "flip-readiness", "verdict": "go", "blocking": []}
+    art = b1.build_flip_readiness_artifact(verdict=verdict, base_url="http://x", model_id="m",
+                                           owlmlx_commit="abc", recorded_at="2026-01-01T00:00:00Z")
+    assert art["kind"] == "flip_readiness"
+    assert art["verdict"] == "go"
+    assert art["promotes"] == "nothing"
+    assert art["reproduction"]["model_id"] == "m"
