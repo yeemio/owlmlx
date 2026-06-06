@@ -734,6 +734,9 @@ def test_tool_choice_forcing_ebnf_dispatches_by_tool_parser_family() -> None:
     assert gemma is not None and "<|tool_call>call:" in gemma
     assert "run_bash" in gemma and "read_file" in gemma
     assert "command" in gemma and "path" in gemma
+    # real gemma4 format: unquoted keys + <|"|> string delimiters, NOT JSON quotes
+    assert r'"\"" pname "\":"' not in gemma  # no JSON-quoted keys
+    assert r'<|\"|>' in gemma or '<|"|>' in gemma  # uses the gemma string delimiter
     assert unknown is None
 
 
@@ -770,6 +773,11 @@ def test_tool_choice_forcing_ebnf_compiles_as_valid_xgrammar() -> None:
     )
     # from_ebnf parses the grammar without a tokenizer -> proves valid EBNF.
     assert xgr.Grammar.from_ebnf(ebnf) is not None
+
+    gemma_ebnf = _tool_choice_forcing_ebnf(_FORCE_TOOLS, "required", parser_family="gemma4")
+    assert gemma_ebnf is not None
+    # from_ebnf parses the grammar without a tokenizer -> proves valid EBNF.
+    assert xgr.Grammar.from_ebnf(gemma_ebnf) is not None
 
 
 def test_native_backend_module_has_no_subprocess_or_sentinel_chain_ties() -> None:

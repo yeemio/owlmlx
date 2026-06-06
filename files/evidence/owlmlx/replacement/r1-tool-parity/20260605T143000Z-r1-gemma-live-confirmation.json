@@ -1,0 +1,50 @@
+{
+  "round": "R1",
+  "tier": "live-confirmation",
+  "recorded": "2026-06-05",
+  "owlmlx_commit": "fd3594b7f134e227dbc860313ce03a3575707564",
+  "branch": "r1-gemma-forcing-fix",
+  "model_id": "gemma-4-31B-it",
+  "model_note": "Live run used full gemma-4-31B-it (the default-visible registered model on the isolated :8067 bench server); the earlier model-free probe used the gemma-4-31B-it-4bit tokenizer. Both are gemma4-family with the identical tool-call wire format (<|tool_call>call:NAME{...}<tool_call|>) and the same mlx_lm gemma4 parser, so the tool-calling result is quant-invariant.",
+  "bench_server": {
+    "port": 8067,
+    "launch": "OWLMLX_MODEL_RELEASE_CANDIDATE_LEDGER_PATH=files/evidence/owlmlx/model-release-candidates/cumulative-ledger.jsonl .venv/bin/python scripts/runtime_native_preview_server.py --host 127.0.0.1 --port 8067 --models-root /Users/yeemio/AI/Agent/models",
+    "isolation_note": "isolated benchmark-only server; did NOT touch the user's :8066 default-visibility daemon; torn down after the run"
+  },
+  "live": {
+    "tier": "live",
+    "base_url": "http://127.0.0.1:8067",
+    "model": "gemma-4-31B-it",
+    "checks": {
+      "auto_emits_tool_call": true,
+      "forced_emits_tool_call": true
+    },
+    "auto_finish_reason": "tool_calls",
+    "auto_tool_calls": [
+      {
+        "id": "call_04ec4b10ae0b4a85b4e9bdee",
+        "type": "function",
+        "function": { "name": "run_bash", "arguments": "{\"command\": \"ls /tmp\"}" }
+      }
+    ],
+    "forced_finish_reason": "tool_calls",
+    "forced_tool_calls": [
+      {
+        "id": "call_bb1769ea2dd14df4a66fc086",
+        "type": "function",
+        "function": { "name": "run_bash", "arguments": "{\"command\": \"ls /tmp\"}" }
+      }
+    ],
+    "all_checks_pass": true
+  },
+  "repro": {
+    "cmd": "scripts/probe/r1_gemma_tool_calling_feasibility.py live --base-url http://127.0.0.1:8067 --model gemma-4-31B-it",
+    "prereq": "bench server launched per bench_server.launch above"
+  },
+  "evidence_language": {
+    "auto_none": "live-confirmed — gemma auto emits a parseable run_bash tool_call with finish_reason=tool_calls (no owlmlx code change needed; generic gemma4 parser)",
+    "forcing": "live-confirmed — tool_choice=required forces a parseable run_bash tool_call via the corrected gemma4 EBNF; arguments are valid JSON, proving the false-applied format bug (55e0762e) is fixed end-to-end, not only model-free"
+  },
+  "supersedes_language": "Upgrades the 20260605T130129Z model-free record: auto/none load-path-compatible -> live-confirmed; forcing applied(model-free construction-confirmed) -> applied(live-confirmed).",
+  "promotes": "nothing; stays experimental for Qwen+Gemma native; §1a untouched"
+}

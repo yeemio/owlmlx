@@ -520,10 +520,14 @@ def _qwen3_coder_forcing_ebnf(funcs: list[str], param_names: list[str]) -> str:
 
 
 def _gemma4_forcing_ebnf(funcs: list[str], param_names: list[str]) -> str:
-    """EBNF that constrains output to the Gemma4 tool-call envelope.
+    """EBNF constraining output to the real gemma4 tool-call envelope.
 
-    This mirrors the qwen3_coder forcing scope: constrain envelope, function
-    name, and parameter keys while leaving values intentionally loose.
+    Real gemma4 format (mlx_lm tool_parsers/gemma4.py): ``call:NAME{key: <|"|>v<|"|>}``
+    with UNQUOTED keys and ``<|"|>``-delimited string values, wrapped in the
+    ``<|tool_call> ... <tool_call|>`` envelope. Mirrors the qwen3_coder scope:
+    constrain envelope + function name + parameter keys, leave values loose.
+    Validated model-free against the Gemma tokenizer by
+    scripts/probe/r1_gemma_tool_calling_feasibility.py.
     """
     fname_alt = " | ".join(_ebnf_string_literal(f) for f in funcs)
     if param_names:
@@ -532,17 +536,16 @@ def _gemma4_forcing_ebnf(funcs: list[str], param_names: list[str]) -> str:
             [
                 r'root ::= "<|tool_call>call:" fname "{" plist "}<tool_call|>"',
                 "fname ::= " + fname_alt,
-                r'plist ::= pair ("," pair)*',
-                r'pair ::= "\"" pname "\":" value',
+                r'plist ::= pair ("," " "? pair)*',
+                r'pair ::= pname ": " strval',
                 "pname ::= " + pname_alt,
-                r'value ::= [^,}]*',
+                r'strval ::= "<|\"|>" [^<]* "<|\"|>"',
             ]
         )
     return "\n".join(
         [
-            r'root ::= "<|tool_call>call:" fname "{" value "}<tool_call|>"',
+            r'root ::= "<|tool_call>call:" fname "{}" "<tool_call|>"',
             "fname ::= " + fname_alt,
-            r'value ::= [^}]*',
         ]
     )
 

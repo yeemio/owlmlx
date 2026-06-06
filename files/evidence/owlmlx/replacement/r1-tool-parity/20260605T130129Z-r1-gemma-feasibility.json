@@ -1,0 +1,34 @@
+{
+  "round": "R1",
+  "owlmlx_commit": "55e0762e8154acaf8b47b9deb388456e266dd9a2",
+  "model_id": "gemma-4-31B-it-4bit",
+  "model_dir": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it-4bit",
+  "model_free": {
+    "tier": "model-free",
+    "model_dir": "/Users/yeemio/AI/Agent/models/gemma-4-31B-it-4bit",
+    "checks": {
+      "gemma4_parser_roundtrips_real_exemplar": true,
+      "committed_ebnf_rejects_real_call": true,
+      "corrected_ebnf_compiles": true,
+      "corrected_accepts_run_bash": true,
+      "corrected_accepts_read_file": true,
+      "corrected_rejects_plain_text": true,
+      "shipped_builder_accepts_real_call": true
+    },
+    "gemma4_parse_detail": "{\"name\": \"run_bash\", \"arguments\": {\"command\": \"ls -la /tmp\"}}",
+    "vocab_size": 262144,
+    "forcing_construction_verdict": "applied",
+    "auto_none_verdict": "load-path-compatible",
+    "all_checks_pass": true
+  },
+  "live": null,
+  "repro": {
+    "model_free_cmd": "scripts/probe/r1_gemma_tool_calling_feasibility.py model-free",
+    "live_cmd": "scripts/probe/r1_gemma_tool_calling_feasibility.py live --base-url http://127.0.0.1:8066 --model gemma-4-31B-it-4bit"
+  },
+  "evidence_language": {
+    "auto_none": "load-path-compatible (live deferred)",
+    "forcing": "applied (model-free construction-confirmed)"
+  },
+  "promotes": "nothing; stays experimental"
+}
