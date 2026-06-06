@@ -28,6 +28,9 @@ def evaluate_flip_readiness(conformance: Mapping[str, Any], readiness: Mapping[s
     blocking: list[str] = []
     for c in conformance.get("contracts", []):
         name = str(c.get("contract", ""))
+        # OwlCoda-blocking criterion: R2 contract names for OwlCoda MUST start
+        # with "owlcoda" (convention: owlcoda_gate_*). A future OwlCoda contract
+        # not following that prefix would NOT be caught here — keep the prefix.
         if c.get("status") == "gap" and name.startswith("owlcoda"):
             blocking.append(f"conformance:{name}")
     if not readiness.get("ready", False):
@@ -49,7 +52,9 @@ def evaluate_flip_readiness(conformance: Mapping[str, Any], readiness: Mapping[s
     }
 
 
-# --- sibling imports (scripts/ is not a package) ---
+# scripts/ is not a package: make sibling modules importable by path.
+# NOTE: sys.path.insert(0, ...) MUST stay directly above both sibling imports;
+# if this block is reorganized, the imports will break.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import r2_control_plane_conformance as _r2  # noqa: E402
 import r4_ops_cutover_pilot as _r4  # noqa: E402
@@ -105,6 +110,7 @@ def build_flip_state_evidence(*, flip_readiness, post_flip_capture, reproduction
     """
     served = {str(r) for r in (post_flip_capture.get("owlmlx_inbound", {}).get("served_request_ids") or [])}
     req_ids = {str(r) for r in (post_flip_capture.get("request_ids") or [])}
+    # empty request_ids -> inbound_coverage_ok=False (conservative: no IDs to confirm)
     inbound_coverage_ok = bool(req_ids) and req_ids <= served
     fallback_count = int(post_flip_capture.get("consumer", {}).get("fallback_count", -1))
     return {

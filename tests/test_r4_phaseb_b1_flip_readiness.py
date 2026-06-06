@@ -69,3 +69,20 @@ def test_flip_state_fallback_used_is_honest_signal():
     assert ev["inbound_coverage_ok"] is False   # 'b' not served
     assert ev["fallback_used_count"] == 3        # honest owlmlx-gap signal, not hidden
     assert "not sustained" in ev["honesty"].lower()
+
+
+def test_no_go_combined_conformance_and_readiness():
+    v = b1.evaluate_flip_readiness(_conf(owlcoda_gap=True),
+                                   {"ready": False, "failures": ["tool_lane_live"], "verdict": "pilot_readiness_failed"})
+    assert v["verdict"] == "no_go"
+    assert any(b.startswith("conformance:") for b in v["blocking"])
+    assert any(b.startswith("readiness:") for b in v["blocking"])
+
+
+def test_flip_state_empty_request_ids_is_conservative():
+    cap = {"request_ids": [],
+           "owlmlx_inbound": {"served_request_ids": ["a", "b"]},
+           "consumer": {"fallback_count": 0, "outbound_hosts": ["127.0.0.1:8066"]}}
+    ev = b1.build_flip_state_evidence(flip_readiness={"verdict": "go"}, post_flip_capture=cap,
+                                      reproduction={"session_id": "s"}, recorded_at="t")
+    assert ev["inbound_coverage_ok"] is False
