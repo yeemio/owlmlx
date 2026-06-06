@@ -108,3 +108,11 @@ def test_aggregate_gap_found_when_any_gap():
     assert agg["verdict"] == "contract_gap_found"
     assert agg["gap_count"] == 1
     assert agg["round"] == "R2"
+
+
+def test_main_out_flat_filename_does_not_crash(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    # dead port -> all contracts fetch-fail (gap), but --out file must still be written
+    rc = r2c.main(["probe-contracts", "--base-url", "http://127.0.0.1:9", "--out", "flat.json"])
+    assert (tmp_path / "flat.json").exists()
+    assert rc in (0, 2)

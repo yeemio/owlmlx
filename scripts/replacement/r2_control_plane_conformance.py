@@ -9,6 +9,12 @@ Promotes nothing. Evidence-language: conformance only, never parity/equivalent.
 """
 from __future__ import annotations
 
+import argparse
+import json
+import os
+import sys
+import urllib.request
+
 PASS = "pass"
 GAP = "gap"
 
@@ -152,8 +158,6 @@ def evaluate_owlcoda_runtime_status(payload):
     missing = []
     if not _dot_present(payload, "health.readiness"):
         missing.append("health.readiness")
-    if not _dot_present(payload, "backend.healthy"):
-        missing.append("backend.healthy")
     inv = payload.get("inventory")
     if not isinstance(inv, dict):
         missing.append("inventory")
@@ -169,6 +173,8 @@ def evaluate_owlcoda_runtime_status(payload):
     if not isinstance(backend, dict):
         missing.append("backend")
     else:
+        if "healthy" not in backend:
+            missing.append("backend.healthy")
         lm = backend.get("loaded_models")
         if not isinstance(lm, list):
             missing.append("backend.loaded_models[]")
@@ -185,13 +191,6 @@ def evaluate_owlcoda_runtime_status(payload):
         "missing": missing,
         "notes": "Probe reports actual owlmlx status shape; missing fields are honest gaps.",
     }
-
-
-import argparse
-import json
-import os
-import sys
-import urllib.request
 
 
 def aggregate_conformance(verdicts):
@@ -231,7 +230,7 @@ def run_contracts(base_url):
         try:
             status, body = _http_get_json(base_url, path)
         except Exception as exc:  # noqa: BLE001 — record fetch failure as a gap, don't crash
-            verdicts.append({"contract": evaluator.__name__, "endpoint": path,
+            verdicts.append({"contract": evaluator({}).get("contract", evaluator.__name__), "endpoint": path,
                              "status": GAP, "missing": ["<fetch failed: %s>" % exc]})
             continue
         v = evaluator(body if isinstance(body, dict) else {})
@@ -253,7 +252,9 @@ def main(argv=None):
         result["base_url"] = args.base_url
         text = json.dumps(result, indent=2, ensure_ascii=False)
         if args.out:
-            os.makedirs(os.path.dirname(args.out), exist_ok=True)
+            d = os.path.dirname(args.out)
+            if d:
+                os.makedirs(d, exist_ok=True)
             with open(args.out, "w", encoding="utf-8") as fh:
                 fh.write(text + "\n")
         print(text)
