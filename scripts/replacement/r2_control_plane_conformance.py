@@ -71,3 +71,117 @@ def evaluate_owlcc_openai_models_resolution(payload):
         "missing": [] if ok else ["data[].id"],
         "notes": "Availability-truth surface OwlCC should read post-cutover.",
     }
+
+
+def evaluate_owlcoda_openai_models(payload):
+    # owlcoda/src/runtime-probe.ts:61-66 parseOpenAiModelIds -> data[].id
+    ok = _is_openai_list(payload)
+    return {
+        "contract": "owlcoda_gate_openai_models",
+        "endpoint": "/v1/openai/models",
+        "consumer_ref": "owlcoda/src/runtime-probe.ts:61-66",
+        "consumer_reads": ["data[].id"],
+        "status": PASS if ok else GAP,
+        "missing": [] if ok else ["data[].id"],
+        "notes": "Availability-truth surface for owlmlx-gate.",
+    }
+
+
+def evaluate_owlcoda_model_visibility(payload):
+    # owlcoda/src/runtime-probe.ts:93-154 probeOwmlxRuntimeVisibility
+    scalar = [
+        "rule", "contract_version",
+        "formal_surface.endpoint", "diagnostic_surface.endpoint",
+        "loaded_inventory_surface.endpoint", "loaded_inventory_surface.semantic_role",
+        "gate.owner", "gate.kind", "gate.models_root",
+    ]
+    missing = [p for p in scalar if not _dot_present(payload, p)]
+    for key in ("visible_model_ids", "blocked_model_ids"):
+        if not isinstance(payload.get(key), list):
+            missing.append(key)
+    entries = payload.get("entries")
+    if not isinstance(entries, list):
+        missing.append("entries[]")
+    elif entries:
+        e0 = entries[0]
+        for f in ("model_id", "visible", "block_reason"):
+            if not isinstance(e0, dict) or f not in e0:
+                missing.append("entries[].%s" % f)
+    return {
+        "contract": "owlcoda_gate_model_visibility",
+        "endpoint": "/v1/runtime/model-visibility",
+        "consumer_ref": "owlcoda/src/runtime-probe.ts:93-154; admin/src/api/types.ts:43-63",
+        "consumer_reads": scalar + ["visible_model_ids", "blocked_model_ids",
+                                    "entries[].model_id", "entries[].visible", "entries[].block_reason"],
+        "status": PASS if not missing else GAP,
+        "missing": missing,
+        "notes": "Diagnostic surface; all fields owlmlx-gate parses must be present.",
+    }
+
+
+def evaluate_owlcoda_loaded_inventory(payload):
+    # owlcoda/src/runtime-probe.ts:68-84 parseLoadedInventory
+    missing = []
+    inv = payload.get("inventory")
+    if not isinstance(inv, dict):
+        missing.append("inventory")
+    else:
+        if not isinstance(inv.get("model_count"), int):
+            missing.append("inventory.model_count")
+        entries = inv.get("entries")
+        if not isinstance(entries, list):
+            missing.append("inventory.entries[]")
+        elif entries and "model_id" not in entries[0]:
+            missing.append("inventory.entries[].model_id")
+    if not _dot_present(payload, "visibility_contract.loaded_inventory_surface.semantic_role"):
+        missing.append("visibility_contract.loaded_inventory_surface.semantic_role")
+    return {
+        "contract": "owlcoda_gate_loaded_inventory",
+        "endpoint": "/v1/models",
+        "consumer_ref": "owlcoda/src/runtime-probe.ts:68-84",
+        "consumer_reads": ["inventory.entries[].model_id", "inventory.model_count",
+                           "visibility_contract.loaded_inventory_surface.semantic_role"],
+        "status": PASS if not missing else GAP,
+        "missing": missing,
+        "notes": "owlmlx /v1/models = loaded-inventory only (owlmlx-gate reads it correctly).",
+    }
+
+
+def evaluate_owlcoda_runtime_status(payload):
+    # owlcoda/src/runtime-probe.ts:231-245
+    missing = []
+    if not _dot_present(payload, "health.readiness"):
+        missing.append("health.readiness")
+    if not _dot_present(payload, "backend.healthy"):
+        missing.append("backend.healthy")
+    inv = payload.get("inventory")
+    if not isinstance(inv, dict):
+        missing.append("inventory")
+    else:
+        if not isinstance(inv.get("model_count"), int):
+            missing.append("inventory.model_count")
+        entries = inv.get("entries")
+        if not isinstance(entries, list):
+            missing.append("inventory.entries[]")
+        elif entries and "model_id" not in entries[0]:
+            missing.append("inventory.entries[].model_id")
+    backend = payload.get("backend")
+    if not isinstance(backend, dict):
+        missing.append("backend")
+    else:
+        lm = backend.get("loaded_models")
+        if not isinstance(lm, list):
+            missing.append("backend.loaded_models[]")
+        elif lm and "model_id" not in lm[0]:
+            missing.append("backend.loaded_models[].model_id")
+    return {
+        "contract": "owlcoda_gate_runtime_status",
+        "endpoint": "/v1/runtime/status",
+        "consumer_ref": "owlcoda/src/runtime-probe.ts:231-245",
+        "consumer_reads": ["health.readiness", "backend.healthy",
+                           "inventory.entries[].model_id", "inventory.model_count",
+                           "backend.loaded_models[].model_id"],
+        "status": PASS if not missing else GAP,
+        "missing": missing,
+        "notes": "Probe reports actual owlmlx status shape; missing fields are honest gaps.",
+    }
