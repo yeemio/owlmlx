@@ -93,3 +93,18 @@ def test_owlcoda_runtime_status_reports_missing_fields():
 def test_owlcoda_openai_models_pass():
     v = r2c.evaluate_owlcoda_openai_models({"object": "list", "data": [{"id": "m"}]})
     assert v["status"] == r2c.PASS
+
+
+def test_aggregate_passed_when_all_pass():
+    verdicts = [{"status": r2c.PASS}, {"status": r2c.PASS}]
+    agg = r2c.aggregate_conformance(verdicts)
+    assert agg["verdict"] == "passed"
+    assert agg["gap_count"] == 0
+
+
+def test_aggregate_gap_found_when_any_gap():
+    verdicts = [{"status": r2c.PASS}, {"status": r2c.GAP}]
+    agg = r2c.aggregate_conformance(verdicts)
+    assert agg["verdict"] == "contract_gap_found"
+    assert agg["gap_count"] == 1
+    assert agg["round"] == "R2"

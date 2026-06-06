@@ -185,3 +185,81 @@ def evaluate_owlcoda_runtime_status(payload):
         "missing": missing,
         "notes": "Probe reports actual owlmlx status shape; missing fields are honest gaps.",
     }
+
+
+import argparse
+import json
+import os
+import sys
+import urllib.request
+
+
+def aggregate_conformance(verdicts):
+    gaps = [v for v in verdicts if v.get("status") == GAP]
+    return {
+        "round": "R2",
+        "tier": "consumer-contract-conformance",
+        "verdict": "contract_gap_found" if gaps else "passed",
+        "gap_count": len(gaps),
+        "contracts": verdicts,
+    }
+
+
+def _http_get_json(base_url, path, timeout=15):
+    url = base_url.rstrip("/") + path
+    req = urllib.request.Request(url, headers={"accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (local trusted URL)
+        body = resp.read().decode("utf-8")
+        return resp.status, json.loads(body)
+
+
+# (endpoint, evaluator) pairs; each evaluator takes the parsed JSON body.
+_CONTRACTS = [
+    ("/healthz", evaluate_owlcc_healthz),
+    ("/v1/models", evaluate_owlcc_v1_models),
+    ("/v1/openai/models", evaluate_owlcc_openai_models_resolution),
+    ("/v1/openai/models", evaluate_owlcoda_openai_models),
+    ("/v1/runtime/model-visibility", evaluate_owlcoda_model_visibility),
+    ("/v1/models", evaluate_owlcoda_loaded_inventory),
+    ("/v1/runtime/status", evaluate_owlcoda_runtime_status),
+]
+
+
+def run_contracts(base_url):
+    verdicts = []
+    for path, evaluator in _CONTRACTS:
+        try:
+            status, body = _http_get_json(base_url, path)
+        except Exception as exc:  # noqa: BLE001 — record fetch failure as a gap, don't crash
+            verdicts.append({"contract": evaluator.__name__, "endpoint": path,
+                             "status": GAP, "missing": ["<fetch failed: %s>" % exc]})
+            continue
+        v = evaluator(body if isinstance(body, dict) else {})
+        v["http_status"] = status
+        verdicts.append(v)
+    return aggregate_conformance(verdicts)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="R2 control-plane consumer-contract conformance probe (read-only)")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("probe-contracts", help="probe owlmlx control-plane endpoints (read-only)")
+    p.add_argument("--base-url", default=os.environ.get("OWLMLX_BASE_URL", "http://127.0.0.1:8066"))
+    p.add_argument("--out", default=None, help="write evidence JSON to this path")
+    args = parser.parse_args(argv)
+
+    if args.cmd == "probe-contracts":
+        result = run_contracts(args.base_url)
+        result["base_url"] = args.base_url
+        text = json.dumps(result, indent=2, ensure_ascii=False)
+        if args.out:
+            os.makedirs(os.path.dirname(args.out), exist_ok=True)
+            with open(args.out, "w", encoding="utf-8") as fh:
+                fh.write(text + "\n")
+        print(text)
+        return 0 if result["verdict"] == "passed" else 2
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
