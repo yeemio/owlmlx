@@ -800,3 +800,192 @@ def test_anthropic_messages_stream_strips_reasoning_trace_for_policy_profile() -
             payload = json.loads(line[len("data: ") :])
             streamed_chunks.append(payload["delta"]["text"])
     assert "".join(streamed_chunks) == "Final visible answer."
+
+
+# --- E1: /v1/messages streaming + tools -> tool_use SSE (R1 Phase-2 spec §2) ---
+
+
+def _collect_sse_events(response_text: str) -> list[dict]:
+    events = []
+    for line in response_text.splitlines():
+        if line.startswith("data: "):
+            try:
+                events.append(json.loads(line[len("data: ") :]))
+            except json.JSONDecodeError:
+                pass
+    return events
+
+
+def _client_for_generate_result(result_factory) -> TestClient:
+    """TestClient whose backend returns result_factory(model_id) from
+    generate_messages (the non-stream call the tools branch must use)."""
+
+    class _ResultBackend(FakeBackend):
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            return result_factory(model_id)
+
+    kernel = RuntimeKernel(_ResultBackend())
+    assert kernel.load_model("fake-model").ok is True
+    return TestClient(create_app(kernel))
+
+
+def test_anthropic_stream_with_tools_emits_tool_use_blocks() -> None:
+    # Backend returns the REAL convention: finish_reason="tool_calls" + detail["tool_calls"]
+    client = _client_for_generate_result(
+        lambda model_id: GenerateResult(
+            ok=True,
+            message="generated tool calls",
+            model_id=model_id,
+            text="",
+            finish_reason="tool_calls",
+            detail={
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                            "name": "write",
+                            "arguments": "{\"path\": \"a.js\", \"content\": \"x\"}",
+                        },
+                    }
+                ]
+            },
+        )
+    )
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-model",
+            "stream": True,
+            "max_tokens": 64,
+            "messages": [{"role": "user", "content": "write a.js"}],
+            "tools": [
+                {
+                    "name": "write",
+                    "description": "w",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ],
+        },
+    )
+    events = _collect_sse_events(response.text)
+    starts = [
+        e
+        for e in events
+        if e.get("type") == "content_block_start"
+        and e.get("content_block", {}).get("type") == "tool_use"
+    ]
+    assert len(starts) == 1
+    assert starts[0]["content_block"]["name"] == "write"
+    deltas = [
+        e
+        for e in events
+        if e.get("type") == "content_block_delta"
+        and e.get("delta", {}).get("type") == "input_json_delta"
+    ]
+    joined = "".join(d["delta"]["partial_json"] for d in deltas)
+    assert json.loads(joined) == {"path": "a.js", "content": "x"}
+    message_deltas = [e for e in events if e.get("type") == "message_delta"]
+    assert message_deltas and message_deltas[-1]["delta"]["stop_reason"] == "tool_use"
+
+
+def test_anthropic_stream_with_tools_text_only_falls_back_to_end_turn() -> None:
+    client = _client_for_generate_result(
+        lambda model_id: GenerateResult(
+            ok=True,
+            message="generated text",
+            model_id=model_id,
+            text="plain answer",
+            finish_reason="stop",
+            detail={},
+        )
+    )
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-model",
+            "stream": True,
+            "max_tokens": 64,
+            "messages": [{"role": "user", "content": "hi"}],
+            "tools": [
+                {
+                    "name": "write",
+                    "description": "w",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ],
+        },
+    )
+    events = _collect_sse_events(response.text)
+    text = "".join(
+        e["delta"]["text"]
+        for e in events
+        if e.get("type") == "content_block_delta"
+        and e.get("delta", {}).get("type") == "text_delta"
+    )
+    assert text == "plain answer"
+    message_deltas = [e for e in events if e.get("type") == "message_delta"]
+    assert message_deltas[-1]["delta"]["stop_reason"] == "end_turn"
+
+
+def test_anthropic_stream_without_tools_keeps_streaming_path() -> None:
+    # No tools -> the existing token-by-token streaming branch must be used.
+    client = _client_with_loaded_fake_model()
+
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-model",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 8,
+            "stream": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = _collect_sse_events(response.text)
+    text_deltas = [
+        e
+        for e in events
+        if e.get("type") == "content_block_delta"
+        and e.get("delta", {}).get("type") == "text_delta"
+    ]
+    assert text_deltas, "expected text deltas from the streaming path"
+    message_deltas = [e for e in events if e.get("type") == "message_delta"]
+    assert message_deltas and message_deltas[-1]["delta"]["stop_reason"] == "end_turn"
+    # No tool_use events when no tools were sent.
+    assert not [
+        e for e in events if e.get("content_block", {}).get("type") == "tool_use"
+    ]
+
+
+def test_anthropic_stream_with_tools_generate_failure_emits_error() -> None:
+    from owlmlx.runtime.types import RuntimeErrorCode
+
+    client = _client_for_generate_result(
+        lambda model_id: GenerateResult(
+            ok=False,
+            message="boom",
+            error_code=RuntimeErrorCode.backend_error,
+            model_id=model_id,
+        )
+    )
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "fake-model",
+            "stream": True,
+            "max_tokens": 64,
+            "messages": [{"role": "user", "content": "hi"}],
+            "tools": [
+                {
+                    "name": "write",
+                    "description": "w",
+                    "input_schema": {"type": "object", "properties": {}},
+                }
+            ],
+        },
+    )
+    events = _collect_sse_events(response.text)
+    assert any(e.get("type") == "error" or "error" in e for e in events)

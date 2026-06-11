@@ -1273,6 +1273,95 @@ def register_openai_compat_routes(
         )
 
         async def anthropic_sse_source():
+            # E1 (R1 Phase-2 spec §2): tools present -> internal non-streaming
+            # generate, then emit the result as Anthropic SSE (mirrors the
+            # OpenAI sse_source tools branch above).
+            tool_choice_type = (
+                payload.tool_choice.get("type")
+                if isinstance(payload.tool_choice, dict)
+                else payload.tool_choice
+            )
+            if payload.tools and tool_choice_type != "none":
+                result = await runtime.generate_messages(
+                    turns, model_id=target_model, **params
+                )
+                if not result.ok:
+                    error_obj = {
+                        "type": "error",
+                        "error": {"type": "api_error", "message": result.message},
+                    }
+                    yield f"event: error\ndata: {json.dumps(error_obj)}\n\n"
+                    return
+                visible_text, _policy_payload = _openai_visible_text_for_policy(
+                    result.text,
+                    finish_reason=result.finish_reason,
+                    policy=anthropic_reasoning_policy,
+                )
+                tool_blocks = _anthropic_tool_use_blocks_from_detail(result.detail)
+                stop_reason = "tool_use" if tool_blocks else "end_turn"
+                yield (
+                    "event: message_start\n"
+                    f"data: {json.dumps({'type': 'message_start', 'message': _anthropic_message_dict(message_id=message_id, model=target_model or 'unknown', text='', stop_reason=None, input_tokens=result.prompt_tokens or input_tokens, output_tokens=0)})}\n\n"
+                )
+                block_index = 0
+                if visible_text and visible_text.strip():
+                    start = {
+                        "type": "content_block_start",
+                        "index": block_index,
+                        "content_block": {"type": "text", "text": ""},
+                    }
+                    yield f"event: content_block_start\ndata: {json.dumps(start)}\n\n"
+                    delta = {
+                        "type": "content_block_delta",
+                        "index": block_index,
+                        "delta": {"type": "text_delta", "text": visible_text},
+                    }
+                    yield f"event: content_block_delta\ndata: {json.dumps(delta)}\n\n"
+                    stop = {"type": "content_block_stop", "index": block_index}
+                    yield f"event: content_block_stop\ndata: {json.dumps(stop)}\n\n"
+                    block_index += 1
+                for block in tool_blocks:
+                    start = {
+                        "type": "content_block_start",
+                        "index": block_index,
+                        "content_block": {
+                            "type": "tool_use",
+                            "id": block.get("id"),
+                            "name": block.get("name"),
+                            "input": {},
+                        },
+                    }
+                    yield f"event: content_block_start\ndata: {json.dumps(start)}\n\n"
+                    delta = {
+                        "type": "content_block_delta",
+                        "index": block_index,
+                        "delta": {
+                            "type": "input_json_delta",
+                            "partial_json": json.dumps(
+                                block.get("input") or {}, ensure_ascii=False
+                            ),
+                        },
+                    }
+                    yield f"event: content_block_delta\ndata: {json.dumps(delta)}\n\n"
+                    stop = {"type": "content_block_stop", "index": block_index}
+                    yield f"event: content_block_stop\ndata: {json.dumps(stop)}\n\n"
+                    block_index += 1
+                message_delta = {
+                    "type": "message_delta",
+                    "delta": {"stop_reason": stop_reason, "stop_sequence": None},
+                    "usage": {"output_tokens": result.completion_tokens or 0},
+                }
+                tools_cache_read_input_tokens = _compat_cached_prompt_tokens(
+                    result.detail
+                )
+                if tools_cache_read_input_tokens is not None:
+                    message_delta["usage"]["cache_read_input_tokens"] = (
+                        tools_cache_read_input_tokens
+                    )
+                yield f"event: message_delta\ndata: {json.dumps(message_delta)}\n\n"
+                yield "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+                return
+
             stream_cache_read_input_tokens: int | None = None
             yield (
                 "event: message_start\n"
