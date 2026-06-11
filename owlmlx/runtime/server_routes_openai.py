@@ -173,6 +173,25 @@ def _openai_profile_for_model(model_id: str | None) -> ModelProfile | None:
     return profile
 
 
+def _profile_declares_reasoning_trace_policy(profile: ModelProfile | None) -> bool:
+    """Whether a model profile opts into final-answer reasoning-trace cleanup.
+
+    Shared by the OpenAI and Anthropic routes so both surfaces apply the same
+    profile-driven policy (the Anthropic request has no ``extra_body`` opt-in,
+    so the profile is its only signal).
+    """
+    if profile is None:
+        return False
+    if profile.thinking_policy.get("default_mode") == "parser_cleanup_required":
+        return True
+    if (
+        profile.thinking_policy.get("reasoning_trace_policy")
+        == "owlmlx.reasoning_trace_policy:v1"
+    ):
+        return True
+    return False
+
+
 def _openai_reasoning_trace_policy(
     payload: ChatCompletionRequest,
     *,
@@ -187,16 +206,7 @@ def _openai_reasoning_trace_policy(
         return "final_answer_content"
     if raw_policy in {"raw", "none", "disabled"}:
         return None
-    if (
-        profile is not None
-        and profile.thinking_policy.get("default_mode") == "parser_cleanup_required"
-    ):
-        return "final_answer_content"
-    if (
-        profile is not None
-        and profile.thinking_policy.get("reasoning_trace_policy")
-        == "owlmlx.reasoning_trace_policy:v1"
-    ):
+    if _profile_declares_reasoning_trace_policy(profile):
         return "final_answer_content"
     return None
 
@@ -430,6 +440,49 @@ def _tool_use_to_openai_tool_call(
             "arguments": json.dumps(tool_input, ensure_ascii=False),
         },
     }
+
+
+def _anthropic_tool_use_blocks_from_detail(
+    detail: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Convert backend tool calls (any of the real ``tool_calls`` /
+    ``tool_uses`` / ``tool_use`` conventions) into Anthropic ``tool_use``
+    content blocks.
+
+    Reuses :func:`_openai_tool_calls_from_detail`, which already normalizes the
+    mlx-native backend's OpenAI-shaped ``detail["tool_calls"]`` *and* the legacy
+    FakeBackend's ``detail["tool_uses"]`` into a single OpenAI shape
+    (``{id, function:{name, arguments(JSON string)}}``). Each normalized call is
+    re-shaped into ``{"type":"tool_use","id","name","input"}``; an empty or
+    invalid ``arguments`` JSON string falls back to ``{}``.
+    """
+    blocks: list[dict[str, Any]] = []
+    for tool_call in _openai_tool_calls_from_detail(detail):
+        function = tool_call.get("function")
+        if not isinstance(function, dict):
+            continue
+        name = function.get("name")
+        if not name:
+            continue
+        arguments = function.get("arguments")
+        tool_input: dict[str, Any]
+        if isinstance(arguments, str) and arguments.strip():
+            try:
+                parsed = json.loads(arguments)
+            except (ValueError, TypeError):
+                parsed = {}
+            tool_input = parsed if isinstance(parsed, dict) else {}
+        else:
+            tool_input = {}
+        blocks.append(
+            {
+                "type": "tool_use",
+                "id": tool_call.get("id"),
+                "name": name,
+                "input": tool_input,
+            }
+        )
+    return blocks
 
 
 def _openai_tool_call_delta(
@@ -1157,6 +1210,34 @@ def register_openai_compat_routes(
                     code=result.error_code.value if result.error_code is not None else "backend_error",
                     status_code=status_code,
                 )
+            # Apply the same profile-driven reasoning-trace cleanup the OpenAI
+            # route applies (the Anthropic request carries no per-request
+            # opt-in, so the model profile is the only signal).
+            reasoning_policy = (
+                "final_answer_content"
+                if _profile_declares_reasoning_trace_policy(
+                    _openai_profile_for_model(target_model)
+                )
+                else None
+            )
+            visible_text, _reasoning_policy_payload = _openai_visible_text_for_policy(
+                result.text,
+                finish_reason=result.finish_reason,
+                policy=reasoning_policy,
+            )
+            # Normalize tool calls from BOTH the real backend convention
+            # (finish_reason="tool_calls" + detail["tool_calls"]) and the legacy
+            # FakeBackend convention (finish_reason="tool_use" + detail["tool_uses"]).
+            tool_use_blocks = _anthropic_tool_use_blocks_from_detail(result.detail)
+            if tool_use_blocks:
+                content: list[dict[str, Any]] = []
+                if visible_text and visible_text.strip():
+                    content.append({"type": "text", "text": visible_text})
+                content.extend(tool_use_blocks)
+                stop_reason = "tool_use"
+            else:
+                content = [{"type": "text", "text": visible_text}]
+                stop_reason = "end_turn"
             return JSONResponse(
                 headers={"x-request-id": request_id},
                 content=(
@@ -1164,30 +1245,32 @@ def register_openai_compat_routes(
                         **_anthropic_message_dict(
                             message_id=message_id,
                             model=target_model or "unknown",
-                            text=result.text,
-                            stop_reason="tool_use" if result.finish_reason == "tool_use" else "end_turn",
+                            text=visible_text,
+                            stop_reason=stop_reason,
                             input_tokens=result.prompt_tokens or input_tokens,
                             output_tokens=result.completion_tokens,
                             cache_read_input_tokens=_compat_cached_prompt_tokens(
                                 result.detail
                             ),
                         ),
-                        "content": (
-                            [
-                                {
-                                    "type": "tool_use",
-                                    "id": tool["id"],
-                                    "name": tool["name"],
-                                    "input": tool["input"],
-                                }
-                                for tool in result.detail.get("tool_uses", [])
-                            ]
-                            if result.finish_reason == "tool_use"
-                            else [{"type": "text", "text": result.text}]
-                        ),
+                        "content": content,
                     }
                 ),
             )
+
+        # B-bug (streaming): when the model profile declares the reasoning-trace
+        # policy, the Anthropic stream must surface cleaned final text (channel
+        # markers stripped), mirroring the OpenAI streaming route which buffers
+        # tokens and emits the cleaned text once at the end. The policy operates
+        # on the *complete* output, so incremental per-token cleanup is not
+        # possible; buffering is the same trade-off the OpenAI route makes.
+        anthropic_reasoning_policy = (
+            "final_answer_content"
+            if _profile_declares_reasoning_trace_policy(
+                _openai_profile_for_model(target_model)
+            )
+            else None
+        )
 
         async def anthropic_sse_source():
             stream_cache_read_input_tokens: int | None = None
@@ -1195,6 +1278,71 @@ def register_openai_compat_routes(
                 "event: message_start\n"
                 f"data: {json.dumps({'type': 'message_start', 'message': _anthropic_message_dict(message_id=message_id, model=target_model or 'unknown', text='', stop_reason=None, input_tokens=input_tokens, output_tokens=0)})}\n\n"
             )
+
+            if anthropic_reasoning_policy == "final_answer_content":
+                buffered_text: list[str] = []
+                finish_reason = "stop"
+                completion_tokens = 0
+                async for event in runtime.generate_stream_messages(
+                    turns,
+                    model_id=target_model,
+                    **params,
+                ):
+                    event_cached_prompt_tokens = _compat_cached_prompt_tokens(
+                        event.detail
+                    )
+                    if event_cached_prompt_tokens is not None:
+                        stream_cache_read_input_tokens = event_cached_prompt_tokens
+                    if event.completion_tokens is not None:
+                        completion_tokens = int(event.completion_tokens)
+                    if event.finish_reason:
+                        finish_reason = event.finish_reason
+                    if event.event == "token":
+                        buffered_text.append(event.text)
+                        continue
+                    if event.event == "done":
+                        visible_text, _policy_payload = _openai_visible_text_for_policy(
+                            "".join(buffered_text),
+                            finish_reason=finish_reason,
+                            policy=anthropic_reasoning_policy,
+                        )
+                        yield (
+                            "event: content_block_start\n"
+                            "data: {\"type\":\"content_block_start\",\"index\":0,"
+                            "\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+                        )
+                        if visible_text:
+                            delta = {
+                                "type": "content_block_delta",
+                                "index": 0,
+                                "delta": {"type": "text_delta", "text": visible_text},
+                            }
+                            yield f"event: content_block_delta\ndata: {json.dumps(delta)}\n\n"
+                        yield "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+                        message_delta = {
+                            "type": "message_delta",
+                            "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                            "usage": {"output_tokens": completion_tokens},
+                        }
+                        if stream_cache_read_input_tokens is not None:
+                            message_delta["usage"]["cache_read_input_tokens"] = (
+                                stream_cache_read_input_tokens
+                            )
+                        yield f"event: message_delta\ndata: {json.dumps(message_delta)}\n\n"
+                        yield "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+                        return
+                    if event.event == "error":
+                        error_obj = {
+                            "type": "error",
+                            "error": {
+                                "type": event.error_code.value if event.error_code is not None else "api_error",
+                                "message": event.detail.get("message", "stream generation failed"),
+                            },
+                        }
+                        yield f"event: error\ndata: {json.dumps(error_obj)}\n\n"
+                        return
+                return
+
             text_block_started = False
             async for event in runtime.generate_stream_messages(
                 turns,
