@@ -442,6 +442,46 @@ def _tool_use_to_openai_tool_call(
     }
 
 
+def _openai_tools_from_anthropic(
+    tools: list["AnthropicToolDef"],
+) -> list[dict[str, Any]]:
+    """Convert Anthropic tool definitions to the OpenAI shape the backend
+    expects ({type: function, function: {name, description, parameters}})."""
+    converted: list[dict[str, Any]] = []
+    for tool in tools:
+        converted.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description or "",
+                    "parameters": tool.input_schema
+                    or {"type": "object", "properties": {}},
+                },
+            }
+        )
+    return converted
+
+
+def _openai_tool_choice_from_anthropic(tool_choice: object) -> object:
+    """Map Anthropic tool_choice dicts onto the OpenAI vocabulary the backend
+    understands; unknown shapes pass through unchanged."""
+    if isinstance(tool_choice, dict):
+        choice_type = tool_choice.get("type")
+        if choice_type == "auto":
+            return "auto"
+        if choice_type in ("any", "required"):
+            return "required"
+        if choice_type == "tool":
+            return {
+                "type": "function",
+                "function": {"name": tool_choice.get("name")},
+            }
+        if choice_type == "none":
+            return "none"
+    return tool_choice
+
+
 def _anthropic_tool_use_blocks_from_detail(
     detail: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
@@ -1165,9 +1205,15 @@ def register_openai_compat_routes(
         if payload.temperature is not None:
             params["temperature"] = payload.temperature
         if payload.tools:
-            params["tools"] = [tool.model_dump() for tool in payload.tools]
+            # The backend (template rendering, forcing grammar, parser) speaks
+            # OpenAI tool shape; Anthropic {name, input_schema} passed through
+            # verbatim renders a garbage declaration and degrades generation
+            # (live-observed degenerate repetition on gemma-4-12B-it).
+            params["tools"] = _openai_tools_from_anthropic(payload.tools)
         if payload.tool_choice is not None:
-            params["tool_choice"] = payload.tool_choice
+            params["tool_choice"] = _openai_tool_choice_from_anthropic(
+                payload.tool_choice
+            )
         input_tokens = _estimate_input_tokens_from_turns(turns)
         session_id = session_id_from_request(request)
         if session_id is not None:

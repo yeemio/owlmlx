@@ -989,3 +989,89 @@ def test_anthropic_stream_with_tools_generate_failure_emits_error() -> None:
     )
     events = _collect_sse_events(response.text)
     assert any(e.get("type") == "error" or "error" in e for e in events)
+
+
+def test_anthropic_messages_converts_tools_to_openai_shape_for_backend() -> None:
+    """Live-found gap: /v1/messages passed Anthropic-shaped tool defs
+    ({name, input_schema}) straight to the backend, whose template rendering
+    and forcing grammar expect OpenAI shape ({type:function, function:
+    {name, parameters}}). The mis-shaped declaration degraded generation
+    (degenerate repetition observed live on gemma-4-12B-it). The route must
+    convert tools AND tool_choice at the boundary."""
+
+    captured: dict = {}
+
+    class _CapturingBackend(FakeBackend):
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            captured.update(kwargs)
+            return GenerateResult(
+                ok=True,
+                message="generated",
+                model_id=model_id,
+                text="ok",
+                finish_reason="stop",
+                detail={},
+            )
+
+    kernel = RuntimeKernel(_CapturingBackend())
+    assert kernel.load_model("stub-model").ok is True
+    client = TestClient(create_app(kernel))
+    response = client.post(
+        "/v1/messages",
+        json={
+            "model": "stub-model",
+            "max_tokens": 64,
+            "messages": [{"role": "user", "content": "hi"}],
+            "tools": [
+                {
+                    "name": "write",
+                    "description": "Write a file.",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}},
+                        "required": ["path"],
+                    },
+                }
+            ],
+            "tool_choice": {"type": "any"},
+        },
+    )
+    assert response.status_code == 200
+    tools = captured.get("tools")
+    assert isinstance(tools, list) and len(tools) == 1
+    assert tools[0]["type"] == "function"
+    function = tools[0]["function"]
+    assert function["name"] == "write"
+    assert function["description"] == "Write a file."
+    assert function["parameters"]["required"] == ["path"]
+    assert "input_schema" not in tools[0]
+    assert captured.get("tool_choice") == "required"
+
+
+def test_anthropic_messages_tool_choice_shapes_map_to_openai() -> None:
+    captured_choices: list = []
+
+    class _CapturingBackend(FakeBackend):
+        def generate_messages(self, model_id, messages, **kwargs):  # type: ignore[no-untyped-def]
+            captured_choices.append(kwargs.get("tool_choice"))
+            return GenerateResult(
+                ok=True, message="generated", model_id=model_id,
+                text="ok", finish_reason="stop", detail={},
+            )
+
+    kernel = RuntimeKernel(_CapturingBackend())
+    assert kernel.load_model("stub-model").ok is True
+    client = TestClient(create_app(kernel))
+    base = {
+        "model": "stub-model", "max_tokens": 64,
+        "messages": [{"role": "user", "content": "hi"}],
+        "tools": [{"name": "write", "description": "w",
+                   "input_schema": {"type": "object", "properties": {}}}],
+    }
+    for tc in ({"type": "auto"}, {"type": "any"},
+               {"type": "tool", "name": "write"}, {"type": "none"}):
+        client.post("/v1/messages", json={**base, "tool_choice": tc})
+    assert captured_choices[0] == "auto"
+    assert captured_choices[1] == "required"
+    assert captured_choices[2] == {"type": "function", "function": {"name": "write"}}
+    assert captured_choices[3] == "none"
