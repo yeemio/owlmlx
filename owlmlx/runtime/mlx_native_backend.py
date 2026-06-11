@@ -32,6 +32,7 @@ import queue
 import threading
 import time
 import uuid
+import importlib
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -478,6 +479,46 @@ def _parse_native_tool_calls(
         wrapped = f"{start_marker}{tool_text}{end_marker or ''}"
         remainder = remainder.replace(wrapped, "", 1)
     return _ParsedNativeToolCalls(tool_calls, remainder.strip(), detail=detail)
+
+
+_GEMMA_VLM_PARSER_SOURCES: tuple[str, ...] = (
+    "mlx_vlm.tool_parsers.gemma4",   # engine-matched first (per Task-2 Step-1 probe)
+    "mlx_lm.tool_parsers.gemma4",
+)
+
+
+def _attach_gemma_vlm_tool_parser(tokenizer: Any, *, model_id: str) -> bool:
+    """Attach the upstream gemma4 tool parser to a vlm-loaded tokenizer.
+
+    mlx_vlm processors expose no ``tool_parser``/``tool_call_start``/
+    ``tool_call_end``, so ``_parse_native_tool_calls`` honestly reports
+    ``tool_parser_missing`` (R1 Phase-2 spec §1-C). Returns True only when a
+    parser was newly attached. Never raises: attach failure leaves the
+    diagnostics truthful.
+    """
+    if callable(getattr(tokenizer, "tool_parser", None)):
+        return False
+    haystack = model_id.lower()
+    if "gemma" not in haystack:
+        return False
+    for module_name in _GEMMA_VLM_PARSER_SOURCES:
+        try:
+            module = importlib.import_module(module_name)
+        except Exception:
+            continue
+        parse_tool_call = getattr(module, "parse_tool_call", None)
+        start = getattr(module, "tool_call_start", None)
+        end = getattr(module, "tool_call_end", None)
+        if not callable(parse_tool_call) or not start or not end:
+            continue
+        try:
+            tokenizer.tool_parser = parse_tool_call
+            tokenizer.tool_call_start = start
+            tokenizer.tool_call_end = end
+        except Exception:
+            return False
+        return True
+    return False
 
 
 def _tool_function_name(tool: object) -> str | None:
@@ -1308,6 +1349,9 @@ class MlxNativeBackend:
                 message=f"native load failed: {exc}",
                 error_code=RuntimeErrorCode.backend_error,
             )
+
+        if engine == "mlx_vlm":
+            _attach_gemma_vlm_tool_parser(tokenizer, model_id=model_id)
 
         info = LoadedModelInfo(
             model_id=model_id,
