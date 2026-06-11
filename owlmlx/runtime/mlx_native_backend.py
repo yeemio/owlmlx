@@ -1350,8 +1350,7 @@ class MlxNativeBackend:
                 error_code=RuntimeErrorCode.backend_error,
             )
 
-        if engine == "mlx_vlm":
-            _attach_gemma_vlm_tool_parser(tokenizer, model_id=model_id)
+        _attach_gemma_vlm_tool_parser(tokenizer, model_id=model_id)
 
         info = LoadedModelInfo(
             model_id=model_id,
