@@ -138,7 +138,10 @@ _PROFILES: dict[str, ModelProfile] = {
     "gemma4_text": _profile(
         profile_id="gemma4_text",
         profile_family="gemma4",
-        model_id_patterns=(r"\bgemma\b.*\b4\b.*\b31b\b.*\bit\b",),
+        model_id_patterns=(
+            r"\bgemma\b.*\b4\b.*\b12b\b.*\bit\b",
+            r"\bgemma\b.*\b4\b.*\b31b\b.*\bit\b",
+        ),
         chat_template_kwargs={"enable_thinking": False},
         stop_token_strings=("<eos>", "<turn|>"),
         sampler_defaults={

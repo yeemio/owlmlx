@@ -36,6 +36,13 @@ DEFAULT_MODEL_RELEASE_CANDIDATES: tuple[dict[str, str], ...] = (
         "verdict": "needs_optimization",
     },
     {
+        "model_id": "gemma-4-12B-it",
+        "lane": "mainline",
+        "artifact_path": "/Users/yeemio/AI/Agent/models/gemma-4-12B-it",
+        "visibility_status": "visible",
+        "verdict": "needs_optimization",
+    },
+    {
         "model_id": "DeepSeek-V4-Flash-2bit-DQ",
         "lane": "technical_preview",
         "artifact_path": (

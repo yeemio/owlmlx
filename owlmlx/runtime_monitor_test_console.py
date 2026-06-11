@@ -55,14 +55,19 @@ TEST_PROFILE_CATALOG: dict[str, dict[str, Any]] = {
     },
     "gemma-repetitive-output-template": {
         "profile_id": "gemma-repetitive-output-template",
-        "model_ids": ("gemma-4-31B-it",),
+        "model_ids": ("gemma-4-12B-it", "gemma-4-31B-it"),
         "purpose": "surface_repetitive_or_visible_reasoning_without_hiding_failure",
         "estimated_memory_gb": 60.0,
         "allow_live_launch": True,
     },
     "post-run-health-gate": {
         "profile_id": "post-run-health-gate",
-        "model_ids": ("Qwen3.6-27B", "Qwen3.6-35B-A3B", "gemma-4-31B-it"),
+        "model_ids": (
+            "Qwen3.6-27B",
+            "Qwen3.6-35B-A3B",
+            "gemma-4-12B-it",
+            "gemma-4-31B-it",
+        ),
         "purpose": "prove_repeated_load_generate_unload_leaves_backend_clean",
         "estimated_memory_gb": None,
         "allow_live_launch": True,

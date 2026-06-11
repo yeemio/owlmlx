@@ -41,6 +41,7 @@ def test_required_profile_ids_serialize() -> None:
 def test_known_model_ids_resolve_to_expected_profiles() -> None:
     assert resolve_model_profile("Qwen3.6-27B").profile_id == "qwen3_6_text"
     assert resolve_model_profile("Qwen3.6-35B-A3B").profile_id == "qwen3_6_moe"
+    assert resolve_model_profile("gemma-4-12B-it").profile_id == "gemma4_text"
     assert resolve_model_profile("gemma-4-31B-it").profile_id == "gemma4_text"
     assert (
         resolve_model_profile("DeepSeek-V4-Flash-2bit-DQ").profile_id
@@ -51,6 +52,7 @@ def test_known_model_ids_resolve_to_expected_profiles() -> None:
 def test_resolver_is_case_and_separator_tolerant() -> None:
     assert resolve_model_profile("qwen3_6_27b").profile_id == "qwen3_6_text"
     assert resolve_model_profile("QWEN3-6-35B-A3B").profile_id == "qwen3_6_moe"
+    assert resolve_model_profile("Gemma 4 12b IT").profile_id == "gemma4_text"
     assert resolve_model_profile("Gemma 4 31b IT").profile_id == "gemma4_text"
     assert resolve_model_profile("deepseek v4 flash").profile_id == "deepseek_v4_experimental"
 
@@ -77,6 +79,7 @@ def test_optional_config_fields_can_supply_family_hint() -> None:
 def test_gemma_profile_includes_stop_channel_and_cache_caveats() -> None:
     profile = get_model_profile("gemma4_text")
     assert profile.chat_template_kwargs["enable_thinking"] is False
+    assert any("12b" in pattern for pattern in profile.model_id_patterns)
     assert "<eos>" in profile.stop_token_strings
     assert "<turn|>" in profile.stop_token_strings
     assert profile.reasoning_parser_family == "gemma4"

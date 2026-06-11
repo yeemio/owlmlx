@@ -1060,6 +1060,9 @@ def register_openai_compat_routes(
                         }
                         if policy_payload is not None:
                             done_chunk["owlmlx_reasoning_trace_policy"] = policy_payload
+                        event_timing = event.detail.get("timing")
+                        if isinstance(event_timing, dict):
+                            done_chunk["timing"] = event_timing
                         if prompt_tokens is not None or completion_tokens is not None:
                             done_chunk["usage"] = _openai_usage_dict(
                                 prompt_tokens=prompt_tokens,
@@ -1161,6 +1164,9 @@ def register_openai_compat_routes(
                         ],
                     }
                     cached_prompt_tokens = _compat_cached_prompt_tokens(event.detail)
+                    event_timing = event.detail.get("timing")
+                    if isinstance(event_timing, dict):
+                        chunk["timing"] = event_timing
                     if (
                         event.prompt_tokens is not None
                         or event.completion_tokens is not None

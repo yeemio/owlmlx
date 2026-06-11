@@ -126,4 +126,4 @@ def test_technical_preview_factory_mounts_model_rc_ledger_env(
     assert latest.status_code == 200
     assert latest.json()["model_id"] == "DeepSeek-V4-Flash-2bit-DQ"
     assert history.status_code == 200
-    assert len(history.json()["records"]) == 4
+    assert len(history.json()["records"]) == 5

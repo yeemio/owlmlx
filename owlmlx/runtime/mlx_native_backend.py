@@ -36,6 +36,7 @@ import importlib
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 from owlmlx.cache_manager import CacheManager, CachedRequestHandle
@@ -81,6 +82,7 @@ class _NativeSession:
     model: Any
     tokenizer: Any
     info: LoadedModelInfo
+    engine: str = "mlx_lm"
     lock: threading.Lock = field(default_factory=threading.Lock)
     last_error: str | None = None
     last_prompt_cache: Any = None
@@ -210,6 +212,61 @@ def _import_mlx_lm() -> tuple[Any, str | None]:
     except Exception as exc:  # pragma: no cover - defensive
         return None, f"mlx_lm import failed: {exc}"
     return mlx_lm, None
+
+
+def _import_mlx_vlm_generate() -> tuple[Any, str | None]:
+    """Return (mlx_vlm.generate module, error) for Gemma4 unified models."""
+
+    try:
+        mlx_vlm_generate = importlib.import_module("mlx_vlm.generate")
+    except ImportError as exc:
+        return None, f"mlx_vlm is not installed in this Python environment: {exc}"
+    except Exception as exc:  # pragma: no cover - defensive
+        return None, f"mlx_vlm import failed: {exc}"
+    return mlx_vlm_generate, None
+
+
+def _model_config_for_path(model_id: str) -> dict[str, Any]:
+    try:
+        path = Path(model_id).expanduser()
+        config_path = path / "config.json" if path.is_dir() else path
+        if config_path.name != "config.json":
+            return {}
+        return json.loads(config_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _native_engine_for_model(model_id: str) -> str:
+    config = _model_config_for_path(model_id)
+    model_type = str(config.get("model_type") or "")
+    architectures = config.get("architectures")
+    if model_type == "gemma4_unified":
+        return "mlx_vlm"
+    if isinstance(architectures, list) and any(
+        str(item) == "Gemma4UnifiedForConditionalGeneration"
+        for item in architectures
+    ):
+        return "mlx_vlm"
+    return "mlx_lm"
+
+
+def _render_single_user_prompt_with_template(processor: Any, prompt: str) -> str:
+    if "<|turn>" in prompt or prompt.startswith("<bos>"):
+        return prompt
+    apply_chat_template = getattr(processor, "apply_chat_template", None)
+    if not callable(apply_chat_template):
+        return prompt
+    try:
+        return str(
+            apply_chat_template(
+                [{"role": "user", "content": prompt}],
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+        )
+    except Exception:
+        return prompt
 
 
 def _resolve_make_prompt_cache(mlx_lm_module: Any) -> Any | None:
@@ -1324,18 +1381,23 @@ class MlxNativeBackend:
                     error_code=RuntimeErrorCode.model_already_loaded,
                 )
 
-        mlx_lm, import_error = _import_mlx_lm()
-        if mlx_lm is None:
+        engine = _native_engine_for_model(model_id)
+        runtime_module, import_error = (
+            _import_mlx_vlm_generate()
+            if engine == "mlx_vlm"
+            else _import_mlx_lm()
+        )
+        if runtime_module is None:
             self._last_error = import_error
             return LoadResult(
                 ok=False,
-                message=import_error or "mlx_lm unavailable",
+                message=import_error or f"{engine} unavailable",
                 error_code=RuntimeErrorCode.backend_error,
-                detail={"reason": "mlx_lm_not_installed"},
+                detail={"reason": f"{engine}_not_installed"},
             )
 
         try:
-            model, tokenizer = mlx_lm.load(model_id)
+            model, tokenizer = runtime_module.load(model_id)
         except FileNotFoundError as exc:
             return LoadResult(
                 ok=False,
@@ -1372,6 +1434,7 @@ class MlxNativeBackend:
                 model=model,
                 tokenizer=tokenizer,
                 info=info,
+                engine=engine,
             )
         # C-3.3: configure the allocator floor on the first successful load
         # (idempotent — subsequent loads see the flag already set). Reads
@@ -1546,8 +1609,9 @@ class MlxNativeBackend:
                 message=f"model not loaded: {model_id}",
                 error_code=RuntimeErrorCode.model_not_loaded,
                 model_id=model_id,
-            )
+        )
         template_render_detail = kwargs.pop("_template_render_detail", None)
+        prompt_already_rendered = bool(kwargs.pop("_prompt_already_rendered", False))
         max_tokens = int(kwargs.get("max_tokens") or 64)  # type: ignore[arg-type]
         session_id = _non_empty_string(kwargs.pop("session_id", None))
         memory_watermark = _non_empty_string(
@@ -1592,19 +1656,40 @@ class MlxNativeBackend:
         _ticket, was_queued = self._admission.acquire()
         wait_time_s = time.time() - wait_started
         try:
-            mlx_lm, import_error = self._run_on_worker(_import_mlx_lm)
-            if mlx_lm is None:
+            runtime_module, import_error = self._run_on_worker(
+                _import_mlx_vlm_generate
+                if session.engine == "mlx_vlm"
+                else _import_mlx_lm
+            )
+            if runtime_module is None:
                 return GenerateResult(
                     ok=False,
-                    message=import_error or "mlx_lm unavailable",
+                    message=import_error or f"{session.engine} unavailable",
                     error_code=RuntimeErrorCode.backend_error,
                     model_id=model_id,
                 )
             try:
                 def call_native_generate() -> Any:
                     with session.lock:
+                        if session.engine == "mlx_vlm":
+                            rendered_prompt = (
+                                prompt
+                                if prompt_already_rendered
+                                else _render_single_user_prompt_with_template(
+                                    session.tokenizer,
+                                    prompt,
+                                )
+                            )
+                            return runtime_module.generate(
+                                session.model,
+                                session.tokenizer,
+                                prompt=rendered_prompt,
+                                max_tokens=max_tokens,
+                                temperature=float(kwargs.get("temperature") or 0.0),
+                                verbose=False,
+                            )
                         _ = (session_id, memory_watermark)
-                        prompt_cache = self._make_fresh_prompt_cache(mlx_lm, session)
+                        prompt_cache = self._make_fresh_prompt_cache(runtime_module, session)
                         call_kwargs: dict[str, Any] = {
                             "prompt": prompt,
                             "max_tokens": max_tokens,
@@ -1613,13 +1698,14 @@ class MlxNativeBackend:
                             call_kwargs["prompt_cache"] = prompt_cache
                         if forcing_processor is not None:
                             call_kwargs["logits_processors"] = [forcing_processor]
-                        return mlx_lm.generate(
+                        return runtime_module.generate(
                             session.model,
                             session.tokenizer,
                             **call_kwargs,
                         )
 
-                text = self._run_on_worker(call_native_generate)
+                generated = self._run_on_worker(call_native_generate)
+                text = getattr(generated, "text", generated)
             except Exception as exc:  # pragma: no cover - defensive
                 session.last_error = str(exc)
                 return GenerateResult(
@@ -1698,6 +1784,7 @@ class MlxNativeBackend:
         )
         if rendered_prompt.detail:
             kwargs["_template_render_detail"] = rendered_prompt.detail
+        kwargs["_prompt_already_rendered"] = True
         return self.generate(model_id, rendered_prompt.prompt, **kwargs)
 
     def generate_cohort(
@@ -1736,22 +1823,34 @@ class MlxNativeBackend:
         _ticket, was_queued = self._admission.acquire()
         wait_time_s = time.time() - wait_started
         try:
-            mlx_lm, import_error = self._run_on_worker(_import_mlx_lm)
+            runtime_module, import_error = self._run_on_worker(
+                _import_mlx_vlm_generate
+                if session.engine == "mlx_vlm"
+                else _import_mlx_lm
+            )
         except BaseException:
             self._admission.release()
             raise
-        if mlx_lm is None:
+        if runtime_module is None:
             try:
                 yield StreamEvent(
                     event="error",
                     model_id=model_id,
                     error_code=RuntimeErrorCode.backend_error,
-                    detail={"message": import_error or "mlx_lm unavailable"},
+                    detail={"message": import_error or f"{session.engine} unavailable"},
                 )
             finally:
                 self._admission.release()
             return
         max_tokens = int(kwargs.get("max_tokens") or 64)  # type: ignore[arg-type]
+        temperature = float(kwargs.get("temperature") or 0.0)
+        prompt_already_rendered = bool(kwargs.pop("_prompt_already_rendered", False))
+        prompt_render_ms = kwargs.pop("_prompt_render_ms", None)
+        prompt_render_ms = (
+            float(prompt_render_ms)
+            if isinstance(prompt_render_ms, (int, float))
+            else None
+        )
         session_id = _non_empty_string(kwargs.pop("session_id", None))
         memory_watermark = _non_empty_string(
             kwargs.pop("session_kv_cache_watermark", None)
@@ -1762,10 +1861,13 @@ class MlxNativeBackend:
                 yield from self._stream_generate_on_worker(
                     model_id,
                     prompt,
-                    mlx_lm=mlx_lm,
+                    runtime_module=runtime_module,
                     max_tokens=max_tokens,
+                    temperature=temperature,
                     session_id=session_id,
                     memory_watermark=memory_watermark,
+                    prompt_already_rendered=prompt_already_rendered,
+                    prompt_render_ms=prompt_render_ms,
                     wait_time_s=wait_time_s,
                     was_queued=was_queued,
                 )
@@ -1781,10 +1883,13 @@ class MlxNativeBackend:
                 for event in self._stream_generate_on_worker(
                     model_id,
                     prompt,
-                    mlx_lm=mlx_lm,
+                    runtime_module=runtime_module,
                     max_tokens=max_tokens,
+                    temperature=temperature,
                     session_id=session_id,
                     memory_watermark=memory_watermark,
+                    prompt_already_rendered=prompt_already_rendered,
+                    prompt_render_ms=prompt_render_ms,
                     wait_time_s=wait_time_s,
                     was_queued=was_queued,
                 ):
@@ -1823,15 +1928,16 @@ class MlxNativeBackend:
             finally:
                 self._admission.release()
 
-    def _stream_generate_on_worker(
+    def _stream_generate_vlm_on_worker(
         self,
         model_id: str,
         prompt: str,
         *,
-        mlx_lm: Any,
+        mlx_vlm_generate: Any,
         max_tokens: int,
-        session_id: str | None,
-        memory_watermark: str | None,
+        temperature: float,
+        prompt_already_rendered: bool,
+        prompt_render_ms: float | None,
         wait_time_s: float,
         was_queued: bool,
     ) -> Iterator[StreamEvent]:
@@ -1846,6 +1952,140 @@ class MlxNativeBackend:
             return
         sequence = 0
         completion_tokens = 0
+        prompt_tokens: int | None = None
+        finish_reason: str | None = None
+        first_response_ms: float | None = None
+        first_visible_token_ms: float | None = None
+        started = time.time()
+        try:
+            with session.lock:
+                if prompt_already_rendered:
+                    rendered_prompt = prompt
+                    measured_prompt_render_ms = float(prompt_render_ms or 0.0)
+                else:
+                    render_started = time.time()
+                    rendered_prompt = _render_single_user_prompt_with_template(
+                        session.tokenizer,
+                        prompt,
+                    )
+                    measured_prompt_render_ms = (time.time() - render_started) * 1000.0
+                for token_payload in mlx_vlm_generate.stream_generate(
+                    session.model,
+                    session.tokenizer,
+                    prompt=rendered_prompt,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                ):
+                    elapsed_ms = (time.time() - started) * 1000.0
+                    if first_response_ms is None:
+                        first_response_ms = elapsed_ms
+                    payload_prompt_tokens = getattr(token_payload, "prompt_tokens", None)
+                    if isinstance(payload_prompt_tokens, int):
+                        prompt_tokens = payload_prompt_tokens
+                    payload_generation_tokens = getattr(
+                        token_payload,
+                        "generation_tokens",
+                        None,
+                    )
+                    if isinstance(payload_generation_tokens, int):
+                        completion_tokens = max(
+                            completion_tokens,
+                            payload_generation_tokens,
+                        )
+                    else:
+                        completion_tokens += 1
+                    finish_reason = getattr(token_payload, "finish_reason", None)
+                    text = str(getattr(token_payload, "text", "") or "")
+                    if text:
+                        sequence += 1
+                        if first_visible_token_ms is None:
+                            first_visible_token_ms = elapsed_ms
+                        yield StreamEvent(
+                            event="token",
+                            model_id=model_id,
+                            text=text,
+                            sequence=sequence,
+                            completion_tokens=completion_tokens,
+                            finish_reason=finish_reason,
+                            wait_time_s=wait_time_s,
+                            was_queued=was_queued,
+                            prefill_ms=(
+                                first_visible_token_ms if sequence == 1 else None
+                            ),
+                        )
+                    if finish_reason is not None:
+                        break
+        except Exception as exc:  # pragma: no cover - defensive
+            session.last_error = str(exc)
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=RuntimeErrorCode.backend_error,
+                detail={"message": f"native vlm stream_generate failed: {exc}"},
+            )
+            return
+        stream_wall_ms = (time.time() - started) * 1000.0
+        yield StreamEvent(
+            event="done",
+            model_id=model_id,
+            sequence=sequence,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            finish_reason=finish_reason or "stop",
+            wait_time_s=wait_time_s,
+            was_queued=was_queued,
+            detail={
+                "timing": {
+                    "surface": "owlmlx.child_stream_timing",
+                    "version": "v1",
+                    "prompt_render_ms": measured_prompt_render_ms,
+                    "first_response_ms": first_response_ms,
+                    "first_visible_token_ms": first_visible_token_ms,
+                    "stream_wall_ms": stream_wall_ms,
+                },
+                "engine": "mlx_vlm",
+            },
+        )
+
+    def _stream_generate_on_worker(
+        self,
+        model_id: str,
+        prompt: str,
+        *,
+        runtime_module: Any,
+        max_tokens: int,
+        temperature: float,
+        session_id: str | None,
+        memory_watermark: str | None,
+        prompt_already_rendered: bool,
+        prompt_render_ms: float | None,
+        wait_time_s: float,
+        was_queued: bool,
+    ) -> Iterator[StreamEvent]:
+        session = self._sessions.get(model_id)
+        if session is None:
+            yield StreamEvent(
+                event="error",
+                model_id=model_id,
+                error_code=RuntimeErrorCode.model_not_loaded,
+                detail={"message": f"model not loaded: {model_id}"},
+            )
+            return
+        if session.engine == "mlx_vlm":
+            yield from self._stream_generate_vlm_on_worker(
+                model_id,
+                prompt,
+                mlx_vlm_generate=runtime_module,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                prompt_already_rendered=prompt_already_rendered,
+                prompt_render_ms=prompt_render_ms,
+                wait_time_s=wait_time_s,
+                was_queued=was_queued,
+            )
+            return
+        sequence = 0
+        completion_tokens = 0
         finish_reason: str | None = None
         prepared_cache: _PreparedPromptCache | None = None
         generated_token_ids: list[int] = []
@@ -1854,7 +2094,7 @@ class MlxNativeBackend:
             try:
                 with session.lock:
                     prepared_cache = self._prepare_prompt_cache_for_stream(
-                        mlx_lm,
+                        runtime_module,
                         session,
                         prompt=prompt,
                         session_id=session_id,
@@ -1868,7 +2108,7 @@ class MlxNativeBackend:
                         stream_kwargs["prompt_cache"] = prepared_cache.prompt_cache
                     generate_start = time.time()
                     first_token_prefill_ms: float | None = None
-                    for token_payload in mlx_lm.stream_generate(
+                    for token_payload in runtime_module.stream_generate(
                         session.model,
                         session.tokenizer,
                         **stream_kwargs,
@@ -1914,7 +2154,7 @@ class MlxNativeBackend:
                 )
                 return
             stream_completed_ok = self._finalize_session_prompt_cache_after_stream(
-                mlx_lm,
+                runtime_module,
                 session,
                 prepared_cache,
                 completion_tokens=completion_tokens,
@@ -1967,7 +2207,24 @@ class MlxNativeBackend:
         messages: list[ChatTurn],
         **kwargs: object,
     ) -> Iterator[StreamEvent]:
-        prompt = "\n".join(f"{turn.role}: {turn.content}" for turn in messages)
+        session = self._sessions.get(model_id)
+        if session is None:
+            prompt = "\n".join(f"{turn.role}: {turn.content}" for turn in messages)
+        else:
+            render_started = time.time()
+            rendered_prompt = _render_chat_messages_with_template(
+                session.tokenizer,
+                messages,
+                tools=kwargs.get("tools"),
+                chat_template_kwargs=(
+                    kwargs.get("chat_template_kwargs")
+                    if isinstance(kwargs.get("chat_template_kwargs"), dict)
+                    else None
+                ),
+            )
+            prompt = rendered_prompt.prompt
+            kwargs["_prompt_already_rendered"] = True
+            kwargs["_prompt_render_ms"] = (time.time() - render_started) * 1000.0
         return self.stream_generate(model_id, prompt, **kwargs)
 
     # ------------------------------------------------------------------ #

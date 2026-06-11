@@ -56,6 +56,7 @@ def test_default_registry_excludes_retired_gpt_oss_120b() -> None:
     model_ids = {entry.model_id for entry in DEFAULT_REGISTERED_RUNTIME_VISIBLE_MODELS}
 
     assert "gpt-oss-120b-MXFP4-Q4" not in model_ids
+    assert "gemma-4-12B-it" in model_ids
 
 
 def test_registered_models_require_base_dir_and_config(tmp_path: Path) -> None:
@@ -196,6 +197,8 @@ def test_default_registry_contains_dsv4_as_technical_preview_only() -> None:
         entry.model_id: entry
         for entry in DEFAULT_REGISTERED_RUNTIME_VISIBLE_MODELS
     }
+
+    assert by_id["gemma-4-12B-it"].tier == "default"
 
     deepseek = by_id["DeepSeek-V4-Flash-2bit-DQ"]
     assert deepseek.tier == "technical_preview"

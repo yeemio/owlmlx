@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+import time
 import types
 from pathlib import Path
 
@@ -198,6 +199,187 @@ def test_native_backend_stream_generate_yields_token_then_done_with_fake_mlx_lm(
             sys.modules.pop("mlx_lm", None)
         else:
             sys.modules["mlx_lm"] = previous_mlx_lm
+        importlib.reload(mod)
+
+
+def test_native_backend_routes_gemma4_unified_to_fake_mlx_vlm_stream(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model_dir = tmp_path / "gemma-4-12B-it"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text(
+        '{"model_type": "gemma4_unified"}',
+        encoding="utf-8",
+    )
+
+    fake_pkg = types.ModuleType("mlx_vlm")
+    fake_generate = types.ModuleType("mlx_vlm.generate")
+    captured: dict[str, object] = {"template_calls": []}
+
+    class FakeProcessor:
+        def apply_chat_template(self, messages, **kwargs):  # type: ignore[no-untyped-def]
+            time.sleep(0.001)
+            captured["template_calls"].append(  # type: ignore[union-attr]
+                {"messages": messages, "kwargs": kwargs}
+            )
+            return "<templated-hi>"
+
+    class FakePayload:
+        def __init__(
+            self,
+            text: str,
+            generation_tokens: int,
+            finish_reason: str | None = None,
+        ) -> None:
+            self.text = text
+            self.generation_tokens = generation_tokens
+            self.prompt_tokens = 7
+            self.finish_reason = finish_reason
+
+    def fake_load(model_id: str) -> tuple[object, FakeProcessor]:
+        assert model_id == str(model_dir)
+        return object(), FakeProcessor()
+
+    def fake_stream_generate(model, processor, *, prompt, max_tokens, temperature):  # type: ignore[no-untyped-def]
+        assert prompt == "<templated-hi>"
+        assert max_tokens == 4
+        assert temperature == 0.0
+        yield FakePayload("", 1)
+        yield FakePayload("hello", 2)
+        yield FakePayload(" world", 3, finish_reason="stop")
+
+    fake_generate.load = fake_load  # type: ignore[attr-defined]
+    fake_generate.stream_generate = fake_stream_generate  # type: ignore[attr-defined]
+    fake_pkg.generate = fake_generate  # type: ignore[attr-defined]
+    previous_mlx_vlm = sys.modules.get("mlx_vlm")
+    previous_mlx_vlm_generate = sys.modules.get("mlx_vlm.generate")
+    monkeypatch.setitem(sys.modules, "mlx_vlm", fake_pkg)
+    monkeypatch.setitem(sys.modules, "mlx_vlm.generate", fake_generate)
+    import owlmlx.runtime.mlx_native_backend as mod
+    importlib.reload(mod)
+    try:
+        backend = mod.MlxNativeBackend()
+        load = backend.load(str(model_dir))
+        assert load.ok is True
+        events = list(
+            backend.stream_generate_messages(
+                str(model_dir),
+                [ChatTurn(role="user", content="hi")],
+                max_tokens=4,
+            )
+        )
+        assert [event.event for event in events] == ["token", "token", "done"]
+        assert [event.text for event in events[:2]] == ["hello", " world"]
+        assert events[-1].completion_tokens == 3
+        assert events[-1].finish_reason == "stop"
+        assert events[-1].detail["engine"] == "mlx_vlm"
+        assert (
+            events[-1].detail["timing"]["surface"]
+            == "owlmlx.child_stream_timing"
+        )
+        assert events[-1].detail["timing"]["prompt_render_ms"] > 0.0
+        assert captured["template_calls"] == [
+            {
+                "messages": [{"role": "user", "content": "hi"}],
+                "kwargs": {"tokenize": False, "add_generation_prompt": True},
+            }
+        ]
+    finally:
+        if previous_mlx_vlm is None:
+            sys.modules.pop("mlx_vlm", None)
+        else:
+            sys.modules["mlx_vlm"] = previous_mlx_vlm
+        if previous_mlx_vlm_generate is None:
+            sys.modules.pop("mlx_vlm.generate", None)
+        else:
+            sys.modules["mlx_vlm.generate"] = previous_mlx_vlm_generate
+        importlib.reload(mod)
+
+
+def test_native_backend_vlm_generate_messages_does_not_double_render_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model_dir = tmp_path / "gemma-4-12B-it"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text(
+        '{"model_type": "gemma4_unified"}',
+        encoding="utf-8",
+    )
+
+    fake_pkg = types.ModuleType("mlx_vlm")
+    fake_generate = types.ModuleType("mlx_vlm.generate")
+    captured: dict[str, object] = {"template_calls": []}
+
+    class FakeProcessor:
+        def apply_chat_template(self, messages, **kwargs):  # type: ignore[no-untyped-def]
+            captured["template_calls"].append(  # type: ignore[union-attr]
+                {"messages": messages, "kwargs": kwargs}
+            )
+            return "<templated-hi>"
+
+        def encode(self, text, add_special_tokens=True):  # type: ignore[no-untyped-def]
+            _ = add_special_tokens
+            return [ord(ch) for ch in str(text)]
+
+    class FakeGenerated:
+        text = "hello"
+
+    def fake_load(model_id: str) -> tuple[object, FakeProcessor]:
+        assert model_id == str(model_dir)
+        return object(), FakeProcessor()
+
+    def fake_sync_generate(  # type: ignore[no-untyped-def]
+        model,
+        processor,
+        *,
+        prompt,
+        max_tokens,
+        temperature,
+        verbose,
+    ):
+        _ = (model, processor, max_tokens, temperature, verbose)
+        captured["prompt"] = prompt
+        return FakeGenerated()
+
+    fake_generate.load = fake_load  # type: ignore[attr-defined]
+    fake_generate.generate = fake_sync_generate  # type: ignore[attr-defined]
+    fake_pkg.generate = fake_generate  # type: ignore[attr-defined]
+    previous_mlx_vlm = sys.modules.get("mlx_vlm")
+    previous_mlx_vlm_generate = sys.modules.get("mlx_vlm.generate")
+    monkeypatch.setitem(sys.modules, "mlx_vlm", fake_pkg)
+    monkeypatch.setitem(sys.modules, "mlx_vlm.generate", fake_generate)
+    import owlmlx.runtime.mlx_native_backend as mod
+    importlib.reload(mod)
+    try:
+        backend = mod.MlxNativeBackend()
+        load = backend.load(str(model_dir))
+        assert load.ok is True
+
+        result = backend.generate_messages(
+            str(model_dir),
+            [ChatTurn(role="user", content="hi")],
+            max_tokens=4,
+        )
+
+        assert result.ok is True
+        assert captured["prompt"] == "<templated-hi>"
+        assert captured["template_calls"] == [
+            {
+                "messages": [{"role": "user", "content": "hi"}],
+                "kwargs": {"tokenize": False, "add_generation_prompt": True},
+            }
+        ]
+    finally:
+        if previous_mlx_vlm is None:
+            sys.modules.pop("mlx_vlm", None)
+        else:
+            sys.modules["mlx_vlm"] = previous_mlx_vlm
+        if previous_mlx_vlm_generate is None:
+            sys.modules.pop("mlx_vlm.generate", None)
+        else:
+            sys.modules["mlx_vlm.generate"] = previous_mlx_vlm_generate
         importlib.reload(mod)
 
 

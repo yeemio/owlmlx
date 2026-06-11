@@ -293,11 +293,16 @@ def test_profile_policy_unknown_model_stays_conservative_when_opted_in() -> None
 
 def test_dry_run_matrix_contains_mainline_and_deepseek_without_pass_claims() -> None:
     payload = _record_dicts()
-    assert len(payload) == 4
+    assert len(payload) == 5
     by_model = {entry["model_id"]: entry for entry in payload}
 
     assert by_model["Qwen3.6-27B"]["lane"] == "mainline"
     assert by_model["Qwen3.6-35B-A3B"]["visibility_status"] == "visible"
+    assert by_model["gemma-4-12B-it"]["lane"] == "mainline"
+    assert by_model["gemma-4-12B-it"]["verdict"] == "needs_optimization"
+    assert by_model["gemma-4-12B-it"]["artifact_path"] == (
+        "/Users/yeemio/AI/Agent/models/gemma-4-12B-it"
+    )
     assert by_model["gemma-4-31B-it"]["verdict"] == "needs_optimization"
     assert "gpt-oss-120b-MXFP4-Q4" not in by_model
 
@@ -573,10 +578,10 @@ def test_ledger_missing_latest_history_and_append_many(tmp_path) -> None:
     assert ledger.history() == []
 
     appended = ledger.append_many(list(_records()))
-    assert len(appended) == 4
+    assert len(appended) == 5
     assert ledger.exists() is True
     assert ledger.latest()["model_id"] == "DeepSeek-V4-Flash-2bit-DQ"
-    assert len(ledger.history()) == 4
+    assert len(ledger.history()) == 5
 
 
 def test_still_blocked_and_history_envelopes_are_stable() -> None:
@@ -612,7 +617,7 @@ def test_operator_dry_run_matrix_outputs_valid_records(tmp_path) -> None:
         text=True,
     )
     payload = json.loads(result.stdout)
-    assert len(payload) == 4
+    assert len(payload) == 5
     for record in payload:
         validate_model_release_candidate_record(record)
 
@@ -662,7 +667,7 @@ def test_operator_append_latest_history_round_trip(tmp_path) -> None:
         text=True,
     )
     assert json.loads(latest.stdout)["model_id"] == "DeepSeek-V4-Flash-2bit-DQ"
-    assert len(json.loads(history.stdout)["records"]) == 4
+    assert len(json.loads(history.stdout)["records"]) == 5
 
 
 def test_operator_append_record_file_and_merge_ledgers(tmp_path) -> None:
@@ -903,7 +908,7 @@ def test_operator_live_http_mainline_appends_valid_record(tmp_path) -> None:
     assert payload["generation_result"]["status"] == "pass"
     assert payload["unload_result"]["status"] == "pass"
     assert payload["reload_result"]["status"] == "pass"
-    assert payload["verdict"] == "needs_optimization"
+    assert payload["verdict"] == "pass"
     assert payload["first_token_latency_ms"] is not None
     assert payload["tokens_per_second"] is not None
     assert payload["ttft_ms"] == payload["first_token_latency_ms"]
@@ -1559,4 +1564,4 @@ def test_http_surface_returns_latest_and_history_when_seeded(tmp_path) -> None:
     assert latest.json()["model_id"] == "DeepSeek-V4-Flash-2bit-DQ"
     assert history.status_code == 200
     assert history.json()["surface"] == MODEL_RELEASE_CANDIDATE_RECORD_HISTORY_SURFACE
-    assert len(history.json()["records"]) == 4
+    assert len(history.json()["records"]) == 5
